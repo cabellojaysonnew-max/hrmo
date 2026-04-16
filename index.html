@@ -183,7 +183,7 @@
                         <select id="attenMonth" class="form-input w-32"></select>
                         <input type="number" id="attenYear" class="form-input w-24" value="2026">
                         <button onclick="generateAttendanceView()" class="btn-primary px-4 rounded text-sm">FETCH</button>
-                        <button onclick="postToLedger()" class="bg-[#2E7D32] text-white px-4 rounded text-sm font-bold">POST TO LEDGER</button>
+                        <button onclick="postToLedger()" class="bg-[#2E7D32] text-white px-4 rounded text-sm font-bold">POST TO Ledger</button>
                     </div>
                 </div>
                 <div class="card overflow-hidden">
@@ -576,13 +576,16 @@
         doc.setFontSize(10); doc.setFont("helvetica", "bold");
         doc.setFillColor(200, 220, 255);
         doc.rect(lMargin, currY, widths.reduce((a,b)=>a+b,0), 8, 'DF');
+        doc.setTextColor(0,0,0);
         doc.text(`DIVISION: ${divisionName}`, lMargin + 2, currY + 5.5);
         currY += 8;
         
-        doc.setFontSize(8); doc.setFillColor(220, 220, 220);
+        doc.setFontSize(8); 
         let cx = lMargin;
         headers.forEach((h, i) => {
+            doc.setFillColor(230, 230, 230);
             doc.rect(cx, currY, widths[i], 8, 'DF');
+            doc.setTextColor(0,0,0);
             doc.text(h, cx + (widths[i]/2), currY + 5, {align: 'center'});
             cx += widths[i];
         });
@@ -598,7 +601,7 @@
                 
                 doc.rect(colX, currY, widths[i], 6);
                 let align = 'center';
-                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) {
+                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO", "PERIOD"].includes(headers[i])) {
                     align = 'left';
                 }
                 const tx = align === 'center' ? colX + (widths[i]/2) : colX + 2;
@@ -610,6 +613,32 @@
         currY += 5;
         return currY;
     }
+
+    const drawMRUAColHeaders = (pdf, cy) => {
+        pdf.setFontSize(7); pdf.setFont("helvetica", "bold");
+        let cx = 15;
+        const headers = ["NAMES", "I.D. NO.", "NO. OF TIMES\nABSENT", "DATES ABSENT", "NO. OF TIMES\nUNDERTIME", "DATE UNDERTIME", "TOTAL HRS/MINS\nUNDERTIME", "TOTAL DAYS", "REMARKS"];
+        const hWidths = [55, 20, 22, 40, 22, 40, 26, 20, 80.6];
+        
+        hWidths.forEach((w, i) => {
+            pdf.setFillColor(230, 230, 230);
+            pdf.rect(cx, cy, w, 12, 'DF');
+            pdf.setTextColor(0,0,0);
+            if(i === 7) {
+                pdf.line(cx, cy+6, cx+w, cy+6);
+                pdf.line(cx+(w/2), cy+6, cx+(w/2), cy+12);
+                pdf.text("TOTAL DAYS", cx+(w/2), cy+4, {align:"center"});
+                pdf.text("VL", cx+(w/4), cy+10, {align:"center"});
+                pdf.text("SL", cx+(w*0.75), cy+10, {align:"center"});
+            } else {
+                const lines = headers[i].split('\n');
+                if(lines.length === 1) pdf.text(lines[0], cx+(w/2), cy+7, {align:"center"});
+                else { pdf.text(lines[0], cx+(w/2), cy+5, {align:"center"}); pdf.text(lines[1], cx+(w/2), cy+9, {align:"center"}); }
+            }
+            cx += w;
+        });
+        return cy + 12;
+    };
 
     // --- EXACT REPORT LOGIC MIGRATION FROM PYTHON ---
     window.generateOfficialPDF = async function(toNo) {
@@ -897,43 +926,24 @@
 
                 const sortedDivs = Object.keys(empGroups).sort();
                 const colWidths = [55, 20, 22, 40, 22, 40, 26, 10, 10, 80.6];
-                
-                const drawHeaders = (pdf, divName, cy) => {
-                    pdf.setFontSize(10); pdf.setFont("helvetica", "bold");
-                    pdf.setFillColor(200, 220, 255);
-                    pdf.rect(15, cy, colWidths.reduce((a,b)=>a+b,0), 6, 'DF');
-                    pdf.text(`DIVISION: ${divName}`, 17, cy + 4);
-                    cy += 6;
-                    
-                    pdf.setFontSize(7); pdf.setFillColor(220, 220, 220);
-                    let cx = 15;
-                    const headers = ["NAMES", "I.D. NO.", "NO. OF TIMES\nABSENT", "DATES ABSENT", "NO. OF TIMES\nUNDERTIME", "DATE UNDERTIME", "TOTAL HRS/MINS\nUNDERTIME", "TOTAL DAYS", "REMARKS"];
-                    const hWidths = [55, 20, 22, 40, 22, 40, 26, 20, 80.6];
-                    
-                    hWidths.forEach((w, i) => {
-                        pdf.rect(cx, cy, w, 12, 'DF');
-                        if(i === 7) {
-                            pdf.line(cx, cy+6, cx+w, cy+6);
-                            pdf.line(cx+(w/2), cy+6, cx+(w/2), cy+12);
-                            pdf.text("TOTAL DAYS", cx+(w/2), cy+4, {align:"center"});
-                            pdf.text("VL", cx+(w/4), cy+10, {align:"center"});
-                            pdf.text("SL", cx+(w*0.75), cy+10, {align:"center"});
-                        } else {
-                            const lines = headers[i].split('\n');
-                            if(lines.length === 1) pdf.text(lines[0], cx+(w/2), cy+7, {align:"center"});
-                            else { pdf.text(lines[0], cx+(w/2), cy+5, {align:"center"}); pdf.text(lines[1], cx+(w/2), cy+9, {align:"center"}); }
-                        }
-                        cx += w;
-                    });
-                    return cy + 12;
-                };
 
                 let currY = 45;
                 if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 355.6, 215.9);
+                currY = drawMRUAColHeaders(doc, currY);
                 
                 sortedDivs.forEach(div => {
-                    if(currY > 170) { doc.addPage(); currY = 15; }
-                    currY = drawHeaders(doc, div, currY);
+                    if(currY > 170) { 
+                        doc.addPage(); 
+                        currY = 15; 
+                        currY = drawMRUAColHeaders(doc, currY);
+                    }
+
+                    doc.setFontSize(10); doc.setFont("helvetica", "bold");
+                    doc.setFillColor(200, 220, 255);
+                    doc.rect(15, currY, colWidths.reduce((a,b)=>a+b,0), 6, 'DF');
+                    doc.setTextColor(0,0,0);
+                    doc.text(`DIVISION: ${div}`, 17, currY + 4);
+                    currY += 6;
                     
                     empGroups[div].forEach(emp => {
                         const eLogs = logs.filter(l => l.emp_id == emp.emp_id);
@@ -961,7 +971,9 @@
                         let rowH = 6; let cx = 15;
                         doc.setFont("helvetica", "normal");
                         colWidths.forEach((w, i) => {
-                            doc.rect(cx, currY, w, rowH);
+                            doc.setFillColor(255, 255, 255);
+                            doc.rect(cx, currY, w, rowH, 'DF');
+                            doc.setTextColor(0,0,0);
                             const align = (i === 0 || i === 3 || i === 5 || i === 9) ? "left" : "center";
                             const tx = align === "center" ? cx + (w/2) : cx + 2;
                             doc.text(rowVals[i], tx, currY + 4, {align: align});
@@ -969,10 +981,12 @@
                         });
                         currY += rowH;
                     });
-                    currY += 5;
                 });
                 
-                if(currY > 170) { doc.addPage(); currY = 15; }
+                if(currY > 170) { 
+                    doc.addPage(); 
+                    currY = 15; 
+                }
                 currY += 5;
                 doc.setFontSize(8); doc.setFont("helvetica", "bold");
                 doc.text("New Assumption(s):", 15, currY); doc.setFont("helvetica", "normal");
@@ -1114,7 +1128,9 @@
 
             // 5. FLAG CEREMONY MEMOS
             } else if (type === "Flag Ceremony Memos") {
-                const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', startIso).lte('log_date', endIso);
+                let dStart = startIso.split('T')[0];
+                let dEnd = endIso.split('T')[0];
+                const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('date', dStart).lte('date', dEnd);
                 const flagLogs = flagLogsData || [];
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 let count = 0;
@@ -1212,15 +1228,13 @@
                         empGroups[div].push(t);
                     });
 
-                    // EXACTLY MATCHED USER INSTRUCTIONS FOR TRAVEL ORDER SUMMARY HEADERS
                     const headers = ["TO NUMBER", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DESTINATION", "PURPOSE", "REPORT TO", "DATE", "SIGNATURE"];
-                    const widths = [30, 45, 45, 55, 60, 40, 25, 30];
+                    const widths = [25, 45, 45, 50, 60, 45, 25, 30];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
                         currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             const il = itin.filter(i => i.to_no === r.to_no);
-                            // EXACTLY MATCHED REPORT TO AND BLANK DATE/SIGNATURE
                             return [r.to_no, (r.emp_name || '').toUpperCase(), getInclusiveDates(il.map(i=>i.travel_date)), [...new Set(il.map(i=>i.destination))].join("; "), il.map(i=>i.purpose).join("; ") || '-', r.report_to || '-', '', ''];
                         }, currY);
                     });
@@ -1302,7 +1316,9 @@
                     });
 
                 } else if (type === "Flag Ceremony Attendance") {
-                    const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', startIso).lte('log_date', endIso);
+                    let dStart = startIso.split('T')[0];
+                    let dEnd = endIso.split('T')[0];
+                    const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('date', dStart).lte('date', dEnd);
                     const flagLogs = flagLogsData || [];
                     
                     let empGroups = {};
@@ -1321,7 +1337,7 @@
                             if(!agg[f.emp_id]) agg[f.emp_id] = { p: 0, a: 0, details: [] };
                             const stat = String(f.status).toUpperCase().includes("ABSENT") ? "ABSENT" : "PRESENT";
                             if(stat === "PRESENT") agg[f.emp_id].p++; else agg[f.emp_id].a++;
-                            const dtStr = new Date(f.log_date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+                            const dtStr = new Date(f.date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
                             const tmStr = formatTime12h(f.time_in || f.log_time);
                             agg[f.emp_id].details.push(`${dtStr}: ${stat} [${tmStr}]`);
                         });
