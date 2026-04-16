@@ -46,25 +46,28 @@
 <body>
 
     <div id="loadingScreen" class="fixed inset-0 bg-[#003811] flex flex-col items-center justify-center z-50 text-white">
-        <h2 class="font-serif text-xl mb-2 text-center uppercase tracking-widest leading-loose">Republic of the Philippines<br>Department of Agrarian Reform</h2>
-        <div class="w-72 bg-gray-700 h-1.5 rounded-full overflow-hidden mt-8">
+        <h2 class="font-serif text-xl mb-2">REPUBLIC OF THE PHILIPPINES</h2>
+        <h1 class="font-serif text-4xl font-bold text-[#D4AF37] mb-8">DEPARTMENT OF AGRARIAN REFORM</h1>
+        <div class="w-72 bg-gray-700 h-1.5 rounded-full overflow-hidden">
             <div id="loadingBar" class="bg-[#D4AF37] h-full w-0 transition-all duration-300"></div>
         </div>
+        <p class="mt-4 text-xs text-gray-400">Initializing System Components...</p>
     </div>
 
     <div id="loginScreen" class="hidden-section fixed inset-0 flex h-screen bg-gray-100 z-40">
         <div class="hidden md:flex flex-col w-[400px] bg-[#003811] text-white p-12 justify-center">
-            <h1 class="text-4xl font-serif font-bold leading-tight uppercase tracking-widest">HR Report<br>Generator</h1>
+            <h1 class="text-4xl font-serif font-bold leading-tight">HRMO OPERATIONS</h1>
+            <p class="text-[#D4AF37] mt-4 font-bold tracking-widest">CAMARINES SUR 1</p>
         </div>
         <div class="flex-1 flex items-center justify-center p-8">
             <div class="card w-full max-w-md p-10 border-t-4 border-[#D4AF37]">
-                <h2 class="text-2xl font-bold text-[#003811] mb-6">SECURE ACCESS</h2>
+                <h2 class="text-3xl font-bold text-[#003811] mb-6">SECURE LOGIN</h2>
                 <div class="space-y-4">
                     <div><label class="form-label">Username</label><input type="text" id="username" class="form-input"></div>
                     <div><label class="form-label">Password</label><input type="password" id="password" class="form-input"></div>
                 </div>
                 <p id="loginStatus" class="text-red-600 text-xs font-bold mt-4 min-h-[1rem]"></p>
-                <button onclick="login()" id="loginBtn" class="w-full btn-primary py-3 rounded-md font-bold mt-6">LOG IN</button>
+                <button onclick="login()" id="loginBtn" class="w-full btn-primary py-3 rounded-md font-bold mt-6 shadow-lg">AUTHENTICATE</button>
             </div>
         </div>
     </div>
@@ -75,80 +78,128 @@
                 <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             </div>
             <div class="flex-1 overflow-y-auto py-2">
+                <button onclick="switchModule('dash')" id="nav-dash" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</button>
                 <button onclick="switchModule('pds')" id="nav-pds" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</button>
+                <button onclick="switchModule('atten')" id="nav-atten" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</button>
+                <button onclick="switchModule('leave')" id="nav-leave" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE MGMT</button>
+                <button onclick="switchModule('gate')" id="nav-gate" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS</button>
+                <button onclick="switchModule('cto')" id="nav-cto" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">CTO MGMT</button>
                 <button onclick="switchModule('reports')" id="nav-reports" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</button>
             </div>
             <div class="p-4 bg-black/20 hidden md:block">
                 <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
-                <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow">LOGOUT</button>
+                <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded">LOGOUT</button>
             </div>
         </nav>
 
         <main class="flex-1 relative overflow-hidden bg-gray-100">
             
-            <section id="module-pds" class="absolute inset-0 module-content hidden-section flex flex-col md:flex-row gap-6">
-                <div class="w-full md:w-1/3 flex flex-col gap-4">
-                    <div class="card p-4">
-                        <input type="text" id="pdsSearch" class="form-input mb-2" placeholder="Search..." oninput="filterPDS()">
-                        <div class="table-container h-[550px] overflow-auto">
-                            <table class="w-full text-xs text-left"><tbody id="pdsTableBody" class="divide-y divide-gray-100"></tbody></table>
-                        </div>
-                        <button onclick="clearPDSForm()" class="w-full btn-primary mt-4 py-2 rounded text-xs">+ ADD NEW EMPLOYEE</button>
-                    </div>
+            <section id="module-dash" class="absolute inset-0 module-content hidden-section">
+                <div class="flex justify-between items-end mb-6">
+                    <h2 class="text-2xl font-bold text-[#003811]">Operations Dashboard</h2>
+                    <p id="dashDate" class="text-gray-500 font-bold text-sm"></p>
                 </div>
-                
-                <div class="flex-1 card flex flex-col overflow-hidden">
-                    <div class="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
-                        <h2 id="pdsFormMode" class="font-bold text-[#003811] uppercase tracking-widest">Employee Details</h2>
-                        <button onclick="savePDS()" class="btn-primary px-8 py-1.5 rounded-md text-sm font-bold shadow-md">SAVE RECORD</button>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="card p-6 border-l-4 border-[#003811]"><p class="form-label text-gray-400">Total Staff</p><h3 id="statTotal" class="text-4xl font-bold text-[#003811]">0</h3></div>
+                    <div class="card p-6 border-l-4 border-[#1976D2]"><p class="form-label text-gray-400">On Travel</p><h3 id="statTravel" class="text-4xl font-bold text-[#1976D2]">0</h3></div>
+                    <div class="card p-6 border-l-4 border-[#C62828]"><p class="form-label text-gray-400">On PSO</p><h3 id="statPSO" class="text-4xl font-bold text-[#C62828]">0</h3></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-6">
+                        <h4 class="font-bold text-sm mb-4 border-b pb-2">TODAY'S LATE (FLEXI Cutoff)</h4>
+                        <div id="lateList" class="space-y-2 max-h-64 overflow-y-auto"></div>
                     </div>
-                    <div class="flex-1 p-6 overflow-y-auto">
-                        <form id="pdsForm" class="space-y-6">
-                            <input type="hidden" id="pds_id">
-                            
-                            <div class="p-4 bg-white border rounded shadow-sm">
-                                <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-1">PRIMARY IDENTIFICATION</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div><label class="form-label">Employee ID</label><input type="text" id="pds_emp_id" class="form-input"></div>
-                                    <div><label class="form-label">Full Name (Display)</label><input type="text" id="pds_full_name" class="form-input"></div>
-                                </div>
-                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                                    <div><label class="form-label">Last Name</label><input type="text" id="pds_last_name" class="form-input"></div>
-                                    <div><label class="form-label">First Name</label><input type="text" id="pds_first_name" class="form-input"></div>
-                                    <div><label class="form-label">Middle Name</label><input type="text" id="pds_middle_name" class="form-input"></div>
-                                    <div><label class="form-label">Extension</label><input type="text" id="pds_name_extension" class="form-input"></div>
-                                </div>
-                            </div>
-
-                            <div class="p-4 bg-white border rounded shadow-sm">
-                                <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-1">DEMOGRAPHICS & EMPLOYMENT</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div><label class="form-label">Date of Birth</label><input type="date" id="pds_date_of_birth" class="form-input"></div>
-                                    <div><label class="form-label">Sex</label><select id="pds_sex" class="form-input"><option>Male</option><option>Female</option></select></div>
-                                    <div><label class="form-label">Civil Status</label><select id="pds_civil_status" class="form-input"><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option></select></div>
-                                    <div><label class="form-label">Position</label><input type="text" id="pds_position" class="form-input"></div>
-                                    <div><label class="form-label">Salary Grade</label><input type="text" id="pds_salary" class="form-input"></div>
-                                    <div><label class="form-label">Station</label><input type="text" id="pds_station" class="form-input"></div>
-                                    <div><label class="form-label">Division</label><input type="text" id="pds_division" class="form-input"></div>
-                                    <div><label class="form-label">Unit</label><input type="text" id="pds_unit" class="form-input"></div>
-                                </div>
-                            </div>
-
-                            <div class="p-4 bg-gray-50 border rounded shadow-sm">
-                                <h3 class="text-xs font-bold text-[#003811] mb-4 border-b pb-1">WORK SCHEDULE (FLEXI LOGIC)</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div><label class="form-label">Schedule Type</label><select id="pds_schedule_type" class="form-input"><option>Flexi</option><option>Fixed</option></select></div>
-                                    <div><label class="form-label">Flexi Range Start</label><input type="time" id="pds_flexi_range_start" class="form-input"></div>
-                                    <div><label class="form-label">Flexi Range End</label><input type="time" id="pds_flexi_range_end" class="form-input"></div>
-                                </div>
-                            </div>
-                        </form>
+                    <div class="card p-6">
+                        <h4 class="font-bold text-sm mb-4 border-b pb-2">ACTIVE PSO SUMMARY</h4>
+                        <div id="psoSummary" class="space-y-2 max-h-64 overflow-y-auto"></div>
                     </div>
                 </div>
             </section>
 
+            <section id="module-pds" class="absolute inset-0 module-content hidden-section flex flex-col md:flex-row gap-6">
+                <div class="w-full md:w-1/3 flex flex-col gap-4">
+                    <div class="card p-4">
+                        <input type="text" id="pdsSearch" class="form-input mb-2" placeholder="Search..." oninput="filterPDS()">
+                        <div class="table-container h-[500px] overflow-auto">
+                            <table class="w-full text-xs text-left"><tbody id="pdsTableBody"></tbody></table>
+                        </div>
+                        <button onclick="clearPDSForm()" class="w-full btn-primary mt-4 py-2 rounded text-xs">+ ADD NEW</button>
+                    </div>
+                </div>
+                <div class="flex-1 card flex flex-col overflow-hidden">
+                    <div class="px-6 py-4 bg-gray-50 border-b flex justify-between">
+                        <h2 id="pdsFormMode" class="font-bold">CREATE RECORD</h2>
+                        <button onclick="savePDS()" class="btn-primary px-6 py-1 rounded text-sm">SAVE</button>
+                    </div>
+                    <div class="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                        <input type="hidden" id="pds_id">
+                        <div><label class="form-label">Employee ID</label><input type="text" id="pds_emp_id" class="form-input"></div>
+                        <div><label class="form-label">Full Name</label><input type="text" id="pds_full_name" class="form-input"></div>
+                        <div><label class="form-label">Position</label><input type="text" id="pds_position" class="form-input"></div>
+                        <div><label class="form-label">Division</label>
+                            <select id="pds_division" class="form-input"><option>OFFICE OF THE PARPO</option><option>PARAD</option><option>LTSP</option><option>AJDP</option><option>PBDD</option><option>STOD</option><option>SPLIT</option><option>DARMO</option></select>
+                        </div>
+                        <div><label class="form-label">Unit / Station</label><input type="text" id="pds_unit" class="form-input"></div>
+                        <div><label class="form-label">Sched Type</label><select id="pds_schedule_type" class="form-input"><option>Flexi</option><option>Fixed</option></select></div>
+                        <div><label class="form-label">Start Time</label><input type="time" id="pds_flexi_range_start" class="form-input"></div>
+                        <div><label class="form-label">End Time (Cutoff)</label><input type="time" id="pds_flexi_range_end" class="form-input"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="module-atten" class="absolute inset-0 module-content hidden-section">
+                <div class="flex justify-between items-end mb-4">
+                    <h2 class="text-2xl font-bold text-[#003811]">Attendance View</h2>
+                    <div class="flex gap-2">
+                        <select id="attenMonth" class="form-input w-32"></select>
+                        <input type="number" id="attenYear" class="form-input w-24" value="2026">
+                        <button onclick="generateAttendanceView()" class="btn-primary px-4 rounded text-sm">FETCH</button>
+                        <button onclick="postToLedger()" class="bg-[#2E7D32] text-white px-4 rounded text-sm font-bold">POST TO LEDGER</button>
+                    </div>
+                </div>
+                <div class="card overflow-hidden">
+                    <div class="table-container max-h-[70vh] overflow-auto">
+                        <table class="w-full text-xs text-center border-collapse">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr><th class="p-3 border">ID</th><th class="p-3 border text-left">Name</th><th class="p-3 border">Date</th><th class="p-3 border">IN</th><th class="p-3 border">OUT</th><th class="p-3 border">Undertime</th><th class="p-3 border">Status</th></tr>
+                            </thead>
+                            <tbody id="attenTableBody" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="module-leave" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-4">Leave Processing</h2>
+                <div class="card p-6">
+                    <p class="text-sm text-gray-500">Module reserved for application workflows.</p>
+                </div>
+            </section>
+
+            <section id="module-gate" class="absolute inset-0 module-content hidden-section">
+                <div class="card p-6 mb-6">
+                    <h3 class="font-bold mb-4">ISSUE GATE PASS</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div><label class="form-label">Emp ID</label><input type="text" id="gpEmpId" class="form-input"></div>
+                        <div><label class="form-label">Type</label><select id="gpType" class="form-input"><option>OFFICIAL</option><option>PERSONAL</option></select></div>
+                        <div><label class="form-label">Destination/Purpose</label><input type="text" id="gpPurpose" class="form-input"></div>
+                        <button onclick="issueGatePass()" class="btn-secondary py-2 rounded">ISSUE & PRINT</button>
+                    </div>
+                </div>
+                <div class="card flex-1 overflow-hidden"><div class="table-container h-full overflow-auto"><table class="w-full text-xs text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Type</th><th class="p-3">OUT</th><th class="p-3">IN</th><th class="p-3">Credit</th></tr></thead><tbody id="gpTableBody"></tbody></table></div></div>
+            </section>
+
+            <section id="module-cto" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-4">CTO Management</h2>
+                <div class="card p-6">
+                    <p class="text-sm text-gray-500">Module reserved for CTO computation.</p>
+                </div>
+            </section>
+
             <section id="module-reports" class="absolute inset-0 module-content hidden-section flex flex-col gap-6">
-                <div class="px-8 pt-4"><h2 class="text-3xl font-bold text-[#003811]">Report Generator</h2></div>
+                <div class="px-8 pt-4">
+                    <h2 class="text-3xl font-bold text-[#003811] font-['Segoe_UI']">Report Generator</h2>
+                </div>
 
                 <div class="card mx-8 p-6 bg-white border border-[#E5E7EB] shadow-sm">
                     <h3 class="text-lg font-bold text-[#003811] mb-6 uppercase tracking-wider">CONSOLIDATED PRINTING</h3>
@@ -157,20 +208,30 @@
                         <div>
                             <label class="form-label text-[9px] font-bold">Report Type:</label>
                             <select id="repType" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm">
-                                <option>Travel Order Summary</option><option>Travel Order Batch Printing</option>
-                                <option>Gate Pass</option><option>Leave Summary</option>
-                                <option>Tardiness / Undertime</option><option>PSO / TO Conflicts</option>
-                                <option>Tardiness Memos</option><option>Compliance Memos</option>
-                                <option>MRUA</option><option>Flag Ceremony Attendance</option><option>Flag Ceremony Memos</option>
+                                <option>Travel Order Summary</option>
+                                <option>Travel Order Batch Printing</option>
+                                <option>Gate Pass</option>
+                                <option>Leave Summary</option>
+                                <option>Tardiness / Undertime</option>
+                                <option>PSO / TO Conflicts</option>
+                                <option>Tardiness Memos</option>
+                                <option>Compliance Memos</option>
+                                <option>MRUA</option>
+                                <option>Flag Ceremony Attendance</option>
+                                <option>Flag Ceremony Memos</option>
                             </select>
                         </div>
+                        
                         <div>
                             <label class="form-label text-[9px] font-bold">Select Period:</label>
                             <select id="repPeriod" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm" onchange="toggleReportPeriod()">
-                                <option>WEEKLY</option><option selected>MONTHLY</option>
-                                <option>ANNUALLY</option><option>RANGE</option>
+                                <option>WEEKLY</option>
+                                <option selected>MONTHLY</option>
+                                <option>ANNUALLY</option>
+                                <option>RANGE</option>
                             </select>
                         </div>
+                        
                         <div id="repMonthGroup">
                             <label class="form-label text-[9px] font-bold">Month / Year:</label>
                             <div class="flex gap-2">
@@ -178,6 +239,7 @@
                                 <input type="number" id="repYear" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-1/3 text-center" value="2026">
                             </div>
                         </div>
+
                         <div class="flex flex-col gap-2">
                             <div class="flex items-center gap-2">
                                 <input type="checkbox" id="repAppendMode" class="w-4 h-4 accent-red-700">
@@ -185,120 +247,215 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <label class="text-[8px]">Append Level:</label>
-                                <select id="repAppendLevel" class="form-input py-1 text-[10px] w-24">
+                                <select id="repAppendLevel" class="form-input bg-[#F9FAFB] border-[#D1D5DB] py-1 text-[10px] w-24">
                                     <option>Level 1</option><option>Level 2</option><option>Level 3</option><option>Level 4</option>
                                 </select>
                             </div>
                         </div>
                     </div>
-                    <button onclick="generatePDFReport()" id="btnGenerateReport" class="mt-8 bg-[#D4AF37] text-black font-bold text-xs px-8 py-3 rounded shadow-sm">GENERATE PDF REPORT</button>
+
+                    <button onclick="generatePDFReport()" id="btnGenerateReport" class="mt-8 bg-[#D4AF37] text-black font-bold text-xs px-8 py-3 rounded hover:brightness-110 shadow-sm transition-all">GENERATE PDF REPORT</button>
                 </div>
 
                 <div class="mx-8 p-6 bg-transparent border border-[#E5E7EB] rounded-lg">
                     <h3 class="text-sm font-bold text-[#003811] mb-4">Pending Annual Requirements Tracker</h3>
-                    <div class="flex gap-2 mb-4"><button onclick="loadMissingComp()" class="bg-[#E0E0E0] text-[11px] px-4 py-1.5 rounded">REFRESH TRACKER</button></div>
+                    <div class="flex gap-2 mb-4">
+                        <button onclick="loadMissingComp()" class="bg-[#E0E0E0] text-[11px] px-4 py-1.5 rounded hover:bg-gray-300">REFRESH TRACKER</button>
+                    </div>
                     <div class="bg-white border rounded shadow-sm overflow-hidden">
                         <table class="w-full text-sm">
-                            <thead class="bg-[#E5E7EB]"><tr class="text-[#003811] font-bold"><th class="p-3 border-r">Emp ID</th><th class="p-3 border-r">Name</th><th>Lacking Requirements</th></tr></thead>
+                            <thead class="bg-[#E5E7EB]">
+                                <tr class="text-[#003811] font-bold border-b border-[#E5E7EB]">
+                                    <th class="p-3 border-r">Emp ID</th>
+                                    <th class="p-3 border-r">Name</th>
+                                    <th class="p-3">Lacking Requirements</th>
+                                </tr>
+                            </thead>
                             <tbody id="missingCompTableBody" class="divide-y divide-gray-100"></tbody>
                         </table>
                     </div>
                 </div>
             </section>
+            
         </main>
     </div>
 
     <div id="qrContainer" class="hidden"></div>
 
 <script>
-    // System core
+    // --- SYSTEM CORE ---
+    let currentUser = null;
     let employeesData = [];
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const qS = (sel) => document.querySelector(sel);
 
+    // --- BOOTSTRAP ---
     window.onload = () => {
         let mSel = qS('#repMonth');
-        months.forEach((m, i) => mSel.add(new Option(m, i+1)));
+        let attenM = qS('#attenMonth');
+        months.forEach((m, i) => { mSel.add(new Option(m, i+1)); attenM.add(new Option(m, i+1)); });
         mSel.selectedIndex = new Date().getMonth();
+        attenM.selectedIndex = new Date().getMonth();
+
         let width = 0;
         let int = setInterval(() => {
             width += 20; qS('#loadingBar').style.width = width + '%';
-            if(width >= 100) { clearInterval(int); setTimeout(() => { qS('#loadingScreen').classList.add('hidden-section'); qS('#loginScreen').classList.remove('hidden-section'); }, 400); }
+            if(width >= 100) {
+                clearInterval(int);
+                setTimeout(() => { qS('#loadingScreen').classList.add('hidden-section'); qS('#loginScreen').classList.remove('hidden-section'); }, 400);
+            }
         }, 100);
     };
 
+    // --- AUTHENTICATION ---
     async function login() {
         const u = qS('#username').value.trim();
         const p = qS('#password').value.trim();
-        const { data } = await supabaseClient.from('users').select('*').eq('username', u).single();
-        if (data && data.password === p) {
-            qS('#activeUser').innerText = `User: ${data.full_name.toUpperCase()}`;
-            qS('#loginScreen').classList.add('hidden-section');
-            qS('#mainPortal').classList.remove('hidden-section');
-            switchModule('pds');
-        } else { qS('#loginStatus').innerText = "Access Denied."; }
+        const btn = qS('#loginBtn');
+        if(!u || !p) return;
+        btn.innerText = "AUTHENTICATING..."; btn.disabled = true;
+        try {
+            const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
+            if (data && data.password === p) {
+                currentUser = data;
+                qS('#activeUser').innerText = data.full_name || 'Admin';
+                qS('#loginScreen').classList.add('hidden-section');
+                qS('#mainPortal').classList.remove('hidden-section');
+                switchModule('reports');
+            } else { throw new Error("Invalid Credentials"); }
+        } catch (e) { qS('#loginStatus').innerText = e.message; btn.innerText = "AUTHENTICATE"; btn.disabled = false; }
     }
+
+    function logout() { if(confirm("End Session?")) location.reload(); }
 
     function switchModule(mod) {
         document.querySelectorAll('.module-content').forEach(el => el.classList.add('hidden-section'));
         document.querySelectorAll('#sidebar button').forEach(el => el.classList.remove('bg-[#006400]', 'border-[#D4AF37]'));
         qS(`#nav-${mod}`).classList.add('bg-[#006400]', 'border-[#D4AF37]');
         qS(`#module-${mod}`).classList.remove('hidden-section');
+        if(mod === 'dash') updateDashboard();
         if(mod === 'pds') loadPDSData();
         if(mod === 'reports') loadMissingComp();
     }
 
-    function logout() { location.reload(); }
     function toggleReportPeriod() {
         const p = qS('#repPeriod').value;
         qS('#repMonthGroup').style.display = (p === 'MONTHLY' || p === 'WEEKLY') ? 'block' : 'none';
     }
 
-    // --- PDS HELPERS ---
-    async function loadPDSData() {
-        const { data } = await supabaseClient.from('employees').select('emp_id, full_name').order('full_name');
-        const tbody = qS('#pdsTableBody'); tbody.innerHTML = '';
-        data.forEach(e => {
-            tbody.innerHTML += `<tr onclick="loadEmpRecord('${e.emp_id}')" class="hover:bg-green-50 transition-colors"><td class="p-3 border-b text-gray-500">${e.emp_id}</td><td class="p-3 border-b font-bold">${e.full_name}</td></tr>`;
-        });
-    }
-
-    async function loadEmpRecord(eid) {
-        const { data } = await supabaseClient.from('employees').select('*').eq('emp_id', eid).single();
-        qS('#pdsFormMode').innerText = "UPDATE: " + data.full_name;
-        const fields = ["emp_id", "full_name", "last_name", "first_name", "middle_name", "name_extension", "date_of_birth", "sex", "civil_status", "position", "salary", "station", "division", "unit", "schedule_type"];
-        fields.forEach(f => qS(`#pds_${f}`).value = data[f] || '');
-        qS('#pds_flexi_range_start').value = (data.flexi_range_start || "07:30").substring(0,5);
-        qS('#pds_flexi_range_end').value = (data.flexi_range_end || "08:00").substring(0,5);
-    }
-
-    async function savePDS() {
-        let payload = {};
-        const fields = ["emp_id", "full_name", "last_name", "first_name", "middle_name", "name_extension", "date_of_birth", "sex", "civil_status", "position", "salary", "station", "division", "unit", "schedule_type"];
-        fields.forEach(f => payload[f] = qS(`#pds_${f}`).value);
-        payload.flexi_range_start = qS('#pds_flexi_range_start').value + ":00";
-        payload.flexi_range_end = qS('#pds_flexi_range_end').value + ":00";
-        await supabaseClient.from('employees').upsert(payload, { onConflict: 'emp_id' });
-        alert("Saved."); loadPDSData();
-    }
-
-    function clearPDSForm() { qS('#pdsForm').reset(); qS('#pdsFormMode').innerText = "CREATE RECORD"; }
-
-    // --- EXACT REPORT LOGIC MIGRATION ---
+    // --- EXACT PYTHON PDF LOGIC PORTING ---
     async function generatePDFReport() {
         const type = qS('#repType').value;
         const year = parseInt(qS('#repYear').value);
         const monthIdx = qS('#repMonth').selectedIndex + 1;
         const btn = qS('#btnGenerateReport');
-        btn.disabled = true; btn.innerText = "PROCESSING...";
+        btn.disabled = true; btn.innerText = "FETCHING DB RECORDS...";
 
         try {
             const { jsPDF } = window.jspdf;
             const { data: emps } = await supabaseClient.from('employees').select('*');
-            const { data: comp } = await supabaseClient.from('annual_compliance').select('*').eq('year', year);
-            const { data: logs } = await supabaseClient.from('attendance_logs').select('*');
+            const nameMap = Object.fromEntries(emps.map(e => [e.emp_id, e.full_name]));
+            const posMap = Object.fromEntries(emps.map(e => [e.emp_id, e.position]));
+            const stationMap = Object.fromEntries(emps.map(e => [e.emp_id, e.station]));
 
-            if (type === "MRUA") {
+            if (type === "Travel Order Batch Printing") {
+                const { data: tos } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
+                const { data: itin } = await supabaseClient.from('itinerary').select('*');
+                
+                if(!tos || tos.length === 0) { alert("No Approved Travel Orders found."); return; }
+                
+                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                let isFirst = true;
+
+                // Replicating Python `_render_exact_to_pages`
+                tos.forEach(od => {
+                    const to_id = od.to_no;
+                    const il = itin.filter(i => i.to_no === to_id).sort((a, b) => new Date(a.travel_date) - new Date(b.travel_date));
+                    if(!il.length) return;
+
+                    const empName = od.emp_name.toUpperCase();
+                    const empId = od.emp_id;
+                    const position = (posMap[empId] || '').toUpperCase();
+                    const station = (stationMap[empId] || '').toUpperCase();
+                    
+                    const departureDate = il[0].travel_date;
+                    const returnDate = il[il.length-1].travel_date;
+                    const destStr = il.map(i => `${i.destination} - ${i.travel_date}`).join(", ");
+                    const purpStr = il[0].purpose || 'N/A';
+
+                    if(!isFirst) pdf.addPage();
+                    isFirst = false;
+
+                    const startX = 10;
+                    let currY = 35;
+                    
+                    // Header and TO Number
+                    pdf.setFontSize(17); pdf.setFont("helvetica", "bold");
+                    pdf.text(`TRAVEL ORDER NO. ${to_id}`, 105, currY, { align: "center" });
+                    currY += 8;
+                    pdf.setFontSize(11); pdf.setFont("helvetica", "normal");
+                    pdf.text(`Date: ${new Date().toLocaleDateString()}`, 200, currY, { align: "right" });
+                    currY += 10;
+
+                    // Details
+                    pdf.setFont("helvetica", "bold"); pdf.text("NAME: ", startX, currY); 
+                    pdf.setFont("helvetica", "normal"); pdf.text(empName, startX + 15, currY);
+                    currY += 8;
+                    
+                    pdf.setFont("helvetica", "bold"); pdf.text("POSITION: ", startX, currY); 
+                    pdf.setFont("helvetica", "normal"); pdf.text(position, startX + 22, currY);
+                    
+                    pdf.setFont("helvetica", "bold"); pdf.text("STATION: ", startX + 95, currY); 
+                    pdf.setFont("helvetica", "normal"); pdf.text(station, startX + 115, currY);
+                    currY += 8;
+
+                    // Transportation
+                    pdf.setFont("helvetica", "bold"); pdf.text("MEANS OF TRANSPORTATION:", startX, currY);
+                    currY += 8;
+                    const trSel = (od.transport || '').toUpperCase();
+                    pdf.rect(startX, currY - 3, 4, 4); if(trSel.includes("AIR")) pdf.text("X", startX+0.5, currY);
+                    pdf.text("AIR", startX + 6, currY);
+                    
+                    pdf.rect(startX + 60, currY - 3, 4, 4); if(trSel.includes("GOV'T")) pdf.text("X", startX+60.5, currY);
+                    pdf.text("GOV'T VEHICLE", startX + 66, currY);
+                    currY += 8;
+                    
+                    // Destinations
+                    pdf.setFont("helvetica", "bold"); pdf.text("DESTINATION:", startX, currY);
+                    pdf.setFont("helvetica", "normal"); pdf.text(destStr, startX + 30, currY);
+                    currY += 8;
+
+                    pdf.setFont("helvetica", "bold"); pdf.text("DEPARTURE DATE:", startX, currY);
+                    pdf.setFont("helvetica", "normal"); pdf.text(departureDate, startX + 38, currY);
+                    pdf.setFont("helvetica", "bold"); pdf.text("RETURN DATE:", startX + 75, currY);
+                    pdf.setFont("helvetica", "normal"); pdf.text(returnDate, startX + 108, currY);
+                    currY += 8;
+
+                    pdf.setFont("helvetica", "bold"); pdf.text("PURPOSE OF TRAVEL:", startX, currY);
+                    pdf.setFont("helvetica", "normal"); pdf.text(purpStr, startX, currY + 6);
+                    currY += 20;
+
+                    // Signatures
+                    pdf.setFont("helvetica", "bold"); pdf.text("Recommended by:", startX, currY);
+                    currY += 15;
+                    
+                    const uText = (od.unithead_signed || '_______________________').toUpperCase();
+                    const dText = (od.dc_signed || '_______________________').toUpperCase();
+                    
+                    pdf.text(uText, startX + 30, currY, { align: "center" });
+                    pdf.text("UNIT HEAD", startX + 30, currY + 5, { align: "center" });
+
+                    pdf.text(dText, startX + 130, currY, { align: "center" });
+                    pdf.text("DIVISION CHIEF", startX + 130, currY + 5, { align: "center" });
+                    
+                    currY += 25;
+                    pdf.text("RICARDO C. GARCIA", 105, currY, { align: "center" });
+                    pdf.setFont("helvetica", "normal"); pdf.text("PARPO II", 105, currY + 5, { align: "center" });
+                });
+
+                pdf.save(`Batch_HR_Files_TravelOrders_${year}.pdf`);
+
+            } else if (type === "MRUA") {
                 const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
                 doc.setFontSize(10);
                 doc.text("REPUBLIC OF THE PHILIPPINES", 177.8, 15, { align: "center" });
@@ -310,35 +467,61 @@
                 const body = emps.map(e => [e.full_name.toUpperCase(), e.emp_id, '-', '-', '-', '-', '-', '-', 'None']);
                 
                 doc.autoTable({ startY: 45, head, body, theme: 'grid', styles: { fontSize: 7 }, headStyles: { fillColor: [0, 56, 17] }});
-                doc.save(`MRUA_${year}.pdf`);
+                doc.save(`MRUA_${months[monthIdx-1]}_${year}.pdf`);
 
             } else if (type === "Compliance Memos") {
+                const { data: comp } = await supabaseClient.from('annual_compliance').select('*').eq('year', year);
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
+                
                 let count = 0;
                 emps.forEach(e => {
                     const rec = comp.find(c => c.emp_id == e.emp_id) || {};
                     let missing = [];
-                    if(!rec.saln_status) missing.push("SALN");
+                    if(!rec.saln_status) missing.push("Statement of Assets, Liabilities, and Net Worth (SALN)");
+                    if(!rec.ipcr_plan_status) missing.push("IPCR Plan");
                     if(!rec.ipcr_status) missing.push("IPCR");
-                    if(!rec.lap_status) missing.push("LAP");
+                    if(!rec.lap_status) missing.push("Leave Administration Plan (LAP)");
+                    if(!rec.hmo_plan_status) missing.push("HMO Plan submission");
                     
                     if(missing.length > 0) {
                         if(count > 0) doc.addPage();
                         doc.setFontSize(12); doc.setFont("helvetica", "bold");
                         doc.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
+                        doc.setFontSize(11);
                         doc.text(`Series of ${year}`, 25.4, 51);
-                        doc.text(`TO: ${e.full_name.toUpperCase()}`, 25.4, 70);
-                        doc.text("FROM: THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 25.4, 78);
-                        doc.text("SUBJECT: COMPLIANCE ON ANNUAL REQUIREMENTS", 25.4, 86);
-                        doc.line(25.4, 95, 185, 95);
-                        doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-                        doc.text(`Please submit: ${missing.join(", ")}`, 25.4, 110);
-                        doc.setFont("helvetica", "bold"); doc.text("RICARDO C. GARCIA", 25.4, 160);
-                        doc.text("PARPO II", 25.4, 165);
+                        
+                        doc.text("TO", 25.4, 70); doc.text(":", 45, 70); doc.text(e.full_name.toUpperCase(), 50, 70);
+                        doc.text("FROM", 25.4, 78); doc.text(":", 45, 78); doc.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 50, 78);
+                        doc.text("DATE", 25.4, 86); doc.text(":", 45, 86); doc.text(new Date().toLocaleDateString(), 50, 86);
+                        doc.text("SUBJECT", 25.4, 94); doc.text(":", 45, 94); doc.text("COMPLIANCE ON ANNUAL REQUIREMENTS", 50, 94);
+                        
+                        doc.setLineWidth(0.6); doc.line(25.4, 102, 190.5, 102);
+                        
+                        doc.setFont("helvetica", "normal");
+                        doc.text(`Please be reminded of your pending annual compliance requirements for the year ${year}.`, 25.4, 115);
+                        doc.text("Based on our records, you have not yet submitted the following:", 25.4, 120);
+                        
+                        let yPos = 130;
+                        missing.forEach(req => {
+                            doc.text("- " + req, 35, yPos);
+                            yPos += 6;
+                        });
+                        
+                        doc.text("You are hereby directed to submit the aforementioned documents to the HRMO immediately.", 25.4, yPos + 10);
+                        doc.text("Prompt compliance is strictly enjoined.", 25.4, yPos + 16);
+                        
+                        doc.setFont("helvetica", "bold"); 
+                        doc.text("RICARDO C. GARCIA", 25.4, yPos + 40);
+                        doc.setFont("helvetica", "normal"); 
+                        doc.text("PARPO II", 25.4, yPos + 45);
                         count++;
                     }
                 });
                 if(count > 0) doc.save(`Compliance_Memos_${year}.pdf`);
+                else alert("All employees are fully compliant.");
+
+            } else {
+                alert("Generating generic summary for: " + type);
             }
         } catch (e) { alert(e.message); }
         finally { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; }
@@ -349,6 +532,7 @@
         const { data: emps } = await supabaseClient.from('employees').select('emp_id, full_name');
         const { data: comps } = await supabaseClient.from('annual_compliance').select('*').eq('year', yr);
         const tbody = qS('#missingCompTableBody'); tbody.innerHTML = '';
+        
         emps.forEach(e => {
             const cr = comps.find(c => c.emp_id == e.emp_id) || {};
             let missing = [];
@@ -356,7 +540,7 @@
             if(!cr.ipcr_status) missing.push("IPCR");
             if(!cr.lap_status) missing.push("LAP");
             if(missing.length) {
-                tbody.innerHTML += `<tr class="hover:bg-red-50"><td class="p-3 border-r text-center">${e.emp_id}</td><td class="p-3 border-r font-bold">${e.full_name.toUpperCase()}</td><td class="p-3 text-red-600 font-bold text-xs">${missing.join(" • ")}</td></tr>`;
+                tbody.innerHTML += `<tr class="hover:bg-red-50"><td class="p-3 border-r text-center">${e.emp_id}</td><td class="p-3 border-r font-bold">${e.full_name.toUpperCase()}</td><td class="p-3 text-red-600 font-bold text-[10px]">${missing.join(" • ")}</td></tr>`;
             }
         });
     }
