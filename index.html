@@ -594,11 +594,11 @@
             let colX = lMargin;
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
-                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE" || headers[i] === "REPORT TO") vStr = ""; // Blank columns
+                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = ""; // Blank columns
                 
                 doc.rect(colX, currY, widths[i], 6);
                 let align = 'center';
-                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "PERIOD"].includes(headers[i])) {
+                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) {
                     align = 'left';
                 }
                 const tx = align === 'center' ? colX + (widths[i]/2) : colX + 2;
@@ -1069,7 +1069,6 @@
                 const logs = logsData || [];
                 
                 let count = 0;
-                let bgMemoData = null; // NO BACKGROUND REQUESTED
 
                 for (const e of emps) {
                     const eLogs = logs.filter(l => l.emp_id == e.emp_id);
@@ -1115,12 +1114,10 @@
 
             // 5. FLAG CEREMONY MEMOS
             } else if (type === "Flag Ceremony Memos") {
-                const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('date', startIso).lte('date', endIso);
+                const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', startIso).lte('log_date', endIso);
                 const flagLogs = flagLogsData || [];
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 let count = 0;
-                
-                let bgMemoData = null; // NO BACKGROUND REQUESTED
 
                 for (const e of emps) {
                     const eFlag = flagLogs.filter(f => f.emp_id == e.emp_id && String(f.status).toUpperCase().includes("ABSENT"));
@@ -1217,7 +1214,7 @@
 
                     // EXACTLY MATCHED USER INSTRUCTIONS FOR TRAVEL ORDER SUMMARY HEADERS
                     const headers = ["TO NUMBER", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DESTINATION", "PURPOSE", "REPORT TO", "DATE", "SIGNATURE"];
-                    const widths = [30, 40, 45, 55, 60, 40, 25, 30];
+                    const widths = [30, 45, 45, 55, 60, 40, 25, 30];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
@@ -1305,7 +1302,7 @@
                     });
 
                 } else if (type === "Flag Ceremony Attendance") {
-                    const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('date', startIso).lte('date', endIso);
+                    const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', startIso).lte('log_date', endIso);
                     const flagLogs = flagLogsData || [];
                     
                     let empGroups = {};
@@ -1324,7 +1321,7 @@
                             if(!agg[f.emp_id]) agg[f.emp_id] = { p: 0, a: 0, details: [] };
                             const stat = String(f.status).toUpperCase().includes("ABSENT") ? "ABSENT" : "PRESENT";
                             if(stat === "PRESENT") agg[f.emp_id].p++; else agg[f.emp_id].a++;
-                            const dtStr = new Date(f.date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+                            const dtStr = new Date(f.log_date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
                             const tmStr = formatTime12h(f.time_in || f.log_time);
                             agg[f.emp_id].details.push(`${dtStr}: ${stat} [${tmStr}]`);
                         });
