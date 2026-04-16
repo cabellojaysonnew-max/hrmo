@@ -325,7 +325,7 @@
         sts.className = "text-green-600 text-xs font-bold h-4 mb-4";
         
         try {
-            const { data, error } = await supabase.from('users').select('*').eq('username', u);
+            const { data, error } = await supabase.from('Users').select('*').eq('username', u);
             if (error) throw error;
             
             if (data && data.length > 0) {
