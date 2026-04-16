@@ -75,7 +75,12 @@
                 <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             </div>
             <div class="flex-1 overflow-y-auto py-2">
+                <button onclick="switchModule('dash')" id="nav-dash" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</button>
                 <button onclick="switchModule('pds')" id="nav-pds" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</button>
+                <button onclick="switchModule('atten')" id="nav-atten" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</button>
+                <button onclick="switchModule('leave')" id="nav-leave" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE MGMT</button>
+                <button onclick="switchModule('gate')" id="nav-gate" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS</button>
+                <button onclick="switchModule('cto')" id="nav-cto" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">CTO MGMT</button>
                 <button onclick="switchModule('reports')" id="nav-reports" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</button>
             </div>
             <div class="p-4 bg-black/20 hidden md:block">
@@ -86,6 +91,28 @@
 
         <main class="flex-1 relative overflow-hidden bg-gray-100">
             
+            <section id="module-dash" class="absolute inset-0 module-content hidden-section">
+                <div class="flex justify-between items-end mb-6">
+                    <h2 class="text-2xl font-bold text-[#003811]">Operations Dashboard</h2>
+                    <p id="dashDate" class="text-gray-500 font-bold text-sm"></p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="card p-6 border-l-4 border-[#003811]"><p class="form-label text-gray-400">Total Staff</p><h3 id="statTotal" class="text-4xl font-bold text-[#003811]">0</h3></div>
+                    <div class="card p-6 border-l-4 border-[#1976D2]"><p class="form-label text-gray-400">On Travel</p><h3 id="statTravel" class="text-4xl font-bold text-[#1976D2]">0</h3></div>
+                    <div class="card p-6 border-l-4 border-[#C62828]"><p class="form-label text-gray-400">On PSO</p><h3 id="statPSO" class="text-4xl font-bold text-[#C62828]">0</h3></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-6">
+                        <h4 class="font-bold text-sm mb-4 border-b pb-2">TODAY'S LATE (FLEXI Cutoff)</h4>
+                        <div id="lateList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                    </div>
+                    <div class="card p-6">
+                        <h4 class="font-bold text-sm mb-4 border-b pb-2">ACTIVE PSO SUMMARY</h4>
+                        <div id="psoSummary" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                    </div>
+                </div>
+            </section>
+
             <section id="module-pds" class="absolute inset-0 module-content hidden-section flex flex-col md:flex-row gap-6">
                 <div class="w-full md:w-1/3 flex flex-col gap-4">
                     <div class="card p-4 bg-white">
@@ -146,6 +173,55 @@
                             </div>
                         </form>
                     </div>
+                </div>
+            </section>
+
+            <section id="module-atten" class="absolute inset-0 module-content hidden-section">
+                <div class="flex justify-between items-end mb-4">
+                    <h2 class="text-2xl font-bold text-[#003811]">Attendance View</h2>
+                    <div class="flex gap-2">
+                        <select id="attenMonth" class="form-input w-32"></select>
+                        <input type="number" id="attenYear" class="form-input w-24" value="2026">
+                        <button onclick="generateAttendanceView()" class="btn-primary px-4 rounded text-sm">FETCH</button>
+                        <button onclick="postToLedger()" class="bg-[#2E7D32] text-white px-4 rounded text-sm font-bold">POST TO LEDGER</button>
+                    </div>
+                </div>
+                <div class="card overflow-hidden">
+                    <div class="table-container max-h-[70vh] overflow-auto">
+                        <table class="w-full text-xs text-center border-collapse">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr><th class="p-3 border">ID</th><th class="p-3 border text-left">Name</th><th class="p-3 border">Date</th><th class="p-3 border">IN</th><th class="p-3 border">OUT</th><th class="p-3 border">Undertime</th><th class="p-3 border">Status</th></tr>
+                            </thead>
+                            <tbody id="attenTableBody" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="module-leave" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-4">Leave Processing</h2>
+                <div class="card p-6">
+                    <p class="text-sm text-gray-500">Module reserved for application workflows.</p>
+                </div>
+            </section>
+
+            <section id="module-gate" class="absolute inset-0 module-content hidden-section">
+                <div class="card p-6 mb-6">
+                    <h3 class="font-bold mb-4">ISSUE GATE PASS</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div><label class="form-label">Emp ID</label><input type="text" id="gpEmpId" class="form-input"></div>
+                        <div><label class="form-label">Type</label><select id="gpType" class="form-input"><option>OFFICIAL</option><option>PERSONAL</option></select></div>
+                        <div><label class="form-label">Destination/Purpose</label><input type="text" id="gpPurpose" class="form-input"></div>
+                        <button onclick="issueGatePass()" class="btn-secondary py-2 rounded">ISSUE & PRINT</button>
+                    </div>
+                </div>
+                <div class="card flex-1 overflow-hidden"><div class="table-container h-full overflow-auto"><table class="w-full text-xs text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Type</th><th class="p-3">OUT</th><th class="p-3">IN</th><th class="p-3">Credit</th></tr></thead><tbody id="gpTableBody"></tbody></table></div></div>
+            </section>
+
+            <section id="module-cto" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-4">CTO Management</h2>
+                <div class="card p-6">
+                    <p class="text-sm text-gray-500">Module reserved for CTO computation.</p>
                 </div>
             </section>
 
@@ -242,8 +318,10 @@
 
     window.onload = () => {
         let mSel = qS('#repMonth');
-        months.forEach((m, i) => mSel.add(new Option(m, i+1)));
+        let attenM = qS('#attenMonth');
+        months.forEach((m, i) => { mSel.add(new Option(m, i+1)); attenM.add(new Option(m, i+1)); });
         mSel.selectedIndex = new Date().getMonth();
+        attenM.selectedIndex = new Date().getMonth();
 
         let width = 0;
         let int = setInterval(() => {
@@ -255,13 +333,19 @@
     async function login() {
         const u = qS('#username').value.trim();
         const p = qS('#password').value.trim();
-        const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
-        if (data && data.password === p) {
-            qS('#activeUser').innerText = `User: ${data.full_name.toUpperCase()}`;
-            qS('#loginScreen').classList.add('hidden-section');
-            qS('#mainPortal').classList.remove('hidden-section');
-            switchModule('reports');
-        } else { qS('#loginStatus').innerText = "Access Denied."; }
+        const btn = qS('#loginBtn');
+        if(!u || !p) return;
+        btn.innerText = "AUTHENTICATING..."; btn.disabled = true;
+        try {
+            const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
+            if (data && data.password === p) {
+                currentUser = data;
+                qS('#activeUser').innerText = `User: ${data.full_name.toUpperCase()}`;
+                qS('#loginScreen').classList.add('hidden-section');
+                qS('#mainPortal').classList.remove('hidden-section');
+                switchModule('reports');
+            } else { throw new Error("Invalid Credentials"); }
+        } catch (e) { qS('#loginStatus').innerText = e.message; btn.innerText = "AUTHENTICATE"; btn.disabled = false; }
     }
 
     function switchModule(mod) {
@@ -390,8 +474,16 @@
         } else if (period === 'ANNUALLY') {
             startIso = `${year}-01-01T00:00:00`;
             endIso = `${year}-12-31T23:59:59`;
+        } else if (period === 'RANGE') {
+            const startStr = prompt("Enter Start Date (YYYY-MM-DD):");
+            if (!startStr) { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; return; }
+            const endStr = prompt("Enter End Date (YYYY-MM-DD):");
+            if (!endStr) { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; return; }
+            startIso = `${startStr}T00:00:00`;
+            endIso = `${endStr}T23:59:59`;
         } else {
-            startIso = new Date(); startIso.setDate(startIso.getDate() - 7); startIso = startIso.toISOString();
+            let d = new Date(); d.setDate(d.getDate() - 7);
+            startIso = d.toISOString();
             endIso = new Date().toISOString();
         }
 
@@ -666,7 +758,7 @@
                 doc.setFont("helvetica", "normal"); doc.setFontSize(8);
                 doc.text("HRMO / AO II", 70, currY, {align: "center"}); doc.text("PARPO II", 240, currY, {align: "center"});
 
-                doc.save(`MRUA_${months[monthIdx-1]}_${year}.pdf`);
+                doc.save(`MRUA_${monthName}_${year}.pdf`);
 
             // 3. COMPLIANCE MEMOS
             } else if (type === "Compliance Memos") {
@@ -745,7 +837,7 @@
 
                 for (const e of emps) {
                     const eLogs = logs.filter(l => l.emp_id == e.emp_id);
-                    if(eLogs.length > 5) { // Simplification of Tardiness check for JS
+                    if(eLogs.length > 5) { // Simplification of Tardiness check
                         if(count > 0) doc.addPage();
                         if(bgMemoData) doc.addImage(bgMemoData, 'JPEG', 0, 0, 215.9, 330.2);
 
@@ -967,6 +1059,38 @@
                         });
                     });
 
+                } else if (type === "Flag Ceremony Attendance") {
+                    const { data: flagLogs } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', startIso).lte('log_date', endIso);
+                    
+                    let empGroups = {};
+                    flagLogs.forEach(t => {
+                        let div = (divMap[t.emp_id] || "UNASSIGNED").toUpperCase();
+                        if(!empGroups[div]) empGroups[div] = [];
+                        empGroups[div].push(t);
+                    });
+
+                    const headers = ["EMP NUMBER", "NAME", "SUMMARY", "DETAILS (DATE: STATUS [TIME IN])"];
+                    const widths = [30, 60, 30, 190];
+
+                    Object.keys(empGroups).sort().forEach(div => {
+                        // Aggregate by employee
+                        let agg = {};
+                        empGroups[div].forEach(f => {
+                            if(!agg[f.emp_id]) agg[f.emp_id] = { p: 0, a: 0, details: [] };
+                            const stat = String(f.status).toUpperCase().includes("ABSENT") ? "ABSENT" : "PRESENT";
+                            if(stat === "PRESENT") agg[f.emp_id].p++; else agg[f.emp_id].a++;
+                            const dtStr = new Date(f.log_date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+                            const tmStr = formatTime12h(f.time_in || f.log_time);
+                            agg[f.emp_id].details.push(`${dtStr}: ${stat} [${tmStr}]`);
+                        });
+                        
+                        const grpData = Object.keys(agg).map(k => ({ emp_id: k, ...agg[k] }));
+
+                        drawTableGroup(doc, div, grpData, headers, widths, r => {
+                            return [r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), `P: ${r.p} | A: ${r.a}`, r.details.join(", ")];
+                        });
+                    });
+
                 } else if (type === "PSO / TO Conflicts") {
                     const { data: tos } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
                     const { data: itin } = await supabaseClient.from('itinerary').select('*');
@@ -1023,7 +1147,7 @@
             if(!cr.ipcr_status) missing.push("IPCR");
             if(!cr.lap_status) missing.push("LAP");
             if(missing.length) {
-                tbody.innerHTML += `<tr class="hover:bg-red-50"><td class="p-3 border-r text-center">${e.emp_id}</td><td class="p-3 border-r font-bold">${e.full_name.toUpperCase()}</td><td class="p-3 text-red-600 font-bold text-[10px]">${missing.join(" • ")}</td></tr>`;
+                tbody.innerHTML += `<tr class="hover:bg-red-50"><td class="p-3 border-r text-center">${e.emp_id}</td><td class="p-3 border-r font-bold">${e.full_name.toUpperCase()}</td><td class="p-3 text-red-600 font-bold text-xs">${missing.join(" • ")}</td></tr>`;
             }
         });
     }
