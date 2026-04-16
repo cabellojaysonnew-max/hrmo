@@ -315,8 +315,7 @@ async function login() {
     sts.className = "text-green-600 text-xs font-bold h-4 mb-4";
     
     try {
-        // CHANGED: Table name updated to lowercase 'users'
-        const { data, error } = await window.supabase.from('users').select('*').eq('username', u);
+        const { data, error } = await supabase.from('users').select('*').eq('username', u);
         
         if (error) throw error;
         
@@ -357,7 +356,7 @@ async function login() {
 
     // --- PDS MODULE ---
     async function loadPDSData() {
-        const { data } = await window.supabase.from('employees').select('emp_id, full_name').order('full_name');
+        const { data } = await supabase.from('employees').select('emp_id, full_name').order('full_name');
         if (data) {
             employeesData = data;
             renderPDSTable(data);
@@ -384,7 +383,7 @@ async function login() {
 
     async function loadEmpRecord(eid) {
         activeEmpId = eid;
-        const { data, error } = await window.supabase.from('employees').select('*').eq('emp_id', eid).single();
+        const { data, error } = await supabase.from('employees').select('*').eq('emp_id', eid).single();
         if (data) {
             qS('#pdsFormMode').innerText = `UPDATE RECORD: ${data.full_name}`;
             
@@ -397,7 +396,7 @@ async function login() {
 
             // Check override
             const today = new Date().toISOString().split('T')[0];
-            const ovrRes = await window.supabase.from('schedule_overrides').select('*').eq('emp_id', eid).lte('start_date', today).gte('end_date', today).order('id', {ascending: false}).limit(1);
+            const ovrRes = await supabase.from('schedule_overrides').select('*').eq('emp_id', eid).lte('start_date', today).gte('end_date', today).order('id', {ascending: false}).limit(1);
             
             if (ovrRes.data && ovrRes.data.length > 0) {
                 const o = ovrRes.data[0];
@@ -419,7 +418,7 @@ async function login() {
     async function clearOverride() {
         if(!activeEmpId || !confirm("Clear active override?")) return;
         const today = new Date().toISOString().split('T')[0];
-        await window.supabase.from('schedule_overrides').delete().eq('emp_id', activeEmpId).lte('start_date', today).gte('end_date', today);
+        await supabase.from('schedule_overrides').delete().eq('emp_id', activeEmpId).lte('start_date', today).gte('end_date', today);
         alert("Override cleared.");
         loadEmpRecord(activeEmpId);
     }
@@ -439,12 +438,12 @@ async function login() {
         qS('#btnSavePDS').innerText = "SAVING...";
         
         if(activeEmpId) {
-            await window.supabase.from('employees').update(payload).eq('emp_id', activeEmpId);
+            await supabase.from('employees').update(payload).eq('emp_id', activeEmpId);
             alert("Database Updated Successfully.");
         } else {
             payload.pass = "1111";
             payload.vl_balance = 0; payload.sl_balance = 0; payload.spl_balance = 0; payload.cto_balance = 0;
-            await window.supabase.from('employees').insert([payload]);
+            await supabase.from('employees').insert([payload]);
             alert("New Employee Saved.");
         }
         qS('#btnSavePDS').innerText = "SAVE RECORD";
@@ -455,8 +454,8 @@ async function login() {
     // --- COMPLIANCE MODULE ---
     async function loadCompliance() {
         const yr = qS('#compYear').value;
-        const { data: emps } = await window.supabase.from('employees').select('emp_id, full_name').order('full_name');
-        const { data: comps } = await window.supabase.from('annual_compliance').select('*').eq('year', yr);
+        const { data: emps } = await supabase.from('employees').select('emp_id, full_name').order('full_name');
+        const { data: comps } = await supabase.from('annual_compliance').select('*').eq('year', yr);
         
         let cMap = {};
         if(comps) comps.forEach(c => cMap[c.emp_id] = c);
@@ -488,7 +487,7 @@ async function login() {
         
         let payload = { emp_id: eid, year: yr, updated_at: new Date().toISOString() };
         payload[field] = newVal;
-        await window.supabase.from('annual_compliance').upsert(payload, { onConflict: 'emp_id,year' });
+        await supabase.from('annual_compliance').upsert(payload, { onConflict: 'emp_id,year' });
     }
 
     async function notifyPending() {
@@ -498,7 +497,7 @@ async function login() {
 
     // --- SCHEDULE CONFIG MODULE ---
     async function loadSchedEmployees() {
-        const { data } = await window.supabase.from('employees').select('emp_id, full_name').order('full_name');
+        const { data } = await supabase.from('employees').select('emp_id, full_name').order('full_name');
         if(data) {
             employeesData = data;
             const sel = qS('#schedTarget');
@@ -522,7 +521,7 @@ async function login() {
         
         const eid = t.split(" - ")[0];
         const today = new Date().toISOString().split('T')[0];
-        const { data } = await window.supabase.from('schedule_overrides').select('*').eq('emp_id', eid).lte('start_date', today).gte('end_date', today).order('id', {ascending:false}).limit(1);
+        const { data } = await supabase.from('schedule_overrides').select('*').eq('emp_id', eid).lte('start_date', today).gte('end_date', today).order('id', {ascending:false}).limit(1);
         
         if(data && data.length > 0) {
             let o = data[0];
@@ -554,7 +553,7 @@ async function login() {
             emp_id: eid, schedule_type: typ, start_date: sD, end_date: eD, start_time: sT+":00", end_time: eT+":00"
         }));
         
-        await window.supabase.from('schedule_overrides').insert(payload);
+        await supabase.from('schedule_overrides').insert(payload);
         
         qS('#btnSchedSave').innerText = "UPDATE SCHEDULE";
         qS('#schedStatus').innerText = `Successfully scheduled shifts for ${targets.length} employee(s).`;
@@ -566,8 +565,8 @@ async function login() {
     
     async function loadMissingComp() {
         const yr = qS('#repYear').value;
-        const { data: emps } = await window.supabase.from('employees').select('emp_id, full_name');
-        const { data: comps } = await window.supabase.from('annual_compliance').select('*').eq('year', yr);
+        const { data: emps } = await supabase.from('employees').select('emp_id, full_name');
+        const { data: comps } = await supabase.from('annual_compliance').select('*').eq('year', yr);
         let cMap = {}; if(comps) comps.forEach(c => cMap[c.emp_id] = c);
         
         const tbody = qS('#missingCompTableBody');
