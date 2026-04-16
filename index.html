@@ -326,6 +326,12 @@
         const sts = qS('#loginStatus');
         
         if(!u || !p) { sts.innerText = "Please enter credentials."; return; }
+
+        if(u !== p) {
+            sts.innerText = "Access Denied: Password must match Employee Number.";
+            sts.className = "text-red-600 text-xs font-bold h-4 mb-4";
+            return;
+        }
         
         btn.innerText = "AUTHENTICATING...";
         btn.disabled = true;
@@ -338,19 +344,14 @@
             
             if (data && data.length > 0) {
                 const user = data[0];
-                const role = String(user.role).toUpperCase();
-                if (role.includes('HR') || role.includes('ADMIN')) {
-                    if (user.password === p) {
-                        currentUser = user;
-                        qS('#activeUser').innerText = `User: ${user.full_name || 'HR Admin'}`;
-                        qS('#loginScreen').classList.add('hidden-section');
-                        qS('#mainPortal').classList.remove('hidden-section');
-                        switchModule('pds');
-                    } else {
-                        throw new Error("Invalid Password.");
-                    }
+                if (String(user.unit).toUpperCase() === 'HRMO' && user.password === p) {
+                    currentUser = user;
+                    qS('#activeUser').innerText = `User: ${user.full_name || 'HR Admin'}`;
+                    qS('#loginScreen').classList.add('hidden-section');
+                    qS('#mainPortal').classList.remove('hidden-section');
+                    switchModule('pds');
                 } else {
-                    throw new Error("Access Denied: Not an HRMO.");
+                    throw new Error("Access Denied: Not an authorized HRMO.");
                 }
             } else {
                 throw new Error("Username not found.");
