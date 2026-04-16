@@ -594,11 +594,11 @@
             let colX = lMargin;
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
-                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = ""; // Blank columns
+                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE" || headers[i] === "REPORT TO") vStr = ""; // Blank columns
                 
                 doc.rect(colX, currY, widths[i], 6);
                 let align = 'center';
-                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO", "PERIOD"].includes(headers[i])) {
+                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "PERIOD"].includes(headers[i])) {
                     align = 'left';
                 }
                 const tx = align === 'center' ? colX + (widths[i]/2) : colX + 2;
@@ -1069,6 +1069,7 @@
                 const logs = logsData || [];
                 
                 let count = 0;
+                let bgMemoData = null; // NO BACKGROUND REQUESTED
 
                 for (const e of emps) {
                     const eLogs = logs.filter(l => l.emp_id == e.emp_id);
@@ -1118,6 +1119,8 @@
                 const flagLogs = flagLogsData || [];
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 let count = 0;
+                
+                let bgMemoData = null; // NO BACKGROUND REQUESTED
 
                 for (const e of emps) {
                     const eFlag = flagLogs.filter(f => f.emp_id == e.emp_id && String(f.status).toUpperCase().includes("ABSENT"));
@@ -1213,15 +1216,15 @@
                     });
 
                     // EXACTLY MATCHED USER INSTRUCTIONS FOR TRAVEL ORDER SUMMARY HEADERS
-                    const headers = ["TO NUMBER", "NAME OF EMPLOYEE", "PERIOD", "PURPOSE", "REPORT TO", "DATE", "SIGNATURE"];
-                    const widths = [30, 50, 45, 80, 55, 30, 35];
+                    const headers = ["TO NUMBER", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DESTINATION", "PURPOSE", "REPORT TO", "DATE", "SIGNATURE"];
+                    const widths = [30, 40, 45, 55, 60, 40, 25, 30];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
                         currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             const il = itin.filter(i => i.to_no === r.to_no);
                             // EXACTLY MATCHED REPORT TO AND BLANK DATE/SIGNATURE
-                            return [r.to_no, (r.emp_name || '').toUpperCase(), getInclusiveDates(il.map(i=>i.travel_date)), r.purpose, r.report_to || '-', '', ''];
+                            return [r.to_no, (r.emp_name || '').toUpperCase(), getInclusiveDates(il.map(i=>i.travel_date)), [...new Set(il.map(i=>i.destination))].join("; "), il.map(i=>i.purpose).join("; ") || '-', r.report_to || '-', '', ''];
                         }, currY);
                     });
 
