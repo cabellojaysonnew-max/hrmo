@@ -305,61 +305,47 @@
     };
 
     // --- LOGIN ---
-    async function login() {
-        const u = qS('#username').value.trim();
-        const p = qS('#password').value.trim();
-        const btn = qS('#loginBtn');
-        const sts = qS('#loginStatus');
+async function login() {
+    const u = qS('#username').value.trim();
+    const p = qS('#password').value.trim();
+    const btn = qS('#loginBtn');
+    const sts = qS('#loginStatus');
+    
+    if(!u || !p) { sts.innerText = "Please enter credentials."; return; }
+    
+    btn.innerText = "AUTHENTICATING...";
+    btn.disabled = true;
+    sts.innerText = "Contacting Database...";
+    sts.className = "text-green-600 text-xs font-bold h-4 mb-4";
+    
+    try {
+        // CHANGED: Table name updated to lowercase 'users'
+        const { data, error } = await supabase.from('users').select('*').eq('username', u);
         
-        if(!u || !p) { sts.innerText = "Please enter credentials."; return; }
-
-        if(u !== p) {
-            sts.innerText = "Access Denied: Password must match Employee Number.";
-            sts.className = "text-red-600 text-xs font-bold h-4 mb-4";
-            return;
-        }
+        if (error) throw error;
         
-        btn.innerText = "AUTHENTICATING...";
-        btn.disabled = true;
-        sts.innerText = "Contacting Database...";
-        sts.className = "text-green-600 text-xs font-bold h-4 mb-4";
-        
-        try {
-            const { data, error } = await supabase.from('Users').select('*').eq('username', u);
-            if (error) throw error;
-            
-            if (data && data.length > 0) {
-                const user = data[0];
-                if (String(user.unit).toUpperCase() === 'HRMO' && user.password === p) {
-                    currentUser = user;
-                    qS('#activeUser').innerText = `User: ${user.full_name || 'HR Admin'}`;
-                    qS('#loginScreen').classList.add('hidden-section');
-                    qS('#mainPortal').classList.remove('hidden-section');
-                    switchModule('pds');
-                } else {
-                    throw new Error("Access Denied: Not an authorized HRMO.");
-                }
+        if (data && data.length > 0) {
+            const user = data[0];
+            // Safe check for unit existence, HRMO authorization, and password match
+            if (user.unit && String(user.unit).toUpperCase() === 'HRMO' && user.password === p) {
+                currentUser = user;
+                qS('#activeUser').innerText = `User: ${user.full_name || 'HR Admin'}`;
+                qS('#loginScreen').classList.add('hidden-section');
+                qS('#mainPortal').classList.remove('hidden-section');
+                switchModule('pds');
             } else {
-                throw new Error("Username not found.");
+                throw new Error("Access Denied: Not an authorized HRMO or incorrect password.");
             }
-        } catch (e) {
-            sts.innerText = e.message;
-            sts.className = "text-red-600 text-xs font-bold h-4 mb-4";
-            btn.innerText = "SECURE LOGIN";
-            btn.disabled = false;
+        } else {
+            throw new Error("Username not found.");
         }
+    } catch (e) {
+        sts.innerText = e.message;
+        sts.className = "text-red-600 text-xs font-bold h-4 mb-4";
+        btn.innerText = "SECURE LOGIN";
+        btn.disabled = false;
     }
-
-    function logout() {
-        currentUser = null;
-        qS('#mainPortal').classList.add('hidden-section');
-        qS('#loginScreen').classList.remove('hidden-section');
-        qS('#username').value = ''; qS('#password').value = '';
-        qS('#loginStatus').innerText = '';
-        qS('#loginBtn').innerText = "SECURE LOGIN";
-        qS('#loginBtn').disabled = false;
-    }
-
+}
     // --- NAVIGATION ---
     function switchModule(mod) {
         document.querySelectorAll('.module-content').forEach(el => el.classList.add('hidden-section'));
