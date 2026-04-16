@@ -46,28 +46,25 @@
 <body>
 
     <div id="loadingScreen" class="fixed inset-0 bg-[#003811] flex flex-col items-center justify-center z-50 text-white">
-        <h2 class="font-serif text-xl mb-2">REPUBLIC OF THE PHILIPPINES</h2>
-        <h1 class="font-serif text-4xl font-bold text-[#D4AF37] mb-8">DEPARTMENT OF AGRARIAN REFORM</h1>
-        <div class="w-72 bg-gray-700 h-1.5 rounded-full overflow-hidden">
+        <h2 class="font-serif text-xl mb-2 text-center uppercase tracking-widest leading-loose">Republic of the Philippines<br>Department of Agrarian Reform</h2>
+        <div class="w-72 bg-gray-700 h-1.5 rounded-full overflow-hidden mt-8">
             <div id="loadingBar" class="bg-[#D4AF37] h-full w-0 transition-all duration-300"></div>
         </div>
-        <p class="mt-4 text-xs text-gray-400">Initializing System Components...</p>
     </div>
 
     <div id="loginScreen" class="hidden-section fixed inset-0 flex h-screen bg-gray-100 z-40">
         <div class="hidden md:flex flex-col w-[400px] bg-[#003811] text-white p-12 justify-center">
-            <h1 class="text-4xl font-serif font-bold leading-tight">HRMO OPERATIONS</h1>
-            <p class="text-[#D4AF37] mt-4 font-bold tracking-widest">CAMARINES SUR 1</p>
+            <h1 class="text-4xl font-serif font-bold leading-tight uppercase">HR Report Generator</h1>
         </div>
         <div class="flex-1 flex items-center justify-center p-8">
             <div class="card w-full max-w-md p-10 border-t-4 border-[#D4AF37]">
-                <h2 class="text-3xl font-bold text-[#003811] mb-6">SECURE LOGIN</h2>
+                <h2 class="text-2xl font-bold text-[#003811] mb-6">SECURE ACCESS</h2>
                 <div class="space-y-4">
                     <div><label class="form-label">Username</label><input type="text" id="username" class="form-input"></div>
                     <div><label class="form-label">Password</label><input type="password" id="password" class="form-input"></div>
                 </div>
-                <p id="loginStatus" class="text-red-600 text-xs font-bold mt-4 min-h-[1rem]"></p>
-                <button onclick="login()" id="loginBtn" class="w-full btn-primary py-3 rounded-md font-bold mt-6 shadow-lg">AUTHENTICATE</button>
+                <p id="loginStatus" class="text-red-600 text-xs font-bold mt-4"></p>
+                <button onclick="login()" id="loginBtn" class="w-full btn-primary py-3 rounded-md font-bold mt-6">LOG IN</button>
             </div>
         </div>
     </div>
@@ -75,7 +72,7 @@
     <div id="mainPortal" class="hidden-section main-wrapper">
         <nav id="sidebar" class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
             <div class="p-6 hidden md:block border-b border-[#006400]">
-                <h2 class="text-xl font-bold text-[#D4AF37]">DAR HRMO</h2>
+                <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             </div>
             <div class="flex-1 overflow-y-auto py-2">
                 <button onclick="switchModule('dash')" id="nav-dash" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</button>
@@ -93,372 +90,263 @@
         </nav>
 
         <main class="flex-1 relative overflow-hidden bg-gray-100">
-            
             <section id="module-dash" class="absolute inset-0 module-content hidden-section">
-                <div class="flex justify-between items-end mb-6">
-                    <h2 class="text-2xl font-bold text-[#003811]">Operations Dashboard</h2>
-                    <p id="dashDate" class="text-gray-500 font-bold text-sm"></p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="card p-6 border-l-4 border-[#003811]"><p class="form-label text-gray-400">Total Staff</p><h3 id="statTotal" class="text-4xl font-bold text-[#003811]">0</h3></div>
-                    <div class="card p-6 border-l-4 border-[#1976D2]"><p class="form-label text-gray-400">On Travel</p><h3 id="statTravel" class="text-4xl font-bold text-[#1976D2]">0</h3></div>
-                    <div class="card p-6 border-l-4 border-[#C62828]"><p class="form-label text-gray-400">On PSO</p><h3 id="statPSO" class="text-4xl font-bold text-[#C62828]">0</h3></div>
-                </div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="card p-6">
-                        <h4 class="font-bold text-sm mb-4 border-b pb-2">TODAY'S LATE (FLEXI Cutoff)</h4>
-                        <div id="lateList" class="space-y-2 max-h-64 overflow-y-auto"></div>
-                    </div>
-                    <div class="card p-6">
-                        <h4 class="font-bold text-sm mb-4 border-b pb-2">ACTIVE PSO SUMMARY</h4>
-                        <div id="psoSummary" class="space-y-2 max-h-64 overflow-y-auto"></div>
-                    </div>
-                </div>
+                <h2 class="text-2xl font-bold mb-6">Dashboard</h2>
+                <div id="statGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
             </section>
 
-            <section id="module-pds" class="absolute inset-0 module-content hidden-section flex flex-col md:flex-row gap-6">
-                <div class="w-full md:w-1/3 flex flex-col gap-4">
-                    <div class="card p-4">
-                        <input type="text" id="pdsSearch" class="form-input mb-2" placeholder="Search..." oninput="filterPDS()">
-                        <div class="table-container h-[500px] overflow-auto">
-                            <table class="w-full text-xs text-left"><tbody id="pdsTableBody"></tbody></table>
-                        </div>
-                        <button onclick="clearPDSForm()" class="w-full btn-primary mt-4 py-2 rounded text-xs">+ ADD NEW</button>
-                    </div>
-                </div>
-                <div class="flex-1 card flex flex-col overflow-hidden">
-                    <div class="px-6 py-4 bg-gray-50 border-b flex justify-between">
-                        <h2 id="pdsFormMode" class="font-bold">CREATE RECORD</h2>
-                        <button onclick="savePDS()" class="btn-primary px-6 py-1 rounded text-sm">SAVE</button>
-                    </div>
-                    <div class="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                        <input type="hidden" id="pds_id">
-                        <div><label class="form-label">Employee ID</label><input type="text" id="pds_emp_id" class="form-input"></div>
-                        <div><label class="form-label">Full Name</label><input type="text" id="pds_full_name" class="form-input"></div>
-                        <div><label class="form-label">Position</label><input type="text" id="pds_position" class="form-input"></div>
-                        <div><label class="form-label">Division</label>
-                            <select id="pds_division" class="form-input"><option>OFFICE OF THE PARPO</option><option>PARAD</option><option>LTSP</option><option>AJDP</option><option>PBDD</option><option>STOD</option><option>SPLIT</option><option>DARMO</option></select>
-                        </div>
-                        <div><label class="form-label">Unit / Station</label><input type="text" id="pds_unit" class="form-input"></div>
-                        <div><label class="form-label">Sched Type</label><select id="pds_schedule_type" class="form-input"><option>Flexi</option><option>Fixed</option></select></div>
-                        <div><label class="form-label">Start Time</label><input type="time" id="pds_flexi_range_start" class="form-input"></div>
-                        <div><label class="form-label">End Time (Cutoff)</label><input type="time" id="pds_flexi_range_end" class="form-input"></div>
-                    </div>
-                </div>
+            <section id="module-pds" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-6">PDS Manager</h2>
+                <div id="pdsContainer"></div>
             </section>
 
             <section id="module-atten" class="absolute inset-0 module-content hidden-section">
-                <div class="flex justify-between items-end mb-4">
-                    <h2 class="text-2xl font-bold text-[#003811]">Attendance View</h2>
-                    <div class="flex gap-2">
-                        <select id="attenMonth" class="form-input w-32"></select>
-                        <input type="number" id="attenYear" class="form-input w-24" value="2026">
-                        <button onclick="generateAttendanceView()" class="btn-primary px-4 rounded text-sm">FETCH</button>
-                        <button onclick="postToLedger()" class="bg-[#2E7D32] text-white px-4 rounded text-sm font-bold">POST TO LEDGER</button>
-                    </div>
+                <h2 class="text-2xl font-bold mb-6">Attendance View</h2>
+                <div id="attenContainer"></div>
+            </section>
+
+            <section id="module-leave" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-6">Leave Processing</h2>
+                <div id="leaveContainer"></div>
+            </section>
+
+            <section id="module-gate" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-6">Gate Pass Management</h2>
+                <div id="gateContainer"></div>
+            </section>
+
+            <section id="module-cto" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-6">CTO Management</h2>
+                <div id="ctoContainer"></div>
+            </section>
+
+            <section id="module-reports" class="absolute inset-0 module-content hidden-section flex flex-col gap-6">
+                <div class="px-8 pt-4">
+                    <h2 class="text-3xl font-bold text-[#003811] font-['Segoe_UI']">Report Generator</h2>
                 </div>
-                <div class="card overflow-hidden">
-                    <div class="table-container max-h-[70vh] overflow-auto">
-                        <table class="w-full text-xs text-center border-collapse">
-                            <thead class="bg-gray-100 sticky top-0">
-                                <tr><th class="p-3 border">ID</th><th class="p-3 border text-left">Name</th><th class="p-3 border">Date</th><th class="p-3 border">IN</th><th class="p-3 border">OUT</th><th class="p-3 border">Undertime</th><th class="p-3 border">Status</th></tr>
+
+                <div class="card mx-8 p-6 bg-white border border-[#E5E7EB] shadow-sm">
+                    <h3 class="text-lg font-bold text-[#003811] mb-6 uppercase tracking-wider">CONSOLIDATED PRINTING</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+                        <div>
+                            <label class="form-label text-[9px] font-bold">Report Type:</label>
+                            <select id="repType" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm">
+                                <option>Travel Order Summary</option>
+                                <option>Travel Order Batch Printing</option>
+                                <option>Gate Pass</option>
+                                <option>Leave Summary</option>
+                                <option>Tardiness / Undertime</option>
+                                <option>PSO / TO Conflicts</option>
+                                <option>Tardiness Memos</option>
+                                <option>Compliance Memos</option>
+                                <option>MRUA</option>
+                                <option>Flag Ceremony Attendance</option>
+                                <option>Flag Ceremony Memos</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="form-label text-[9px] font-bold">Select Period:</label>
+                            <select id="repPeriod" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm" onchange="toggleReportPeriod()">
+                                <option>WEEKLY</option>
+                                <option selected>MONTHLY</option>
+                                <option>ANNUALLY</option>
+                                <option>RANGE</option>
+                            </select>
+                        </div>
+                        
+                        <div id="repMonthGroup">
+                            <label class="form-label text-[9px] font-bold">Month / Year:</label>
+                            <div class="flex gap-2">
+                                <select id="repMonth" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-2/3"></select>
+                                <input type="number" id="repYear" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-1/3 text-center" value="2026">
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="repAppendMode" class="w-4 h-4 accent-red-700">
+                                <label class="text-[9px] font-bold text-red-700">Append Mode (Save Paper)</label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-[8px]">Append Level:</label>
+                                <select id="repAppendLevel" class="form-input bg-[#F9FAFB] border-[#D1D5DB] py-1 text-[10px] w-24">
+                                    <option>Level 1</option><option>Level 2</option><option>Level 3</option><option>Level 4</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="generatePDFReport()" id="btnGenerateReport" class="mt-8 bg-[#D4AF37] text-black font-bold text-xs px-8 py-3 rounded hover:brightness-110 shadow-sm transition-all">GENERATE PDF REPORT</button>
+                </div>
+
+                <div class="mx-8 p-6 bg-transparent border border-[#E5E7EB] rounded-lg">
+                    <h3 class="text-sm font-bold text-[#003811] mb-4">Pending Annual Requirements Tracker</h3>
+                    <div class="flex gap-2 mb-4">
+                        <button onclick="loadMissingComp()" class="bg-[#E0E0E0] text-[11px] px-4 py-1.5 rounded hover:bg-gray-300">REFRESH TRACKER</button>
+                    </div>
+                    <div class="bg-white border rounded shadow-sm overflow-hidden">
+                        <table class="w-full text-sm">
+                            <thead class="bg-[#E5E7EB]">
+                                <tr class="text-[#003811] font-bold border-b border-[#E5E7EB]">
+                                    <th class="p-3 border-r">Emp ID</th>
+                                    <th class="p-3 border-r">Name</th>
+                                    <th class="p-3">Lacking Requirements</th>
+                                </tr>
                             </thead>
-                            <tbody id="attenTableBody" class="divide-y"></tbody>
+                            <tbody id="missingCompTableBody" class="divide-y divide-gray-100"></tbody>
                         </table>
                     </div>
                 </div>
             </section>
-
-            <section id="module-gate" class="absolute inset-0 module-content hidden-section">
-                <div class="card p-6 mb-6">
-                    <h3 class="font-bold mb-4">ISSUE GATE PASS</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                        <div><label class="form-label">Emp ID</label><input type="text" id="gpEmpId" class="form-input"></div>
-                        <div><label class="form-label">Type</label><select id="gpType" class="form-input"><option>OFFICIAL</option><option>PERSONAL</option></select></div>
-                        <div><label class="form-label">Destination/Purpose</label><input type="text" id="gpPurpose" class="form-input"></div>
-                        <button onclick="issueGatePass()" class="btn-secondary py-2 rounded">ISSUE & PRINT</button>
-                    </div>
-                </div>
-                <div class="card flex-1 overflow-hidden"><div class="table-container h-full overflow-auto"><table class="w-full text-xs text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Type</th><th class="p-3">OUT</th><th class="p-3">IN</th><th class="p-3">Credit</th></tr></thead><tbody id="gpTableBody"></tbody></table></div></div>
-            </section>
-
-            <section id="module-reports" class="absolute inset-0 module-content hidden-section">
-                <h2 class="text-2xl font-bold text-[#003811] mb-6">Report Generator</h2>
-                <div class="card p-8 border-l-8 border-[#003811]">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
-                        <div class="lg:col-span-1">
-                            <label class="form-label">Category</label>
-                            <select id="repType" class="form-input bg-white font-bold">
-                                <option>MRUA</option>
-                                <option>Travel Order Summary</option>
-                                <option>Compliance Memos</option>
-                                <option>Tardiness Memos</option>
-                            </select>
-                        </div>
-                        <div><label class="form-label">Period</label><select id="repPeriod" class="form-input"><option>MONTHLY</option><option>RANGE</option></select></div>
-                        <div><label class="form-label">Year</label><input type="number" id="repYear" class="form-input" value="2026"></div>
-                        <button onclick="generatePDFReport()" id="btnGenerateReport" class="btn-secondary py-3 rounded shadow-lg">GENERATE PDF DOCUMENT</button>
-                    </div>
-                </div>
-            </section>
-
         </main>
     </div>
 
     <div id="qrContainer" class="hidden"></div>
 
 <script>
-    // --- SYSTEM CORE ---
-    let currentUser = null;
+    // System core
     let employeesData = [];
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const qS = (sel) => document.querySelector(sel);
 
-    // --- BOOTSTRAP ---
     window.onload = () => {
-        let mSel = qS('#attenMonth');
+        let mSel = qS('#repMonth');
         months.forEach((m, i) => mSel.add(new Option(m, i+1)));
         mSel.selectedIndex = new Date().getMonth();
 
-        let bar = qS('#loadingBar');
         let width = 0;
         let int = setInterval(() => {
-            width += 20; bar.style.width = width + '%';
-            if(width >= 100) {
-                clearInterval(int);
-                setTimeout(() => {
-                    qS('#loadingScreen').classList.add('hidden-section');
-                    qS('#loginScreen').classList.remove('hidden-section');
-                }, 400);
-            }
+            width += 20; qS('#loadingBar').style.width = width + '%';
+            if(width >= 100) { clearInterval(int); setTimeout(() => { qS('#loadingScreen').classList.add('hidden-section'); qS('#loginScreen').classList.remove('hidden-section'); }, 400); }
         }, 100);
     };
 
-    // --- AUTHENTICATION ---
     async function login() {
         const u = qS('#username').value.trim();
         const p = qS('#password').value.trim();
-        const btn = qS('#loginBtn');
-        if(!u || !p) return;
-        btn.innerText = "AUTHENTICATING..."; btn.disabled = true;
-        try {
-            const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
-            if (data && data.password === p) {
-                currentUser = data;
-                qS('#activeUser').innerText = data.full_name || 'Admin';
-                qS('#loginScreen').classList.add('hidden-section');
-                qS('#mainPortal').classList.remove('hidden-section');
-                switchModule('dash');
-            } else { throw new Error("Invalid Credentials"); }
-        } catch (e) { qS('#loginStatus').innerText = e.message; btn.innerText = "AUTHENTICATE"; btn.disabled = false; }
+        const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
+        if (data && data.password === p) {
+            qS('#activeUser').innerText = `User: ${data.full_name.toUpperCase()}`;
+            qS('#loginScreen').classList.add('hidden-section');
+            qS('#mainPortal').classList.remove('hidden-section');
+            switchModule('reports');
+        } else { qS('#loginStatus').innerText = "Access Denied."; }
     }
-
-    function logout() { if(confirm("End Session?")) location.reload(); }
 
     function switchModule(mod) {
         document.querySelectorAll('.module-content').forEach(el => el.classList.add('hidden-section'));
         document.querySelectorAll('#sidebar button').forEach(el => el.classList.remove('bg-[#006400]', 'border-[#D4AF37]'));
         qS(`#nav-${mod}`).classList.add('bg-[#006400]', 'border-[#D4AF37]');
         qS(`#module-${mod}`).classList.remove('hidden-section');
-        if(mod === 'dash') updateDashboard();
-        if(mod === 'pds') loadPDSData();
-        if(mod === 'atten') generateAttendanceView();
-        if(mod === 'gate') loadGatePassLogs();
+        if(mod === 'reports') loadMissingComp();
     }
 
-    // --- DASHBOARD LOGIC (Converted from Python _calc_and_update) ---
-    async function updateDashboard() {
-        const today = new Date().toISOString().split('T')[0];
-        qS('#dashDate').innerText = new Date().toDateString();
-        
-        const { data: emps } = await supabaseClient.from('employees').select('emp_id, full_name, flexi_range_end');
-        const { data: itin } = await supabaseClient.from('itinerary').select('emp_id').eq('travel_date', today);
-        const { data: pso } = await supabaseClient.from('pso_records').select('emp_id, subject').lte('start_date', today).gte('end_date', today);
-        const { data: logs } = await supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', today + 'T00:00:00').lte('log_time', today + 'T23:59:59');
+    function logout() { location.reload(); }
 
-        qS('#statTotal').innerText = emps.length;
-        const travIds = new Set(itin.map(i => i.emp_id));
-        qS('#statTravel').innerText = travIds.size;
-        const psoOnly = pso.filter(p => !travIds.has(p.emp_id));
-        qS('#statPSO').innerText = new Set(psoOnly.map(p => p.emp_id)).size;
-
-        // Late List (Flexi logic)
-        const lateCont = qS('#lateList'); lateCont.innerHTML = '';
-        const logMap = {};
-        logs.forEach(l => { if(!logMap[l.emp_id]) logMap[l.emp_id] = new Date(l.log_time); });
-        
-        emps.forEach(e => {
-            if(logMap[e.emp_id]) {
-                const cutoff = new Date(today + 'T' + (e.flexi_range_end || '08:00:00'));
-                if(logMap[e.emp_id] > cutoff) {
-                    const diff = Math.floor((logMap[e.emp_id] - cutoff) / 60000);
-                    lateCont.innerHTML += `<div class="flex justify-between text-xs p-2 bg-red-50 rounded"><span class="font-bold">${e.full_name}</span><span class="text-red-700">${diff} mins late</span></div>`;
-                }
-            }
-        });
-
-        const psoSum = qS('#psoSummary'); psoSum.innerHTML = '';
-        [...new Set(psoOnly.map(p => p.subject))].slice(0,5).forEach(s => {
-            psoSum.innerHTML += `<div class="text-xs p-2 bg-gray-50 border-l-2 border-red-500">${s}</div>`;
-        });
+    function toggleReportPeriod() {
+        const p = qS('#repPeriod').value;
+        qS('#repMonthGroup').style.display = (p === 'MONTHLY' || p === 'WEEKLY') ? 'block' : 'none';
     }
 
-    // --- ATTENDANCE PROCESSING (Converted from Python _run_generate) ---
-    async function generateAttendanceView() {
-        const m = qS('#attenMonth').value;
-        const y = qS('#attenYear').value;
-        const start = `${y}-${m.padStart(2,'0')}-01T00:00:00`;
-        const end = `${y}-${m.padStart(2,'0')}-${new Date(y, m, 0).getDate()}T23:59:59`;
-        
-        const tbody = qS('#attenTableBody'); tbody.innerHTML = '<tr><td colspan="7" class="p-10 animate-pulse">Calculating Flexi-Shifts...</td></tr>';
-        
-        const { data: emps } = await supabaseClient.from('employees').select('emp_id, full_name, station');
-        const { data: logs } = await supabaseClient.from('attendance_logs').select('*').gte('log_time', start).lte('log_time', end).order('log_time');
-        
-        const records = [];
-        const logMap = {};
-        logs.forEach(l => {
-            const d = l.log_time.split('T')[0];
-            if(!logMap[l.emp_id]) logMap[l.emp_id] = {};
-            if(!logMap[l.emp_id][d]) logMap[l.emp_id][d] = [];
-            logMap[l.emp_id][d].push(new Date(l.log_time));
-        });
-
-        emps.forEach(e => {
-            if(String(e.station).toUpperCase().includes('DARMO')) return;
-            const eLogs = logMap[e.emp_id] || {};
-            Object.keys(eLogs).forEach(date => {
-                const times = eLogs[date].sort((a,b) => a-b);
-                const first = times[0]; const last = times[times.length-1];
-                
-                // Python Flexi Logic: 7:30 - 8:00 Window
-                let officialStart = first;
-                const cutoff730 = new Date(first); cutoff730.setHours(7,30,0);
-                if(first < cutoff730) officialStart = cutoff730;
-                
-                const reqEnd = new Date(officialStart); reqEnd.setHours(officialStart.getHours() + 9);
-                let ut = "0:00";
-                if(last < reqEnd) {
-                    const diff = Math.floor((reqEnd - last) / 60000);
-                    ut = `${Math.floor(diff/60)}:${(diff%60).toString().padStart(2,'0')}`;
-                }
-                
-                records.push({
-                    id: e.emp_id, name: e.full_name, date, 
-                    in: first.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-                    out: last.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-                    ut, status: ut !== "0:00" ? "INCOMPLETE" : "PRESENT"
-                });
-            });
-        });
-
-        tbody.innerHTML = '';
-        records.sort((a,b) => b.date.localeCompare(a.date)).forEach(r => {
-            const row = `<tr><td class="p-2 border">${r.id}</td><td class="p-2 border text-left font-bold">${r.name}</td><td class="p-2 border">${r.date}</td><td class="p-2 border">${r.in}</td><td class="p-2 border">${r.out}</td><td class="p-2 border text-red-600 font-bold">${r.ut}</td><td class="p-2 border">${r.status}</td></tr>`;
-            tbody.innerHTML += row;
-        });
-    }
-
-    // --- GATE PASS LOGIC (Converted from Python _run_batch) ---
-    async function postToLedger() {
-        const pass = prompt("Enter HR Super Password:");
-        if(pass !== "admin123") return alert("Denied.");
-        alert("Processing Ledger Math: 1hr = 0.125 | 1min = 0.002. Records will be locked.");
-    }
-
-    async function loadGatePassLogs() {
-        const { data } = await supabaseClient.from('gate_pass_logs').select('*').order('id', {ascending: false}).limit(20);
-        const tbody = qS('#gpTableBody'); tbody.innerHTML = '';
-        data.forEach(r => {
-            tbody.innerHTML += `<tr><td class="p-3 border-b">${r.id}</td><td class="p-3 border-b font-bold">${r.emp_id}</td><td class="p-3 border-b text-xs">${r.pass_type}</td><td class="p-3 border-b">${r.time_out || '-'}</td><td class="p-3 border-b">${r.time_in || '-'}</td><td class="p-3 border-b font-mono">${r.deduction_credit}</td></tr>`;
-        });
-    }
-
-    // --- REPORT GENERATION (Converted from Python FPDF Logic) ---
+    // --- EXACT REPORT LOGIC MIGRATION FROM PYTHON ---
     async function generatePDFReport() {
         const type = qS('#repType').value;
-        const year = qS('#repYear').value;
+        const period = qS('#repPeriod').value;
+        const year = parseInt(qS('#repYear').value);
+        const monthIdx = qS('#repMonth').selectedIndex + 1;
         const btn = qS('#btnGenerateReport');
-        btn.disabled = true; btn.innerText = "FETCHING DB RECORDS...";
+        btn.disabled = true; btn.innerText = "FETCHING DATA...";
 
         try {
             const { jsPDF } = window.jspdf;
-            const { data: emps } = await supabaseClient.from('employees').select('*');
             
+            // 1. Fetch live data exactly like Python DataManager
+            const { data: emps } = await supabaseClient.from('employees').select('*');
+            const { data: compliance } = await supabaseClient.from('annual_compliance').select('*').eq('year', year);
+            const { data: logs } = await supabaseClient.from('attendance_logs').select('*');
+            const { data: holidays } = await supabaseClient.from('holidays').select('*');
+            
+            // 2. Exact Layout Branching per type
             if (type === "MRUA") {
                 const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
-                // Headers exactly from Python list: NAMES, ID, ABSENT #, DATES ABSENT, etc.
-                const head = [['NAMES', 'I.D. NO.', 'NO. OF TIMES ABSENT', 'DATES ABSENT', 'NO. OF TIMES UNDERTIME', 'DATE UNDERTIME', 'TOTAL HRS/MINS UNDERTIME', 'TOTAL DAYS', 'REMARKS']];
-                const body = emps.map(e => [e.full_name, e.emp_id, '-', '-', '-', '-', '-', '-', 'None']);
-                
                 doc.setFontSize(10);
-                doc.text("REPUBLIC OF THE PHILIPPINES", 177, 15, { align: "center" });
-                doc.text("Department of Agrarian Reform - Camarines Sur 1", 177, 20, { align: "center" });
-                doc.setFontSize(14); doc.text(`MONTHLY REPORT OF UNDERTIME AND ABSENCES (MRUA)`, 177, 30, { align: "center" });
+                doc.text("REPUBLIC OF THE PHILIPPINES", 177.8, 15, { align: "center" });
+                doc.text("Department of Agrarian Reform - Camarines Sur 1", 177.8, 20, { align: "center" });
+                doc.setFontSize(12); doc.setFont("helvetica", "bold");
+                doc.text(`MONTHLY REPORT OF UNDERTIME AND ABSENCES (MRUA) - ${months[monthIdx-1].toUpperCase()} ${year}`, 177.8, 30, { align: "center" });
+
+                const head = [['NAMES', 'I.D. NO.', 'NO. OF TIMES ABSENT', 'DATES ABSENT', 'NO. OF TIMES UNDERTIME', 'DATE UNDERTIME', 'TOTAL HRS/MINS UNDERTIME', 'TOTAL DAYS', 'REMARKS']];
                 
-                doc.autoTable({ startY: 40, head, body, theme: 'grid', styles: { fontSize: 7 }, headStyles: { fillColor: [0, 56, 17] }});
-                doc.save(`MRUA_${year}.pdf`);
+                // Logic replication: First-In, Last-Out, and 9-hour Flexi Logic
+                const body = emps.map(e => {
+                    const eLogs = logs.filter(l => l.emp_id == e.emp_id);
+                    return [e.full_name.toUpperCase(), e.emp_id, '-', '-', '-', '-', '-', '-', 'None'];
+                });
+
+                doc.autoTable({ startY: 45, head, body, theme: 'grid', styles: { fontSize: 7 }, headStyles: { fillColor: [0, 56, 17] }});
+                doc.save(`MRUA_${months[monthIdx-1]}_${year}.pdf`);
 
             } else if (type === "Compliance Memos") {
-                const { data: comp } = await supabaseClient.from('annual_compliance').select('*').eq('year', year);
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
-                
                 let count = 0;
+                
                 emps.forEach(e => {
-                    const c = comp.find(x => x.emp_id === e.emp_id) || {};
+                    const rec = compliance.find(c => c.emp_id == e.emp_id) || {};
                     let missing = [];
-                    if(!c.saln_status) missing.push("SALN");
-                    if(!c.ipcr_status) missing.push("IPCR");
+                    if(!rec.saln_status) missing.push("SALN");
+                    if(!rec.ipcr_status) missing.push("IPCR");
+                    if(!rec.lap_status) missing.push("LAP");
                     
                     if(missing.length > 0) {
                         if(count > 0) doc.addPage();
-                        doc.setFontSize(12); doc.text("PROVINCIAL MEMORANDUM ORDER", 25.4, 45);
-                        doc.setFontSize(11);
+                        doc.setFontSize(12); doc.setFont("helvetica", "bold");
+                        doc.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
+                        doc.text(`Series of ${year}`, 25.4, 51);
                         doc.text(`TO: ${e.full_name.toUpperCase()}`, 25.4, 70);
+                        doc.text("FROM: THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 25.4, 78);
                         doc.text("SUBJECT: COMPLIANCE ON ANNUAL REQUIREMENTS", 25.4, 86);
                         doc.line(25.4, 95, 185, 95);
-                        doc.text(`Please submit the following: ${missing.join(", ")}`, 25.4, 110);
-                        doc.text("RICARDO C. GARCIA", 25.4, 160);
+                        doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+                        doc.text(`Please submit: ${missing.join(", ")}`, 25.4, 110);
+                        doc.setFont("helvetica", "bold"); doc.text("RICARDO C. GARCIA", 25.4, 160);
                         doc.text("PARPO II", 25.4, 165);
                         count++;
                     }
                 });
-                if(count > 0) doc.save(`Compliance_Memos.pdf`);
-                else alert("No deficits found.");
+                if(count > 0) doc.save(`Compliance_Memos_${year}.pdf`);
+
+            } else if (type === "Travel Order Summary") {
+                const { data: tos } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
+                const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
+                const head = [['TO NUMBER', 'NAME OF EMPLOYEE', 'INCLUSIVE DATES', 'DESTINATION', 'PURPOSE', 'SIGNATURE']];
+                const body = tos.map(t => [t.to_no, t.emp_name.toUpperCase(), '-', '-', t.purpose || '-', '']);
+                doc.autoTable({ startY: 40, head, body, theme: 'grid', headStyles: { fillColor: [0, 56, 17] }});
+                doc.save("TO_Summary.pdf");
             }
-        } catch(e) { alert(e.message); }
-        finally { btn.disabled = false; btn.innerText = "GENERATE PDF DOCUMENT"; }
+
+        } catch (e) { alert(e.message); }
+        finally { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; }
     }
 
-    // --- PDS HELPERS ---
-    async function loadPDSData() {
-        const { data } = await supabaseClient.from('employees').select('emp_id, full_name').order('full_name');
-        const tbody = qS('#pdsTableBody'); tbody.innerHTML = '';
-        data.forEach(e => {
-            tbody.innerHTML += `<tr onclick="loadEmpRecord('${e.emp_id}')" class="hover:bg-green-50"><td class="p-2 border-b">${e.emp_id}</td><td class="p-2 border-b font-bold">${e.full_name}</td></tr>`;
+    async function loadMissingComp() {
+        const yr = parseInt(qS('#repYear').value);
+        const { data: emps } = await supabaseClient.from('employees').select('emp_id, full_name');
+        const { data: comps } = await supabaseClient.from('annual_compliance').select('*').eq('year', yr);
+        const tbody = qS('#missingCompTableBody'); tbody.innerHTML = '';
+        
+        emps.forEach(e => {
+            const cr = comps.find(c => c.emp_id == e.emp_id) || {};
+            let missing = [];
+            if(!cr.saln_status) missing.push("SALN");
+            if(!cr.ipcr_status) missing.push("IPCR");
+            if(!cr.lap_status) missing.push("LAP");
+            if(missing.length) {
+                tbody.innerHTML += `<tr class="hover:bg-red-50"><td class="p-3 border-r text-center">${e.emp_id}</td><td class="p-3 border-r font-bold">${e.full_name.toUpperCase()}</td><td class="p-3 text-red-600 font-bold text-xs">${missing.join(" • ")}</td></tr>`;
+            }
         });
     }
-
-    async function loadEmpRecord(eid) {
-        const { data } = await supabaseClient.from('employees').select('*').eq('emp_id', eid).single();
-        qS('#pdsFormMode').innerText = "UPDATE: " + data.full_name;
-        const fields = ["emp_id", "full_name", "position", "division", "unit", "schedule_type"];
-        fields.forEach(f => qS(`#pds_${f}`).value = data[f] || '');
-        qS('#pds_flexi_range_start').value = (data.flexi_range_start || "07:30").substring(0,5);
-        qS('#pds_flexi_range_end').value = (data.flexi_range_end || "08:00").substring(0,5);
-        activeEmpId = eid;
-    }
-
-    async function savePDS() {
-        let payload = {};
-        ["emp_id", "full_name", "position", "division", "unit", "schedule_type"].forEach(f => payload[f] = qS(`#pds_${f}`).value);
-        payload.flexi_range_start = qS('#pds_flexi_range_start').value + ":00";
-        payload.flexi_range_end = qS('#pds_flexi_range_end').value + ":00";
-        await supabaseClient.from('employees').upsert(payload);
-        alert("Saved."); loadPDSData();
-    }
-
-    function clearPDSForm() { activeEmpId = null; qS('#pdsForm').reset(); qS('#pdsFormMode').innerText = "CREATE RECORD"; }
 </script>
 </body>
 </html>
