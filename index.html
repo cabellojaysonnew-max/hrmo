@@ -593,11 +593,11 @@
             let colX = lMargin;
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
-                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE") vStr = "";
+                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = ""; // Blank columns
                 
                 doc.rect(colX, currY, widths[i], 6);
                 let align = 'center';
-                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])"].includes(headers[i])) {
+                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) {
                     align = 'left';
                 }
                 const tx = align === 'center' ? colX + (widths[i]/2) : colX + 2;
@@ -678,6 +678,10 @@
 
                 try {
                     let { data } = await supabaseClient.storage.from('e-sign').createSignedUrl('bg_form.jpg', 60);
+                    if (!data || !data.signedUrl) {
+                        let res2 = await supabaseClient.storage.from('e-sgn').createSignedUrl('bg_form.jpg', 60);
+                        data = res2.data;
+                    }
                     if (data && data.signedUrl) { bgData = await loadImgData(data.signedUrl); }
                 } catch(e) { console.log("bg_form.jpg check failed"); }
 
@@ -933,15 +937,7 @@
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 let count = 0;
                 
-                let bgMemoData = null;
-                try {
-                    let { data } = await supabaseClient.storage.from('e-sign').createSignedUrl('bg_memo.jpg', 60);
-                    if (!data || !data.signedUrl) {
-                        let res2 = await supabaseClient.storage.from('e-sgn').createSignedUrl('bg_memo.jpg', 60);
-                        data = res2.data;
-                    }
-                    if (data && data.signedUrl) { bgMemoData = await loadImgData(data.signedUrl); }
-                } catch(e) { console.warn("bg_memo missing"); }
+                let bgMemoData = null; // NO BACKGROUND REQUESTED
                 
                 for (const e of emps) {
                     const rec = comp.find(c => c.emp_id == e.emp_id) || {};
@@ -954,7 +950,6 @@
                     
                     if(missing.length > 0) {
                         if(count > 0) doc.addPage();
-                        if(bgMemoData) doc.addImage(bgMemoData, 'JPEG', 0, 0, 215.9, 330.2);
 
                         doc.setFontSize(12); doc.setFont("helvetica", "bold");
                         doc.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
@@ -1001,21 +996,12 @@
                 const logs = logsData || [];
                 
                 let count = 0;
-                let bgMemoData = null;
-                try {
-                    let { data } = await supabaseClient.storage.from('e-sign').createSignedUrl('bg_memo.jpg', 60);
-                    if (!data || !data.signedUrl) {
-                        let res2 = await supabaseClient.storage.from('e-sgn').createSignedUrl('bg_memo.jpg', 60);
-                        data = res2.data;
-                    }
-                    if (data && data.signedUrl) { bgMemoData = await loadImgData(data.signedUrl); }
-                } catch(e) { console.warn("bg_memo missing"); }
+                let bgMemoData = null; // NO BACKGROUND REQUESTED
 
                 for (const e of emps) {
                     const eLogs = logs.filter(l => l.emp_id == e.emp_id);
                     if(eLogs.length > 5) { // Simplification of Tardiness check
                         if(count > 0) doc.addPage();
-                        if(bgMemoData) doc.addImage(bgMemoData, 'JPEG', 0, 0, 215.9, 330.2);
 
                         doc.setFontSize(12); doc.setFont("helvetica", "bold");
                         doc.text("PROVINCIAL MEMORANDUM ORDER", 25.4, 45);
@@ -1061,21 +1047,12 @@
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 let count = 0;
                 
-                let bgMemoData = null;
-                try {
-                    let { data } = await supabaseClient.storage.from('e-sign').createSignedUrl('bg_memo.jpg', 60);
-                    if (!data || !data.signedUrl) {
-                        let res2 = await supabaseClient.storage.from('e-sgn').createSignedUrl('bg_memo.jpg', 60);
-                        data = res2.data;
-                    }
-                    if (data && data.signedUrl) { bgMemoData = await loadImgData(data.signedUrl); }
-                } catch(e) { console.warn("bg_memo missing"); }
+                let bgMemoData = null; // NO BACKGROUND REQUESTED
 
                 for (const e of emps) {
                     const eFlag = flagLogs.filter(f => f.emp_id == e.emp_id && String(f.status).toUpperCase().includes("ABSENT"));
                     if(eFlag.length > 0) {
                         if(count > 0) doc.addPage();
-                        if(bgMemoData) doc.addImage(bgMemoData, 'JPEG', 0, 0, 215.9, 330.2);
 
                         doc.setFontSize(12); doc.setFont("helvetica", "bold");
                         doc.text("PROVINCIAL MEMORANDUM ORDER", 25.4, 45);
@@ -1165,14 +1142,16 @@
                         empGroups[div].push(t);
                     });
 
-                    const headers = ["TO NUMBER", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DESTINATION", "PURPOSE", "RECEIVED", "SIGNATURE"];
-                    const widths = [30, 45, 60, 45, 70, 30, 30];
+                    // MODIFIED: Added Date and Signature columns
+                    const headers = ["TO NUMBER", "NAME OF EMPLOYEE", "PERIOD", "PURPOSE", "REPORT TO", "DATE", "SIGNATURE"];
+                    const widths = [30, 50, 45, 80, 55, 30, 35];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
                         currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             const il = itin.filter(i => i.to_no === r.to_no);
-                            return [r.to_no, (r.emp_name || '').toUpperCase(), getInclusiveDates(il.map(i=>i.travel_date)), [...new Set(il.map(i=>i.destination))].join("; "), r.purpose, '', ''];
+                            // MODIFIED: Added Report To
+                            return [r.to_no, (r.emp_name || '').toUpperCase(), getInclusiveDates(il.map(i=>i.travel_date)), r.purpose, r.report_to || '-', '', ''];
                         }, currY);
                     });
 
@@ -1211,13 +1190,14 @@
                         empGroups[div].push(t);
                     });
 
-                    const headers = ["EMP NUMBER", "NAME", "LEAVE TYPE", "INCLUSIVE DATES", "TOTAL DAYS"];
-                    const widths = [30, 70, 40, 85, 45];
+                    // MODIFIED: Added LEAVE APPLICATION column
+                    const headers = ["LEAVE APPLICATION", "EMP NUMBER", "NAME", "LEAVE TYPE", "INCLUSIVE DATES", "TOTAL DAYS"];
+                    const widths = [40, 30, 60, 30, 85, 45];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
                         currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
-                            return [r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), (r.type || '').toUpperCase(), r.date, Math.abs(parseFloat(r.debit||0)).toFixed(2)];
+                            return [r.transaction_id || '-', r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), (r.type || '').toUpperCase(), r.date, Math.abs(parseFloat(r.debit||0)).toFixed(2)];
                         }, currY);
                     });
 
@@ -1228,9 +1208,10 @@
                     
                     let agg = {};
                     tu.forEach(r => {
-                        if(!agg[r.emp_id]) agg[r.emp_id] = { total_deduction: 0, total_days: 0 };
+                        if(!agg[r.emp_id]) agg[r.emp_id] = { total_deduction: 0, total_days: 0, dates: [] };
                         agg[r.emp_id].total_deduction += Math.abs(parseFloat(r.debit || 0));
                         agg[r.emp_id].total_days += 1;
+                        if(r.date) agg[r.emp_id].dates.push(r.date);
                     });
 
                     let empGroups = {};
@@ -1240,13 +1221,15 @@
                         empGroups[div].push({ emp_id: eid, ...agg[eid] });
                     });
 
-                    const headers = ["EMP NUMBER", "NAME", "TOTAL HOURS", "TOTAL DAYS", "CREDIT TO VL"];
-                    const widths = [45, 90, 55, 55, 65];
+                    // MODIFIED: Added DATES column
+                    const headers = ["DATES", "EMP NUMBER", "NAME", "TOTAL HOURS", "TOTAL DAYS", "CREDIT TO VL"];
+                    const widths = [60, 40, 70, 45, 45, 55];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
                         currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
-                            return [r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), (r.total_deduction * 8).toFixed(2), r.total_days, r.total_deduction.toFixed(3)];
+                            const dateStr = [...new Set(r.dates)].slice(0,3).join(", ") + (r.dates.length > 3 ? "..." : "");
+                            return [dateStr || '-', r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), (r.total_deduction * 8).toFixed(2), r.total_days, r.total_deduction.toFixed(3)];
                         }, currY);
                     });
 
@@ -1298,7 +1281,8 @@
                             if(iDate >= new Date(startIso) && iDate <= new Date(endIso)) {
                                 const pMatch = pso.filter(p => p.emp_id == t.emp_id && new Date(p.start_date) <= iDate && new Date(p.end_date) >= iDate);
                                 pMatch.forEach(p => {
-                                    conflicts.push({ emp_id: t.emp_id, date: i.travel_date, pso: p.subject, to: i.destination, rso: '-' });
+                                    // MODIFIED: Added TO Number and PSO Number variables
+                                    conflicts.push({ emp_id: t.emp_id, date: i.travel_date, pso_no: p.subject, to_no: t.to_no, dest: i.destination, rso: '-' });
                                 });
                             }
                         });
@@ -1311,13 +1295,14 @@
                         empGroups[div].push(t);
                     });
 
-                    const headers = ["EMP NUMBER", "NAME", "DATE", "PSO", "TO", "RSO"];
-                    const widths = [35, 55, 35, 75, 75, 35];
+                    // MODIFIED: Reordered columns to strictly match specific outputs
+                    const headers = ["TO NUMBER", "EMP NUMBER", "NAME", "DATE", "PSO NUMBER", "DESTINATION", "RSO"];
+                    const widths = [30, 30, 45, 30, 80, 70, 30];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
                         currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
-                            return [r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), r.date, r.pso, r.to, r.rso];
+                            return [r.to_no, r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), r.date, r.pso_no, r.dest, r.rso];
                         }, currY);
                     });
                 }
