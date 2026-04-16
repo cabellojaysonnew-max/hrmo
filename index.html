@@ -183,7 +183,7 @@
                         <select id="attenMonth" class="form-input w-32"></select>
                         <input type="number" id="attenYear" class="form-input w-24" value="2026">
                         <button onclick="generateAttendanceView()" class="btn-primary px-4 rounded text-sm">FETCH</button>
-                        <button onclick="postToLedger()" class="bg-[#2E7D32] text-white px-4 rounded text-sm font-bold">POST TO Ledger</button>
+                        <button onclick="postToLedger()" class="bg-[#2E7D32] text-white px-4 rounded text-sm font-bold">POST TO LEDGER</button>
                     </div>
                 </div>
                 <div class="card overflow-hidden">
@@ -574,7 +574,7 @@
         let currY = startY;
 
         doc.setFontSize(10); doc.setFont("helvetica", "bold");
-        doc.setFillColor(200, 220, 255);
+        doc.setFillColor("#C8DCFF"); // FPDF 200, 220, 255
         doc.rect(lMargin, currY, widths.reduce((a,b)=>a+b,0), 8, 'DF');
         doc.setTextColor(0,0,0);
         doc.text(`DIVISION: ${divisionName}`, lMargin + 2, currY + 5.5);
@@ -583,7 +583,7 @@
         doc.setFontSize(8); 
         let cx = lMargin;
         headers.forEach((h, i) => {
-            doc.setFillColor(230, 230, 230);
+            doc.setFillColor("#DCDCDC"); // FPDF 220, 220, 220
             doc.rect(cx, currY, widths[i], 8, 'DF');
             doc.setTextColor(0,0,0);
             doc.text(h, cx + (widths[i]/2), currY + 5, {align: 'center'});
@@ -595,20 +595,36 @@
         groupData.forEach(row => {
             let rowData = rowFormatter(row);
             let colX = lMargin;
+            
+            // Calculate dynamic height exactly like python
+            let maxLines = 1;
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
-                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = ""; // Blank columns
+                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = "";
+                let lines = doc.splitTextToSize(vStr, widths[i] - 2);
+                if (lines.length > maxLines) maxLines = lines.length;
+            });
+            let rowH = Math.max(6, maxLines * 4.5 + 2);
+            
+            rowData.forEach((val, i) => {
+                let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
+                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = ""; 
                 
-                doc.rect(colX, currY, widths[i], 6);
+                doc.setFillColor("#FFFFFF");
+                doc.rect(colX, currY, widths[i], rowH, 'DF');
+                doc.setTextColor(0,0,0);
+                
                 let align = 'center';
-                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO", "PERIOD"].includes(headers[i])) {
+                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) {
                     align = 'left';
                 }
                 const tx = align === 'center' ? colX + (widths[i]/2) : colX + 2;
-                doc.text(vStr.substring(0, parseInt(widths[i]*0.8)), tx, currY + 4, {align: align});
+                
+                let textLines = doc.splitTextToSize(vStr, widths[i] - 2);
+                doc.text(textLines, tx, currY + 4, {align: align});
                 colX += widths[i];
             });
-            currY += 6;
+            currY += rowH;
         });
         currY += 5;
         return currY;
@@ -621,7 +637,7 @@
         const hWidths = [55, 20, 22, 40, 22, 40, 26, 20, 80.6];
         
         hWidths.forEach((w, i) => {
-            pdf.setFillColor(230, 230, 230);
+            pdf.setFillColor("#DCDCDC"); // Light grey
             pdf.rect(cx, cy, w, 12, 'DF');
             pdf.setTextColor(0,0,0);
             if(i === 7) {
@@ -714,7 +730,7 @@
                     doc.setFont("helvetica", "bold"); doc.setFontSize(8); 
                     if(typeLabel){ doc.text(typeLabel, 190, 33, {align: 'center'}); }
                     doc.setFont("helvetica", "italic"); doc.setFontSize(7);
-                    doc.text("HR FILE COPY", 185, 37, {align: 'center'});
+                    doc.text("HR FILE COPY", 185, 33.5, {align: 'center'});
                 } catch(e){} 
             }
 
@@ -917,6 +933,8 @@
                 
                 let empGroups = {};
                 emps.forEach(e => {
+                    if ((e.type || '').toUpperCase() !== 'REGULAR') return; // EXPLICIT REGULAR FILTER
+
                     let div = (e.division || "UNASSIGNED").toUpperCase();
                     let st = (e.station || "").toUpperCase();
                     if(div.includes("DARMO") && st && st !== "NONE") div = `DARMO - ${st}`;
@@ -939,7 +957,7 @@
                     }
 
                     doc.setFontSize(10); doc.setFont("helvetica", "bold");
-                    doc.setFillColor(200, 220, 255);
+                    doc.setFillColor("#C8DCFF");
                     doc.rect(15, currY, colWidths.reduce((a,b)=>a+b,0), 6, 'DF');
                     doc.setTextColor(0,0,0);
                     doc.text(`DIVISION: ${div}`, 17, currY + 4);
@@ -969,9 +987,17 @@
                         ];
 
                         let rowH = 6; let cx = 15;
+                        
+                        // Check if we need a page break before drawing the row
+                        if (currY + rowH > 185) {
+                            doc.addPage();
+                            currY = 15;
+                            currY = drawMRUAColHeaders(doc, currY);
+                        }
+
                         doc.setFont("helvetica", "normal");
                         colWidths.forEach((w, i) => {
-                            doc.setFillColor(255, 255, 255);
+                            doc.setFillColor("#FFFFFF");
                             doc.rect(cx, currY, w, rowH, 'DF');
                             doc.setTextColor(0,0,0);
                             const align = (i === 0 || i === 3 || i === 5 || i === 9) ? "left" : "center";
@@ -1130,7 +1156,7 @@
             } else if (type === "Flag Ceremony Memos") {
                 let dStart = startIso.split('T')[0];
                 let dEnd = endIso.split('T')[0];
-                const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('date', dStart).lte('date', dEnd);
+                const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', dStart).lte('log_date', dEnd);
                 const flagLogs = flagLogsData || [];
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 let count = 0;
@@ -1153,7 +1179,7 @@
                         doc.setLineWidth(0.6); doc.line(25.4, cy, 190.5, cy); cy += 8;
                         
                         doc.setFont("helvetica", "normal");
-                        const datesStr = eFlag.map(f => new Date(f.date).toLocaleDateString('en-US', {month:'short', day:'numeric'})).join(", ");
+                        const datesStr = eFlag.map(f => new Date(f.log_date).toLocaleDateString('en-US', {month:'short', day:'numeric'})).join(", ");
                         
                         doc.text(`Based on the records of the Human Resource Management Office (HRMO), you failed to attend`, 25.4, cy); cy += 5;
                         doc.text(`the Flag Raising/Lowering Ceremony on the following date/s: ${datesStr}.`, 25.4, cy); cy += 10;
@@ -1229,7 +1255,7 @@
                     });
 
                     const headers = ["TO NUMBER", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DESTINATION", "PURPOSE", "REPORT TO", "DATE", "SIGNATURE"];
-                    const widths = [25, 45, 45, 50, 60, 45, 25, 30];
+                    const widths = [30, 45, 40, 50, 60, 40, 30, 30.6];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
@@ -1318,7 +1344,7 @@
                 } else if (type === "Flag Ceremony Attendance") {
                     let dStart = startIso.split('T')[0];
                     let dEnd = endIso.split('T')[0];
-                    const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('date', dStart).lte('date', dEnd);
+                    const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', dStart).lte('log_date', dEnd);
                     const flagLogs = flagLogsData || [];
                     
                     let empGroups = {};
@@ -1337,7 +1363,7 @@
                             if(!agg[f.emp_id]) agg[f.emp_id] = { p: 0, a: 0, details: [] };
                             const stat = String(f.status).toUpperCase().includes("ABSENT") ? "ABSENT" : "PRESENT";
                             if(stat === "PRESENT") agg[f.emp_id].p++; else agg[f.emp_id].a++;
-                            const dtStr = new Date(f.date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+                            const dtStr = new Date(f.log_date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
                             const tmStr = formatTime12h(f.time_in || f.log_time);
                             agg[f.emp_id].details.push(`${dtStr}: ${stat} [${tmStr}]`);
                         });
