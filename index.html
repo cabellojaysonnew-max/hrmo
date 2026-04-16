@@ -355,6 +355,9 @@
         qS(`#module-${mod}`).classList.remove('hidden-section');
         if(mod === 'reports') loadMissingComp();
         if(mod === 'pds') loadPDSData();
+        if(mod === 'dash') updateDashboard();
+        if(mod === 'atten') generateAttendanceView();
+        if(mod === 'gate') loadGatePassLogs();
     }
 
     function logout() { location.reload(); }
@@ -363,6 +366,148 @@
         const p = qS('#repPeriod').value;
         qS('#repMonthGroup').style.display = (p === 'MONTHLY' || p === 'WEEKLY') ? 'block' : 'none';
     }
+
+    // --- DASHBOARD LOGIC ---
+    async function updateDashboard() {
+        const today = new Date().toISOString().split('T')[0];
+        qS('#dashDate').innerText = new Date().toDateString();
+        
+        const { data: emps } = await supabaseClient.from('employees').select('emp_id, full_name, flexi_range_end');
+        const { data: itin } = await supabaseClient.from('itinerary').select('emp_id').eq('travel_date', today);
+        const { data: pso } = await supabaseClient.from('pso_records').select('emp_id, subject').lte('start_date', today).gte('end_date', today);
+        const { data: logs } = await supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', today + 'T00:00:00').lte('log_time', today + 'T23:59:59');
+
+        qS('#statTotal').innerText = emps.length;
+        const travIds = new Set(itin.map(i => i.emp_id));
+        qS('#statTravel').innerText = travIds.size;
+        const psoOnly = pso.filter(p => !travIds.has(p.emp_id));
+        qS('#statPSO').innerText = new Set(psoOnly.map(p => p.emp_id)).size;
+
+        const lateCont = qS('#lateList'); lateCont.innerHTML = '';
+        const logMap = {};
+        logs.forEach(l => { if(!logMap[l.emp_id]) logMap[l.emp_id] = new Date(l.log_time); });
+        
+        emps.forEach(e => {
+            if(logMap[e.emp_id]) {
+                const cutoff = new Date(today + 'T' + (e.flexi_range_end || '08:00:00'));
+                if(logMap[e.emp_id] > cutoff) {
+                    const diff = Math.floor((logMap[e.emp_id] - cutoff) / 60000);
+                    lateCont.innerHTML += `<div class="flex justify-between text-xs p-2 bg-red-50 rounded"><span class="font-bold">${e.full_name}</span><span class="text-red-700">${diff} mins late</span></div>`;
+                }
+            }
+        });
+
+        const psoSum = qS('#psoSummary'); psoSum.innerHTML = '';
+        [...new Set(psoOnly.map(p => p.subject))].slice(0,5).forEach(s => {
+            psoSum.innerHTML += `<div class="text-xs p-2 bg-gray-50 border-l-2 border-red-500">${s}</div>`;
+        });
+    }
+
+    // --- PDS LOGIC ---
+    async function loadPDSData() {
+        const { data } = await supabaseClient.from('employees').select('emp_id, full_name').order('full_name');
+        const tbody = qS('#pdsTableBody'); tbody.innerHTML = '';
+        data.forEach(e => {
+            tbody.innerHTML += `<tr onclick="loadEmpRecord('${e.emp_id}')" class="hover:bg-green-50 cursor-pointer"><td class="p-2 border-b text-gray-500">${e.emp_id}</td><td class="p-2 border-b font-bold">${e.full_name}</td></tr>`;
+        });
+    }
+
+    async function loadEmpRecord(eid) {
+        const { data } = await supabaseClient.from('employees').select('*').eq('emp_id', eid).single();
+        qS('#pdsFormMode').innerText = "UPDATE: " + data.full_name.toUpperCase();
+        const fields = ["emp_id", "full_name", "last_name", "first_name", "middle_name", "name_extension", "date_of_birth", "sex", "civil_status", "position", "salary", "station", "division", "unit", "schedule_type"];
+        fields.forEach(f => { if(qS(`#pds_${f}`)) qS(`#pds_${f}`).value = data[f] || ''; });
+        if(qS('#pds_flexi_range_start')) qS('#pds_flexi_range_start').value = (data.flexi_range_start || "07:30").substring(0,5);
+        if(qS('#pds_flexi_range_end')) qS('#pds_flexi_range_end').value = (data.flexi_range_end || "08:00").substring(0,5);
+        qS('#pds_id').value = eid;
+    }
+
+    async function savePDS() {
+        let payload = {};
+        const fields = ["emp_id", "full_name", "last_name", "first_name", "middle_name", "name_extension", "date_of_birth", "sex", "civil_status", "position", "salary", "station", "division", "unit", "schedule_type"];
+        fields.forEach(f => { if(qS(`#pds_${f}`)) payload[f] = qS(`#pds_${f}`).value; });
+        if(qS('#pds_flexi_range_start')) payload.flexi_range_start = qS('#pds_flexi_range_start').value + ":00";
+        if(qS('#pds_flexi_range_end')) payload.flexi_range_end = qS('#pds_flexi_range_end').value + ":00";
+        await supabaseClient.from('employees').upsert(payload, { onConflict: 'emp_id' });
+        alert("Employee Record Saved."); loadPDSData();
+    }
+
+    function clearPDSForm() { qS('#pdsForm').reset(); qS('#pds_id').value = ''; qS('#pdsFormMode').innerText = "CREATE RECORD"; }
+
+    // --- ATTENDANCE LOGIC ---
+    async function generateAttendanceView() {
+        const m = qS('#attenMonth').value;
+        const y = qS('#attenYear').value;
+        const start = `${y}-${m.padStart(2,'0')}-01T00:00:00`;
+        const end = `${y}-${m.padStart(2,'0')}-${new Date(y, m, 0).getDate()}T23:59:59`;
+        
+        const tbody = qS('#attenTableBody'); tbody.innerHTML = '<tr><td colspan="7" class="p-10 animate-pulse">Calculating...</td></tr>';
+        
+        const { data: emps } = await supabaseClient.from('employees').select('emp_id, full_name, station, flexi_range_start, flexi_range_end');
+        const { data: logs } = await supabaseClient.from('attendance_logs').select('*').gte('log_time', start).lte('log_time', end).order('log_time');
+        
+        const records = [];
+        const logMap = {};
+        logs.forEach(l => {
+            const d = l.log_time.split('T')[0];
+            if(!logMap[l.emp_id]) logMap[l.emp_id] = {};
+            if(!logMap[l.emp_id][d]) logMap[l.emp_id][d] = [];
+            logMap[l.emp_id][d].push(new Date(l.log_time));
+        });
+
+        emps.forEach(e => {
+            if(String(e.station).toUpperCase().includes('DARMO')) return;
+            const eLogs = logMap[e.emp_id] || {};
+            Object.keys(eLogs).forEach(date => {
+                const times = eLogs[date].sort((a,b) => a-b);
+                const first = times[0]; const last = times[times.length-1];
+                
+                let fStart = new Date(date + 'T' + (e.flexi_range_start || '08:00:00'));
+                let fEnd = new Date(date + 'T' + (e.flexi_range_end || '08:00:00'));
+
+                let countedStart = first <= fStart ? fStart : (first <= fEnd ? first : fEnd);
+                const reqEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000)); // 9 hours
+                
+                let ut = "0:00";
+                if(last < reqEnd && first !== last) {
+                    const diff = Math.floor((reqEnd - last) / 60000);
+                    ut = `${Math.floor(diff/60)}:${(diff%60).toString().padStart(2,'0')}`;
+                }
+                
+                records.push({
+                    id: e.emp_id, name: e.full_name, date, 
+                    in: first.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+                    out: last.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+                    ut, status: ut !== "0:00" ? "INCOMPLETE" : "PRESENT"
+                });
+            });
+        });
+
+        tbody.innerHTML = '';
+        records.sort((a,b) => b.date.localeCompare(a.date)).forEach(r => {
+            tbody.innerHTML += `<tr><td class="p-2 border">${r.id}</td><td class="p-2 border text-left font-bold">${r.name}</td><td class="p-2 border">${r.date}</td><td class="p-2 border">${r.in}</td><td class="p-2 border">${r.out}</td><td class="p-2 border text-red-600 font-bold">${r.ut}</td><td class="p-2 border">${r.status}</td></tr>`;
+        });
+    }
+
+    async function postToLedger() {
+        const pass = prompt("Enter HR Super Password:");
+        if(pass !== "admin123") return alert("Denied.");
+        alert("Processing Ledger Math...");
+    }
+
+    // --- GATE PASS LOGIC ---
+    async function loadGatePassLogs() {
+        const { data } = await supabaseClient.from('gate_pass_logs').select('*').order('id', {ascending: false}).limit(20);
+        const tbody = qS('#gpTableBody'); tbody.innerHTML = '';
+        data.forEach(r => {
+            tbody.innerHTML += `<tr><td class="p-3 border-b">${r.id}</td><td class="p-3 border-b font-bold">${r.emp_id}</td><td class="p-3 border-b text-xs">${r.pass_type}</td><td class="p-3 border-b">${r.time_out || '-'}</td><td class="p-3 border-b">${r.time_in || '-'}</td><td class="p-3 border-b font-mono">${r.deduction_credit}</td></tr>`;
+        });
+    }
+
+    async function issueGatePass() {
+        alert("Gate pass issued (simulation).");
+    }
+
 
     // --- HELPER FUNCTIONS ---
     async function loadImgData(url) {
@@ -413,46 +558,48 @@
         return `${startStr} to ${endStr}`;
     }
 
-    function drawTableGroup(doc, divisionName, groupData, headers, widths, rowFormatter) {
+    // --- REPLICATED PYTHON DRAWING LOGIC ---
+    // Returns the new currY position to avoid overlaps
+    function drawTableGroup(doc, divisionName, groupData, headers, widths, rowFormatter, startY) {
         const lMargin = 15;
-        doc.setX(lMargin);
+        let currY = startY;
+
         doc.setFontSize(10); doc.setFont("helvetica", "bold");
         doc.setFillColor(200, 220, 255);
-        doc.rect(lMargin, doc.getY(), widths.reduce((a,b)=>a+b,0), 8, 'DF');
-        doc.text(`DIVISION: ${divisionName}`, lMargin + 2, doc.getY() + 5.5);
-        doc.setY(doc.getY() + 8);
+        doc.rect(lMargin, currY, widths.reduce((a,b)=>a+b,0), 8, 'DF');
+        doc.text(`DIVISION: ${divisionName}`, lMargin + 2, currY + 5.5);
+        currY += 8;
         
-        doc.setX(lMargin);
         doc.setFontSize(8); doc.setFillColor(220, 220, 220);
         let cx = lMargin;
         headers.forEach((h, i) => {
-            doc.rect(cx, doc.getY(), widths[i], 8, 'DF');
-            doc.text(h, cx + (widths[i]/2), doc.getY() + 5, {align: 'center'});
+            doc.rect(cx, currY, widths[i], 8, 'DF');
+            doc.text(h, cx + (widths[i]/2), currY + 5, {align: 'center'});
             cx += widths[i];
         });
-        doc.setY(doc.getY() + 8);
+        currY += 8;
         
         doc.setFontSize(7); doc.setFont("helvetica", "normal");
         groupData.forEach(row => {
-            doc.setX(lMargin);
             let rowData = rowFormatter(row);
-            let cx = lMargin;
+            cx = lMargin;
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
                 if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE") vStr = "";
                 
-                doc.rect(cx, doc.getY(), widths[i], 6);
+                doc.rect(cx, currY, widths[i], 6);
                 let align = 'center';
                 if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])"].includes(headers[i])) {
                     align = 'left';
                 }
                 const tx = align === 'center' ? cx + (widths[i]/2) : cx + 2;
-                doc.text(vStr.substring(0, parseInt(widths[i]*0.8)), tx, doc.getY() + 4, {align: align});
+                doc.text(vStr.substring(0, parseInt(widths[i]*0.8)), tx, currY + 4, {align: align});
                 cx += widths[i];
             });
-            doc.setY(doc.getY() + 6);
+            currY += 6;
         });
-        doc.setY(doc.getY() + 5);
+        currY += 5;
+        return currY;
     }
 
     // --- EXACT REPORT LOGIC MIGRATION FROM PYTHON ---
@@ -943,14 +1090,15 @@
             } else {
                 const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
                 
-                // Replicating PrintPage._draw_table_group
                 let isAppend = qS('#repAppendMode').checked;
                 let lvl = parseInt(qS('#repAppendLevel').value.replace('Level ', ''));
+                let currY = 45;
                 
                 if (isAppend) {
-                    doc.setY(15 + (lvl * 45));
+                    currY = 15 + (lvl * 45);
                     doc.setFontSize(7); doc.setFont("helvetica", "italic");
-                    doc.text(`-- Continuation of ${type.toUpperCase()} --`, 340, doc.getY(), {align: 'right'});
+                    doc.text(`-- Continuation of ${type.toUpperCase()} --`, 340, currY, {align: 'right'});
+                    currY += 5;
                 } else {
                     doc.setFontSize(10); doc.setFont("helvetica", "bold");
                     doc.text("REPUBLIC OF THE PHILIPPINES", 177.8, 15, { align: "center" });
@@ -958,7 +1106,7 @@
                     doc.text("Provincial Office of Camarines Sur 1", 177.8, 25, { align: "center" });
                     doc.setFontSize(12);
                     doc.text(`CONSOLIDATED REPORT: ${type.toUpperCase()} - ${period === 'MONTHLY' ? monthName + ' ' + year : period}`, 177.8, 35, { align: "center" });
-                    doc.setY(45);
+                    currY = 45;
                 }
 
                 if (type === "Travel Order Summary") {
@@ -985,10 +1133,11 @@
                     const widths = [30, 45, 60, 45, 70, 30, 30];
 
                     Object.keys(empGroups).sort().forEach(div => {
-                        drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             const il = itin.filter(i => i.to_no === r.to_no);
                             return [r.to_no, (r.emp_name || '').toUpperCase(), getInclusiveDates(il.map(i=>i.travel_date)), [...new Set(il.map(i=>i.destination))].join("; "), r.purpose, '', ''];
-                        });
+                        }, currY);
                     });
 
                 } else if (type === "Gate Pass") {
@@ -1005,12 +1154,13 @@
                     const widths = [20, 50, 20, 50, 75, 25, 25, 25];
 
                     Object.keys(empGroups).sort().forEach(div => {
-                        drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             let purpStr = String(r.purpose || '-');
                             let dest = "-", purp = purpStr;
                             if(purpStr.includes(" - ")) { let parts = purpStr.split(" - "); dest = parts[0]; purp = parts[1]; }
                             return [r.id, (nameMap[r.emp_id] || '').toUpperCase(), r.pass_type, dest, purp, formatTime12h(r.time_out), formatTime12h(r.time_in), parseFloat(r.deduction_credit||0).toFixed(3)];
-                        });
+                        }, currY);
                     });
 
                 } else if (type === "Leave Summary") {
@@ -1027,9 +1177,10 @@
                     const widths = [30, 70, 40, 85, 45];
 
                     Object.keys(empGroups).sort().forEach(div => {
-                        drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             return [r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), (r.type || '').toUpperCase(), r.date, Math.abs(parseFloat(r.debit||0)).toFixed(2)];
-                        });
+                        }, currY);
                     });
 
                 } else if (type === "Tardiness / Undertime") {
@@ -1054,9 +1205,10 @@
                     const widths = [45, 90, 55, 55, 65];
 
                     Object.keys(empGroups).sort().forEach(div => {
-                        drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             return [r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), (r.total_deduction * 8).toFixed(2), r.total_days, r.total_deduction.toFixed(3)];
-                        });
+                        }, currY);
                     });
 
                 } else if (type === "Flag Ceremony Attendance") {
@@ -1073,7 +1225,6 @@
                     const widths = [30, 60, 30, 190];
 
                     Object.keys(empGroups).sort().forEach(div => {
-                        // Aggregate by employee
                         let agg = {};
                         empGroups[div].forEach(f => {
                             if(!agg[f.emp_id]) agg[f.emp_id] = { p: 0, a: 0, details: [] };
@@ -1083,12 +1234,12 @@
                             const tmStr = formatTime12h(f.time_in || f.log_time);
                             agg[f.emp_id].details.push(`${dtStr}: ${stat} [${tmStr}]`);
                         });
-                        
                         const grpData = Object.keys(agg).map(k => ({ emp_id: k, ...agg[k] }));
 
-                        drawTableGroup(doc, div, grpData, headers, widths, r => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, grpData, headers, widths, r => {
                             return [r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), `P: ${r.p} | A: ${r.a}`, r.details.join(", ")];
-                        });
+                        }, currY);
                     });
 
                 } else if (type === "PSO / TO Conflicts") {
@@ -1121,9 +1272,10 @@
                     const widths = [35, 55, 35, 75, 75, 35];
 
                     Object.keys(empGroups).sort().forEach(div => {
-                        drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             return [r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), r.date, r.pso, r.to, r.rso];
-                        });
+                        }, currY);
                     });
                 }
                 
