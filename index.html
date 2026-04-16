@@ -54,7 +54,7 @@
 
     <div id="loginScreen" class="hidden-section fixed inset-0 flex h-screen bg-gray-100 z-40">
         <div class="hidden md:flex flex-col w-[400px] bg-[#003811] text-white p-12 justify-center">
-            <h1 class="text-4xl font-serif font-bold leading-tight uppercase">HR Report Generator</h1>
+            <h1 class="text-4xl font-serif font-bold leading-tight uppercase tracking-widest">HR Report<br>Generator</h1>
         </div>
         <div class="flex-1 flex items-center justify-center p-8">
             <div class="card w-full max-w-md p-10 border-t-4 border-[#D4AF37]">
@@ -63,7 +63,7 @@
                     <div><label class="form-label">Username</label><input type="text" id="username" class="form-input"></div>
                     <div><label class="form-label">Password</label><input type="password" id="password" class="form-input"></div>
                 </div>
-                <p id="loginStatus" class="text-red-600 text-xs font-bold mt-4"></p>
+                <p id="loginStatus" class="text-red-600 text-xs font-bold mt-4 min-h-[1rem]"></p>
                 <button onclick="login()" id="loginBtn" class="w-full btn-primary py-3 rounded-md font-bold mt-6">LOG IN</button>
             </div>
         </div>
@@ -75,55 +75,80 @@
                 <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             </div>
             <div class="flex-1 overflow-y-auto py-2">
-                <button onclick="switchModule('dash')" id="nav-dash" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</button>
                 <button onclick="switchModule('pds')" id="nav-pds" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</button>
-                <button onclick="switchModule('atten')" id="nav-atten" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</button>
-                <button onclick="switchModule('leave')" id="nav-leave" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE MGMT</button>
-                <button onclick="switchModule('gate')" id="nav-gate" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS</button>
-                <button onclick="switchModule('cto')" id="nav-cto" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">CTO MGMT</button>
                 <button onclick="switchModule('reports')" id="nav-reports" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</button>
             </div>
             <div class="p-4 bg-black/20 hidden md:block">
                 <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
-                <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded">LOGOUT</button>
+                <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow">LOGOUT</button>
             </div>
         </nav>
 
         <main class="flex-1 relative overflow-hidden bg-gray-100">
-            <section id="module-dash" class="absolute inset-0 module-content hidden-section">
-                <h2 class="text-2xl font-bold mb-6">Dashboard</h2>
-                <div id="statGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
-            </section>
+            
+            <section id="module-pds" class="absolute inset-0 module-content hidden-section flex flex-col md:flex-row gap-6">
+                <div class="w-full md:w-1/3 flex flex-col gap-4">
+                    <div class="card p-4">
+                        <input type="text" id="pdsSearch" class="form-input mb-2" placeholder="Search..." oninput="filterPDS()">
+                        <div class="table-container h-[550px] overflow-auto">
+                            <table class="w-full text-xs text-left"><tbody id="pdsTableBody" class="divide-y divide-gray-100"></tbody></table>
+                        </div>
+                        <button onclick="clearPDSForm()" class="w-full btn-primary mt-4 py-2 rounded text-xs">+ ADD NEW EMPLOYEE</button>
+                    </div>
+                </div>
+                
+                <div class="flex-1 card flex flex-col overflow-hidden">
+                    <div class="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
+                        <h2 id="pdsFormMode" class="font-bold text-[#003811] uppercase tracking-widest">Employee Details</h2>
+                        <button onclick="savePDS()" class="btn-primary px-8 py-1.5 rounded-md text-sm font-bold shadow-md">SAVE RECORD</button>
+                    </div>
+                    <div class="flex-1 p-6 overflow-y-auto">
+                        <form id="pdsForm" class="space-y-6">
+                            <input type="hidden" id="pds_id">
+                            
+                            <div class="p-4 bg-white border rounded shadow-sm">
+                                <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-1">PRIMARY IDENTIFICATION</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label class="form-label">Employee ID</label><input type="text" id="pds_emp_id" class="form-input"></div>
+                                    <div><label class="form-label">Full Name (Display)</label><input type="text" id="pds_full_name" class="form-input"></div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                                    <div><label class="form-label">Last Name</label><input type="text" id="pds_last_name" class="form-input"></div>
+                                    <div><label class="form-label">First Name</label><input type="text" id="pds_first_name" class="form-input"></div>
+                                    <div><label class="form-label">Middle Name</label><input type="text" id="pds_middle_name" class="form-input"></div>
+                                    <div><label class="form-label">Extension</label><input type="text" id="pds_name_extension" class="form-input"></div>
+                                </div>
+                            </div>
 
-            <section id="module-pds" class="absolute inset-0 module-content hidden-section">
-                <h2 class="text-2xl font-bold mb-6">PDS Manager</h2>
-                <div id="pdsContainer"></div>
-            </section>
+                            <div class="p-4 bg-white border rounded shadow-sm">
+                                <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-1">DEMOGRAPHICS & EMPLOYMENT</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div><label class="form-label">Date of Birth</label><input type="date" id="pds_date_of_birth" class="form-input"></div>
+                                    <div><label class="form-label">Sex</label><select id="pds_sex" class="form-input"><option>Male</option><option>Female</option></select></div>
+                                    <div><label class="form-label">Civil Status</label><select id="pds_civil_status" class="form-input"><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option></select></div>
+                                    <div><label class="form-label">Position</label><input type="text" id="pds_position" class="form-input"></div>
+                                    <div><label class="form-label">Salary Grade</label><input type="text" id="pds_salary" class="form-input"></div>
+                                    <div><label class="form-label">Station</label><input type="text" id="pds_station" class="form-input"></div>
+                                    <div><label class="form-label">Division</label><input type="text" id="pds_division" class="form-input"></div>
+                                    <div><label class="form-label">Unit</label><input type="text" id="pds_unit" class="form-input"></div>
+                                </div>
+                            </div>
 
-            <section id="module-atten" class="absolute inset-0 module-content hidden-section">
-                <h2 class="text-2xl font-bold mb-6">Attendance View</h2>
-                <div id="attenContainer"></div>
-            </section>
-
-            <section id="module-leave" class="absolute inset-0 module-content hidden-section">
-                <h2 class="text-2xl font-bold mb-6">Leave Processing</h2>
-                <div id="leaveContainer"></div>
-            </section>
-
-            <section id="module-gate" class="absolute inset-0 module-content hidden-section">
-                <h2 class="text-2xl font-bold mb-6">Gate Pass Management</h2>
-                <div id="gateContainer"></div>
-            </section>
-
-            <section id="module-cto" class="absolute inset-0 module-content hidden-section">
-                <h2 class="text-2xl font-bold mb-6">CTO Management</h2>
-                <div id="ctoContainer"></div>
+                            <div class="p-4 bg-gray-50 border rounded shadow-sm">
+                                <h3 class="text-xs font-bold text-[#003811] mb-4 border-b pb-1">WORK SCHEDULE (FLEXI LOGIC)</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div><label class="form-label">Schedule Type</label><select id="pds_schedule_type" class="form-input"><option>Flexi</option><option>Fixed</option></select></div>
+                                    <div><label class="form-label">Flexi Range Start</label><input type="time" id="pds_flexi_range_start" class="form-input"></div>
+                                    <div><label class="form-label">Flexi Range End</label><input type="time" id="pds_flexi_range_end" class="form-input"></div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </section>
 
             <section id="module-reports" class="absolute inset-0 module-content hidden-section flex flex-col gap-6">
-                <div class="px-8 pt-4">
-                    <h2 class="text-3xl font-bold text-[#003811] font-['Segoe_UI']">Report Generator</h2>
-                </div>
+                <div class="px-8 pt-4"><h2 class="text-3xl font-bold text-[#003811]">Report Generator</h2></div>
 
                 <div class="card mx-8 p-6 bg-white border border-[#E5E7EB] shadow-sm">
                     <h3 class="text-lg font-bold text-[#003811] mb-6 uppercase tracking-wider">CONSOLIDATED PRINTING</h3>
@@ -132,30 +157,20 @@
                         <div>
                             <label class="form-label text-[9px] font-bold">Report Type:</label>
                             <select id="repType" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm">
-                                <option>Travel Order Summary</option>
-                                <option>Travel Order Batch Printing</option>
-                                <option>Gate Pass</option>
-                                <option>Leave Summary</option>
-                                <option>Tardiness / Undertime</option>
-                                <option>PSO / TO Conflicts</option>
-                                <option>Tardiness Memos</option>
-                                <option>Compliance Memos</option>
-                                <option>MRUA</option>
-                                <option>Flag Ceremony Attendance</option>
-                                <option>Flag Ceremony Memos</option>
+                                <option>Travel Order Summary</option><option>Travel Order Batch Printing</option>
+                                <option>Gate Pass</option><option>Leave Summary</option>
+                                <option>Tardiness / Undertime</option><option>PSO / TO Conflicts</option>
+                                <option>Tardiness Memos</option><option>Compliance Memos</option>
+                                <option>MRUA</option><option>Flag Ceremony Attendance</option><option>Flag Ceremony Memos</option>
                             </select>
                         </div>
-                        
                         <div>
                             <label class="form-label text-[9px] font-bold">Select Period:</label>
                             <select id="repPeriod" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm" onchange="toggleReportPeriod()">
-                                <option>WEEKLY</option>
-                                <option selected>MONTHLY</option>
-                                <option>ANNUALLY</option>
-                                <option>RANGE</option>
+                                <option>WEEKLY</option><option selected>MONTHLY</option>
+                                <option>ANNUALLY</option><option>RANGE</option>
                             </select>
                         </div>
-                        
                         <div id="repMonthGroup">
                             <label class="form-label text-[9px] font-bold">Month / Year:</label>
                             <div class="flex gap-2">
@@ -163,7 +178,6 @@
                                 <input type="number" id="repYear" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-1/3 text-center" value="2026">
                             </div>
                         </div>
-
                         <div class="flex flex-col gap-2">
                             <div class="flex items-center gap-2">
                                 <input type="checkbox" id="repAppendMode" class="w-4 h-4 accent-red-700">
@@ -171,30 +185,21 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <label class="text-[8px]">Append Level:</label>
-                                <select id="repAppendLevel" class="form-input bg-[#F9FAFB] border-[#D1D5DB] py-1 text-[10px] w-24">
+                                <select id="repAppendLevel" class="form-input py-1 text-[10px] w-24">
                                     <option>Level 1</option><option>Level 2</option><option>Level 3</option><option>Level 4</option>
                                 </select>
                             </div>
                         </div>
                     </div>
-
-                    <button onclick="generatePDFReport()" id="btnGenerateReport" class="mt-8 bg-[#D4AF37] text-black font-bold text-xs px-8 py-3 rounded hover:brightness-110 shadow-sm transition-all">GENERATE PDF REPORT</button>
+                    <button onclick="generatePDFReport()" id="btnGenerateReport" class="mt-8 bg-[#D4AF37] text-black font-bold text-xs px-8 py-3 rounded shadow-sm">GENERATE PDF REPORT</button>
                 </div>
 
                 <div class="mx-8 p-6 bg-transparent border border-[#E5E7EB] rounded-lg">
                     <h3 class="text-sm font-bold text-[#003811] mb-4">Pending Annual Requirements Tracker</h3>
-                    <div class="flex gap-2 mb-4">
-                        <button onclick="loadMissingComp()" class="bg-[#E0E0E0] text-[11px] px-4 py-1.5 rounded hover:bg-gray-300">REFRESH TRACKER</button>
-                    </div>
+                    <div class="flex gap-2 mb-4"><button onclick="loadMissingComp()" class="bg-[#E0E0E0] text-[11px] px-4 py-1.5 rounded">REFRESH TRACKER</button></div>
                     <div class="bg-white border rounded shadow-sm overflow-hidden">
                         <table class="w-full text-sm">
-                            <thead class="bg-[#E5E7EB]">
-                                <tr class="text-[#003811] font-bold border-b border-[#E5E7EB]">
-                                    <th class="p-3 border-r">Emp ID</th>
-                                    <th class="p-3 border-r">Name</th>
-                                    <th class="p-3">Lacking Requirements</th>
-                                </tr>
-                            </thead>
+                            <thead class="bg-[#E5E7EB]"><tr class="text-[#003811] font-bold"><th class="p-3 border-r">Emp ID</th><th class="p-3 border-r">Name</th><th>Lacking Requirements</th></tr></thead>
                             <tbody id="missingCompTableBody" class="divide-y divide-gray-100"></tbody>
                         </table>
                     </div>
@@ -215,7 +220,6 @@
         let mSel = qS('#repMonth');
         months.forEach((m, i) => mSel.add(new Option(m, i+1)));
         mSel.selectedIndex = new Date().getMonth();
-
         let width = 0;
         let int = setInterval(() => {
             width += 20; qS('#loadingBar').style.width = width + '%';
@@ -226,12 +230,12 @@
     async function login() {
         const u = qS('#username').value.trim();
         const p = qS('#password').value.trim();
-        const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
+        const { data } = await supabaseClient.from('users').select('*').eq('username', u).single();
         if (data && data.password === p) {
             qS('#activeUser').innerText = `User: ${data.full_name.toUpperCase()}`;
             qS('#loginScreen').classList.add('hidden-section');
             qS('#mainPortal').classList.remove('hidden-section');
-            switchModule('reports');
+            switchModule('pds');
         } else { qS('#loginStatus').innerText = "Access Denied."; }
     }
 
@@ -240,35 +244,60 @@
         document.querySelectorAll('#sidebar button').forEach(el => el.classList.remove('bg-[#006400]', 'border-[#D4AF37]'));
         qS(`#nav-${mod}`).classList.add('bg-[#006400]', 'border-[#D4AF37]');
         qS(`#module-${mod}`).classList.remove('hidden-section');
+        if(mod === 'pds') loadPDSData();
         if(mod === 'reports') loadMissingComp();
     }
 
     function logout() { location.reload(); }
-
     function toggleReportPeriod() {
         const p = qS('#repPeriod').value;
         qS('#repMonthGroup').style.display = (p === 'MONTHLY' || p === 'WEEKLY') ? 'block' : 'none';
     }
 
-    // --- EXACT REPORT LOGIC MIGRATION FROM PYTHON ---
+    // --- PDS HELPERS ---
+    async function loadPDSData() {
+        const { data } = await supabaseClient.from('employees').select('emp_id, full_name').order('full_name');
+        const tbody = qS('#pdsTableBody'); tbody.innerHTML = '';
+        data.forEach(e => {
+            tbody.innerHTML += `<tr onclick="loadEmpRecord('${e.emp_id}')" class="hover:bg-green-50 transition-colors"><td class="p-3 border-b text-gray-500">${e.emp_id}</td><td class="p-3 border-b font-bold">${e.full_name}</td></tr>`;
+        });
+    }
+
+    async function loadEmpRecord(eid) {
+        const { data } = await supabaseClient.from('employees').select('*').eq('emp_id', eid).single();
+        qS('#pdsFormMode').innerText = "UPDATE: " + data.full_name;
+        const fields = ["emp_id", "full_name", "last_name", "first_name", "middle_name", "name_extension", "date_of_birth", "sex", "civil_status", "position", "salary", "station", "division", "unit", "schedule_type"];
+        fields.forEach(f => qS(`#pds_${f}`).value = data[f] || '');
+        qS('#pds_flexi_range_start').value = (data.flexi_range_start || "07:30").substring(0,5);
+        qS('#pds_flexi_range_end').value = (data.flexi_range_end || "08:00").substring(0,5);
+    }
+
+    async function savePDS() {
+        let payload = {};
+        const fields = ["emp_id", "full_name", "last_name", "first_name", "middle_name", "name_extension", "date_of_birth", "sex", "civil_status", "position", "salary", "station", "division", "unit", "schedule_type"];
+        fields.forEach(f => payload[f] = qS(`#pds_${f}`).value);
+        payload.flexi_range_start = qS('#pds_flexi_range_start').value + ":00";
+        payload.flexi_range_end = qS('#pds_flexi_range_end').value + ":00";
+        await supabaseClient.from('employees').upsert(payload, { onConflict: 'emp_id' });
+        alert("Saved."); loadPDSData();
+    }
+
+    function clearPDSForm() { qS('#pdsForm').reset(); qS('#pdsFormMode').innerText = "CREATE RECORD"; }
+
+    // --- EXACT REPORT LOGIC MIGRATION ---
     async function generatePDFReport() {
         const type = qS('#repType').value;
-        const period = qS('#repPeriod').value;
         const year = parseInt(qS('#repYear').value);
         const monthIdx = qS('#repMonth').selectedIndex + 1;
         const btn = qS('#btnGenerateReport');
-        btn.disabled = true; btn.innerText = "FETCHING DATA...";
+        btn.disabled = true; btn.innerText = "PROCESSING...";
 
         try {
             const { jsPDF } = window.jspdf;
-            
-            // 1. Fetch live data exactly like Python DataManager
             const { data: emps } = await supabaseClient.from('employees').select('*');
-            const { data: compliance } = await supabaseClient.from('annual_compliance').select('*').eq('year', year);
+            const { data: comp } = await supabaseClient.from('annual_compliance').select('*').eq('year', year);
             const { data: logs } = await supabaseClient.from('attendance_logs').select('*');
-            const { data: holidays } = await supabaseClient.from('holidays').select('*');
-            
-            // 2. Exact Layout Branching per type
+
             if (type === "MRUA") {
                 const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
                 doc.setFontSize(10);
@@ -276,24 +305,18 @@
                 doc.text("Department of Agrarian Reform - Camarines Sur 1", 177.8, 20, { align: "center" });
                 doc.setFontSize(12); doc.setFont("helvetica", "bold");
                 doc.text(`MONTHLY REPORT OF UNDERTIME AND ABSENCES (MRUA) - ${months[monthIdx-1].toUpperCase()} ${year}`, 177.8, 30, { align: "center" });
-
-                const head = [['NAMES', 'I.D. NO.', 'NO. OF TIMES ABSENT', 'DATES ABSENT', 'NO. OF TIMES UNDERTIME', 'DATE UNDERTIME', 'TOTAL HRS/MINS UNDERTIME', 'TOTAL DAYS', 'REMARKS']];
                 
-                // Logic replication: First-In, Last-Out, and 9-hour Flexi Logic
-                const body = emps.map(e => {
-                    const eLogs = logs.filter(l => l.emp_id == e.emp_id);
-                    return [e.full_name.toUpperCase(), e.emp_id, '-', '-', '-', '-', '-', '-', 'None'];
-                });
-
+                const head = [['NAMES', 'I.D. NO.', 'NO. OF TIMES ABSENT', 'DATES ABSENT', 'NO. OF TIMES UNDERTIME', 'DATE UNDERTIME', 'TOTAL HRS/MINS UNDERTIME', 'TOTAL DAYS', 'REMARKS']];
+                const body = emps.map(e => [e.full_name.toUpperCase(), e.emp_id, '-', '-', '-', '-', '-', '-', 'None']);
+                
                 doc.autoTable({ startY: 45, head, body, theme: 'grid', styles: { fontSize: 7 }, headStyles: { fillColor: [0, 56, 17] }});
-                doc.save(`MRUA_${months[monthIdx-1]}_${year}.pdf`);
+                doc.save(`MRUA_${year}.pdf`);
 
             } else if (type === "Compliance Memos") {
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 let count = 0;
-                
                 emps.forEach(e => {
-                    const rec = compliance.find(c => c.emp_id == e.emp_id) || {};
+                    const rec = comp.find(c => c.emp_id == e.emp_id) || {};
                     let missing = [];
                     if(!rec.saln_status) missing.push("SALN");
                     if(!rec.ipcr_status) missing.push("IPCR");
@@ -316,16 +339,7 @@
                     }
                 });
                 if(count > 0) doc.save(`Compliance_Memos_${year}.pdf`);
-
-            } else if (type === "Travel Order Summary") {
-                const { data: tos } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
-                const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
-                const head = [['TO NUMBER', 'NAME OF EMPLOYEE', 'INCLUSIVE DATES', 'DESTINATION', 'PURPOSE', 'SIGNATURE']];
-                const body = tos.map(t => [t.to_no, t.emp_name.toUpperCase(), '-', '-', t.purpose || '-', '']);
-                doc.autoTable({ startY: 40, head, body, theme: 'grid', headStyles: { fillColor: [0, 56, 17] }});
-                doc.save("TO_Summary.pdf");
             }
-
         } catch (e) { alert(e.message); }
         finally { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; }
     }
@@ -335,7 +349,6 @@
         const { data: emps } = await supabaseClient.from('employees').select('emp_id, full_name');
         const { data: comps } = await supabaseClient.from('annual_compliance').select('*').eq('year', yr);
         const tbody = qS('#missingCompTableBody'); tbody.innerHTML = '';
-        
         emps.forEach(e => {
             const cr = comps.find(c => c.emp_id == e.emp_id) || {};
             let missing = [];
