@@ -598,7 +598,7 @@
                 
                 doc.rect(colX, currY, widths[i], 6);
                 let align = 'center';
-                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) {
+                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO", "PERIOD"].includes(headers[i])) {
                     align = 'left';
                 }
                 const tx = align === 'center' ? colX + (widths[i]/2) : colX + 2;
@@ -612,6 +612,196 @@
     }
 
     // --- EXACT REPORT LOGIC MIGRATION FROM PYTHON ---
+    window.generateOfficialPDF = async function(toNo) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4'); 
+        
+        try {
+            const { data: group_orders } = await supabaseClient.from('travel_orders').select('*').eq('to_no', toNo);
+            const { data: itin_list } = await supabaseClient.from('itinerary').select('*').eq('to_no', toNo).order('travel_date');
+            const { data: emp_details } = await supabaseClient.from('employees').select('emp_id, full_name, position, station, type');
+            
+            if (!group_orders || !group_orders.length) return;
+            
+            const od = group_orders[0];
+            const names = group_orders.map(m => m.emp_name.toUpperCase()).join(", ");
+            const positions = [...new Set(group_orders.map(m => emp_details?.find(e => e.emp_id === m.emp_id)?.position || ""))].join(", ").toUpperCase();
+            const stations = [...new Set(group_orders.map(m => emp_details?.find(e => e.emp_id === m.emp_id)?.station || ""))].join(", ").toUpperCase();
+            
+            const rawType = emp_details?.find(e => e.emp_id === group_orders[0].emp_id)?.type?.toUpperCase();
+            const typeLabel = rawType === 'SPLIT' ? 'SPLIT/COS' : (rawType === 'REGULAR' ? 'REGULAR' : '');
+
+            const isMARPO = currentUser && currentUser.position && currentUser.position.toUpperCase().includes("MARPO");
+
+            const uniqueUnits = [...new Set(group_orders.map(o => o.unit).filter(u => u && u !== "PARPO"))];
+            const uniqueDivs = [...new Set(group_orders.map(o => o.division ? o.division.split(',')[0].trim() : "").filter(d => d))];
+
+            let uh_list = [];
+            if (!isMARPO && uniqueUnits.length > 0) {
+                const { data } = await supabaseClient.from('users').select('full_name, username').in('unit', uniqueUnits);
+                if (data) uh_list = data;
+            }
+
+            let dc_list = [];
+            if (currentUser && currentUser.unit !== "PARPO" && uniqueDivs.length > 0) {
+                const { data } = await supabaseClient.from('users').select('full_name, username').in('division', uniqueDivs).eq('role', 'CHIEF');
+                if (data) dc_list = data;
+            }
+
+            let bgData = null, qrData = null, p2Data = null;
+            let uh_imgs = [], dc_imgs = [];
+
+            try {
+                let res1 = await supabaseClient.storage.from('e-sign').createSignedUrl('bg_form.jpg', 60);
+                if (!res1.data || !res1.data.signedUrl) {
+                    res1 = await supabaseClient.storage.from('e-sgn').createSignedUrl('bg_form.jpg', 60);
+                }
+                if (res1.data && res1.data.signedUrl) bgData = await loadImgData(res1.data.signedUrl);
+                
+                qrData = await getQRDataURL(toNo);
+                
+                let res2 = await supabaseClient.storage.from('e-sign').createSignedUrl('P2.png', 60);
+                 if (!res2.data || !res2.data.signedUrl) {
+                    res2 = await supabaseClient.storage.from('e-sgn').createSignedUrl('P2.png', 60);
+                }
+                if (res2.data && res2.data.signedUrl) p2Data = await loadImgData(res2.data.signedUrl);
+
+                for (const uh of uh_list) {
+                    let res = await supabaseClient.storage.from('e-sign').createSignedUrl(`${uh.username}.png`, 60);
+                    if (!res.data || !res.data.signedUrl) res = await supabaseClient.storage.from('e-sgn').createSignedUrl(`${uh.username}.png`, 60);
+                    if (res.data && res.data.signedUrl) uh_imgs.push(await loadImgData(res.data.signedUrl));
+                }
+                for (const dc of dc_list) {
+                    let res = await supabaseClient.storage.from('e-sign').createSignedUrl(`${dc.username}.png`, 60);
+                    if (!res.data || !res.data.signedUrl) res = await supabaseClient.storage.from('e-sgn').createSignedUrl(`${dc.username}.png`, 60);
+                    if (res.data && res.data.signedUrl) dc_imgs.push(await loadImgData(res.data.signedUrl));
+                }
+            } catch(e) { console.log(e); }
+
+            if (bgData) { try { doc.addImage(bgData, 'JPEG', 0, 0, 210, 297); } catch(e){} }
+            if (qrData) { 
+                try { 
+                    doc.addImage(qrData, 'PNG', 175, 10, 20, 20); 
+                    doc.setFont("helvetica", "bold"); doc.setFontSize(8); 
+                    if(typeLabel){ doc.text(typeLabel, 190, 33, {align: 'center'}); }
+                    doc.setFont("helvetica", "italic"); doc.setFontSize(7);
+                    doc.text("HR FILE COPY", 185, 37, {align: 'center'});
+                } catch(e){} 
+            }
+
+            if (od.transport === "GOV'T VEHICLE") {
+                doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+                doc.text("NOT VALID FOR TRANSPORTATION REIMBURSEMENT CLAIM", 105, 48, { align: 'center' });
+            }
+            if (od.remarks && od.remarks.includes("EXISTING PSO")) {
+                doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+                doc.text("WITH EXISTING PSO/RSO, subject for PARPO's FINAL APPROVAL", 105, 28, { align: 'center' });
+            }
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+            doc.text(`TRAVEL ORDER NO. ${toNo}`, 105, 35, { align: 'center' });
+            const fDate = new Date(od.created_at || new Date()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+            doc.text(`Date: ${fDate}`, 105, 42, { align: 'center' });
+
+            const renderFlexibleText = (text, x, y, maxWidth, defaultSize) => {
+                let currentSize = defaultSize;
+                doc.setFontSize(currentSize);
+                while (doc.getTextWidth(text) > maxWidth && currentSize > 4) {
+                    currentSize -= 0.5;
+                    doc.setFontSize(currentSize);
+                }
+                doc.text(text, x, y);
+                doc.setFontSize(defaultSize);
+            };
+
+            doc.setFontSize(10); 
+            doc.setFont("helvetica", "bold"); doc.text("NAME:", 20, 48); 
+            renderFlexibleText(names, 40, 48, 120, 10); doc.line(40, 49, 160, 49);
+
+            doc.setFont("helvetica", "bold"); doc.text("POSITION:", 20, 54);
+            doc.setFont("helvetica", "normal"); renderFlexibleText(positions, 40, 54, 45, 10); doc.line(40, 55, 85, 55);
+            doc.setFont("helvetica", "bold"); doc.text("STATION:", 90, 54);
+            doc.setFont("helvetica", "normal"); renderFlexibleText(stations, 110, 54, 50, 10); doc.line(110, 55, 160, 55);
+
+            doc.setFont("helvetica", "bold"); doc.text("MEANS OF TRANSPORTATION:", 20, 61);
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+            const drawCheck = (label, x, y, isChecked) => {
+                doc.rect(x, y - 3, 3, 3);
+                if (isChecked) { doc.setFont("helvetica", "bold"); doc.text("X", x + 0.5, y - 0.2); doc.setFont("helvetica", "normal"); }
+                doc.text(label, x + 5, y);
+            };
+            drawCheck("AIR", 20, 66, od.transport === "AIR");
+            drawCheck("GOV'T VEHICLE", 70, 66, od.transport === "GOV'T VEHICLE");
+            drawCheck("LAND", 20, 71, od.transport === "LAND");
+            drawCheck("OTHERS, PLEASE SPECIFY", 70, 71, od.transport === "OTHERS");
+
+            doc.setFontSize(10); doc.setFont("helvetica", "bold");
+            doc.text("DESTINATION:", 20, 78);
+            const formatDestDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+            let destY = 78;
+            (itin_list || []).forEach(it => {
+                doc.text(`${formatDestDate(it.travel_date)} - ${it.destination}`, 50, destY);
+                destY += 4.5;
+            });
+            
+            let curY = Math.max(destY, 83);
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+            doc.text("DEPARTURE DATE:", 20, curY);
+            doc.setFont("helvetica", "normal"); doc.text(itin_list[0]?.travel_date || "", 55, curY); doc.line(55, curY+1, 90, curY+1);
+            doc.setFont("helvetica", "bold"); doc.text("RETURN DATE:", 95, curY);
+            doc.setFont("helvetica", "normal"); doc.text(itin_list[itin_list.length-1]?.travel_date || "", 125, curY); doc.line(125, curY+1, 160, curY+1);
+
+            curY += 6;
+            doc.setFont("helvetica", "bold"); doc.text("REPORT TO:", 20, curY);
+            doc.setFont("helvetica", "normal"); doc.text(od.report_to || "", 50, curY); doc.line(50, curY+1, 160, curY+1);
+            
+            curY += 6;
+            doc.setFont("helvetica", "bold"); doc.text("PURPOSE OF TRAVEL:", 20, curY);
+            curY += 4;
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+            const purpLines = doc.splitTextToSize(itin_list[0]?.purpose || "", 140);
+            doc.text(purpLines, 20, curY); doc.line(20, curY+1, 160, curY+1);
+            curY += Math.max(5, purpLines.length * 4);
+
+            doc.setFont("helvetica", "italic"); doc.setFontSize(8);
+            doc.text("In case of seminar/workshop/consultation/briefing, indicate:", 20, curY);
+            drawCheck("LIVE IN", 110, curY, (itin_list[0]?.purpose || "").toUpperCase().includes("LIVE IN"));
+            drawCheck("LIVE OUT", 135, curY, (itin_list[0]?.purpose || "").toUpperCase().includes("LIVE OUT"));
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+            doc.text("Recommended by:", 20, 156);
+            
+            const renderSigs = (list, imgs, startX, width) => {
+                if (list.length === 0) return;
+                const count = Math.min(list.length, 2);
+                const step = width / count;
+                doc.setFontSize(count > 1 ? 6 : 8);
+                for (let j = 0; j < count; j++) {
+                    let cx = startX + (step * j) + (step / 2) - 10; 
+                    if (imgs[j]) { try { doc.addImage(imgs[j], 'PNG', cx, 153, 20, 20); } catch(e){} }
+                    doc.text(list[j].full_name.toUpperCase(), cx + 10, 166, {align: 'center'});
+                }
+            };
+
+            if (!isMARPO) renderSigs(uh_list, uh_imgs, 20, 60);
+            renderSigs(dc_list, dc_imgs, 95, 60);
+
+            doc.line(25, 168, 80, 168); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(isMARPO ? "" : "MARPO/UNIT HEAD", 52.5, 172, {align: 'center'});
+            doc.line(100, 168, 155, 168); doc.text("DIVISION CHIEF", 127.5, 172, {align: 'center'});
+
+            if(p2Data) { try { doc.addImage(p2Data, 'PNG', 122, 187, 20, 20); } catch(e){} }
+            doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("RICARDO C. GARCIA", 127.5, 202, {align: 'center'});
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+            doc.text("PARPO II", 127.5, 206, {align: 'center'});
+
+            doc.save(`TO_${toNo}.pdf`);
+        } catch (e) { alert("PDF Error: " + e.message); }
+    };
+
     async function generatePDFReport() {
         const type = qS('#repType').value;
         const period = qS('#repPeriod').value;
@@ -673,191 +863,9 @@
 
                 if(!validTos.length) { alert("No Approved Travel Orders found for this period."); return; }
                 
-                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-                let addedPages = false;
-
-                const getImg = async (path) => {
-                    try {
-                        let { data } = await supabaseClient.storage.from('e-sign').createSignedUrl(path, 60);
-                        if (!data || !data.signedUrl) {
-                            let res2 = await supabaseClient.storage.from('e-sgn').createSignedUrl(path, 60);
-                            data = res2.data;
-                        }
-                        if (data && data.signedUrl) return await loadImgData(data.signedUrl);
-                        return null;
-                    } catch(e) { return null; }
-                };
-
-                for (const t of validTos) {
-                    const toNo = t.to_no;
-                    const { data: group_orders } = await supabaseClient.from('travel_orders').select('*').eq('to_no', toNo);
-                    const { data: itin_list } = await supabaseClient.from('itinerary').select('*').eq('to_no', toNo).order('travel_date');
-                    const { data: emp_details } = await supabaseClient.from('employees').select('emp_id, full_name, position, station, type');
-                    
-                    if (!group_orders || !group_orders.length) continue;
-                    
-                    const od = group_orders[0];
-                    const names = group_orders.map(m => m.emp_name.toUpperCase()).join(", ");
-                    const positions = [...new Set(group_orders.map(m => emp_details?.find(e => e.emp_id === m.emp_id)?.position || ""))].join(", ").toUpperCase();
-                    const stations = [...new Set(group_orders.map(m => emp_details?.find(e => e.emp_id === m.emp_id)?.station || ""))].join(", ").toUpperCase();
-                    
-                    const rawType = emp_details?.find(e => e.emp_id === group_orders[0].emp_id)?.type?.toUpperCase();
-                    const typeLabel = rawType === 'SPLIT' ? 'SPLIT/COS' : (rawType === 'REGULAR' ? 'REGULAR' : '');
-
-                    const isMARPO = currentUser && currentUser.position && currentUser.position.toUpperCase().includes("MARPO");
-
-                    const uniqueUnits = [...new Set(group_orders.map(o => o.unit).filter(u => u && u !== "PARPO"))];
-                    const uniqueDivs = [...new Set(group_orders.map(o => o.division ? o.division.split(',')[0].trim() : "").filter(d => d))];
-
-                    let uh_list = [];
-                    if (!isMARPO && uniqueUnits.length > 0) {
-                        const { data } = await supabaseClient.from('users').select('full_name, username').in('unit', uniqueUnits);
-                        if (data) uh_list = data;
-                    }
-
-                    let dc_list = [];
-                    if (currentUser && currentUser.unit !== "PARPO" && uniqueDivs.length > 0) {
-                        const { data } = await supabaseClient.from('users').select('full_name, username').in('division', uniqueDivs).eq('role', 'CHIEF');
-                        if (data) dc_list = data;
-                    }
-
-                    const [img_bg, img_qr, img_p2, ...sigs] = await Promise.all([
-                        getImg("bg_form.jpg"),
-                        getQRDataURL(toNo),
-                        getImg("p2.png"), 
-                        ...uh_list.map(uh => getImg(`${uh.username}.png`)),
-                        ...dc_list.map(dc => getImg(`${dc.username}.png`))
-                    ]);
-                    
-                    const uh_imgs = sigs.slice(0, uh_list.length);
-                    const dc_imgs = sigs.slice(uh_list.length);
-
-                    if (addedPages) pdf.addPage();
-                    addedPages = true;
-
-                    if (img_bg) { try { pdf.addImage(img_bg, 'JPEG', 0, 0, 210, 297); } catch(e){} }
-                    if (img_qr) { 
-                        try { 
-                            pdf.addImage(img_qr, 'PNG', 175, 10, 20, 20); 
-                            pdf.setFont("helvetica", "bold"); pdf.setFontSize(8); 
-                            if(typeLabel){ pdf.text(typeLabel, 190, 33, {align: 'center'}); }
-                            pdf.setFont("helvetica", "italic"); pdf.setFontSize(7);
-                            pdf.text("HR FILE COPY", 190, 37, {align: 'center'});
-                        } catch(e){} 
-                    }
-
-                    if (od.transport === "GOV'T VEHICLE") {
-                        pdf.setFont("helvetica", "bold"); pdf.setFontSize(8);
-                        pdf.text("NOT VALID FOR TRANSPORTATION REIMBURSEMENT CLAIM", 105, 48, { align: 'center' });
-                    }
-                    if (od.remarks && od.remarks.includes("EXISTING PSO")) {
-                        pdf.setFont("helvetica", "bold"); pdf.setFontSize(9);
-                        pdf.text("WITH EXISTING PSO/RSO, subject for PARPO's FINAL APPROVAL", 105, 28, { align: 'center' });
-                    }
-
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(14);
-                    pdf.text(`TRAVEL ORDER NO. ${toNo}`, 105, 35, { align: 'center' });
-                    const fDate = new Date(od.created_at || new Date()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
-                    pdf.text(`Date: ${fDate}`, 105, 42, { align: 'center' });
-
-                    const renderFlexibleText = (text, x, y, maxWidth, defaultSize) => {
-                        let currentSize = defaultSize;
-                        pdf.setFontSize(currentSize);
-                        while (pdf.getTextWidth(text) > maxWidth && currentSize > 4) {
-                            currentSize -= 0.5;
-                            pdf.setFontSize(currentSize);
-                        }
-                        pdf.text(text, x, y);
-                        pdf.setFontSize(defaultSize);
-                    };
-
-                    pdf.setFontSize(10); 
-                    pdf.setFont("helvetica", "bold"); pdf.text("NAME:", 20, 48); 
-                    renderFlexibleText(names, 40, 48, 120, 10); pdf.line(40, 49, 160, 49);
-
-                    pdf.setFont("helvetica", "bold"); pdf.text("POSITION:", 20, 54);
-                    pdf.setFont("helvetica", "normal"); renderFlexibleText(positions, 40, 54, 45, 10); pdf.line(40, 55, 85, 55);
-                    pdf.setFont("helvetica", "bold"); pdf.text("STATION:", 90, 54);
-                    pdf.setFont("helvetica", "normal"); renderFlexibleText(stations, 110, 54, 50, 10); pdf.line(110, 55, 160, 55);
-
-                    pdf.setFont("helvetica", "bold"); pdf.text("MEANS OF TRANSPORTATION:", 20, 61);
-                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
-                    const drawCheck = (label, x, y, isChecked) => {
-                        pdf.rect(x, y - 3, 3, 3);
-                        if (isChecked) { pdf.setFont("helvetica", "bold"); pdf.text("X", x + 0.5, y - 0.2); pdf.setFont("helvetica", "normal"); }
-                        pdf.text(label, x + 5, y);
-                    };
-                    drawCheck("AIR", 20, 66, od.transport === "AIR");
-                    drawCheck("GOV'T VEHICLE", 70, 66, od.transport === "GOV'T VEHICLE");
-                    drawCheck("LAND", 20, 71, od.transport === "LAND");
-                    drawCheck("OTHERS, PLEASE SPECIFY", 70, 71, od.transport === "OTHERS");
-
-                    pdf.setFontSize(10); pdf.setFont("helvetica", "bold");
-                    pdf.text("DESTINATION:", 20, 78);
-                    const formatDestDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
-                    let destY = 78;
-                    (itin_list || []).forEach(it => {
-                        pdf.text(`${formatDestDate(it.travel_date)} - ${it.destination}`, 50, destY);
-                        destY += 4.5;
-                    });
-                    
-                    let curY = Math.max(destY, 83);
-
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(10);
-                    pdf.text("DEPARTURE DATE:", 20, curY);
-                    pdf.setFont("helvetica", "normal"); pdf.text(itin_list[0]?.travel_date || "", 55, curY); pdf.line(55, curY+1, 90, curY+1);
-                    pdf.setFont("helvetica", "bold"); pdf.text("RETURN DATE:", 95, curY);
-                    pdf.setFont("helvetica", "normal"); pdf.text(itin_list[itin_list.length-1]?.travel_date || "", 125, curY); pdf.line(125, curY+1, 160, curY+1);
-
-                    curY += 6;
-                    pdf.setFont("helvetica", "bold"); pdf.text("REPORT TO:", 20, curY);
-                    pdf.setFont("helvetica", "normal"); pdf.text(od.report_to || "", 50, curY); pdf.line(50, curY+1, 160, curY+1);
-                    
-                    curY += 6;
-                    pdf.setFont("helvetica", "bold"); pdf.text("PURPOSE OF TRAVEL:", 20, curY);
-                    curY += 4;
-                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
-                    const purpLines = pdf.splitTextToSize(itin_list[0]?.purpose || "", 140);
-                    pdf.text(purpLines, 20, curY); pdf.line(20, curY+1, 160, curY+1);
-                    curY += Math.max(5, purpLines.length * 4);
-
-                    pdf.setFont("helvetica", "italic"); pdf.setFontSize(8);
-                    pdf.text("In case of seminar/workshop/consultation/briefing, indicate:", 20, curY);
-                    drawCheck("LIVE IN", 110, curY, (itin_list[0]?.purpose || "").toUpperCase().includes("LIVE IN"));
-                    drawCheck("LIVE OUT", 135, curY, (itin_list[0]?.purpose || "").toUpperCase().includes("LIVE OUT"));
-
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(10);
-                    pdf.text("Recommended by:", 20, 156);
-                    
-                    const renderSigs = (list, imgs, startX, width) => {
-                        if (list.length === 0) return;
-                        const count = Math.min(list.length, 2);
-                        const step = width / count;
-                        pdf.setFontSize(count > 1 ? 6 : 8);
-                        for (let j = 0; j < count; j++) {
-                            let cx = startX + (step * j) + (step / 2) - 10; 
-                            if (imgs[j]) { try { pdf.addImage(imgs[j], 'PNG', cx, 153, 20, 20); } catch(e){} }
-                            pdf.text(list[j].full_name.toUpperCase(), cx + 10, 166, {align: 'center'});
-                        }
-                    };
-
-                    if (!isMARPO) renderSigs(uh_list, uh_imgs, 20, 60);
-                    renderSigs(dc_list, dc_imgs, 95, 60);
-
-                    pdf.line(25, 168, 80, 168); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.text(isMARPO ? "" : "MARPO/UNIT HEAD", 52.5, 172, {align: 'center'});
-                    pdf.line(100, 168, 155, 168); pdf.text("DIVISION CHIEF", 127.5, 172, {align: 'center'});
-
-                    if(img_p2) { try { pdf.addImage(img_p2, 'PNG', 122, 187, 20, 20); } catch(e){} }
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(11);
-                    pdf.text("RICARDO C. GARCIA", 127.5, 202, {align: 'center'});
-                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(9);
-                    pdf.text("PARPO II", 127.5, 206, {align: 'center'});
+                for (const od of validTos) {
+                    await window.generateOfficialPDF(od.to_no);
                 }
-
-                if(!addedPages) { alert("Failed to render."); return; }
-                pdf.save(`Batch_HR_Files_TravelOrders_${year}.pdf`);
 
             // 2. MRUA
             } else if (type === "MRUA") {
@@ -993,6 +1001,8 @@
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 let count = 0;
                 
+                let bgMemoData = null; // NO BACKGROUND REQUESTED
+                
                 for (const e of emps) {
                     const rec = comp.find(c => c.emp_id == e.emp_id) || {};
                     let missing = [];
@@ -1095,7 +1105,7 @@
 
             // 5. FLAG CEREMONY MEMOS
             } else if (type === "Flag Ceremony Memos") {
-                const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', startIso).lte('log_date', endIso);
+                const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('date', startIso).lte('date', endIso);
                 const flagLogs = flagLogsData || [];
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 let count = 0;
@@ -1118,7 +1128,7 @@
                         doc.setLineWidth(0.6); doc.line(25.4, cy, 190.5, cy); cy += 8;
                         
                         doc.setFont("helvetica", "normal");
-                        const datesStr = eFlag.map(f => new Date(f.log_date).toLocaleDateString('en-US', {month:'short', day:'numeric'})).join(", ");
+                        const datesStr = eFlag.map(f => new Date(f.date).toLocaleDateString('en-US', {month:'short', day:'numeric'})).join(", ");
                         
                         doc.text(`Based on the records of the Human Resource Management Office (HRMO), you failed to attend`, 25.4, cy); cy += 5;
                         doc.text(`the Flag Raising/Lowering Ceremony on the following date/s: ${datesStr}.`, 25.4, cy); cy += 10;
@@ -1193,7 +1203,7 @@
                         empGroups[div].push(t);
                     });
 
-                    // EXACTLY MATCHED USER INSTRUCTIONS
+                    // EXACTLY MATCHED USER INSTRUCTIONS FOR TRAVEL ORDER SUMMARY HEADERS
                     const headers = ["TO NUMBER", "NAME OF EMPLOYEE", "PERIOD", "PURPOSE", "REPORT TO", "DATE", "SIGNATURE"];
                     const widths = [30, 50, 45, 80, 55, 30, 35];
 
@@ -1201,6 +1211,7 @@
                         if(currY > 180) { doc.addPage(); currY = 15; }
                         currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             const il = itin.filter(i => i.to_no === r.to_no);
+                            // EXACTLY MATCHED REPORT TO AND BLANK DATE/SIGNATURE
                             return [r.to_no, (r.emp_name || '').toUpperCase(), getInclusiveDates(il.map(i=>i.travel_date)), r.purpose, r.report_to || '-', '', ''];
                         }, currY);
                     });
@@ -1282,7 +1293,7 @@
                     });
 
                 } else if (type === "Flag Ceremony Attendance") {
-                    const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', startIso).lte('log_date', endIso);
+                    const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('date', startIso).lte('date', endIso);
                     const flagLogs = flagLogsData || [];
                     
                     let empGroups = {};
@@ -1301,7 +1312,7 @@
                             if(!agg[f.emp_id]) agg[f.emp_id] = { p: 0, a: 0, details: [] };
                             const stat = String(f.status).toUpperCase().includes("ABSENT") ? "ABSENT" : "PRESENT";
                             if(stat === "PRESENT") agg[f.emp_id].p++; else agg[f.emp_id].a++;
-                            const dtStr = new Date(f.log_date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+                            const dtStr = new Date(f.date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
                             const tmStr = formatTime12h(f.time_in || f.log_time);
                             agg[f.emp_id].details.push(`${dtStr}: ${stat} [${tmStr}]`);
                         });
