@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports - DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; }
+        .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: #003811; margin-bottom: 0.25rem; text-transform: uppercase; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">REPORTS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow hover:bg-red-700">LOGOUT</button>
+        </div>
+    </nav>
+
+    <main class="flex-1 overflow-y-auto p-8">
+        <h2 class="text-3xl font-bold text-[#003811] mb-6">Report Generator</h2>
+
+        <div class="card p-6 border-[#E5E7EB] shadow-sm mb-6">
+            <h3 class="text-lg font-bold text-[#003811] mb-6 uppercase tracking-wider">CONSOLIDATED PRINTING</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+                <div>
+                    <label class="form-label text-[9px] font-bold">Report Type:</label>
+                    <select id="repType" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm">
+                        <option>Travel Order Summary</option>
+                        <option>Travel Order Batch Printing</option>
+                        <option>Gate Pass</option>
+                        <option>Leave Summary</option>
+                        <option>Tardiness / Undertime</option>
+                        <option>PSO / TO Conflicts</option>
+                        <option>Tardiness Memos</option>
+                        <option>Compliance Memos</option>
+                        <option>MRUA</option>
+                        <option>Flag Ceremony Attendance</option>
+                        <option>Flag Ceremony Memos</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="form-label text-[9px] font-bold">Select Period:</label>
+                    <select id="repPeriod" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm" onchange="toggleReportPeriod()">
+                        <option>WEEKLY</option>
+                        <option selected>MONTHLY</option>
+                        <option>ANNUALLY</option>
+                        <option>RANGE</option>
+                    </select>
+                </div>
+                
+                <div id="repMonthGroup">
+                    <label class="form-label text-[9px] font-bold">Month / Year:</label>
+                    <div class="flex gap-2">
+                        <select id="repMonth" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-2/3"></select>
+                        <input type="number" id="repYear" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-1/3 text-center" value="2026">
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="repAppendMode" class="w-4 h-4 accent-red-700">
+                        <label class="text-[9px] font-bold text-red-700">Append Mode (Save Paper)</label>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-[8px]">Append Level:</label>
+                        <select id="repAppendLevel" class="form-input bg-[#F9FAFB] border-[#D1D5DB] py-1 text-[10px] w-24">
+                            <option>Level 1</option><option>Level 2</option><option>Level 3</option><option>Level 4</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="generatePDFReport()" id="btnGenerateReport" class="mt-8 bg-[#D4AF37] text-black font-bold text-xs px-8 py-3 rounded shadow-sm hover:brightness-110">GENERATE PDF REPORT</button>
+        </div>
+
+        <div class="card p-6 border-[#E5E7EB]">
+            <h3 class="text-sm font-bold text-[#003811] mb-4">Pending Annual Requirements Tracker</h3>
+            <button onclick="loadMissingComp()" class="bg-[#E0E0E0] text-[11px] px-4 py-1.5 rounded hover:bg-gray-300 mb-4">REFRESH TRACKER</button>
+            
+            <div class="border rounded overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-[#E5E7EB]">
+                        <tr class="text-[#003811] font-bold border-b">
+                            <th class="p-3 border-r">Emp ID</th>
+                            <th class="p-3 border-r">Name</th>
+                            <th class="p-3">Lacking Requirements</th>
+                        </tr>
+                    </thead>
+                    <tbody id="missingCompTableBody" class="divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="qrContainer" class="hidden"></div>
+
+<script>
+    // Session Check & Initialization
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) { window.location.href = 'index.html'; }
+    const currentUser = JSON.parse(userData);
+    document.getElementById('activeUser').innerText = `User: ${currentUser.full_name.toUpperCase()}`;
+
+    function logout() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    }
+
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const qS = (sel) => document.querySelector(sel);
+
+    window.onload = () => {
+        let mSel = qS('#repMonth');
+        months.forEach((m, i) => mSel.add(new Option(m, i+1)));
+        mSel.selectedIndex = new Date().getMonth();
+        loadMissingComp();
+    };
+
+    function toggleReportPeriod() {
+        const p = qS('#repPeriod').value;
+        qS('#repMonthGroup').style.display = (p === 'MONTHLY' || p === 'WEEKLY') ? 'block' : 'none';
+    }
+
+    // --- HELPER FUNCTIONS ---
+    async function loadImgData(url) {
+        return new Promise((resolve, reject) => {
+            let img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                let canvas = document.createElement('canvas');
+                canvas.width = img.width; canvas.height = img.height;
+                let ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/jpeg'));
+            };
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+
+    async function getQRDataURL(text) {
+        return new Promise((resolve) => {
+            qS('#qrContainer').innerHTML = "";
+            new QRCode(qS('#qrContainer'), { text: text, width: 100, height: 100 });
+            setTimeout(() => { resolve(qS('#qrContainer').querySelector("canvas").toDataURL("image/png")); }, 100);
+        });
+    }
+
+    function formatTime12h(timeStr) {
+        if (!timeStr) return "";
+        try {
+            const [h, m] = timeStr.split(":");
+            let hour = parseInt(h, 10);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12 || 12;
+            return `${hour.toString().padStart(2, '0')}:${m} ${ampm}`;
+        } catch(e) { return timeStr; }
+    }
+
+    function getInclusiveDates(datesArray) {
+        if (!datesArray || datesArray.length === 0) return "-";
+        const dates = datesArray.map(d => new Date(d)).sort((a,b) => a-b);
+        const start = dates[0];
+        const end = dates[dates.length - 1];
+        const startStr = start.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+        const endStr = end.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+        if (start.getTime() === end.getTime()) return startStr;
+        return `${startStr} to ${endStr}`;
+    }
+
+    // --- REPORT GENERATION LOGIC ---
+    function drawTableGroup(doc, divisionName, groupData, headers, widths, rowFormatter, startY) {
+        const lMargin = 15;
+        let currY = startY;
+
+        doc.setFontSize(10); doc.setFont("helvetica", "bold");
+        doc.setFillColor(200, 220, 255);
+        doc.rect(lMargin, currY, widths.reduce((a,b)=>a+b,0), 8, 'DF');
+        doc.setTextColor(0,0,0);
+        doc.text(`DIVISION: ${divisionName}`, lMargin + 2, currY + 5.5);
+        currY += 8;
+        
+        doc.setFontSize(8); 
+        let cx = lMargin;
+        headers.forEach((h, i) => {
+            doc.setFillColor(220, 220, 220);
+            doc.rect(cx, currY, widths[i], 8, 'DF');
+            doc.setTextColor(0,0,0);
+            doc.text(h, cx + (widths[i]/2), currY + 5, {align: 'center'});
+            cx += widths[i];
+        });
+        currY += 8;
+        
+        doc.setFontSize(7); doc.setFont("helvetica", "normal");
+        groupData.forEach(row => {
+            let rowData = rowFormatter(row);
+            let colX = lMargin;
+            
+            let maxLines = 1;
+            rowData.forEach((val, i) => {
+                let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
+                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = "";
+                let lines = doc.splitTextToSize(vStr, widths[i] - 2);
+                if (lines.length > maxLines) maxLines = lines.length;
+            });
+            let rowH = Math.max(6, maxLines * 4.5 + 2);
+            
+            rowData.forEach((val, i) => {
+                let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
+                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = ""; 
+                
+                doc.setFillColor(255, 255, 255); 
+                doc.rect(colX, currY, widths[i], rowH, 'DF');
+                doc.setTextColor(0,0,0);
+                
+                let align = 'center';
+                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) {
+                    align = 'left';
+                }
+                const tx = align === 'center' ? colX + (widths[i]/2) : colX + 2;
+                
+                let textLines = doc.splitTextToSize(vStr, widths[i] - 2);
+                doc.text(textLines, tx, currY + 4, {align: align});
+                colX += widths[i];
+            });
+            currY += rowH;
+        });
+        currY += 5;
+        return currY;
+    }
+
+    const drawMRUAColHeaders = (pdf, cy) => {
+        pdf.setFontSize(7); pdf.setFont("helvetica", "bold");
+        let cx = 15;
+        const headers = ["NAMES", "I.D. NO.", "NO. OF TIMES\nABSENT", "DATES ABSENT", "NO. OF TIMES\nUNDERTIME", "DATE UNDERTIME", "TOTAL HRS/MINS\nUNDERTIME", "TOTAL DAYS", "REMARKS"];
+        const hWidths = [55, 20, 22, 40, 22, 40, 26, 20, 80.6];
+        
+        hWidths.forEach((w, i) => {
+            pdf.setFillColor(220, 220, 220); 
+            pdf.rect(cx, cy, w, 12, 'DF');
+            pdf.setTextColor(0,0,0);
+            if(i === 7) {
+                pdf.line(cx, cy+6, cx+w, cy+6);
+                pdf.line(cx+(w/2), cy+6, cx+(w/2), cy+12);
+                pdf.text("TOTAL DAYS", cx+(w/2), cy+4, {align:"center"});
+                pdf.text("VL", cx+(w/4), cy+10, {align:"center"});
+                pdf.text("SL", cx+(w*0.75), cy+10, {align:"center"});
+            } else {
+                const lines = headers[i].split('\n');
+                if(lines.length === 1) pdf.text(lines[0], cx+(w/2), cy+7, {align:"center"});
+                else { pdf.text(lines[0], cx+(w/2), cy+5, {align:"center"}); pdf.text(lines[1], cx+(w/2), cy+9, {align:"center"}); }
+            }
+            cx += w;
+        });
+        return cy + 12;
+    };
+
+    window.generateOfficialPDF = async function(toNo) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4'); 
+        
+        try {
+            const { data: group_orders } = await supabaseClient.from('travel_orders').select('*').eq('to_no', toNo);
+            const { data: itin_list } = await supabaseClient.from('itinerary').select('*').eq('to_no', toNo).order('travel_date');
+            const { data: emp_details } = await supabaseClient.from('employees').select('emp_id, full_name, position, station, type');
+            
+            if (!group_orders || !group_orders.length) return;
+            
+            const od = group_orders[0];
+            const names = group_orders.map(m => m.emp_name.toUpperCase()).join(", ");
+            const positions = [...new Set(group_orders.map(m => emp_details?.find(e => e.emp_id === m.emp_id)?.position || ""))].join(", ").toUpperCase();
+            const stations = [...new Set(group_orders.map(m => emp_details?.find(e => e.emp_id === m.emp_id)?.station || ""))].join(", ").toUpperCase();
+            
+            const rawType = emp_details?.find(e => e.emp_id === group_orders[0].emp_id)?.type?.toUpperCase();
+            const typeLabel = rawType === 'SPLIT' ? 'SPLIT/COS' : (rawType === 'REGULAR' ? 'REGULAR' : '');
+            const isMARPO = currentUser && currentUser.position && currentUser.position.toUpperCase().includes("MARPO");
+
+            const uniqueUnits = [...new Set(group_orders.map(o => o.unit).filter(u => u && u !== "PARPO"))];
+            const uniqueDivs = [...new Set(group_orders.map(o => o.division ? o.division.split(',')[0].trim() : "").filter(d => d))];
+
+            let uh_list = [], dc_list = [];
+            if (!isMARPO && uniqueUnits.length > 0) {
+                const { data } = await supabaseClient.from('users').select('full_name, username').in('unit', uniqueUnits);
+                if (data) uh_list = data;
+            }
+            if (currentUser && currentUser.unit !== "PARPO" && uniqueDivs.length > 0) {
+                const { data } = await supabaseClient.from('users').select('full_name, username').in('division', uniqueDivs).eq('role', 'CHIEF');
+                if (data) dc_list = data;
+            }
+
+            let bgData = null, qrData = null, p2Data = null, uh_imgs = [], dc_imgs = [];
+            try {
+                let res1 = await supabaseClient.storage.from('e-sign').createSignedUrl('bg_form.jpg', 60);
+                if (!res1.data || !res1.data.signedUrl) res1 = await supabaseClient.storage.from('e-sgn').createSignedUrl('bg_form.jpg', 60);
+                if (res1.data && res1.data.signedUrl) bgData = await loadImgData(res1.data.signedUrl);
+                
+                qrData = await getQRDataURL(toNo);
+                
+                let res2 = await supabaseClient.storage.from('e-sign').createSignedUrl('P2.png', 60);
+                if (!res2.data || !res2.data.signedUrl) res2 = await supabaseClient.storage.from('e-sgn').createSignedUrl('P2.png', 60);
+                if (res2.data && res2.data.signedUrl) p2Data = await loadImgData(res2.data.signedUrl);
+
+                for (const uh of uh_list) {
+                    let res = await supabaseClient.storage.from('e-sign').createSignedUrl(`${uh.username}.png`, 60);
+                    if (!res.data || !res.data.signedUrl) res = await supabaseClient.storage.from('e-sgn').createSignedUrl(`${uh.username}.png`, 60);
+                    if (res.data && res.data.signedUrl) uh_imgs.push(await loadImgData(res.data.signedUrl));
+                }
+                for (const dc of dc_list) {
+                    let res = await supabaseClient.storage.from('e-sign').createSignedUrl(`${dc.username}.png`, 60);
+                    if (!res.data || !res.data.signedUrl) res = await supabaseClient.storage.from('e-sgn').createSignedUrl(`${dc.username}.png`, 60);
+                    if (res.data && res.data.signedUrl) dc_imgs.push(await loadImgData(res.data.signedUrl));
+                }
+            } catch(e) { console.log(e); }
+
+            if (bgData) { try { doc.addImage(bgData, 'JPEG', 0, 0, 210, 297); } catch(e){} }
+            if (qrData) { 
+                try { 
+                    doc.addImage(qrData, 'PNG', 175, 10, 20, 20); 
+                    doc.setFont("helvetica", "bold"); doc.setFontSize(8); 
+                    if(typeLabel){ doc.text(typeLabel, 190, 33, {align: 'center'}); }
+                    doc.setFont("helvetica", "italic"); doc.setFontSize(7);
+                    doc.text("HR FILE COPY", 185, 33.5, {align: 'center'});
+                } catch(e){} 
+            }
+
+            if (od.transport === "GOV'T VEHICLE") {
+                doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+                doc.text("NOT VALID FOR TRANSPORTATION REIMBURSEMENT CLAIM", 105, 48, { align: 'center' });
+            }
+            if (od.remarks && od.remarks.includes("EXISTING PSO")) {
+                doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+                doc.text("WITH EXISTING PSO/RSO, subject for PARPO's FINAL APPROVAL", 105, 28, { align: 'center' });
+            }
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+            doc.text(`TRAVEL ORDER NO. ${toNo}`, 105, 35, { align: 'center' });
+            const fDate = new Date(od.created_at || new Date()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+            doc.text(`Date: ${fDate}`, 105, 42, { align: 'center' });
+
+            const renderFlexibleText = (text, x, y, maxWidth, defaultSize) => {
+                let currentSize = defaultSize;
+                doc.setFontSize(currentSize);
+                while (doc.getTextWidth(text) > maxWidth && currentSize > 4) { currentSize -= 0.5; doc.setFontSize(currentSize); }
+                doc.text(text, x, y); doc.setFontSize(defaultSize);
+            };
+
+            doc.setFontSize(10); 
+            doc.setFont("helvetica", "bold"); doc.text("NAME:", 20, 48); 
+            renderFlexibleText(names, 40, 48, 120, 10); doc.line(40, 49, 160, 49);
+
+            doc.setFont("helvetica", "bold"); doc.text("POSITION:", 20, 54);
+            doc.setFont("helvetica", "normal"); renderFlexibleText(positions, 40, 54, 45, 10); doc.line(40, 55, 85, 55);
+            doc.setFont("helvetica", "bold"); doc.text("STATION:", 90, 54);
+            doc.setFont("helvetica", "normal"); renderFlexibleText(stations, 110, 54, 50, 10); doc.line(110, 55, 160, 55);
+
+            doc.setFont("helvetica", "bold"); doc.text("MEANS OF TRANSPORTATION:", 20, 61);
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+            const drawCheck = (label, x, y, isChecked) => {
+                doc.rect(x, y - 3, 3, 3);
+                if (isChecked) { doc.setFont("helvetica", "bold"); doc.text("X", x + 0.5, y - 0.2); doc.setFont("helvetica", "normal"); }
+                doc.text(label, x + 5, y);
+            };
+            drawCheck("AIR", 20, 66, od.transport === "AIR");
+            drawCheck("GOV'T VEHICLE", 70, 66, od.transport === "GOV'T VEHICLE");
+            drawCheck("LAND", 20, 71, od.transport === "LAND");
+            drawCheck("OTHERS, PLEASE SPECIFY", 70, 71, od.transport === "OTHERS");
+
+            doc.setFontSize(10); doc.setFont("helvetica", "bold");
+            doc.text("DESTINATION:", 20, 78);
+            const formatDestDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+            let destY = 78;
+            (itin_list || []).forEach(it => { doc.text(`${formatDestDate(it.travel_date)} - ${it.destination}`, 50, destY); destY += 4.5; });
+            
+            let curY = Math.max(destY, 83);
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+            doc.text("DEPARTURE DATE:", 20, curY);
+            doc.setFont("helvetica", "normal"); doc.text(itin_list[0]?.travel_date || "", 55, curY); doc.line(55, curY+1, 90, curY+1);
+            doc.setFont("helvetica", "bold"); doc.text("RETURN DATE:", 95, curY);
+            doc.setFont("helvetica", "normal"); doc.text(itin_list[itin_list.length-1]?.travel_date || "", 125, curY); doc.line(125, curY+1, 160, curY+1);
+
+            curY += 6;
+            doc.setFont("helvetica", "bold"); doc.text("REPORT TO:", 20, curY);
+            doc.setFont("helvetica", "normal"); doc.text(od.report_to || "", 50, curY); doc.line(50, curY+1, 160, curY+1);
+            
+            curY += 6;
+            doc.setFont("helvetica", "bold"); doc.text("PURPOSE OF TRAVEL:", 20, curY);
+            curY += 4;
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+            const purpLines = doc.splitTextToSize(itin_list[0]?.purpose || "", 140);
+            doc.text(purpLines, 20, curY); doc.line(20, curY+1, 160, curY+1);
+            curY += Math.max(5, purpLines.length * 4);
+
+            doc.setFont("helvetica", "italic"); doc.setFontSize(8);
+            doc.text("In case of seminar/workshop/consultation/briefing, indicate:", 20, curY);
+            drawCheck("LIVE IN", 110, curY, (itin_list[0]?.purpose || "").toUpperCase().includes("LIVE IN"));
+            drawCheck("LIVE OUT", 135, curY, (itin_list[0]?.purpose || "").toUpperCase().includes("LIVE OUT"));
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+            doc.text("Recommended by:", 20, 156);
+            
+            const renderSigs = (list, imgs, startX, width) => {
+                if (list.length === 0) return;
+                const count = Math.min(list.length, 2);
+                const step = width / count;
+                doc.setFontSize(count > 1 ? 6 : 8);
+                for (let j = 0; j < count; j++) {
+                    let cx = startX + (step * j) + (step / 2) - 10; 
+                    if (imgs[j]) { try { doc.addImage(imgs[j], 'PNG', cx, 153, 20, 20); } catch(e){} }
+                    doc.text(list[j].full_name.toUpperCase(), cx + 10, 166, {align: 'center'});
+                }
+            };
+
+            if (!isMARPO) renderSigs(uh_list, uh_imgs, 20, 60);
+            renderSigs(dc_list, dc_imgs, 95, 60);
+
+            doc.line(25, 168, 80, 168); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(isMARPO ? "" : "MARPO/UNIT HEAD", 52.5, 172, {align: 'center'});
+            doc.line(100, 168, 155, 168); doc.text("DIVISION CHIEF", 127.5, 172, {align: 'center'});
+
+            if(p2Data) { try { doc.addImage(p2Data, 'PNG', 122, 187, 20, 20); } catch(e){} }
+            doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("RICARDO C. GARCIA", 127.5, 202, {align: 'center'});
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+            doc.text("PARPO II", 127.5, 206, {align: 'center'});
+
+            doc.save(`TO_${toNo}.pdf`);
+        } catch (e) { alert("PDF Error: " + e.message); }
+    };
+
+    async function generatePDFReport() {
+        const type = qS('#repType').value;
+        const period = qS('#repPeriod').value;
+        const year = parseInt(qS('#repYear').value);
+        const monthIdx = qS('#repMonth').selectedIndex + 1;
+        const monthName = months[monthIdx-1];
+        const btn = qS('#btnGenerateReport');
+        btn.disabled = true; btn.innerText = "FETCHING DATA...";
+
+        let startIso, endIso;
+        if (period === 'MONTHLY') {
+            startIso = `${year}-${String(monthIdx).padStart(2,'0')}-01T00:00:00`;
+            const lastDay = new Date(year, monthIdx, 0).getDate();
+            endIso = `${year}-${String(monthIdx).padStart(2,'0')}-${lastDay}T23:59:59`;
+        } else if (period === 'ANNUALLY') {
+            startIso = `${year}-01-01T00:00:00`;
+            endIso = `${year}-12-31T23:59:59`;
+        } else if (period === 'RANGE') {
+            const startStr = prompt("Enter Start Date (YYYY-MM-DD):");
+            if (!startStr) { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; return; }
+            const endStr = prompt("Enter End Date (YYYY-MM-DD):");
+            if (!endStr) { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; return; }
+            startIso = `${startStr}T00:00:00`;
+            endIso = `${endStr}T23:59:59`;
+        } else {
+            let d = new Date(); d.setDate(d.getDate() - 7);
+            startIso = d.toISOString();
+            endIso = new Date().toISOString();
+        }
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const { data: empsData, error: eErr } = await supabaseClient.from('employees').select('*');
+            const emps = empsData || [];
+            if(!emps.length) { alert("No employees found in database."); return; }
+
+            const nameMap = Object.fromEntries(emps.map(e => [e.emp_id, e.full_name]));
+            const divMap = Object.fromEntries(emps.map(e => [e.emp_id, e.division]));
+            const posMap = Object.fromEntries(emps.map(e => [e.emp_id, e.position]));
+            const stationMap = Object.fromEntries(emps.map(e => [e.emp_id, e.station]));
+
+            if (type === "Travel Order Batch Printing") {
+                const { data: tosData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
+                const tos = tosData || [];
+                const { data: itinData } = await supabaseClient.from('itinerary').select('*');
+                const itins = itinData || [];
+                
+                const validTos = tos.filter(t => {
+                    const il = itins.filter(i => i.to_no === t.to_no);
+                    if(!il.length) return false;
+                    const dts = il.map(i => new Date(i.travel_date));
+                    const minD = new Date(Math.min(...dts));
+                    const maxD = new Date(Math.max(...dts));
+                    const s = new Date(startIso); const e = new Date(endIso);
+                    return (minD >= s && minD <= e) || (maxD >= s && maxD <= e);
+                });
+
+                if(!validTos.length) { alert("No Approved Travel Orders found for this period."); return; }
+                
+                for (const od of validTos) {
+                    await window.generateOfficialPDF(od.to_no);
+                }
+
+            } else if (type === "MRUA") {
+                const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
+                
+                let mruaBgData = null;
+                try {
+                    let { data } = await supabaseClient.storage.from('e-sign').createSignedUrl('mrua_bg.jpg', 60);
+                    if(!data || !data.signedUrl) {
+                         let res2 = await supabaseClient.storage.from('e-sgn').createSignedUrl('mrua_bg.jpg', 60);
+                         data = res2.data;
+                    }
+                    if (data && data.signedUrl) { mruaBgData = await loadImgData(data.signedUrl); }
+                } catch(e) { console.warn("No mrua_bg.jpg found"); }
+                
+                const { data: logsData } = await supabaseClient.from('attendance_logs').select('*').gte('log_time', startIso).lte('log_time', endIso);
+                const logs = logsData || [];
+                const { data: leavesData } = await supabaseClient.from('leave_ledger').select('*').gte('date', startIso).lte('date', endIso).eq('transaction_t', 'APPROVED');
+                const leaves = leavesData || [];
+                
+                let empGroups = {};
+                emps.forEach(e => {
+                    if ((e.type || '').toUpperCase() !== 'REGULAR') return; 
+
+                    let div = (e.division || "UNASSIGNED").toUpperCase();
+                    let st = (e.station || "").toUpperCase();
+                    if(div.includes("DARMO") && st && st !== "NONE") div = `DARMO - ${st}`;
+                    if(!empGroups[div]) empGroups[div] = [];
+                    empGroups[div].push(e);
+                });
+
+                const sortedDivs = Object.keys(empGroups).sort();
+                const colWidths = [55, 20, 22, 40, 22, 40, 26, 10, 10, 80.6];
+
+                let currY = 45;
+                if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 355.6, 215.9);
+                currY = drawMRUAColHeaders(doc, currY);
+                
+                sortedDivs.forEach(div => {
+                    if(currY > 170) { 
+                        doc.addPage(); 
+                        currY = 15; 
+                        currY = drawMRUAColHeaders(doc, currY);
+                    }
+
+                    doc.setFontSize(10); doc.setFont("helvetica", "bold");
+                    doc.setFillColor(200, 220, 255);
+                    doc.rect(15, currY, colWidths.reduce((a,b)=>a+b,0), 6, 'DF');
+                    doc.setTextColor(0,0,0);
+                    doc.text(`DIVISION: ${div}`, 17, currY + 4);
+                    currY += 6;
+                    
+                    empGroups[div].forEach(emp => {
+                        const eLogs = logs.filter(l => l.emp_id == emp.emp_id);
+                        const eLeaves = leaves.filter(l => l.emp_id == emp.emp_id);
+                        
+                        let vlDays = 0, slDays = 0, absCount = 0;
+                        eLeaves.forEach(lr => {
+                            let type = (lr.type || "").toUpperCase();
+                            if(type.includes("VL") || type.includes("VACATION")) vlDays += Math.abs(parseFloat(lr.debit||0));
+                            if(type.includes("SL") || type.includes("SICK")) slDays += Math.abs(parseFloat(lr.debit||0));
+                            absCount++;
+                        });
+                        
+                        let utCount = 0, totUtMins = 0; 
+                        
+                        if(absCount === 0 && utCount === 0) return;
+
+                        const rowVals = [
+                            emp.full_name.toUpperCase(), emp.emp_id, 
+                            absCount > 0 ? String(absCount) : "-", "-", 
+                            utCount > 0 ? String(utCount) : "-", "-", 
+                            "-", vlDays > 0 ? String(vlDays) : "-", slDays > 0 ? String(slDays) : "-", "-"
+                        ];
+
+                        let rowH = 6; let cx = 15;
+                        
+                        if (currY + rowH > 185) {
+                            doc.addPage();
+                            currY = 15;
+                            currY = drawMRUAColHeaders(doc, currY);
+                        }
+
+                        doc.setFont("helvetica", "normal");
+                        colWidths.forEach((w, i) => {
+                            doc.setFillColor(255, 255, 255);
+                            doc.rect(cx, currY, w, rowH, 'DF');
+                            doc.setTextColor(0,0,0);
+                            const align = (i === 0 || i === 3 || i === 5 || i === 9) ? "left" : "center";
+                            const tx = align === "center" ? cx + (w/2) : cx + 2;
+                            doc.text(rowVals[i], tx, currY + 4, {align: align});
+                            cx += w;
+                        });
+                        currY += rowH;
+                    });
+                });
+                
+                if(currY > 170) { doc.addPage(); currY = 15; }
+                currY += 5;
+                doc.setFontSize(8); doc.setFont("helvetica", "bold");
+                doc.text("New Assumption(s):", 15, currY); doc.setFont("helvetica", "normal");
+                doc.text("Date: _________________", 50, currY); doc.text("Nature: _________________", 85, currY);
+                doc.text("Former Station: _________________", 130, currY); doc.text("Remarks: _________________", 180, currY);
+                currY += 5;
+                doc.setFont("helvetica", "bold"); doc.text("Separation(s):", 15, currY); doc.setFont("helvetica", "normal");
+                doc.text("Date: _________________", 50, currY); doc.text("Nature: _________________", 85, currY);
+                doc.text("Station: _________________", 130, currY); doc.text("Remarks: _________________", 180, currY);
+                
+                currY += 15;
+                doc.text("Prepared and Posted:", 70, currY, {align: "center"}); doc.text("Approved by:", 240, currY, {align: "center"});
+                currY += 10;
+                doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+                doc.text("SHERALYN S. MIRARAN", 70, currY, {align: "center"}); doc.text("RICARDO C. GARCIA", 240, currY, {align: "center"});
+                currY += 4;
+                doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+                doc.text("HRMO / AO II", 70, currY, {align: "center"}); doc.text("PARPO II", 240, currY, {align: "center"});
+
+                doc.save(`MRUA_${monthName}_${year}.pdf`);
+
+            } else if (type === "Compliance Memos") {
+                const { data: compData } = await supabaseClient.from('annual_compliance').select('*').eq('year', year);
+                const comp = compData || [];
+                const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
+                let count = 0;
+                
+                let bgMemoData = null; 
+                try {
+                    let { data } = await supabaseClient.storage.from('e-sign').createSignedUrl('bg_memo.jpg', 60);
+                    if (!data || !data.signedUrl) {
+                        let res2 = await supabaseClient.storage.from('e-sgn').createSignedUrl('bg_memo.jpg', 60);
+                        data = res2.data;
+                    }
+                    if (data && data.signedUrl) { bgMemoData = await loadImgData(data.signedUrl); }
+                } catch(e) { console.warn("bg_memo missing"); }
+                
+                for (const e of emps) {
+                    const rec = comp.find(c => c.emp_id == e.emp_id) || {};
+                    let missing = [];
+                    if(!rec.saln_status) missing.push("Statement of Assets, Liabilities, and Net Worth (SALN)");
+                    if(!rec.ipcr_plan_status) missing.push("IPCR Plan");
+                    if(!rec.ipcr_status) missing.push("IPCR");
+                    if(!rec.lap_status) missing.push("Leave Administration Plan (LAP)");
+                    if(!rec.hmo_plan_status) missing.push("HMO Plan submission");
+                    
+                    if(missing.length > 0) {
+                        if(count > 0) doc.addPage();
+                        if (bgMemoData) doc.addImage(bgMemoData, 'JPEG', 0, 0, 215.9, 330.2);
+
+                        doc.setFontSize(12); doc.setFont("helvetica", "bold");
+                        doc.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
+                        doc.setFontSize(11);
+                        doc.text(`Series of ${year}`, 25.4, 51);
+                        
+                        let lineH = 8; let cy = 70;
+                        doc.text("TO", 25.4, cy); doc.text(":", 45, cy); doc.text(e.full_name.toUpperCase(), 50, cy); cy += lineH;
+                        doc.text("FROM", 25.4, cy); doc.text(":", 45, cy); doc.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 50, cy); cy += lineH;
+                        doc.text("DATE", 25.4, cy); doc.text(":", 45, cy); doc.text(new Date().toLocaleDateString('en-US', {month:'long', day:'2-digit', year:'numeric'}), 50, cy); cy += lineH;
+                        doc.text("SUBJECT", 25.4, cy); doc.text(":", 45, cy); doc.text("COMPLIANCE ON ANNUAL REQUIREMENTS", 50, cy); cy += 6;
+                        
+                        doc.setLineWidth(0.6); doc.line(25.4, cy, 190.5, cy); cy += 8;
+                        
+                        doc.setFont("helvetica", "normal");
+                        doc.text(`Please be reminded of your pending annual compliance requirements for the year ${year}.`, 25.4, cy); cy += 5;
+                        doc.text("Based on our records, you have not yet submitted the following:", 25.4, cy); cy += 6;
+                        
+                        missing.forEach(req => { doc.text("-", 35, cy); doc.text(req, 40, cy); cy += 5; });
+                        
+                        doc.text("You are hereby directed to submit the aforementioned documents to the HRMO immediately.", 25.4, cy+5);
+                        doc.text("Prompt compliance is strictly enjoined.", 25.4, cy+10);
+                        doc.text("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended,", 25.4, cy+20);
+                        doc.text("revoked and/or superseded.", 25.4, cy+25);
+                        doc.text("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1,", 25.4, cy+35);
+                        doc.text("HL Building, Carnation Street, Triangulo, City of Naga.", 25.4, cy+40);
+
+                        doc.setFont("helvetica", "bold"); doc.text("RICARDO C. GARCIA", 25.4, cy + 60);
+                        
+                        let traceId = `TRC-${e.emp_id}-${Date.now()}`;
+                        let qrData = await getQRDataURL(traceId);
+                        doc.addImage(qrData, 'PNG', 25.4, cy + 65, 22, 22);
+
+                        count++;
+                    }
+                }
+                if(count > 0) doc.save(`Compliance_Memos_${year}.pdf`);
+                else alert("All employees are fully compliant.");
+
+            } else if (type === "Tardiness Memos") {
+                const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
+                const { data: logsData } = await supabaseClient.from('attendance_logs').select('*').gte('log_time', startIso).lte('log_time', endIso);
+                const logs = logsData || [];
+                let count = 0;
+
+                for (const e of emps) {
+                    const eLogs = logs.filter(l => l.emp_id == e.emp_id);
+                    if(eLogs.length > 5) {
+                        if(count > 0) doc.addPage();
+
+                        doc.setFontSize(12); doc.setFont("helvetica", "bold");
+                        doc.text("PROVINCIAL MEMORANDUM ORDER", 25.4, 45);
+                        
+                        let lineH = 8; let cy = 70;
+                        doc.setFontSize(11);
+                        doc.text("TO", 25.4, cy); doc.text(":", 45, cy); doc.text(e.full_name.toUpperCase(), 50, cy); cy += lineH;
+                        doc.text("FROM", 25.4, cy); doc.text(":", 45, cy); doc.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 50, cy); cy += lineH;
+                        doc.text("DATE", 25.4, cy); doc.text(":", 45, cy); doc.text(new Date().toLocaleDateString('en-US', {month:'long', day:'2-digit', year:'numeric'}), 50, cy); cy += lineH;
+                        doc.text("SUBJECT", 25.4, cy); doc.text(":", 45, cy); doc.text("ACCUMULATED TARDINESS AND ATTENDANCE MONITORING", 50, cy); cy += 6;
+                        
+                        doc.setLineWidth(0.6); doc.line(25.4, cy, 190.5, cy); cy += 8;
+                        
+                        doc.setFont("helvetica", "normal");
+                        doc.text(`Based on the review of your Daily Time Records (DTR) for the month of ${monthName} ${year},`, 25.4, cy); cy += 5;
+                        doc.text(`you have incurred a total of accumulated tardiness/undertime.`, 25.4, cy); cy += 10;
+                        
+                        doc.text("Under Civil Service Commission (CSC) rules on attendance and leave, tardiness and undertime", 25.4, cy); cy += 5;
+                        doc.text("accumulated to eight (8) hours is equivalent to one (1) day absence.", 25.4, cy); cy += 10;
+                        
+                        doc.text("This serves as your ", 25.4, cy);
+                        doc.setTextColor(255,0,0); doc.setFont("helvetica", "bold"); doc.text("FIRST WARNING", 65, cy); doc.setTextColor(0,0,0);
+                        doc.setFont("helvetica", "normal"); doc.text(". You are strongly advised to improve your attendance.", 95, cy); cy += 5;
+                        doc.text("Continued excessive tardiness may result in an administrative case.", 25.4, cy); cy += 15;
+
+                        doc.setFont("helvetica", "bold"); 
+                        doc.text("RICARDO C. GARCIA", 25.4, cy + 30);
+                        
+                        let traceId = `TRC-${e.emp_id}-${Date.now()}`;
+                        let qrData = await getQRDataURL(traceId);
+                        doc.addImage(qrData, 'PNG', 25.4, cy + 35, 22, 22);
+
+                        count++;
+                    }
+                }
+                if(count > 0) doc.save(`Tardiness_Memos_${monthName}_${year}.pdf`);
+                else alert("No excessive tardiness found.");
+
+            } else if (type === "Flag Ceremony Memos") {
+                let dStart = startIso.split('T')[0];
+                let dEnd = endIso.split('T')[0];
+                const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', dStart).lte('log_date', dEnd);
+                const flagLogs = flagLogsData || [];
+                const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
+                let count = 0;
+
+                for (const e of emps) {
+                    const eFlag = flagLogs.filter(f => f.emp_id == e.emp_id && String(f.status).toUpperCase().includes("ABSENT"));
+                    if(eFlag.length > 0) {
+                        if(count > 0) doc.addPage();
+
+                        doc.setFontSize(12); doc.setFont("helvetica", "bold");
+                        doc.text("PROVINCIAL MEMORANDUM ORDER", 25.4, 45);
+                        
+                        let lineH = 8; let cy = 70;
+                        doc.setFontSize(11);
+                        doc.text("TO", 25.4, cy); doc.text(":", 45, cy); doc.text(e.full_name.toUpperCase(), 50, cy); cy += lineH;
+                        doc.text("FROM", 25.4, cy); doc.text(":", 45, cy); doc.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 50, cy); cy += lineH;
+                        doc.text("DATE", 25.4, cy); doc.text(":", 45, cy); doc.text(new Date().toLocaleDateString('en-US', {month:'long', day:'2-digit', year:'numeric'}), 50, cy); cy += lineH;
+                        doc.text("SUBJECT", 25.4, cy); doc.text(":", 45, cy); doc.text("NON-ATTENDANCE TO FLAG CEREMONY", 50, cy); cy += 6;
+                        
+                        doc.setLineWidth(0.6); doc.line(25.4, cy, 190.5, cy); cy += 8;
+                        
+                        doc.setFont("helvetica", "normal");
+                        const datesStr = eFlag.map(f => new Date(f.log_date).toLocaleDateString('en-US', {month:'short', day:'numeric'})).join(", ");
+                        
+                        doc.text(`Based on the records of the Human Resource Management Office (HRMO), you failed to attend`, 25.4, cy); cy += 5;
+                        doc.text(`the Flag Raising/Lowering Ceremony on the following date/s: ${datesStr}.`, 25.4, cy); cy += 10;
+                        
+                        doc.text("Please be reminded that under Section 18, Rule XIII of the Omnibus Rules Implementing Book V", 25.4, cy); cy += 5;
+                        doc.text("of Executive Order No. 292, and Civil Service Commission (CSC) Memorandum Circular No. 19,", 25.4, cy); cy += 5;
+                        doc.text("all government officials and employees are required to attend the Flag Raising Ceremony every", 25.4, cy); cy += 5;
+                        doc.text("Monday and the Flag Lowering Ceremony every Friday.", 25.4, cy); cy += 10;
+
+                        doc.text("Failure to attend the said ceremonies without justifiable cause constitutes a violation of reasonable", 25.4, cy); cy += 5;
+                        doc.text("office rules and regulations.", 25.4, cy); cy += 10;
+
+                        doc.text("In view thereof, you are hereby directed to submit a written explanation within seventy-two (72)", 25.4, cy); cy += 5;
+                        doc.text("hours from receipt of this Memorandum why no administrative disciplinary action should be taken", 25.4, cy); cy += 5;
+                        doc.text("against you.", 25.4, cy); cy += 20;
+
+                        doc.setFont("helvetica", "bold"); 
+                        doc.text("RICARDO C. GARCIA", 25.4, cy + 30);
+                        
+                        let traceId = `TRC-FLAG-${e.emp_id}-${Date.now()}`;
+                        let qrData = await getQRDataURL(traceId);
+                        doc.addImage(qrData, 'PNG', 25.4, cy + 35, 22, 22);
+
+                        count++;
+                    }
+                }
+                if(count > 0) doc.save(`Flag_Ceremony_Memos_${monthName}_${year}.pdf`);
+                else alert("No non-attendance records found.");
+
+            } else {
+                const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
+                
+                let isAppend = qS('#repAppendMode').checked;
+                let lvl = parseInt(qS('#repAppendLevel').value.replace('Level ', ''));
+                let currY = 45;
+                
+                if (isAppend) {
+                    currY = 15 + (lvl * 45);
+                    doc.setFontSize(7); doc.setFont("helvetica", "italic");
+                    doc.text(`-- Continuation of ${type.toUpperCase()} --`, 340, currY, {align: 'right'});
+                    currY += 5;
+                } else {
+                    doc.setFontSize(10); doc.setFont("helvetica", "bold");
+                    doc.text("REPUBLIC OF THE PHILIPPINES", 177.8, 15, { align: "center" });
+                    doc.text("Department of Agrarian Reform", 177.8, 20, { align: "center" });
+                    doc.text("Provincial Office of Camarines Sur 1", 177.8, 25, { align: "center" });
+                    doc.setFontSize(12);
+                    doc.text(`CONSOLIDATED REPORT: ${type.toUpperCase()} - ${period === 'MONTHLY' ? monthName + ' ' + year : period}`, 177.8, 35, { align: "center" });
+                    currY = 45;
+                }
+
+                if (type === "Travel Order Summary") {
+                    const { data: tosData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
+                    const tos = tosData || [];
+                    const { data: itinData } = await supabaseClient.from('itinerary').select('*');
+                    const itin = itinData || [];
+                    
+                    const validTos = tos.filter(t => {
+                        const il = itin.filter(i => i.to_no === t.to_no);
+                        if(!il.length) return false;
+                        const minD = new Date(Math.min(...il.map(i => new Date(i.travel_date))));
+                        const maxD = new Date(Math.max(...il.map(i => new Date(i.travel_date))));
+                        const s = new Date(startIso); const e = new Date(endIso);
+                        return (minD >= s && minD <= e) || (maxD >= s && maxD <= e);
+                    });
+
+                    let empGroups = {};
+                    validTos.forEach(t => {
+                        let div = (divMap[t.emp_id] || "UNASSIGNED").toUpperCase();
+                        if(!empGroups[div]) empGroups[div] = [];
+                        empGroups[div].push(t);
+                    });
+
+                    const headers = ["EMPL NO.", "NAME", "INCLUSIVE DATES", "DESTINATION", "PURPOSE", "REPORT TO", "DATE", "SIGNATURE"];
+                    const widths = [25, 45, 40, 50, 60, 45, 25, 30.6];
+
+                    Object.keys(empGroups).sort().forEach(div => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                            const il = itin.filter(i => i.to_no === r.to_no);
+                            
+                            let rawPurp = il.map(i=>i.purpose).join("; ") || '-';
+                            let purpWords = rawPurp.split(/\s+/);
+                            if (purpWords.length > 30) {
+                                rawPurp = purpWords.slice(0, 30).join(" ") + "...";
+                            }
+                            
+                            return [r.emp_id, (r.emp_name || '').toUpperCase(), getInclusiveDates(il.map(i=>i.travel_date)), [...new Set(il.map(i=>i.destination))].join("; "), rawPurp, r.report_to || '-', '', ''];
+                        }, currY);
+                    });
+
+                } else if (type === "Gate Pass") {
+                    const { data: gpData } = await supabaseClient.from('gate_pass_logs').select('*').eq('status', 'PROCESSED').gte('date', startIso).lte('date', endIso);
+                    const gp = gpData || [];
+                    
+                    let empGroups = {};
+                    gp.forEach(t => {
+                        let div = (divMap[t.emp_id] || "UNASSIGNED").toUpperCase();
+                        if(!empGroups[div]) empGroups[div] = [];
+                        empGroups[div].push(t);
+                    });
+
+                    const headers = ["CTRL NO", "NAME OF EMPLOYEE", "TYPE", "DESTINATION", "PURPOSE", "DEPARTURE", "ARRIVAL", "CREDIT VL"];
+                    const widths = [20, 50, 20, 50, 75, 25, 25, 25];
+
+                    Object.keys(empGroups).sort().forEach(div => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                            let purpStr = String(r.purpose || '-');
+                            let dest = "-", purp = purpStr;
+                            if(purpStr.includes(" - ")) { let parts = purpStr.split(" - "); dest = parts[0]; purp = parts[1]; }
+                            return [r.id, (nameMap[r.emp_id] || '').toUpperCase(), r.pass_type, dest, purp, formatTime12h(r.time_out), formatTime12h(r.time_in), parseFloat(r.deduction_credit||0).toFixed(3)];
+                        }, currY);
+                    });
+
+                } else if (type === "Leave Summary") {
+                    const { data: llData } = await supabaseClient.from('leave_ledger').select('*').in('transaction_type', ['APPROVED', 'PROCESSED']).gte('date', startIso).lte('date', endIso);
+                    const ll = llData || [];
+                    
+                    let empGroups = {};
+                    ll.forEach(t => {
+                        let div = (divMap[t.emp_id] || "UNASSIGNED").toUpperCase();
+                        if(!empGroups[div]) empGroups[div] = [];
+                        empGroups[div].push(t);
+                    });
+
+                    const headers = ["LEAVE APPLICATION", "EMP NUMBER", "NAME", "LEAVE TYPE", "INCLUSIVE DATES", "TOTAL DAYS"];
+                    const widths = [40, 30, 60, 30, 85, 45];
+
+                    Object.keys(empGroups).sort().forEach(div => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                            return [r.transaction_id || '-', r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), (r.type || '').toUpperCase(), r.date, Math.abs(parseFloat(r.debit||0)).toFixed(2)];
+                        }, currY);
+                    });
+
+                } else if (type === "Tardiness / Undertime") {
+                    const { data: llData } = await supabaseClient.from('leave_ledger').select('*').gte('date', startIso).lte('date', endIso);
+                    const ll = llData || [];
+                    const tu = ll.filter(l => String(l.transaction_type).toUpperCase().includes("TARDINESS") || String(l.transaction_type).toUpperCase().includes("UNDERTIME"));
+                    
+                    let agg = {};
+                    tu.forEach(r => {
+                        if(!agg[r.emp_id]) agg[r.emp_id] = { total_deduction: 0, total_days: 0, dates: [] };
+                        agg[r.emp_id].total_deduction += Math.abs(parseFloat(r.debit || 0));
+                        agg[r.emp_id].total_days += 1;
+                        if(r.date) agg[r.emp_id].dates.push(r.date);
+                    });
+
+                    let empGroups = {};
+                    Object.keys(agg).forEach(eid => {
+                        let div = (divMap[eid] || "UNASSIGNED").toUpperCase();
+                        if(!empGroups[div]) empGroups[div] = [];
+                        empGroups[div].push({ emp_id: eid, ...agg[eid] });
+                    });
+
+                    const headers = ["DATES", "EMP NUMBER", "NAME", "TOTAL HOURS", "TOTAL DAYS", "CREDIT TO VL"];
+                    const widths = [60, 40, 70, 45, 45, 55];
+
+                    Object.keys(empGroups).sort().forEach(div => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                            const dateStr = [...new Set(r.dates)].slice(0,3).join(", ") + (r.dates.length > 3 ? "..." : "");
+                            return [dateStr || '-', r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), (r.total_deduction * 8).toFixed(2), r.total_days, r.total_deduction.toFixed(3)];
+                        }, currY);
+                    });
+
+                } else if (type === "Flag Ceremony Attendance") {
+                    let dStart = startIso.split('T')[0];
+                    let dEnd = endIso.split('T')[0];
+                    const { data: flagLogsData } = await supabaseClient.from('flag_attendance').select('*').gte('log_date', dStart).lte('log_date', dEnd);
+                    const flagLogs = flagLogsData || [];
+                    
+                    let empGroups = {};
+                    flagLogs.forEach(t => {
+                        let div = (divMap[t.emp_id] || "UNASSIGNED").toUpperCase();
+                        if(!empGroups[div]) empGroups[div] = [];
+                        empGroups[div].push(t);
+                    });
+
+                    const headers = ["EMP NUMBER", "NAME", "SUMMARY", "DETAILS (DATE: STATUS [TIME IN])"];
+                    const widths = [30, 60, 30, 190];
+
+                    Object.keys(empGroups).sort().forEach(div => {
+                        let agg = {};
+                        empGroups[div].forEach(f => {
+                            if(!agg[f.emp_id]) agg[f.emp_id] = { p: 0, a: 0, details: [] };
+                            const stat = String(f.status).toUpperCase().includes("ABSENT") ? "ABSENT" : "PRESENT";
+                            if(stat === "PRESENT") agg[f.emp_id].p++; else agg[f.emp_id].a++;
+                            const dtStr = new Date(f.log_date).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+                            const tmStr = formatTime12h(f.time_in || f.log_time);
+                            agg[f.emp_id].details.push(`${dtStr}: ${stat} [${tmStr}]`);
+                        });
+                        const grpData = Object.keys(agg).map(k => ({ emp_id: k, ...agg[k] }));
+
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, grpData, headers, widths, r => {
+                            return [r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), `P: ${r.p} | A: ${r.a}`, r.details.join(", ")];
+                        }, currY);
+                    });
+
+                } else if (type === "PSO / TO Conflicts") {
+                    const { data: tosData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
+                    const tos = tosData || [];
+                    const { data: itinData } = await supabaseClient.from('itinerary').select('*');
+                    const itin = itinData || [];
+                    const { data: psoData } = await supabaseClient.from('pso_records').select('*');
+                    const pso = psoData || [];
+                    
+                    let conflicts = [];
+                    tos.forEach(t => {
+                        const eItin = itin.filter(i => i.to_no === t.to_no);
+                        eItin.forEach(i => {
+                            const iDate = new Date(i.travel_date);
+                            if(iDate >= new Date(startIso) && iDate <= new Date(endIso)) {
+                                const pMatch = pso.filter(p => p.emp_id == t.emp_id && new Date(p.start_date) <= iDate && new Date(p.end_date) >= iDate);
+                                pMatch.forEach(p => {
+                                    conflicts.push({ emp_id: t.emp_id, date: i.travel_date, pso_no: p.subject, to_no: t.to_no, dest: i.destination, rso: '-' });
+                                });
+                            }
+                        });
+                    });
+
+                    let empGroups = {};
+                    conflicts.forEach(t => {
+                        let div = (divMap[t.emp_id] || "UNASSIGNED").toUpperCase();
+                        if(!empGroups[div]) empGroups[div] = [];
+                        empGroups[div].push(t);
+                    });
+
+                    const headers = ["TO NUMBER", "EMP NUMBER", "NAME", "DATE", "PSO NUMBER", "DESTINATION", "RSO"];
+                    const widths = [30, 30, 45, 30, 80, 70, 30];
+
+                    Object.keys(empGroups).sort().forEach(div => {
+                        if(currY > 180) { doc.addPage(); currY = 15; }
+                        currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
+                            return [r.to_no, r.emp_id, (nameMap[r.emp_id] || '').toUpperCase(), r.date, r.pso_no, r.dest, r.rso];
+                        }, currY);
+                    });
+                }
+                
+                if(!isAppend) doc.save(`Consolidated_${type.replace(/ /g,'_')}.pdf`);
+            }
+
+        } catch (e) { alert(e.message); }
+        finally { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; }
+    }
+
+    async function loadMissingComp() {
+        const yr = parseInt(qS('#repYear').value);
+        const { data: empsData } = await supabaseClient.from('employees').select('emp_id, full_name');
+        const emps = empsData || [];
+        const { data: compsData } = await supabaseClient.from('annual_compliance').select('*').eq('year', yr);
+        const comps = compsData || [];
+        const tbody = qS('#missingCompTableBody'); tbody.innerHTML = '';
+        
+        emps.forEach(e => {
+            const cr = comps.find(c => c.emp_id == e.emp_id) || {};
+            let missing = [];
+            if(!cr.saln_status) missing.push("SALN");
+            if(!cr.ipcr_status) missing.push("IPCR");
+            if(!cr.lap_status) missing.push("LAP");
+            if(missing.length) {
+                tbody.innerHTML += `<tr class="hover:bg-red-50"><td class="p-3 border-r text-center">${e.emp_id}</td><td class="p-3 border-r font-bold">${e.full_name.toUpperCase()}</td><td class="p-3 text-red-600 font-bold text-xs">${missing.join(" • ")}</td></tr>`;
+            }
+        });
+    }
+</script>
+</body>
+</html>
