@@ -61,18 +61,32 @@
                 <div>
                     <label class="form-label text-[9px] font-bold">Select Period:</label>
                     <select id="repPeriod" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm" onchange="toggleReportPeriod()">
-                        <option>WEEKLY</option>
-                        <option selected>MONTHLY</option>
-                        <option>ANNUALLY</option>
-                        <option>RANGE</option>
+                        <option value="DAILY">DAILY</option>
+                        <option value="WEEKLY">WEEKLY</option>
+                        <option value="MONTHLY" selected>MONTHLY</option>
+                        <option value="ANNUALLY">ANNUALLY</option>
+                        <option value="DATE RANGE">DATE RANGE</option>
                     </select>
                 </div>
                 
-                <div id="repMonthGroup">
-                    <label class="form-label text-[9px] font-bold">Month / Year:</label>
-                    <div class="flex gap-2">
-                        <select id="repMonth" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-2/3"></select>
-                        <input type="number" id="repYear" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-1/3 text-center" value="2026">
+                <div id="repDynamicInputs" class="relative h-[60px] w-full">
+                    <div id="repMonthGroup" class="absolute w-full top-0 left-0 transition-opacity duration-200 z-10">
+                        <label class="form-label text-[9px] font-bold" id="lblMonthYear">Month / Year:</label>
+                        <div class="flex gap-2">
+                            <select id="repMonth" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-2/3"></select>
+                            <input type="number" id="repYear" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-1/3 text-center" value="2026">
+                        </div>
+                    </div>
+                    <div id="repDailyGroup" class="absolute w-full top-0 left-0 opacity-0 pointer-events-none transition-opacity duration-200 z-0">
+                        <label class="form-label text-[9px] font-bold">Select Date:</label>
+                        <input type="date" id="repDate" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-full">
+                    </div>
+                    <div id="repRangeGroup" class="absolute w-full top-0 left-0 opacity-0 pointer-events-none transition-opacity duration-200 z-0">
+                        <label class="form-label text-[9px] font-bold">Date Range:</label>
+                        <div class="flex gap-2">
+                            <input type="date" id="repStartDate" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-1/2">
+                            <input type="date" id="repEndDate" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-1/2">
+                        </div>
                     </div>
                 </div>
 
@@ -115,14 +129,37 @@
         let mSel = qS('#repMonth');
         months.forEach((m, i) => mSel.add(new Option(m, i+1)));
         mSel.selectedIndex = new Date().getMonth();
+        qS('#repDate').value = new Date().toISOString().split('T')[0];
     };
 
     function toggleReportPeriod() {
         const p = qS('#repPeriod').value;
-        qS('#repMonthGroup').style.display = (p === 'MONTHLY' || p === 'WEEKLY') ? 'block' : 'none';
+        const monthGroup = qS('#repMonthGroup');
+        const dailyGroup = qS('#repDailyGroup');
+        const rangeGroup = qS('#repRangeGroup');
+        const monthSelect = qS('#repMonth');
+        const lblMonthYear = qS('#lblMonthYear');
+
+        monthGroup.classList.add('opacity-0', 'pointer-events-none'); monthGroup.classList.remove('z-10');
+        dailyGroup.classList.add('opacity-0', 'pointer-events-none'); dailyGroup.classList.remove('z-10');
+        rangeGroup.classList.add('opacity-0', 'pointer-events-none'); rangeGroup.classList.remove('z-10');
+
+        if (p === 'MONTHLY') {
+            monthGroup.classList.remove('opacity-0', 'pointer-events-none'); monthGroup.classList.add('z-10');
+            monthSelect.style.display = 'block';
+            lblMonthYear.innerText = 'Month / Year:';
+        } else if (p === 'ANNUALLY') {
+            monthGroup.classList.remove('opacity-0', 'pointer-events-none'); monthGroup.classList.add('z-10');
+            monthSelect.style.display = 'none';
+            lblMonthYear.innerText = 'Year:';
+        } else if (p === 'DAILY') {
+            dailyGroup.classList.remove('opacity-0', 'pointer-events-none'); dailyGroup.classList.add('z-10');
+        } else if (p === 'DATE RANGE') {
+            rangeGroup.classList.remove('opacity-0', 'pointer-events-none'); rangeGroup.classList.add('z-10');
+        }
     }
 
-    // --- SYSTEM HELPERS (Python Translations) ---
+    // --- SYSTEM HELPERS ---
     function cleanId(val) { return val ? String(val).split('.')[0].trim() : ""; }
 
     function formatTime12h(timeStr) {
@@ -189,23 +226,22 @@
         let cy = startY;
         const lMargin = 15;
 
-        // Group Header (Blueish background)
+        // Group Header
         doc.setFillColor(200, 220, 255); 
-        doc.setTextColor(0, 0, 0); 
         doc.setDrawColor(0, 0, 0);
-        doc.setFont("helvetica", "bold"); 
-        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10);
         doc.rect(lMargin, cy, widths.reduce((a,b)=>a+b,0), 8, 'DF');
         doc.text(`DIVISION: ${divisionName}`, lMargin + 2, cy + 5.5);
         cy += 8;
         
-        // Column Headers (Light grey background, explicit color resets to prevent black boxes)
+        // Column Headers
+        doc.setFillColor(220, 220, 220); 
+        doc.setTextColor(0, 0, 0);
+        doc.setDrawColor(0, 0, 0);
         doc.setFontSize(8); 
         let cx = lMargin;
         headers.forEach((h, i) => {
-            doc.setFillColor(220, 220, 220); 
-            doc.setTextColor(0, 0, 0); 
-            doc.setDrawColor(0, 0, 0);
             doc.rect(cx, cy, widths[i], 8, 'DF');
             doc.text(h, cx + (widths[i]/2), cy + 5, {align: 'center'});
             cx += widths[i];
@@ -226,7 +262,7 @@
             let maxLines = 1;
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
-                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = "";
+                if (headers[i] === "DATE" || headers[i] === "SIGNATURE") vStr = "";
                 let lines = doc.splitTextToSize(vStr, widths[i] - 2);
                 if (lines.length > maxLines) maxLines = lines.length;
             });
@@ -234,15 +270,15 @@
             
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
-                if (headers[i] === "RECEIVED" || headers[i] === "SIGNATURE" || headers[i] === "DATE") vStr = ""; 
+                if (headers[i] === "DATE" || headers[i] === "SIGNATURE") vStr = ""; 
                 
                 doc.setFillColor(255, 255, 255); 
-                doc.setTextColor(0, 0, 0); 
                 doc.setDrawColor(0, 0, 0);
+                doc.setTextColor(0, 0, 0);
                 doc.rect(cx, cy, widths[i], rowH, 'DF');
                 
                 let align = 'center';
-                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) align = 'left';
+                if (["PURPOSE", "DESTINATION", "NAME", "INCLUSIVE DATES", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) align = 'left';
                 const tx = align === 'center' ? cx + (widths[i]/2) : cx + 2;
                 
                 let textLines = doc.splitTextToSize(vStr, widths[i] - 2);
@@ -286,9 +322,6 @@
     window.generatePDFReport = async function() {
         const type = qS('#repType').value;
         const period = qS('#repPeriod').value;
-        const year = parseInt(qS('#repYear').value);
-        const monthIdx = parseInt(qS('#repMonth').value);
-        const monthName = months[monthIdx-1];
         const btn = qS('#btnGenerateReport');
         const isAppend = qS('#repAppendMode').checked;
         const appendLvlStr = qS('#repAppendLevel').value;
@@ -297,22 +330,32 @@
         btn.disabled = true; btn.innerText = "FETCHING DATA...";
 
         let startDt, endDt, titleSuffix;
+        const year = parseInt(qS('#repYear').value);
+        const monthIdx = parseInt(qS('#repMonth').value);
+
         if (period === 'MONTHLY') {
             startDt = new Date(year, monthIdx - 1, 1);
             endDt = new Date(year, monthIdx, 0, 23, 59, 59);
-            titleSuffix = `${monthName.toUpperCase()} ${year}`;
+            titleSuffix = `${months[monthIdx-1].toUpperCase()} ${year}`;
         } else if (period === 'ANNUALLY') {
             startDt = new Date(year, 0, 1);
             endDt = new Date(year, 11, 31, 23, 59, 59);
             titleSuffix = `YEAR ${year}`;
-        } else if (period === 'RANGE') {
-            const startStr = prompt("Enter Start Date (YYYY-MM-DD):");
-            const endStr = prompt("Enter End Date (YYYY-MM-DD):");
-            if (!startStr || !endStr) { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; return; }
-            startDt = new Date(startStr); endDt = new Date(endStr); endDt.setHours(23, 59, 59);
-            titleSuffix = `${startStr} to ${endStr}`;
+        } else if (period === 'DAILY') {
+            const dStr = qS('#repDate').value;
+            if (!dStr) { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; alert("Please select a date."); return; }
+            startDt = new Date(dStr); startDt.setHours(0,0,0);
+            endDt = new Date(dStr); endDt.setHours(23,59,59);
+            titleSuffix = startDt.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'}).toUpperCase();
+        } else if (period === 'DATE RANGE') {
+            const sStr = qS('#repStartDate').value;
+            const eStr = qS('#repEndDate').value;
+            if (!sStr || !eStr) { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; alert("Start and End dates required."); return; }
+            startDt = new Date(sStr); startDt.setHours(0,0,0);
+            endDt = new Date(eStr); endDt.setHours(23,59,59);
+            titleSuffix = `${sStr} to ${eStr}`;
         } else {
-            endDt = new Date(); startDt = new Date(); startDt.setDate(endDt.getDate() - 7);
+            endDt = new Date(); startDt = new Date(); startDt.setDate(endDt.getDate() - 7); startDt.setHours(0,0,0);
             titleSuffix = "LAST 7 DAYS";
         }
 
@@ -762,7 +805,7 @@
                     doc.text("Department of Agrarian Reform", 177.8, 20, { align: "center" });
                     doc.text("Provincial Office of Camarines Sur 1", 177.8, 25, { align: "center" });
                     doc.setFontSize(12);
-                    doc.text(`CONSOLIDATED REPORT: ${type.toUpperCase()} - ${period === 'MONTHLY' ? monthName + ' ' + year : period}`, 177.8, 35, { align: "center" });
+                    doc.text(`CONSOLIDATED REPORT: ${type.toUpperCase()} - ${titleSuffix}`, 177.8, 35, { align: "center" });
                     currY = 45;
                 }
 
