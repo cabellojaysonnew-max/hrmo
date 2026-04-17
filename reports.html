@@ -3,977 +3,736 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports Generator - DAR HRMO</title>
+    <title>DAR HRMO Operations System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <script src="supabase-config.js"></script>
+    
     <style>
         :root {
             --color-primary: #003811;
             --color-secondary: #D4AF37;
+            --color-light: #006400;
+            --color-bg-main: #F3F4F6;
+            --color-surface: #FFFFFF;
+            --color-text-main: #1F2937;
+            --color-text-muted: #6B7280;
+            --color-danger: #b91c1c;
         }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
-        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
-        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
-        .form-input:focus { outline: none; border-color: var(--color-primary); ring: 1px solid var(--color-primary); }
+        
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--color-bg-main); color: var(--color-text-main); overflow-x: hidden; }
+        .hidden-section { display: none !important; }
+        .btn-primary { background-color: var(--color-primary); color: white; transition: all 0.2s ease; }
+        .btn-primary:hover { background-color: var(--color-light); transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-secondary { background-color: var(--color-secondary); color: black; font-weight: bold; }
+        .card { background: var(--color-surface); border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; }
         .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.25rem; text-transform: uppercase; }
+        .main-wrapper { display: flex; height: 100vh; overflow: hidden; }
+        .module-content { height: 100vh; overflow-y: auto; padding: 1.5rem; width: 100%; }
+        @media (max-width: 768px) {
+            .main-wrapper { flex-direction: column; }
+            #sidebar { width: 100%; height: auto; flex-direction: row; order: 2; overflow-x: auto; }
+            #sidebar > div:first-child, #sidebar > div:last-child { display: none; }
+            #sidebar .flex-1 { display: flex; flex-direction: row; }
+            .module-content { height: calc(100vh - 60px); order: 1; }
+        }
     </style>
 </head>
-<body class="flex h-screen overflow-hidden text-[#1F2937]">
+<body>
 
-    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 hidden md:block border-b border-[#006400]">
-            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
-            <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
+    <div id="loadingScreen" class="fixed inset-0 bg-[#003811] flex flex-col items-center justify-center z-50 text-white">
+        <h2 class="font-serif text-xl mb-2">REPUBLIC OF THE PHILIPPINES</h2>
+        <h1 class="font-serif text-4xl font-bold text-[#D4AF37] mb-8">DEPARTMENT OF AGRARIAN REFORM</h1>
+        <div class="w-72 bg-gray-700 h-1.5 rounded-full overflow-hidden">
+            <div id="loadingBar" class="bg-[#D4AF37] h-full w-0 transition-all duration-300"></div>
         </div>
-        <div class="flex-1 overflow-y-auto py-2">
-            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
-            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
-            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
-            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">REPORTS</a>
+        <p class="mt-4 text-xs text-gray-400">Initializing System Components...</p>
+    </div>
+
+    <div id="loginScreen" class="hidden-section fixed inset-0 flex h-screen bg-gray-100 z-40">
+        <div class="hidden md:flex flex-col w-[400px] bg-[#003811] text-white p-12 justify-center">
+            <h1 class="text-4xl font-serif font-bold leading-tight">HRMO OPERATIONS</h1>
+            <p class="text-[#D4AF37] mt-4 font-bold tracking-widest">CAMARINES SUR 1</p>
         </div>
-        <div class="p-4 bg-black/20 hidden md:block">
-            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
-            <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
-        </div>
-    </nav>
-
-    <main class="flex-1 flex flex-col overflow-y-auto bg-gray-100 p-8">
-        
-        <div class="mb-8">
-            <h2 class="text-3xl font-bold text-[#003811]">Report Generator</h2>
-            <p class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide">Consolidated Printing & Memos</p>
-        </div>
-
-        <div class="card p-8 max-w-5xl mx-auto border-t-4 border-[#003811] flex flex-col items-center">
-            <h3 class="text-2xl font-bold text-[#003811] w-full text-left border-b pb-4 mb-6">CONSOLIDATED PRINTING</h3>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
-                <div class="space-y-6">
-                    <div>
-                        <label class="form-label">Report Type</label>
-                        <select id="reportType" class="form-input text-base py-2">
-                            <option value="Travel Order Summary">Travel Order Summary</option>
-                            <option value="Travel Order Batch Printing">Travel Order Batch Printing</option>
-                            <option value="Gate Pass">Gate Pass</option>
-                            <option value="Leave Summary">Leave Summary</option>
-                            <option value="Tardiness / Undertime">Tardiness / Undertime</option>
-                            <option value="PSO / TO Conflicts">PSO / TO Conflicts</option>
-                            <option value="Tardiness Memos">Tardiness Memos</option>
-                            <option value="Compliance Memos">Compliance Memos</option>
-                            <option value="MRUA">MRUA</option>
-                            <option value="Flag Ceremony Attendance">Flag Ceremony Attendance</option>
-                            <option value="Flag Ceremony Memos">Flag Ceremony Memos</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="form-label">Select Period</label>
-                        <select id="periodType" class="form-input text-base py-2" onchange="togglePeriodUI()">
-                            <option value="MONTHLY">MONTHLY</option>
-                            <option value="WEEKLY">WEEKLY (Last 7 Days)</option>
-                            <option value="ANNUALLY">ANNUALLY</option>
-                            <option value="RANGE">CUSTOM RANGE</option>
-                        </select>
-                    </div>
-
-                    <div id="uiMonthly" class="flex gap-4">
-                        <div class="w-1/2">
-                            <label class="form-label">Month</label>
-                            <select id="reportMonth" class="form-input">
-                                <option value="1">January</option><option value="2">February</option><option value="3">March</option>
-                                <option value="4">April</option><option value="5">May</option><option value="6">June</option>
-                                <option value="7">July</option><option value="8">August</option><option value="9">September</option>
-                                <option value="10">October</option><option value="11">November</option><option value="12">December</option>
-                            </select>
-                        </div>
-                        <div class="w-1/2">
-                            <label class="form-label">Year</label>
-                            <select id="reportYear" class="form-input"></select>
-                        </div>
-                    </div>
-
-                    <div id="uiRange" class="hidden flex gap-4">
-                        <div class="w-1/2">
-                            <label class="form-label">Start Date</label>
-                            <input type="date" id="startDate" class="form-input">
-                        </div>
-                        <div class="w-1/2">
-                            <label class="form-label">End Date</label>
-                            <input type="date" id="endDate" class="form-input">
-                        </div>
-                    </div>
-
-                    <div class="pt-4 border-t border-gray-200">
-                        <label class="flex items-center gap-2 cursor-pointer mb-2">
-                            <input type="checkbox" id="appendMode" class="w-4 h-4 accent-[#003811]" onchange="document.getElementById('appendLevelDiv').classList.toggle('opacity-50', !this.checked)">
-                            <span class="text-sm font-bold text-red-700">Append Mode (Save Paper)</span>
-                        </label>
-                        <div id="appendLevelDiv" class="flex items-center gap-3 opacity-50 transition-opacity">
-                            <label class="text-xs text-gray-600 font-bold">Append Level:</label>
-                            <select id="appendLevel" class="form-input py-1 text-xs w-32">
-                                <option value="1">Level 1</option>
-                                <option value="2">Level 2</option>
-                                <option value="3">Level 3</option>
-                                <option value="4">Level 4</option>
-                            </select>
-                        </div>
-                    </div>
+        <div class="flex-1 flex items-center justify-center p-8">
+            <div class="card w-full max-w-md p-10 border-t-4 border-[#D4AF37]">
+                <h2 class="text-3xl font-bold text-[#003811] mb-6">SECURE LOGIN</h2>
+                <div class="space-y-4">
+                    <div><label class="form-label">Username</label><input type="text" id="username" class="form-input"></div>
+                    <div><label class="form-label">Password</label><input type="password" id="password" class="form-input"></div>
                 </div>
-
-                <div class="flex flex-col justify-center items-center bg-gray-50 rounded-lg border border-dashed border-gray-300 p-8">
-                    <svg class="w-16 h-16 text-[#003811] mb-6 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                    <button onclick="generateReport()" id="btnGenerate" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded-lg font-bold text-lg shadow-lg hover:bg-yellow-500 transition-colors">
-                        GENERATE PDF REPORT
-                    </button>
-                    <p id="statusMsg" class="mt-4 text-sm font-bold text-gray-500 text-center"></p>
-                </div>
+                <p id="loginStatus" class="text-red-600 text-xs font-bold mt-4 min-h-[1rem]"></p>
+                <button onclick="login()" id="loginBtn" class="w-full btn-primary py-3 rounded-md font-bold mt-6 shadow-lg">AUTHENTICATE</button>
             </div>
         </div>
-    </main>
+    </div>
+
+    <div id="mainPortal" class="hidden-section main-wrapper">
+        <nav id="sidebar" class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+            <div class="p-6 hidden md:block border-b border-[#006400]">
+                <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+            </div>
+            <div class="flex-1 overflow-y-auto py-2">
+                <button onclick="switchModule('dash')" id="nav-dash" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</button>
+                <button onclick="switchModule('pds')" id="nav-pds" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</button>
+                <button onclick="switchModule('atten')" id="nav-atten" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</button>
+                <button onclick="switchModule('leave')" id="nav-leave" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE MGMT</button>
+                <button onclick="switchModule('gate')" id="nav-gate" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS</button>
+                <button onclick="switchModule('cto')" id="nav-cto" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">CTO MGMT</button>
+                <button onclick="switchModule('reports')" id="nav-reports" class="w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</button>
+            </div>
+            <div class="p-4 bg-black/20 hidden md:block">
+                <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
+                <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded">LOGOUT</button>
+            </div>
+        </nav>
+
+        <main class="flex-1 relative overflow-hidden bg-gray-100">
+            
+            <section id="module-dash" class="absolute inset-0 module-content hidden-section">
+                <div class="flex justify-between items-end mb-6">
+                    <h2 class="text-2xl font-bold text-[#003811]">Operations Dashboard</h2>
+                    <p id="dashDate" class="text-gray-500 font-bold text-sm"></p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="card p-6 border-l-4 border-[#003811]"><p class="form-label text-gray-400">Total Staff</p><h3 id="statTotal" class="text-4xl font-bold text-[#003811]">0</h3></div>
+                    <div class="card p-6 border-l-4 border-[#1976D2]"><p class="form-label text-gray-400">On Travel</p><h3 id="statTravel" class="text-4xl font-bold text-[#1976D2]">0</h3></div>
+                    <div class="card p-6 border-l-4 border-[#C62828]"><p class="form-label text-gray-400">On PSO</p><h3 id="statPSO" class="text-4xl font-bold text-[#C62828]">0</h3></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-6">
+                        <h4 class="font-bold text-sm mb-4 border-b pb-2">TODAY'S LATE (FLEXI Cutoff)</h4>
+                        <div id="lateList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                    </div>
+                    <div class="card p-6">
+                        <h4 class="font-bold text-sm mb-4 border-b pb-2">ACTIVE PSO SUMMARY</h4>
+                        <div id="psoSummary" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="module-pds" class="absolute inset-0 module-content hidden-section flex flex-col md:flex-row gap-6">
+                <div class="w-full md:w-1/3 flex flex-col gap-4">
+                    <div class="card p-4">
+                        <input type="text" id="pdsSearch" class="form-input mb-2" placeholder="Search..." oninput="filterPDS()">
+                        <div class="table-container h-[500px] overflow-auto">
+                            <table class="w-full text-xs text-left"><tbody id="pdsTableBody"></tbody></table>
+                        </div>
+                        <button onclick="clearPDSForm()" class="w-full btn-primary mt-4 py-2 rounded text-xs">+ ADD NEW</button>
+                    </div>
+                </div>
+                <div class="flex-1 card flex flex-col overflow-hidden">
+                    <div class="px-6 py-4 bg-gray-50 border-b flex justify-between">
+                        <h2 id="pdsFormMode" class="font-bold">CREATE RECORD</h2>
+                        <button onclick="savePDS()" class="btn-primary px-6 py-1 rounded text-sm">SAVE</button>
+                    </div>
+                    <div class="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                        <input type="hidden" id="pds_id">
+                        <div><label class="form-label">Employee ID</label><input type="text" id="pds_emp_id" class="form-input"></div>
+                        <div><label class="form-label">Full Name</label><input type="text" id="pds_full_name" class="form-input"></div>
+                        <div><label class="form-label">Position</label><input type="text" id="pds_position" class="form-input"></div>
+                        <div><label class="form-label">Division</label>
+                            <select id="pds_division" class="form-input"><option>OFFICE OF THE PARPO</option><option>PARAD</option><option>LTSP</option><option>AJDP</option><option>PBDD</option><option>STOD</option><option>SPLIT</option><option>DARMO</option></select>
+                        </div>
+                        <div><label class="form-label">Unit / Station</label><input type="text" id="pds_unit" class="form-input"></div>
+                        <div><label class="form-label">Sched Type</label><select id="pds_schedule_type" class="form-input"><option>Flexi</option><option>Fixed</option></select></div>
+                        <div><label class="form-label">Start Time</label><input type="time" id="pds_flexi_range_start" class="form-input"></div>
+                        <div><label class="form-label">End Time (Cutoff)</label><input type="time" id="pds_flexi_range_end" class="form-input"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="module-atten" class="absolute inset-0 module-content hidden-section">
+                <div class="flex justify-between items-end mb-4">
+                    <h2 class="text-2xl font-bold text-[#003811]">Attendance View</h2>
+                    <div class="flex gap-2">
+                        <select id="attenMonth" class="form-input w-32"></select>
+                        <input type="number" id="attenYear" class="form-input w-24" value="2026">
+                        <button onclick="generateAttendanceView()" class="btn-primary px-4 rounded text-sm">FETCH</button>
+                        <button onclick="postToLedger()" class="bg-[#2E7D32] text-white px-4 rounded text-sm font-bold">POST TO LEDGER</button>
+                    </div>
+                </div>
+                <div class="card overflow-hidden">
+                    <div class="table-container max-h-[70vh] overflow-auto">
+                        <table class="w-full text-xs text-center border-collapse">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr><th class="p-3 border">ID</th><th class="p-3 border text-left">Name</th><th class="p-3 border">Date</th><th class="p-3 border">IN</th><th class="p-3 border">OUT</th><th class="p-3 border">Undertime</th><th class="p-3 border">Status</th></tr>
+                            </thead>
+                            <tbody id="attenTableBody" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="module-leave" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-4">Leave Processing</h2>
+                <div class="card p-6">
+                    <p class="text-sm text-gray-500">Module reserved for application workflows.</p>
+                </div>
+            </section>
+
+            <section id="module-gate" class="absolute inset-0 module-content hidden-section">
+                <div class="card p-6 mb-6">
+                    <h3 class="font-bold mb-4">ISSUE GATE PASS</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div><label class="form-label">Emp ID</label><input type="text" id="gpEmpId" class="form-input"></div>
+                        <div><label class="form-label">Type</label><select id="gpType" class="form-input"><option>OFFICIAL</option><option>PERSONAL</option></select></div>
+                        <div><label class="form-label">Destination/Purpose</label><input type="text" id="gpPurpose" class="form-input"></div>
+                        <button onclick="issueGatePass()" class="btn-secondary py-2 rounded">ISSUE & PRINT</button>
+                    </div>
+                </div>
+                <div class="card flex-1 overflow-hidden"><div class="table-container h-full overflow-auto"><table class="w-full text-xs text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Type</th><th class="p-3">OUT</th><th class="p-3">IN</th><th class="p-3">Credit</th></tr></thead><tbody id="gpTableBody"></tbody></table></div></div>
+            </section>
+
+            <section id="module-cto" class="absolute inset-0 module-content hidden-section">
+                <h2 class="text-2xl font-bold mb-4">CTO Management</h2>
+                <div class="card p-6">
+                    <p class="text-sm text-gray-500">Module reserved for CTO computation.</p>
+                </div>
+            </section>
+
+            <section id="module-reports" class="absolute inset-0 module-content hidden-section flex flex-col gap-6">
+                <div class="px-8 pt-4">
+                    <h2 class="text-3xl font-bold text-[#003811] font-['Segoe_UI']">Report Generator</h2>
+                </div>
+
+                <div class="card mx-8 p-6 bg-white border border-[#E5E7EB] shadow-sm">
+                    <h3 class="text-lg font-bold text-[#003811] mb-6 uppercase tracking-wider">CONSOLIDATED PRINTING</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+                        <div>
+                            <label class="form-label text-[9px] font-bold">Report Type:</label>
+                            <select id="repType" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm">
+                                <option>Travel Order Summary</option>
+                                <option>Travel Order Batch Printing</option>
+                                <option>Gate Pass</option>
+                                <option>Leave Summary</option>
+                                <option>Tardiness / Undertime</option>
+                                <option>PSO / TO Conflicts</option>
+                                <option>Tardiness Memos</option>
+                                <option>Compliance Memos</option>
+                                <option>MRUA</option>
+                                <option>Flag Ceremony Attendance</option>
+                                <option>Flag Ceremony Memos</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="form-label text-[9px] font-bold">Select Period:</label>
+                            <select id="repPeriod" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm" onchange="toggleReportPeriod()">
+                                <option>WEEKLY</option>
+                                <option selected>MONTHLY</option>
+                                <option>ANNUALLY</option>
+                                <option>RANGE</option>
+                            </select>
+                        </div>
+                        
+                        <div id="repMonthGroup">
+                            <label class="form-label text-[9px] font-bold">Month / Year:</label>
+                            <div class="flex gap-2">
+                                <select id="repMonth" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-2/3"></select>
+                                <input type="number" id="repYear" class="form-input bg-[#F9FAFB] border-[#D1D5DB] text-sm w-1/3 text-center" value="2026">
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="repAppendMode" class="w-4 h-4 accent-red-700">
+                                <label class="text-[9px] font-bold text-red-700">Append Mode (Save Paper)</label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-[8px]">Append Level:</label>
+                                <select id="repAppendLevel" class="form-input bg-[#F9FAFB] border-[#D1D5DB] py-1 text-[10px] w-24">
+                                    <option>Level 1</option><option>Level 2</option><option>Level 3</option><option>Level 4</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="generatePDFReport()" id="btnGenerateReport" class="mt-8 bg-[#D4AF37] text-black font-bold text-xs px-8 py-3 rounded hover:brightness-110 shadow-sm transition-all">GENERATE PDF REPORT</button>
+                </div>
+
+                <div class="mx-8 p-6 bg-transparent border border-[#E5E7EB] rounded-lg">
+                    <h3 class="text-sm font-bold text-[#003811] mb-4">Pending Annual Requirements Tracker</h3>
+                    <div class="flex gap-2 mb-4">
+                        <button onclick="loadMissingComp()" class="bg-[#E0E0E0] text-[11px] px-4 py-1.5 rounded hover:bg-gray-300">REFRESH TRACKER</button>
+                    </div>
+                    <div class="bg-white border rounded shadow-sm overflow-hidden">
+                        <table class="w-full text-sm">
+                            <thead class="bg-[#E5E7EB]">
+                                <tr class="text-[#003811] font-bold border-b border-[#E5E7EB]">
+                                    <th class="p-3 border-r">Emp ID</th>
+                                    <th class="p-3 border-r">Name</th>
+                                    <th class="p-3">Lacking Requirements</th>
+                                </tr>
+                            </thead>
+                            <tbody id="missingCompTableBody" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="qrContainer" class="hidden"></div>
 
 <script>
-    // --- SESSION & RBAC AUTH ---
-    const userData = sessionStorage.getItem('currentUser');
-    if (!userData) window.location.href = 'index.html';
-    const currentUser = JSON.parse(userData);
-
-    if (!currentUser.role.toUpperCase().includes('HR') && !currentUser.role.toUpperCase().includes('ADMIN')) {
-        alert("Unauthorized Access. HRMO personnel only.");
-        window.location.href = 'dashboard.html';
-    }
-
-    document.getElementById('activeUser').innerText = currentUser.full_name;
-    document.getElementById('userRoleBadge').innerText = currentUser.role;
-
-    function logout() {
-        sessionStorage.removeItem('currentUser');
-        window.location.href = 'index.html';
-    }
+    // System core
+    let employeesData = [];
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const qS = (sel) => document.querySelector(sel);
 
     window.onload = () => {
-        const today = new Date();
-        const currYear = today.getFullYear();
-        const yHtml = `<option value="${currYear}">${currYear}</option><option value="${currYear-1}">${currYear-1}</option>`;
-        document.getElementById('reportYear').innerHTML = yHtml;
-        document.getElementById('reportMonth').value = today.getMonth() + 1;
+        let mSel = qS('#repMonth');
+        let attenM = qS('#attenMonth');
+        months.forEach((m, i) => { mSel.add(new Option(m, i+1)); attenM.add(new Option(m, i+1)); });
+        mSel.selectedIndex = new Date().getMonth();
+        attenM.selectedIndex = new Date().getMonth();
+
+        let width = 0;
+        let int = setInterval(() => {
+            width += 20; qS('#loadingBar').style.width = width + '%';
+            if(width >= 100) { clearInterval(int); setTimeout(() => { qS('#loadingScreen').classList.add('hidden-section'); qS('#loginScreen').classList.remove('hidden-section'); }, 400); }
+        }, 100);
     };
 
-    function togglePeriodUI() {
-        const p = document.getElementById('periodType').value;
-        const mUI = document.getElementById('uiMonthly');
-        const rUI = document.getElementById('uiRange');
-        const yUI = document.getElementById('reportYear');
-        
-        mUI.classList.add('hidden');
-        rUI.classList.add('hidden');
-        yUI.parentElement.classList.add('hidden');
-
-        if (p === 'MONTHLY') {
-            mUI.classList.remove('hidden');
-            yUI.parentElement.classList.remove('hidden');
-        } else if (p === 'ANNUALLY') {
-            mUI.classList.remove('hidden');
-            yUI.parentElement.classList.remove('hidden');
-            document.getElementById('reportMonth').parentElement.classList.add('hidden'); 
-        } else if (p === 'RANGE') {
-            rUI.classList.remove('hidden');
-        }
-    }
-
-    // --- SYSTEM HELPERS ---
-    function cleanId(val) {
-        if (!val || val === 'nan') return "";
-        return String(val).split('.')[0].trim();
-    }
-
-    function formatTime12(dateStr) {
-        if (!dateStr || dateStr === 'None' || dateStr === 'nan' || dateStr === '-') return '-';
+    async function login() {
+        const u = qS('#username').value.trim();
+        const p = qS('#password').value.trim();
+        const btn = qS('#loginBtn');
+        if(!u || !p) return;
+        btn.innerText = "AUTHENTICATING..."; btn.disabled = true;
         try {
-            return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).replace(' AM', '').replace(' PM','');
-        } catch { return String(dateStr); }
+            const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
+            if (data && data.password === p) {
+                qS('#activeUser').innerText = `User: ${data.full_name.toUpperCase()}`;
+                qS('#loginScreen').classList.add('hidden-section');
+                qS('#mainPortal').classList.remove('hidden-section');
+                switchModule('reports');
+            } else { qS('#loginStatus').innerText = "Access Denied."; }
+        } catch (e) { qS('#loginStatus').innerText = e.message; btn.innerText = "AUTHENTICATE"; btn.disabled = false; }
     }
 
-    async function getSupabaseAssetAsBase64(bucket, path) {
-        try {
-            const { data, error } = await supabaseClient.storage.from(bucket).download(path);
-            if (error) throw error;
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(data);
-            });
-        } catch (e) {
-            console.warn(`Failed to fetch asset ${path}:`, e.message);
-            return null; 
-        }
+    function switchModule(mod) {
+        document.querySelectorAll('.module-content').forEach(el => el.classList.add('hidden-section'));
+        document.querySelectorAll('#sidebar button').forEach(el => el.classList.remove('bg-[#006400]', 'border-[#D4AF37]'));
+        qS(`#nav-${mod}`).classList.add('bg-[#006400]', 'border-[#D4AF37]');
+        qS(`#module-${mod}`).classList.remove('hidden-section');
+        if(mod === 'reports') loadMissingComp();
     }
 
-    async function getQRAsBase64(dataStr) {
-        try {
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(dataStr)}`;
-            const response = await fetch(qrUrl);
-            const blob = await response.blob();
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
-        } catch(e) { return null; }
+    function logout() { location.reload(); }
+
+    function toggleReportPeriod() {
+        const p = qS('#repPeriod').value;
+        qS('#repMonthGroup').style.display = (p === 'MONTHLY' || p === 'WEEKLY') ? 'block' : 'none';
     }
 
-    // Custom Group Table Drawing logic replicating the Python FPDF mechanism
-    function drawTableGroup(pdf, divisionName, dataRows, headers, widths, startY, isAppend) {
-        let cy = startY;
-        const margin = 15;
-
-        // Group Header
-        pdf.setFillColor(200, 220, 255);
-        pdf.setFont("helvetica", "bold"); pdf.setFontSize(10);
-        const totalW = widths.reduce((a,b)=>a+b, 0);
-        pdf.rect(margin, cy, totalW, 8, 'FD');
-        pdf.text(`DIVISION: ${divisionName}`, margin + 2, cy + 5.5);
-        cy += 8;
-
-        // Column Headers
-        pdf.setFillColor(220, 220, 220);
-        pdf.setFontSize(8);
-        let cx = margin;
-        headers.forEach((h, i) => {
-            pdf.rect(cx, cy, widths[i], 8, 'FD');
-            pdf.text(h, cx + (widths[i]/2), cy + 5, {align: 'center'});
-            cx += widths[i];
-        });
-        cy += 8;
-
-        // Rows
-        pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
-        dataRows.forEach(row => {
-            if (cy > 185 && !isAppend) { 
-                pdf.addPage();
-                cy = 20; 
-            }
-            cx = margin;
-            
-            let maxLines = 1;
-            row.forEach((text, i) => {
-                const split = pdf.splitTextToSize(String(text), widths[i] - 2);
-                if (split.length > maxLines) maxLines = split.length;
-            });
-            const rowH = Math.max(6, maxLines * 4 + 2);
-
-            row.forEach((text, i) => {
-                pdf.rect(cx, cy, widths[i], rowH);
-                const align = (headers[i].includes("PURPOSE") || headers[i].includes("DESTINATION") || headers[i].includes("NAME") || headers[i].includes("REMARKS")) ? 'left' : 'center';
-                const split = pdf.splitTextToSize(String(text), widths[i] - 2);
-                
-                if (align === 'center') {
-                    pdf.text(split, cx + (widths[i]/2), cy + 4, {align: 'center'});
-                } else {
-                    pdf.text(split, cx + 1, cy + 4);
-                }
-                cx += widths[i];
-            });
-            cy += rowH;
-        });
-        return cy + 5;
-    }
-
-    // --- MAIN REPORT GENERATOR ---
-    async function generateReport() {
-        const btn = document.getElementById('btnGenerate');
-        const status = document.getElementById('statusMsg');
-        const repType = document.getElementById('reportType').value;
-        const period = document.getElementById('periodType').value;
-
-        btn.disabled = true; btn.innerText = "FETCHING DATA...";
-        status.innerText = "Contacting database...";
-
-        let startDt, endDt, titleSuffix;
-        const now = new Date();
-
-        // Determine Date Bounds safely
-        if (period === 'MONTHLY') {
-            const y = parseInt(document.getElementById('reportYear').value);
-            const m = parseInt(document.getElementById('reportMonth').value);
-            startDt = new Date(y, m - 1, 1);
-            endDt = new Date(y, m, 0, 23, 59, 59);
-            const monthNames = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
-            titleSuffix = `${monthNames[m-1]} ${y}`;
-        } else if (period === 'ANNUALLY') {
-            const y = parseInt(document.getElementById('reportYear').value);
-            startDt = new Date(y, 0, 1);
-            endDt = new Date(y, 11, 31, 23, 59, 59);
-            titleSuffix = `YEAR ${y}`;
-        } else if (period === 'RANGE') {
-            const sStr = document.getElementById('startDate').value;
-            const eStr = document.getElementById('endDate').value;
-            if (!sStr || !eStr) {
-                btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; status.innerText = "";
-                return alert("Start and End dates required.");
-            }
-            startDt = new Date(sStr);
-            endDt = new Date(eStr); endDt.setHours(23, 59, 59);
-            titleSuffix = `${sStr} to ${eStr}`;
-        } else { // WEEKLY
-            endDt = new Date();
-            startDt = new Date(); startDt.setDate(endDt.getDate() - 7);
-            titleSuffix = "LAST 7 DAYS";
-        }
-
-        // Formatting ISO strictly to prevent TZ shifting to prior day
-        const tzOffset = startDt.getTimezoneOffset() * 60000;
-        const localStartIso = (new Date(startDt - tzOffset)).toISOString().slice(0, -1);
-        const localEndIso = (new Date(endDt - tzOffset)).toISOString().slice(0, -1);
-        
-        const { jsPDF } = window.jspdf;
-
-        try {
-            // Fetch Employee Data
-            status.innerText = "Loading employee data...";
-            const { data: empData, error: eErr } = await supabaseClient.from('employees').select('*');
-            if (eErr) throw eErr;
-            if (!empData || empData.length === 0) throw new Error("Employee Database is empty.");
-
-            const nameMap = {}, divMap = {}, posMap = {}, stationMap = {}, empObjMap = {};
-            empData.forEach(e => {
-                const cleanIdStr = cleanId(e.emp_id);
-                nameMap[cleanIdStr] = String(e.full_name).toUpperCase();
-                divMap[cleanIdStr] = String(e.division).toUpperCase();
-                posMap[cleanIdStr] = String(e.position).toUpperCase();
-                stationMap[cleanIdStr] = String(e.station).toUpperCase();
-                empObjMap[cleanIdStr] = e;
-            });
-
-            // Base PDF Setup logic
-            let pdf;
-            const isAppend = document.getElementById('appendMode').checked;
-            const appendLvl = parseInt(document.getElementById('appendLevel').value);
-            
-            const initHeaderLandscape = () => {
-                if (isAppend) {
-                    pdf.setDrawColor(200); pdf.line(10, (appendLvl * 45) - 5, 287, (appendLvl * 45) - 5);
-                    pdf.setFont("helvetica", "italic"); pdf.setFontSize(7);
-                    pdf.text(`-- Continuation of ${repType.toUpperCase()} (${titleSuffix}) --`, 280, appendLvl * 45, {align: 'right'});
-                } else {
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(10);
-                    pdf.text("REPUBLIC OF THE PHILIPPINES", 148.5, 15, {align: 'center'});
-                    pdf.text("Department of Agrarian Reform", 148.5, 20, {align: 'center'});
-                    pdf.text("Provincial Office of Camarines Sur 1", 148.5, 25, {align: 'center'});
-                    pdf.setFontSize(12);
-                    pdf.text(`CONSOLIDATED REPORT: ${repType.toUpperCase()} - ${titleSuffix}`, 148.5, 35, {align: 'center'});
-                }
-                return isAppend ? (appendLvl * 45) + 10 : 45;
+    // --- HELPER FUNCTIONS ---
+    async function loadImgData(url) {
+        return new Promise((resolve, reject) => {
+            let img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                let canvas = document.createElement('canvas');
+                canvas.width = img.width; canvas.height = img.height;
+                let ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/jpeg'));
             };
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
 
-            // ==========================================
-            // TRAVEL ORDER BATCH PRINTING
-            // ==========================================
-            if (repType === "Travel Order Batch Printing") {
-                status.innerText = "Processing Travel Orders...";
+    async function getQRDataURL(text) {
+        return new Promise((resolve) => {
+            qS('#qrContainer').innerHTML = "";
+            new QRCode(qS('#qrContainer'), { text: text, width: 100, height: 100 });
+            setTimeout(() => {
+                resolve(qS('#qrContainer').querySelector("canvas").toDataURL("image/png"));
+            }, 100);
+        });
+    }
+
+    function formatTime12h(timeStr) {
+        if (!timeStr) return "";
+        try {
+            const [h, m] = timeStr.split(":");
+            let hour = parseInt(h, 10);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12 || 12;
+            return `${hour.toString().padStart(2, '0')}:${m} ${ampm}`;
+        } catch(e) { return timeStr; }
+    }
+
+    // --- EXACT REPORT LOGIC MIGRATION FROM PYTHON ---
+    async function generatePDFReport() {
+        const type = qS('#repType').value;
+        const period = qS('#repPeriod').value;
+        const year = parseInt(qS('#repYear').value);
+        const monthIdx = qS('#repMonth').selectedIndex + 1;
+        const btn = qS('#btnGenerateReport');
+        btn.disabled = true; btn.innerText = "FETCHING DATA...";
+
+        // Handle Date Logic
+        let startIso, endIso;
+        if (period === 'MONTHLY') {
+            startIso = `${year}-${String(monthIdx).padStart(2,'0')}-01T00:00:00`;
+            const lastDay = new Date(year, monthIdx, 0).getDate();
+            endIso = `${year}-${String(monthIdx).padStart(2,'0')}-${lastDay}T23:59:59`;
+        }
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const { data: emps } = await supabaseClient.from('employees').select('*');
+
+            // 1. TRAVEL ORDER BATCH PRINTING
+            if (type === "Travel Order Batch Printing") {
+                const { data: tos } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
+                const { data: itins } = await supabaseClient.from('itinerary').select('*');
                 
-                const { data: toData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
-                if (!toData || toData.length === 0) throw new Error("No Approved Travel Orders found.");
-
-                const validToNos = toData.map(t => t.to_no);
-                const { data: itinData } = await supabaseClient.from('itinerary').select('*').in('to_no', validToNos).gte('travel_date', localStartIso.split('T')[0]).lte('travel_date', localEndIso.split('T')[0]);
+                if(!tos || !tos.length) { alert("No Approved Travel Orders found."); return; }
                 
-                if (!itinData || itinData.length === 0) throw new Error(`No Approved Travel Orders found for ${period} period.`);
+                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                let addedPages = false;
+                let bgData = null;
 
-                const activeToNos = [...new Set(itinData.map(i => i.to_no))];
-                const activeTOs = toData.filter(t => activeToNos.includes(t.to_no));
+                try {
+                    const { data } = await supabaseClient.storage.from('e-sign').createSignedUrl('bg_form.jpg', 60);
+                    bgData = await loadImgData(data.signedUrl);
+                } catch(e) { console.log("No bg_form.jpg found"); }
 
-                status.innerText = "Downloading signatures & backgrounds...";
-                const bgBase64 = await getSupabaseAssetAsBase64('e-sign', 'bg_form.jpg');
-                const p2Base64 = await getSupabaseAssetAsBase64('e-sign', 'p2.png');
+                for (const od of tos) {
+                    const to_id = od.to_no;
+                    const il = itins.filter(i => i.to_no === to_id).sort((a,b) => new Date(a.travel_date) - new Date(b.travel_date));
+                    if(!il.length) continue;
 
-                pdf = new jsPDF('p', 'mm', 'a4');
-                let isFirst = true;
-
-                for (let t of activeTOs) {
-                    const toItins = itinData.filter(i => i.to_no === t.to_no).sort((a,b) => new Date(a.travel_date) - new Date(b.travel_date));
+                    const eDet = emps.find(e => e.emp_id === od.emp_id) || {};
+                    const empName = (od.emp_name || '').toUpperCase();
+                    const position = (eDet.position || '').toUpperCase();
+                    const station = (eDet.station || '').toUpperCase();
                     
-                    const unitHeadName = String(t.unithead_signed || '').toUpperCase().trim();
-                    const dcName = String(t.dc_signed || '').toUpperCase().trim();
-
-                    const unitHeadEmp = empData.find(e => String(e.full_name).toUpperCase().trim() === unitHeadName);
-                    const dcEmp = empData.find(e => String(e.full_name).toUpperCase().trim() === dcName);
-
-                    const unitSign = unitHeadEmp ? await getSupabaseAssetAsBase64('e-sign', `${cleanId(unitHeadEmp.emp_id)}.png`) : null;
-                    const dcSign = dcEmp ? await getSupabaseAssetAsBase64('e-sign', `${cleanId(dcEmp.emp_id)}.png`) : null;
-                    const qrImgData = await getQRAsBase64(t.to_no);
-
-                    if (!isFirst) pdf.addPage();
-                    isFirst = false;
-
-                    if (bgBase64) pdf.addImage(bgBase64, 'JPEG', 0, 0, 210, 297);
-
-                    let wy = 10;
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.setTextColor(255, 0, 0);
+                    const departureDate = il[0].travel_date || "N/A";
+                    const returnDate = il[il.length-1].travel_date || "N/A";
+                    const destStr = il.map(i => `${i.destination} - ${i.travel_date}`).join(", ");
+                    const purpStr = il[0].purpose || "N/A";
                     
-                    if (String(t.remarks) === "PSO_OVERRIDE") {
-                        pdf.text("WITH EXISTING PSO/RSO, subject for PARPO's FINAL APPROVAL", 60, wy); wy += 5;
+                    if(addedPages) pdf.addPage();
+                    addedPages = true;
+
+                    if(bgData) pdf.addImage(bgData, 'JPEG', 0, 0, 210, 297);
+
+                    let cy = 10;
+                    pdf.setFontSize(10); pdf.setFont("helvetica", "bold"); pdf.setTextColor(255,0,0);
+                    if(od.remarks === "PSO_OVERRIDE") {
+                        pdf.text("WITH EXISTING PSO/RSO, subject for PARPO's FINAL APPROVAL", 60, cy);
+                        cy += 5;
                     }
-                    if (String(t.transport).toUpperCase().includes("GOV'T")) {
-                        pdf.text("NOT VALID FOR TRANSPORTATION REIMBURSEMENT CLAIM", 60, wy);
+                    if(String(od.transport).toUpperCase() === "GOV'T VEHICLE") {
+                        pdf.text("NOT VALID FOR TRANSPORTATION REIMBURSEMENT CLAIM", 60, cy);
                     }
+                    pdf.setTextColor(0,0,0);
+
+                    pdf.setFontSize(7); pdf.setFont("helvetica", "italic");
+                    pdf.text("HR FILE COPY", 187.5, 5, {align: 'center'});
                     
-                    pdf.setTextColor(0, 0, 0);
-                    pdf.setFont("helvetica", "italic"); pdf.setFontSize(7);
-                    pdf.text("HR FILE COPY", 187.5, 5, { align: 'center' });
+                    let qrData = await getQRDataURL(to_id);
+                    pdf.addImage(qrData, 'PNG', 175, 10, 25, 25);
+
+                    cy = 35;
+                    pdf.setFontSize(17); pdf.setFont("helvetica", "bold");
+                    pdf.text(`TRAVEL ORDER NO. ${to_id}`, 105, cy, {align: 'center'});
                     
-                    if(qrImgData) pdf.addImage(qrImgData, 'PNG', 175, 10, 25, 25);
+                    pdf.setFontSize(11); pdf.setFont("helvetica", "normal");
+                    pdf.text(`Date: ${new Date().toLocaleDateString('en-US', {month:'long', day:'2-digit', year:'numeric'})}`, 200, cy+6, {align: 'right'});
+                    cy += 11;
 
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(17);
-                    pdf.text(`TRAVEL ORDER NO. ${t.to_no}`, 105, 40, { align: 'center' });
+                    let startX = 10;
+                    pdf.setFontSize(11); pdf.setFont("helvetica", "bold"); pdf.text("NAME: ", startX, cy);
+                    pdf.text(empName, startX + 15, cy);
+                    cy += 6;
                     
-                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(11);
-                    pdf.text(`Date: ${new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`, 200, 46, { align: 'right' });
+                    pdf.setFontSize(10); pdf.text("POSITION: ", startX, cy);
+                    pdf.text(position, startX + 22, cy);
+                    pdf.text("STATION: ", startX + 95, cy);
+                    pdf.text(station, startX + 115, cy);
+                    cy += 9;
 
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(11);
-                    pdf.text("NAME: ", 10, 56); 
-                    pdf.line(25, 57, 200, 57);
-                    pdf.text(String(t.emp_name).toUpperCase(), 25, 56);
-
-                    pdf.setFontSize(10);
-                    pdf.text("POSITION: ", 10, 62);
-                    pdf.line(32, 63, 100, 63);
-                    pdf.text(posMap[cleanId(t.emp_id)] || '', 32, 62);
-
-                    pdf.text("STATION: ", 105, 62);
-                    pdf.line(125, 63, 200, 63);
-                    pdf.text(stationMap[cleanId(t.emp_id)] || '', 125, 62);
-
-                    pdf.text("MEANS OF TRANSPORTATION:", 10, 72);
-                    const trans = String(t.transport).toUpperCase();
+                    pdf.text("MEANS OF TRANSPORTATION:", startX, cy);
+                    cy += 6;
                     
-                    const chk = (lbl, x, y, checked) => {
-                        pdf.rect(x, y, 4, 4);
-                        if (checked) { pdf.setFontSize(9); pdf.text("X", x + 0.5, y + 3.5); }
-                        pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
-                        pdf.text(lbl, x + 6, y + 3.5);
+                    const trSel = String(od.transport).toUpperCase();
+                    const drawChk = (l, o, isChk) => {
+                        pdf.rect(startX + o, cy - 4, 4, 4);
+                        if(isChk) { pdf.setFontSize(9); pdf.text("X", startX + o + 0.5, cy - 0.5); }
+                        pdf.setFontSize(10); pdf.setFont("helvetica", "normal"); pdf.text(l, startX + o + 5, cy - 1);
                         pdf.setFont("helvetica", "bold");
                     };
 
-                    chk("AIR", 15, 76, trans.includes("AIR")); chk("GOV'T VEHICLE", 75, 76, trans.includes("GOV'T"));
-                    chk("LAND", 15, 82, trans.includes("LAND")); chk("OTHERS, PLEASE SPECIFY", 75, 82, trans.includes("OTHERS"));
+                    drawChk("AIR", 2, trSel.includes("AIR")); drawChk("GOV'T VEHICLE", 60, trSel.includes("GOV'T")); cy += 6;
+                    drawChk("LAND", 2, trSel.includes("LAND")); drawChk("OTHERS, PLEASE SPECIFY", 60, trSel.includes("OTHERS")); cy += 8;
 
-                    pdf.text("DESTINATION:", 10, 92);
-                    pdf.setFont("helvetica", "normal");
-                    const dests = toItins.map(i => `${i.destination} - ${new Date(i.travel_date).toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`).join(", ");
-                    const splitDests = pdf.splitTextToSize(dests, 160);
-                    pdf.text(splitDests, 40, 92);
-                    pdf.line(40, 93 + ((splitDests.length-1)*5), 200, 93 + ((splitDests.length-1)*5));
+                    pdf.setFont("helvetica", "bold"); pdf.text("DESTINATION:", startX, cy);
+                    pdf.setFont("helvetica", "normal"); pdf.text(destStr, startX + 30, cy); cy += 6;
 
-                    const nextY = 102 + ((splitDests.length-1)*5);
-                    pdf.setFont("helvetica", "bold");
-                    pdf.text("DEPARTURE DATE:", 10, nextY); pdf.setFont("helvetica", "normal"); pdf.text(toItins[0].travel_date, 50, nextY); pdf.line(45, nextY+1, 85, nextY+1);
-                    pdf.setFont("helvetica", "bold");
-                    pdf.text("   RETURN DATE:", 90, nextY); pdf.setFont("helvetica", "normal"); pdf.text(toItins[toItins.length-1].travel_date, 125, nextY); pdf.line(120, nextY+1, 160, nextY+1);
+                    pdf.setFont("helvetica", "bold"); pdf.text("DEPARTURE DATE:", startX, cy);
+                    pdf.setFont("helvetica", "normal"); pdf.text(departureDate, startX + 38, cy);
+                    pdf.setFont("helvetica", "bold"); pdf.text("   RETURN DATE:", startX + 75, cy);
+                    pdf.setFont("helvetica", "normal"); pdf.text(returnDate, startX + 108, cy); cy += 8;
 
-                    pdf.setFont("helvetica", "bold");
-                    pdf.text("REPORT TO:", 10, nextY + 8); pdf.setFont("helvetica", "normal"); pdf.text(String(t.report_to || 'N/A'), 35, nextY + 8); pdf.line(35, nextY + 9, 200, nextY + 9);
+                    pdf.setFont("helvetica", "bold"); pdf.text("REPORT TO:", startX, cy);
+                    pdf.setFont("helvetica", "normal"); pdf.text(od.report_to || 'N/A', startX + 25, cy); cy += 8;
 
-                    pdf.setFont("helvetica", "bold");
-                    pdf.text("PURPOSE OF TRAVEL:", 10, nextY + 16); pdf.setFont("helvetica", "normal");
-                    const splitPurp = pdf.splitTextToSize(toItins[0].purpose || 'N/A', 190);
-                    pdf.text(splitPurp, 10, nextY + 22);
-                    pdf.line(10, nextY + 23 + ((splitPurp.length-1)*5), 200, nextY + 23 + ((splitPurp.length-1)*5));
+                    pdf.setFont("helvetica", "bold"); pdf.text("PURPOSE OF TRAVEL:", startX, cy);
+                    pdf.setFont("helvetica", "normal"); pdf.text(purpStr, startX, cy + 6);
+                    cy += 20;
 
-                    const cBoxY = nextY + 30 + ((splitPurp.length-1)*5);
-                    pdf.setFont("helvetica", "italic"); pdf.setFontSize(9);
-                    pdf.text("In case of seminar/workshop/consultation/briefing, indicate:", 10, cBoxY);
-                    const isLiveIn = String(toItins[0].purpose).toUpperCase().includes("LIVE IN");
-                    const isLiveOut = String(toItins[0].purpose).toUpperCase().includes("LIVE OUT");
-                    pdf.setFont("helvetica", "bold");
-                    chk("LIVE IN", 15, cBoxY + 2, isLiveIn); chk("LIVE OUT", 40, cBoxY + 2, isLiveOut);
+                    pdf.setFontSize(9); pdf.setFont("helvetica", "italic");
+                    pdf.text("In case of seminar/workshop/consultation/briefing, indicate:", startX, cy);
+                    cy += 6;
+                    drawChk("LIVE IN", 0, purpStr.toUpperCase().includes("LIVE IN"));
+                    drawChk("LIVE OUT", 25, purpStr.toUpperCase().includes("LIVE OUT"));
+                    
+                    cy = 150;
+                    pdf.setFontSize(10); pdf.setFont("helvetica", "bold");
+                    pdf.text("Recommended by:", startX, cy);
+                    cy += 15;
 
-                    pdf.text("Recommended by:", 10, 165);
-                    let sy = 180;
+                    let uText = String(od.unithead_signed || "NONE").toUpperCase() === "NONE" ? "_______________________" : String(od.unithead_signed).toUpperCase();
+                    let dText = String(od.dc_signed || "NONE").toUpperCase() === "NONE" ? "_______________________" : String(od.dc_signed).toUpperCase();
 
-                    if (unitSign) { try { pdf.addImage(unitSign, 'PNG', 35, sy - 15, 35, 25); } catch(e){} }
-                    pdf.text(unitHeadName || "_______________________", 50, sy, { align: 'center' });
-                    pdf.line(20, sy + 2, 80, sy + 2);
-                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.text("UNIT HEAD", 50, sy + 6, { align: 'center' });
-
+                    pdf.text(uText, startX + 30, cy, {align: "center"});
+                    pdf.line(startX + 10, cy + 2, startX + 70, cy + 2);
+                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.text("UNIT HEAD", startX + 30, cy + 6, {align: "center"});
+                    
                     pdf.setFont("helvetica", "bold"); pdf.setFontSize(10);
-                    if (dcSign) { try { pdf.addImage(dcSign, 'PNG', 115, sy - 20, 35, 25); } catch(e){} }
-                    pdf.text(dcName || "_______________________", 130, sy, { align: 'center' });
-                    pdf.line(100, sy + 2, 160, sy + 2);
-                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.text("DIVISION CHIEF", 130, sy + 6, { align: 'center' });
-
-                    sy += 25;
-                    if (p2Base64) { try { pdf.addImage(p2Base64, 'PNG', 115, sy - 15, 30, 25); } catch(e){} }
+                    pdf.text(dText, startX + 130, cy, {align: "center"});
+                    pdf.line(startX + 90, cy + 2, startX + 150, cy + 2);
+                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.text("DIVISION CHIEF", startX + 130, cy + 6, {align: "center"});
+                    
+                    cy += 25;
                     pdf.setFont("helvetica", "bold"); pdf.setFontSize(11);
-                    pdf.text("RICARDO C. GARCIA", 130, sy, { align: 'center' });
+                    pdf.text("RICARDO C. GARCIA", 105, cy, {align: "center"});
                     pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
-                    pdf.text("PARPO II", 130, sy + 5, { align: 'center' });
+                    pdf.text("PARPO II", 105, cy + 5, {align: "center"});
                 }
 
-                pdf.save(`Batch_HR_Files_TravelOrders_${titleSuffix.replace(/ /g, '_')}.pdf`);
-                btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; status.innerText = "Report generated.";
-                return;
-            }
+                if(!addedPages) { alert("Failed to render."); return; }
+                pdf.save(`Batch_HR_Files_TravelOrders_${year}.pdf`);
 
-            // ==========================================
-            // COMPLIANCE MEMOS
-            // ==========================================
-            if (repType === "Compliance Memos") {
-                status.innerText = "Checking annual compliance...";
-                const y2 = parseInt(document.getElementById('reportYear').value);
-                const { data: compData } = await supabaseClient.from('annual_compliance').select('*').eq('year', y2);
+            // 2. MRUA
+            } else if (type === "MRUA") {
+                const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
                 
-                pdf = new jsPDF('p', 'mm', [215.9, 330.2]); // Long/Legal
-                const bgPath = await getSupabaseAssetAsBase64('e-sign', 'bg_memo.jpg');
-
-                let memosGen = 0;
-                const todayStr = new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
-
-                for (let emp of empData) {
-                    const eid = cleanId(emp.emp_id);
-                    const eComp = (compData || []).find(c => cleanId(c.emp_id) === eid);
-                    
-                    let missing = [];
-                    if (!eComp) {
-                        missing = ["Statement of Assets, Liabilities, and Net Worth (SALN)", "IPCR Plan", "IPCR", "Leave Administration Plan (LAP)", "HMO Plan submission"];
-                    } else {
-                        if (String(eComp.saln_status).toLowerCase() !== 'true') missing.push("Statement of Assets, Liabilities, and Net Worth (SALN)");
-                        if (String(eComp.ipcr_plan_status).toLowerCase() !== 'true') missing.push("IPCR Plan");
-                        if (String(eComp.ipcr_status).toLowerCase() !== 'true') missing.push("IPCR");
-                        if (String(eComp.lap_status).toLowerCase() !== 'true') missing.push("Leave Administration Plan (LAP)");
-                        if (String(eComp.hmo_plan_status).toLowerCase() !== 'true') missing.push("HMO Plan submission");
-                    }
-
-                    if (missing.length > 0) {
-                        if (memosGen > 0) pdf.addPage();
-                        memosGen++;
-
-                        if (bgPath) pdf.addImage(bgPath, 'JPEG', 0, 0, 215.9, 330.2);
-
-                        pdf.setFont("helvetica", "bold"); pdf.setFontSize(12);
-                        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
-                        pdf.setFontSize(11);
-                        pdf.text(`Series of ${todayStr.split(',')[1].trim()}`, 25.4, 51);
-
-                        let cy = 65;
-                        pdf.text("TO", 25.4, cy); pdf.text(":", 50, cy); pdf.text(String(emp.full_name).toUpperCase(), 55, cy); cy += 8;
-                        pdf.text("FROM", 25.4, cy); pdf.text(":", 50, cy); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 55, cy); cy += 8;
-                        pdf.text("DATE", 25.4, cy); pdf.text(":", 50, cy); pdf.text(todayStr, 55, cy); cy += 8;
-                        pdf.text("SUBJECT", 25.4, cy); pdf.text(":", 50, cy); pdf.text("COMPLIANCE ON ANNUAL REQUIREMENTS", 55, cy); cy += 6;
-
-                        pdf.setLineWidth(0.6); pdf.line(25.4, cy, 215.9 - 25.4, cy); cy += 8;
-
-                        pdf.setFont("helvetica", "normal");
-                        const p1 = `Please be reminded of your pending annual compliance requirements for the year ${y2}. Based on our records, you have not yet submitted the following:`;
-                        const splitP1 = pdf.splitTextToSize(p1, 165.1);
-                        pdf.text(splitP1, 25.4, cy); cy += (splitP1.length * 5) + 5;
-
-                        missing.forEach(req => {
-                            pdf.text("-", 30, cy);
-                            pdf.text(req, 35, cy);
-                            cy += 5;
-                        });
-                        cy += 5;
-
-                        const p2 = "You are hereby directed to submit the aforementioned documents to the HRMO immediately. Prompt compliance is strictly enjoined.";
-                        const splitP2 = pdf.splitTextToSize(p2, 165.1);
-                        pdf.text(splitP2, 25.4, cy); cy += (splitP2.length * 5) + 5;
-
-                        pdf.text("For your strict compliance.", 25.4, cy); cy += 10;
-
-                        const p3 = "All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.";
-                        const splitP3 = pdf.splitTextToSize(p3, 165.1);
-                        pdf.text(splitP3, 25.4, cy); cy += (splitP3.length * 5) + 5;
-
-                        const p4 = "_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.";
-                        const splitP4 = pdf.splitTextToSize(p4, 165.1);
-                        pdf.text(splitP4, 25.4, cy); cy += 20;
-
-                        pdf.setFont("helvetica", "bold");
-                        pdf.text("RICARDO C. GARCIA", 25.4, cy);
-
-                        const traceId = `TRC-${eid}-${Date.now()}`;
-                        const qrPayload = `DAR CS1 HRMO\nTrace ID: ${traceId}\nCompliance Memo\nIssued To: ${emp.full_name}\nGen: ${todayStr}`;
-                        const qrData = await getQRAsBase64(qrPayload);
-                        if (qrData) pdf.addImage(qrData, 'PNG', 25.4, cy + 5, 20, 20);
-                    }
-                }
-
-                if (memosGen === 0) {
-                    btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; status.innerText = "";
-                    return alert("All employees are fully compliant for this period.");
-                }
-
-                pdf.save(`Compliance_Memos_${y2}.pdf`);
-                btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; status.innerText = "Memos generated.";
-                return;
-            }
-
-            // ==========================================
-            // TARDINESS MEMOS & FLAG CEREMONY MEMOS
-            // ==========================================
-            if (repType === "Tardiness Memos" || repType === "Flag Ceremony Memos") {
-                alert(`${repType} logic requires complex cross-month history tracking not fully ported to Web UI. Please use the Desktop System or contact DB Admin.`);
-                btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; status.innerText = "";
-                return;
-            }
-
-            // ==========================================
-            // MRUA GENERATOR
-            // ==========================================
-            if (repType === "MRUA") {
-                status.innerText = "Compiling MRUA Data...";
+                let mruaBgData = null;
+                try {
+                    const { data } = await supabaseClient.storage.from('e-sign').createSignedUrl('mrua_bg.jpg', 60);
+                    mruaBgData = await loadImgData(data.signedUrl);
+                } catch(e) { console.log("No mrua_bg.jpg found"); }
                 
-                const { data: llData } = await supabaseClient.from('leave_ledger').select('*').eq('transaction_t', 'APPROVED').gte('date', localStartIso.split('T')[0]).lte('date', localEndIso.split('T')[0]);
-                const { data: alData } = await supabaseClient.from('attendance_logs').select('*').gte('log_time', localStartIso).lte('log_time', localEndIso);
+                if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 355.6, 215.9);
 
-                pdf = new jsPDF('l', 'mm', [215.9, 355.6]); // Landscape Legal
-                const mruaBg = await getSupabaseAssetAsBase64('e-sign', 'mrua_bg.jpg');
+                const { data: logs } = await supabaseClient.from('attendance_logs').select('*').gte('log_time', startIso).lte('log_time', endIso);
+                const { data: leaves } = await supabaseClient.from('leave_ledger').select('*').gte('start_date', startIso).lte('start_date', endIso).eq('transaction_t', 'APPROVED');
+                
+                let empGroups = {};
+                emps.forEach(e => {
+                    let div = (e.division || "UNASSIGNED").toUpperCase();
+                    let st = (e.station || "").toUpperCase();
+                    if(div.includes("DARMO") && st && st !== "NONE") div = `DARMO - ${st}`;
+                    if(!empGroups[div]) empGroups[div] = [];
+                    empGroups[div].push(e);
+                });
 
-                const drawHeaders = () => {
-                    pdf.setFillColor(220, 220, 220);
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(7);
+                const sortedDivs = Object.keys(empGroups).sort();
+                const colWidths = [55, 20, 22, 40, 22, 40, 26, 10, 10, 80.6];
+                
+                const drawHeaders = (pdf, divName, cy) => {
+                    pdf.setFontSize(10); pdf.setFont("helvetica", "bold");
+                    pdf.setFillColor(200, 220, 255);
+                    pdf.rect(15, cy, colWidths.reduce((a,b)=>a+b,0), 6, 'DF');
+                    pdf.text(`DIVISION: ${divName}`, 17, cy + 4);
+                    cy += 6;
                     
-                    const cw = [55, 20, 22, 40, 22, 40, 26, 10, 10, 80.6];
-                    let cx = 15; let cy = 45;
-
-                    pdf.rect(cx, cy, cw[0], 12, 'FD'); pdf.text("NAMES", cx + cw[0]/2, cy + 6, {align:'center'}); cx += cw[0];
-                    pdf.rect(cx, cy, cw[1], 12, 'FD'); pdf.text("I.D. NO.", cx + cw[1]/2, cy + 6, {align:'center'}); cx += cw[1];
-                    pdf.rect(cx, cy, cw[2], 12, 'FD'); pdf.text("NO. OF TIMES\nABSENT", cx + cw[2]/2, cy + 5, {align:'center'}); cx += cw[2];
-                    pdf.rect(cx, cy, cw[3], 12, 'FD'); pdf.text("DATES ABSENT", cx + cw[3]/2, cy + 6, {align:'center'}); cx += cw[3];
-                    pdf.rect(cx, cy, cw[4], 12, 'FD'); pdf.text("NO. OF TIMES\nUNDERTIME", cx + cw[4]/2, cy + 5, {align:'center'}); cx += cw[4];
-                    pdf.rect(cx, cy, cw[5], 12, 'FD'); pdf.text("DATE UNDERTIME", cx + cw[5]/2, cy + 6, {align:'center'}); cx += cw[5];
-                    pdf.rect(cx, cy, cw[6], 12, 'FD'); pdf.text("TOTAL HRS/MINS\nUNDERTIME", cx + cw[6]/2, cy + 5, {align:'center'}); cx += cw[6];
+                    pdf.setFontSize(7); pdf.setFillColor(220, 220, 220);
+                    let cx = 15;
+                    const headers = ["NAMES", "I.D. NO.", "NO. OF TIMES\nABSENT", "DATES ABSENT", "NO. OF TIMES\nUNDERTIME", "DATE UNDERTIME", "TOTAL HRS/MINS\nUNDERTIME", "TOTAL DAYS", "REMARKS"];
+                    const hWidths = [55, 20, 22, 40, 22, 40, 26, 20, 80.6];
                     
-                    pdf.rect(cx, cy, cw[7]+cw[8], 6, 'FD'); pdf.text("TOTAL DAYS", cx + (cw[7]+cw[8])/2, cy + 4, {align:'center'}); 
-                    pdf.rect(cx, cy + 6, cw[7], 6, 'FD'); pdf.text("VL", cx + cw[7]/2, cy + 10, {align:'center'}); cx += cw[7];
-                    pdf.rect(cx, cy + 6, cw[8], 6, 'FD'); pdf.text("SL", cx + cw[8]/2, cy + 10, {align:'center'}); cx += cw[8];
-                    
-                    pdf.rect(cx, cy, cw[9], 12, 'FD'); pdf.text("REMARKS", cx + cw[9]/2, cy + 6, {align:'center'});
+                    hWidths.forEach((w, i) => {
+                        pdf.rect(cx, cy, w, 12, 'DF');
+                        if(i === 7) {
+                            pdf.line(cx, cy+6, cx+w, cy+6);
+                            pdf.line(cx+(w/2), cy+6, cx+(w/2), cy+12);
+                            pdf.text("TOTAL DAYS", cx+(w/2), cy+4, {align:"center"});
+                            pdf.text("VL", cx+(w/4), cy+10, {align:"center"});
+                            pdf.text("SL", cx+(w*0.75), cy+10, {align:"center"});
+                        } else {
+                            const lines = headers[i].split('\n');
+                            if(lines.length === 1) pdf.text(lines[0], cx+(w/2), cy+7, {align:"center"});
+                            else { pdf.text(lines[0], cx+(w/2), cy+5, {align:"center"}); pdf.text(lines[1], cx+(w/2), cy+9, {align:"center"}); }
+                        }
+                        cx += w;
+                    });
+                    return cy + 12;
                 };
 
-                let isFirst = true;
-
-                // Group by explicitly formatted division for MRUA
-                const groupedEmps = {};
-                empData.forEach(e => {
-                    let d = String(e.division).toUpperCase().trim();
-                    let st = String(e.station).toUpperCase().trim();
-                    if (d.includes("DARMO") && st && st !== 'NAN' && st !== 'UNASSIGNED') {
-                        d = `DARMO - ${st}`;
-                    }
-                    if(!groupedEmps[d]) groupedEmps[d] = [];
-                    groupedEmps[d].push(e);
-                });
-
-                const sortedDivs = Object.keys(groupedEmps).sort();
-
-                for (const div of sortedDivs) {
-                    if (!isFirst) pdf.addPage();
-                    isFirst = false;
-
-                    if (mruaBg) pdf.addImage(mruaBg, 'JPEG', 0, 0, 355.6, 215.9);
-                    drawHeaders();
-
-                    pdf.setFillColor(200, 220, 255);
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(8);
-                    pdf.rect(15, 57, 325.6, 6, 'FD');
-                    pdf.text(`DIVISION: ${div}`, 17, 61);
-
-                    let cy = 63;
-                    const cw = [55, 20, 22, 40, 22, 40, 26, 10, 10, 80.6];
-                    pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
-
-                    groupedEmps[div].forEach(e => {
-                        const eid = cleanId(e.emp_id);
+                let currY = 45;
+                sortedDivs.forEach(div => {
+                    if(currY > 170) { doc.addPage(); if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 355.6, 215.9); currY = 15; }
+                    currY = drawHeaders(doc, div, currY);
+                    
+                    empGroups[div].forEach(emp => {
+                        const eLogs = logs.filter(l => l.emp_id == emp.emp_id);
+                        const eLeaves = leaves.filter(l => l.emp_id == emp.emp_id);
                         
-                        let vl = 0, sl = 0, absCnt = 0;
-                        (llData || []).filter(l => cleanId(l.emp_id) === eid).forEach(l => {
-                            const t = String(l.type).toUpperCase();
-                            if (t.includes('VL') || t.includes('VACATION')) vl += Math.abs(parseFloat(l.debit || 0));
-                            if (t.includes('SL') || t.includes('SICK')) sl += Math.abs(parseFloat(l.debit || 0));
-                            absCnt++;
+                        let vlDays = 0, slDays = 0, absCount = 0;
+                        eLeaves.forEach(lr => {
+                            let type = (lr.type || "").toUpperCase();
+                            if(type.includes("VL") || type.includes("VACATION")) vlDays += Math.abs(parseFloat(lr.debit||0));
+                            if(type.includes("SL") || type.includes("SICK")) slDays += Math.abs(parseFloat(lr.debit||0));
+                            absCount++;
                         });
+                        
+                        let utCount = 0, totUtMins = 0; 
+                        
+                        if(absCount === 0 && utCount === 0) return;
 
-                        // Simplified MRUA render calculations (Mocking the complex python calc)
-                        let rowH = 6;
-                        if (cy + rowH > 185) {
-                            pdf.addPage();
-                            if (mruaBg) pdf.addImage(mruaBg, 'JPEG', 0, 0, 355.6, 215.9);
-                            drawHeaders();
-                            cy = 57;
-                        }
+                        const rowVals = [
+                            emp.full_name.toUpperCase(), emp.emp_id, 
+                            absCount > 0 ? String(absCount) : "-", "-", 
+                            utCount > 0 ? String(utCount) : "-", "-", 
+                            "-", vlDays > 0 ? String(vlDays) : "-", slDays > 0 ? String(slDays) : "-", "-"
+                        ];
 
-                        let cx = 15;
-                        const drawCell = (w, txt, align) => {
-                            pdf.rect(cx, cy, w, rowH);
-                            const split = pdf.splitTextToSize(txt, w - 2);
-                            pdf.text(split, cx + (align === 'C' ? w/2 : 2), cy + 4, {align: align === 'C' ? 'center' : 'left'});
+                        let rowH = 6; let cx = 15;
+                        doc.setFont("helvetica", "normal");
+                        colWidths.forEach((w, i) => {
+                            doc.rect(cx, currY, w, rowH);
+                            const align = (i === 0 || i === 3 || i === 5 || i === 9) ? "left" : "center";
+                            const tx = align === "center" ? cx + (w/2) : cx + 2;
+                            doc.text(rowVals[i], tx, currY + 4, {align: align});
                             cx += w;
-                        };
-
-                        drawCell(cw[0], String(e.full_name).toUpperCase(), 'L');
-                        drawCell(cw[1], eid, 'C');
-                        drawCell(cw[2], absCnt > 0 ? String(absCnt) : "-", 'C');
-                        drawCell(cw[3], "-", 'C'); // Dates Absent logic
-                        drawCell(cw[4], "-", 'C'); // UT count logic
-                        drawCell(cw[5], "-", 'C'); // UT Dates logic
-                        drawCell(cw[6], "-", 'C'); // Total UT logic
-                        drawCell(cw[7], vl > 0 ? String(vl) : "-", 'C');
-                        drawCell(cw[8], sl > 0 ? String(sl) : "-", 'C');
-                        drawCell(cw[9], "-", 'L'); // Remarks
-                        
-                        cy += rowH;
-                    });
-
-                    // MRUA Footer
-                    cy += 5;
-                    pdf.setFont("helvetica", "bold"); pdf.setFontSize(8);
-                    pdf.text("Prepared and Posted:", 40, cy, {align: 'center'});
-                    pdf.text("Approved by:", 210, cy, {align: 'center'});
-                    
-                    cy += 15;
-                    pdf.text("SHERALYN S. MIRARAN", 40, cy, {align: 'center'});
-                    pdf.text("RICARDO C. GARCIA", 210, cy, {align: 'center'});
-                    
-                    pdf.setFont("helvetica", "normal");
-                    pdf.text("HRMO / AO II", 40, cy + 4, {align: 'center'});
-                    pdf.text("PARPO II", 210, cy + 4, {align: 'center'});
-                }
-
-                pdf.save(`MRUA_${titleSuffix.replace(/ /g, '_')}.pdf`);
-                btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; status.innerText = "Report Generated.";
-                return;
-            }
-
-            // ==========================================
-            // TABLE GENERATORS (LANDSCAPE A4)
-            // ==========================================
-            pdf = new jsPDF('l', 'mm', 'a4');
-            let startY = initHeaderLandscape();
-
-            if (repType === "Travel Order Summary") {
-                const { data: toData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
-                const { data: itinData } = await supabaseClient.from('itinerary').select('*').gte('travel_date', localStartIso.split('T')[0]).lte('travel_date', localEndIso.split('T')[0]);
-                
-                if (!toData || !itinData || itinData.length === 0) throw new Error("No TO data for this period.");
-
-                const validToNos = new Set(toData.map(t=>t.to_no));
-                const activeItins = itinData.filter(i => validToNos.has(i.to_no));
-
-                const summaryObj = {};
-                activeItins.forEach(i => {
-                    const toObj = toData.find(t => t.to_no === i.to_no);
-                    const eid = cleanId(toObj.emp_id);
-                    const key = `${i.to_no}_${eid}`;
-                    if (!summaryObj[key]) {
-                        summaryObj[key] = {
-                            to_no: i.to_no, emp_id: eid, name: nameMap[eid] || 'Unknown', div: divMap[eid] || 'UNASSIGNED',
-                            dates: [], dests: new Set(), purps: new Set()
-                        };
-                    }
-                    summaryObj[key].dates.push(i.travel_date);
-                    summaryObj[key].dests.add(i.destination);
-                    summaryObj[key].purps.add(i.purpose);
-                });
-
-                const divGroups = {};
-                Object.values(summaryObj).forEach(row => {
-                    if(!divGroups[row.div]) divGroups[row.div] = [];
-                    row.dates.sort();
-                    let dateStr = row.dates[0];
-                    if (row.dates.length > 1) dateStr += ` to ${row.dates[row.dates.length-1]}`;
-                    divGroups[row.div].push([row.to_no, row.name, dateStr, Array.from(row.dests).join('; '), Array.from(row.purps).join('; '), '', '']);
-                });
-
-                const headers = ["TO NUMBER", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DESTINATION", "PURPOSE", "RECEIVED", "SIGNATURE"];
-                const w = [30, 45, 60, 45, 50, 20, 27];
-                for (const div in divGroups) startY = drawTableGroup(pdf, div, divGroups[div], headers, w, startY, isAppend);
-            }
-
-            else if (repType === "Gate Pass") {
-                const { data: gpData } = await supabaseClient.from('gate_pass_logs').select('*').gte('date', localStartIso.split('T')[0]).lte('date', localEndIso.split('T')[0]).eq('status', 'PROCESSED');
-                if (!gpData || gpData.length === 0) throw new Error("No PROCESSED data available for Gate Pass.");
-
-                const divGroups = {};
-                gpData.forEach(g => {
-                    const eid = cleanId(g.emp_id);
-                    const div = divMap[eid] || 'UNASSIGNED';
-                    if(!divGroups[div]) divGroups[div] = [];
-
-                    let dest = "-", purp = g.purpose || "-";
-                    if (purp.includes(" - ")) [dest, purp] = purp.split(" - ");
-
-                    const tOut = formatTime12(g.time_out);
-                    const tIn = formatTime12(g.time_in);
-                    
-                    let h = "0", m = "0";
-                    if (g.time_out && g.time_in) {
-                        const outDate = new Date(`1970-01-01T${g.time_out}`);
-                        const inDate = new Date(`1970-01-01T${g.time_in}`);
-                        const diffMins = (inDate - outDate) / 60000;
-                        if (diffMins > 0) { h = Math.floor(diffMins/60).toString(); m = (diffMins%60).toString(); }
-                    }
-
-                    divGroups[div].push([
-                        g.id, nameMap[eid] || 'Unknown', g.pass_type || '-', dest, purp, tOut, tIn, h, m, parseFloat(g.deduction_credit || 0).toFixed(3)
-                    ]);
-                });
-
-                const headers = ["CTRL NO", "NAME OF EMPLOYEE", "TYPE", "DESTINATION", "PURPOSE", "DEPARTURE", "ARRIVAL", "HOURS", "MINUTES", "CREDIT VL"];
-                const w = [20, 50, 20, 40, 65, 25, 25, 20, 20, 25];
-                for (const div in divGroups) startY = drawTableGroup(pdf, div, divGroups[div], headers, w, startY, isAppend);
-            }
-
-            else if (repType === "Leave Summary") {
-                const { data: llData } = await supabaseClient.from('leave_ledger').select('*').in('transaction_t', ['APPROVED', 'PROCESSED']).gte('date', localStartIso.split('T')[0]).lte('date', localEndIso.split('T')[0]);
-                if (!llData || llData.length === 0) throw new Error("No Leave Summary data for this period.");
-
-                const summaryObj = {};
-                llData.forEach(l => {
-                    const eid = cleanId(l.emp_id);
-                    let lType = String(l.type).toUpperCase();
-                    if (lType.includes('VACATION')) lType = 'VL';
-                    else if (lType.includes('SICK')) lType = 'SL';
-                    else if (lType.includes('PRIVILEGE')) lType = 'SPL';
-                    else if (lType.includes('WELLNESS')) lType = 'WL';
-                    else if (lType.includes('FORCED')) lType = 'FL';
-                    else if (lType.includes('COMPENSATORY')) lType = 'CTO';
-
-                    const key = `${eid}_${lType}_${l.remarks}`;
-                    if (!summaryObj[key]) {
-                        summaryObj[key] = { eid, name: nameMap[eid], div: divMap[eid] || 'UNASSIGNED', type: lType, dates: [], totalDays: 0 };
-                    }
-                    summaryObj[key].dates.push(l.date || l.start_date);
-                    summaryObj[key].totalDays += Math.abs(parseFloat(l.debit || 0));
-                });
-
-                const divGroups = {};
-                Object.values(summaryObj).forEach(row => {
-                    if(!divGroups[row.div]) divGroups[row.div] = [];
-                    row.dates.sort();
-                    let dateStr = row.dates[0];
-                    if (row.dates.length > 1) dateStr += ` to ${row.dates[row.dates.length-1]}`;
-                    
-                    divGroups[row.div].push([row.eid, row.name, row.type, dateStr, row.totalDays.toFixed(2), "See MRUA"]); // Strict balances omitted for speed
-                });
-
-                const headers = ["EMP NUMBER", "NAME", "LEAVE TYPE", "INCLUSIVE DATES", "TOTAL DAYS", "AVAILABLE BALANCE"];
-                const w = [30, 70, 30, 85, 45, 50];
-                for (const div in divGroups) startY = drawTableGroup(pdf, div, divGroups[div], headers, w, startY, isAppend);
-            }
-
-            else if (repType === "Tardiness / Undertime") {
-                const { data: llData } = await supabaseClient.from('leave_ledger').select('*').gte('date', localStartIso.split('T')[0]).lte('date', localEndIso.split('T')[0]);
-                if (!llData || llData.length === 0) throw new Error("No ledger data found.");
-
-                const tuData = llData.filter(l => {
-                    const t = String(l.transaction_t).toUpperCase();
-                    const ty = String(l.type).toUpperCase();
-                    const r = String(l.remarks).toUpperCase();
-                    return t.includes('TARDINESS') || t.includes('UNDERTIME') || t.includes('GATE') || ty.includes('TARDINESS') || r.includes('TARDINESS');
-                });
-
-                if (tuData.length === 0) throw new Error("No Tardiness/Undertime data available for this period.");
-
-                const summaryObj = {};
-                tuData.forEach(l => {
-                    const eid = cleanId(l.emp_id);
-                    if (!summaryObj[eid]) summaryObj[eid] = { count: 0, deduction: 0 };
-                    summaryObj[eid].count++;
-                    summaryObj[eid].deduction += Math.abs(parseFloat(l.debit || 0));
-                });
-
-                const divGroups = {};
-                Object.keys(summaryObj).forEach(eid => {
-                    const div = divMap[eid] || 'UNASSIGNED';
-                    if(!divGroups[div]) divGroups[div] = [];
-                    const row = summaryObj[eid];
-                    divGroups[div].push([eid, nameMap[eid], (row.deduction * 8).toFixed(2), row.count.toString(), row.deduction.toFixed(3)]);
-                });
-
-                const headers = ["EMP NUMBER", "NAME", "TOTAL HOURS", "TOTAL DAYS", "CREDIT TO VL"];
-                const w = [45, 90, 55, 55, 65];
-                for (const div in divGroups) startY = drawTableGroup(pdf, div, divGroups[div], headers, w, startY, isAppend);
-            }
-
-            else if (repType === "Flag Ceremony Attendance") {
-                const { data: fData } = await supabaseClient.from('flag_attendance').select('*').gte('date', localStartIso.split('T')[0]).lte('date', localEndIso.split('T')[0]);
-                if (!fData || fData.length === 0) throw new Error("No Flag Ceremony data available for this period.");
-
-                const summaryObj = {};
-                fData.forEach(f => {
-                    const eid = cleanId(f.emp_id);
-                    if (!summaryObj[eid]) summaryObj[eid] = { p: 0, a: 0, details: [] };
-                    
-                    const stat = String(f.status || f.remarks).toUpperCase();
-                    const isAbs = stat.includes("ABSENT") || !f.time_in;
-                    
-                    if(isAbs) summaryObj[eid].a++; else summaryObj[eid].p++;
-                    summaryObj[eid].details.push(`${f.date}: ${isAbs ? 'ABSENT' : 'PRESENT'} [${formatTime12(f.time_in)}]`);
-                });
-
-                const divGroups = {};
-                Object.keys(summaryObj).forEach(eid => {
-                    const div = divMap[eid] || 'UNASSIGNED';
-                    if(!divGroups[div]) divGroups[div] = [];
-                    const row = summaryObj[eid];
-                    divGroups[div].push([eid, nameMap[eid], `P: ${row.p} | A: ${row.a}`, row.details.join(', ')]);
-                });
-
-                const headers = ["EMP NUMBER", "NAME", "SUMMARY", "DETAILS (DATE: STATUS [TIME IN])"];
-                const w = [30, 60, 30, 190];
-                for (const div in divGroups) startY = drawTableGroup(pdf, div, divGroups[div], headers, w, startY, isAppend);
-            }
-            
-            else if (repType === "PSO / TO Conflicts") {
-                const { data: toData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
-                const { data: itinData } = await supabaseClient.from('itinerary').select('*').gte('travel_date', localStartIso.split('T')[0]).lte('travel_date', localEndIso.split('T')[0]);
-                const { data: psoData } = await supabaseClient.from('pso_records').select('*').lte('start_date', localEndIso.split('T')[0]).gte('end_date', localStartIso.split('T')[0]);
-
-                if (!toData || !itinData || !psoData) throw new Error("Insufficient data to check conflicts.");
-
-                const validToNos = new Set(toData.map(t=>t.to_no));
-                const activeItins = itinData.filter(i => validToNos.has(i.to_no));
-
-                const divGroups = {};
-                let conflictCount = 0;
-
-                activeItins.forEach(i => {
-                    const toObj = toData.find(t => t.to_no === i.to_no);
-                    const eid = cleanId(toObj.emp_id);
-                    
-                    const conflicts = psoData.filter(p => cleanId(p.emp_id) === eid && i.travel_date >= p.start_date && i.travel_date <= p.end_date);
-                    
-                    if (conflicts.length > 0) {
-                        conflictCount++;
-                        const div = divMap[eid] || 'UNASSIGNED';
-                        if(!divGroups[div]) divGroups[div] = [];
-                        
-                        conflicts.forEach(c => {
-                            divGroups[div].push([eid, nameMap[eid], i.travel_date, c.subject || c.pso_no || '-', i.destination || '-', '-']);
                         });
-                    }
+                        currY += rowH;
+                    });
+                    currY += 5;
                 });
+                
+                if(currY > 170) { doc.addPage(); if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 355.6, 215.9); currY = 15; }
+                currY += 5;
+                doc.setFontSize(8); doc.setFont("helvetica", "bold");
+                doc.text("New Assumption(s):", 15, currY); doc.setFont("helvetica", "normal");
+                doc.text("Date: _________________", 50, currY); doc.text("Nature: _________________", 85, currY);
+                doc.text("Former Station: _________________", 130, currY); doc.text("Remarks: _________________", 180, currY);
+                currY += 5;
+                doc.setFont("helvetica", "bold"); doc.text("Separation(s):", 15, currY); doc.setFont("helvetica", "normal");
+                doc.text("Date: _________________", 50, currY); doc.text("Nature: _________________", 85, currY);
+                doc.text("Station: _________________", 130, currY); doc.text("Remarks: _________________", 180, currY);
+                
+                currY += 15;
+                doc.text("Prepared and Posted:", 70, currY, {align: "center"}); doc.text("Approved by:", 240, currY, {align: "center"});
+                currY += 10;
+                doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+                doc.text("SHERALYN S. MIRARAN", 70, currY, {align: "center"}); doc.text("RICARDO C. GARCIA", 240, currY, {align: "center"});
+                currY += 4;
+                doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+                doc.text("HRMO / AO II", 70, currY, {align: "center"}); doc.text("PARPO II", 240, currY, {align: "center"});
 
-                if (conflictCount === 0) throw new Error("No PSO/TO conflicts found for this period.");
+                doc.save(`MRUA_${months[monthIdx-1]}_${year}.pdf`);
 
-                const headers = ["EMP NUMBER", "NAME", "DATE", "PSO", "TO", "RSO"];
-                const w = [35, 55, 35, 75, 75, 35];
-                for (const div in divGroups) startY = drawTableGroup(pdf, div, divGroups[div], headers, w, startY, isAppend);
+            // 3. COMPLIANCE MEMOS
+            } else if (type === "Compliance Memos") {
+                const { data: comp } = await supabaseClient.from('annual_compliance').select('*').eq('year', year);
+                const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
+                let count = 0;
+                
+                let bgMemoData = null;
+                try {
+                    const { data } = await supabaseClient.storage.from('e-sign').createSignedUrl('bg_memo.jpg', 60);
+                    bgMemoData = await loadImgData(data.signedUrl);
+                } catch(e) {}
+                
+                for (const e of emps) {
+                    const rec = comp.find(c => c.emp_id == e.emp_id) || {};
+                    let missing = [];
+                    if(!rec.saln_status) missing.push("Statement of Assets, Liabilities, and Net Worth (SALN)");
+                    if(!rec.ipcr_plan_status) missing.push("IPCR Plan");
+                    if(!rec.ipcr_status) missing.push("IPCR");
+                    if(!rec.lap_status) missing.push("Leave Administration Plan (LAP)");
+                    if(!rec.hmo_plan_status) missing.push("HMO Plan submission");
+                    
+                    if(missing.length > 0) {
+                        if(count > 0) doc.addPage();
+                        if(bgMemoData) doc.addImage(bgMemoData, 'JPEG', 0, 0, 215.9, 330.2);
+
+                        doc.setFontSize(12); doc.setFont("helvetica", "bold");
+                        doc.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
+                        doc.setFontSize(11);
+                        doc.text(`Series of ${year}`, 25.4, 51);
+                        
+                        let lineH = 8; let cy = 70;
+                        doc.text("TO", 25.4, cy); doc.text(":", 45, cy); doc.text(e.full_name.toUpperCase(), 50, cy); cy += lineH;
+                        doc.text("FROM", 25.4, cy); doc.text(":", 45, cy); doc.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 50, cy); cy += lineH;
+                        doc.text("DATE", 25.4, cy); doc.text(":", 45, cy); doc.text(new Date().toLocaleDateString('en-US', {month:'long', day:'2-digit', year:'numeric'}), 50, cy); cy += lineH;
+                        doc.text("SUBJECT", 25.4, cy); doc.text(":", 45, cy); doc.text("COMPLIANCE ON ANNUAL REQUIREMENTS", 50, cy); cy += 6;
+                        
+                        doc.setLineWidth(0.6); doc.line(25.4, cy, 190.5, cy); cy += 8;
+                        
+                        doc.setFont("helvetica", "normal");
+                        doc.text(`Please be reminded of your pending annual compliance requirements for the year ${year}.`, 25.4, cy); cy += 5;
+                        doc.text("Based on our records, you have not yet submitted the following:", 25.4, cy); cy += 6;
+                        
+                        missing.forEach(req => { doc.text("-", 35, cy); doc.text(req, 40, cy); cy += 5; });
+                        
+                        doc.text("You are hereby directed to submit the aforementioned documents to the HRMO immediately.", 25.4, cy+5);
+                        doc.text("Prompt compliance is strictly enjoined.", 25.4, cy+10);
+                        doc.text("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended,", 25.4, cy+20);
+                        doc.text("revoked and/or superseded.", 25.4, cy+25);
+                        doc.text("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1,", 25.4, cy+35);
+                        doc.text("HL Building, Carnation Street, Triangulo, City of Naga.", 25.4, cy+40);
+
+                        doc.setFont("helvetica", "bold"); doc.text("RICARDO C. GARCIA", 25.4, cy + 60);
+                        
+                        let traceId = `TRC-${e.emp_id}-${Date.now()}`;
+                        let qrData = await getQRDataURL(traceId);
+                        doc.addImage(qrData, 'PNG', 25.4, cy + 65, 22, 22);
+
+                        count++;
+                    }
+                }
+                if(count > 0) doc.save(`Compliance_Memos_${year}.pdf`);
+                else alert("All employees are fully compliant.");
+
+            } else {
+                alert("Generating generic summary for: " + type);
             }
+        } catch (e) { alert(e.message); }
+        finally { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; }
+    }
 
-            pdf.save(`Consolidated_${repType.replace(/ /g, '_')}_${titleSuffix.replace(/ /g, '_')}.pdf`);
-            btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; status.innerText = "Report saved successfully.";
-
-        } catch (e) {
-            status.innerText = `Error: ${e.message}`;
-            alert(e.message);
-            btn.disabled = false; btn.innerText = "GENERATE PDF REPORT";
-        }
+    async function loadMissingComp() {
+        const yr = parseInt(qS('#repYear').value);
+        const { data: emps } = await supabaseClient.from('employees').select('emp_id, full_name');
+        const { data: comps } = await supabaseClient.from('annual_compliance').select('*').eq('year', yr);
+        const tbody = qS('#missingCompTableBody'); tbody.innerHTML = '';
+        
+        emps.forEach(e => {
+            const cr = comps.find(c => c.emp_id == e.emp_id) || {};
+            let missing = [];
+            if(!cr.saln_status) missing.push("SALN");
+            if(!cr.ipcr_status) missing.push("IPCR");
+            if(!cr.lap_status) missing.push("LAP");
+            if(missing.length) {
+                tbody.innerHTML += `<tr class="hover:bg-red-50"><td class="p-3 border-r text-center">${e.emp_id}</td><td class="p-3 border-r font-bold">${e.full_name.toUpperCase()}</td><td class="p-3 text-red-600 font-bold text-xs">${missing.join(" • ")}</td></tr>`;
+            }
+        });
     }
 </script>
 </body>
