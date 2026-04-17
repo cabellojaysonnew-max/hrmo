@@ -240,6 +240,19 @@
                         <div><label class="form-label">Time 2 (Out/Latest)</label><input type="time" id="s_end_time" class="form-input"></div>
                     </div>
 
+                    <div class="p-4 bg-gray-50 border rounded mt-4">
+                        <label class="form-label mb-2">Active Working Days (OP MO 114 Compressed Week)</label>
+                        <div class="flex flex-wrap gap-4">
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="1" checked class="w-4 h-4 accent-[#003811]"> Mon</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="2" checked class="w-4 h-4 accent-[#003811]"> Tue</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="3" checked class="w-4 h-4 accent-[#003811]"> Wed</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="4" checked class="w-4 h-4 accent-[#003811]"> Thu</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="5" checked class="w-4 h-4 accent-[#003811]"> Fri</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="6" class="w-4 h-4 accent-[#003811]"> Sat</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="0" class="w-4 h-4 accent-[#003811]"> Sun</label>
+                        </div>
+                    </div>
+
                     <div class="flex items-center gap-4 mt-8 pt-4 border-t">
                         <button onclick="applySchedule()" id="btnApplySched" class="bg-[#003811] text-white px-8 py-3 rounded font-bold shadow hover:bg-[#006400] transition-colors">UPDATE SCHEDULE</button>
                         <p id="sched_status_lbl" class="text-sm font-bold text-[#2E7D32]"></p>
@@ -396,7 +409,8 @@
             const o = ovr[0];
             const tIn = o.start_time ? o.start_time.substring(0,5) : '';
             const tOut = o.end_time ? o.end_time.substring(0,5) : '';
-            statusText.innerText = `⚠️ ACTIVE OVERRIDE: ${o.schedule_type} (${tIn} - ${tOut}) until ${o.end_date}`;
+            const wDays = o.working_days ? `[Days: ${o.working_days}] ` : '';
+            statusText.innerText = `⚠️ ACTIVE OVERRIDE: ${o.schedule_type} (${tIn} - ${tOut}) ${wDays}until ${o.end_date}`;
         } else {
             banner.classList.add('hidden');
             banner.classList.remove('flex');
@@ -495,7 +509,8 @@
                 const o = ovr[0];
                 const tIn = o.start_time ? o.start_time.substring(0,5) : '';
                 const tOut = o.end_time ? o.end_time.substring(0,5) : '';
-                lbl.innerText = `Status: Currently on OVERRIDE ${o.schedule_type} (${tIn} - ${tOut}) until ${o.end_date}.`;
+                const wDays = o.working_days ? `[Days: ${o.working_days}] ` : '';
+                lbl.innerText = `Status: Currently on OVERRIDE ${o.schedule_type} (${tIn} - ${tOut}) ${wDays}until ${o.end_date}.`;
                 lbl.className = "text-sm font-bold text-red-700";
             } else {
                 lbl.innerText = "Status: No active overrides. Following Base PDS profile.";
@@ -513,9 +528,15 @@
         const sType = document.getElementById('s_schedule_type').value;
         let sTime = document.getElementById('s_start_time').value;
         let eTime = document.getElementById('s_end_time').value;
+        
+        // NEW: Gather Working Days
+        const selectedDays = Array.from(document.querySelectorAll('input[name="s_work_days"]:checked')).map(cb => cb.value).join(',');
 
         if (!sDate || !eDate || !sTime || !eTime) {
             return alert("All fields (Dates and Times) are required.");
+        }
+        if (!selectedDays) {
+            return alert("Please select at least one working day.");
         }
 
         if (new Date(eDate) < new Date(sDate)) {
@@ -545,7 +566,8 @@
                 start_date: sDate,
                 end_date: eDate,
                 start_time: sTime,
-                end_time: eTime
+                end_time: eTime,
+                working_days: selectedDays
             }));
 
             const { error } = await supabaseClient.from('schedule_overrides').insert(payload);
