@@ -178,7 +178,7 @@
                                     <label class="form-label">Station</label>
                                     <select id="f_station" class="form-input">
                                         <option value="Provincial Office">Provincial Office</option>
-                                        </select>
+                                    </select>
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -223,7 +223,7 @@
                         <label class="form-label">TARGET EMPLOYEE(S)</label>
                         <select id="s_target" class="form-input text-lg py-3" onchange="checkActiveSetup()">
                             <option value="ALL">All Employees (Global Override)</option>
-                            </select>
+                        </select>
                     </div>
 
                     <div class="grid grid-cols-2 gap-6">
@@ -548,7 +548,6 @@
                 end_time: eTime
             }));
 
-            // Supabase allows bulk inserts up to certain limits. For safety, insert in chunks if large, but DAR CS1 is likely < 500 so single insert is fine.
             const { error } = await supabaseClient.from('schedule_overrides').insert(payload);
             if (error) throw error;
 
