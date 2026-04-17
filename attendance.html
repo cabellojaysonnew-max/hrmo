@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance & Form 48 - DAR HRMO</title>
+    <title>PDS Manager - DAR HRMO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="supabase-config.js"></script>
     <style>
         :root {
@@ -17,9 +16,10 @@
         .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
         .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
         .form-input:focus { outline: none; border-color: var(--color-primary); ring: 1px solid var(--color-primary); }
+        .form-input:disabled { background-color: #E5E7EB; cursor: not-allowed; }
         .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.25rem; text-transform: uppercase; }
         
-        .scroll-list::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scroll-list::-webkit-scrollbar { width: 4px; }
         .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
         .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
         .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
@@ -28,16 +28,6 @@
         .tab-active { background-color: #FFFFFF; border-top: 4px solid var(--color-secondary); color: var(--color-primary); font-weight: bold; }
         .tab-inactive { background-color: #F3F4F6; color: #6B7280; font-weight: 600; border-top: 4px solid transparent; }
         .tab-inactive:hover { background-color: #E5E7EB; }
-        .modal-bg { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); }
-
-        .status-onto { color: #1976D2; font-weight: bold; }
-        .status-onpso { color: #C62828; font-weight: bold; }
-        .status-onleave { color: #8E24AA; font-weight: bold; }
-        .status-absent { color: #D32F2F; font-weight: bold; font-style: italic; }
-        .status-incomplete { color: #E64A19; font-weight: bold; }
-        
-        .editable-cell { cursor: pointer; transition: background-color 0.2s; }
-        .editable-cell:hover { background-color: #FEF3C7; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
@@ -49,8 +39,8 @@
         </div>
         <div class="flex-1 overflow-y-auto py-2">
             <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
-            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
-            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">ATTENDANCE</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
         </div>
         <div class="p-4 bg-black/20 hidden md:block">
@@ -59,143 +49,213 @@
         </div>
     </nav>
 
-    <main class="flex-1 flex flex-col overflow-hidden bg-gray-100 relative">
-        <div class="px-8 pt-8 pb-4 flex justify-between items-end">
-            <div>
-                <h2 class="text-3xl font-bold text-[#003811]">Monthly Attendance & Form 48</h2>
-                <p class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide">Log Management & Civil Service Generation</p>
-            </div>
-            <button onclick="openLockModal()" class="bg-red-700 text-white px-4 py-2 rounded text-xs font-bold shadow hover:bg-red-800 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                LOCK MONTH
-            </button>
+    <main class="flex-1 flex flex-col overflow-hidden bg-gray-100">
+        
+        <div class="px-8 pt-8 pb-4">
+            <h2 class="text-3xl font-bold text-[#003811]">HRMO Operations</h2>
+            <p class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide">Employee Data & Scheduling</p>
         </div>
 
         <div class="flex px-8 border-b border-gray-300">
-            <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn tab-active px-6 py-3 rounded-t-lg">Monthly Log View</button>
-            <button onclick="switchTab('f48')" id="tab-f48" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Form 48 Generator</button>
+            <button onclick="switchTab('pds')" id="tab-pds" class="tab-btn tab-active px-6 py-3 rounded-t-lg">Employee PDS</button>
+            <button onclick="switchTab('sched')" id="tab-sched" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Work Schedule Configurator</button>
         </div>
 
-        <div id="module-logs" class="flex-1 flex flex-col p-8 overflow-hidden">
-            <div class="card bg-white flex flex-col h-full overflow-hidden">
-                <div class="p-4 border-b bg-gray-50 flex flex-wrap gap-4 items-end">
-                    <div>
-                        <label class="form-label">Month</label>
-                        <select id="viewMonth" class="form-input py-1.5 w-32">
-                            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
-                            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
-                            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
-                            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
-                        </select>
+        <div id="module-pds" class="flex-1 flex flex-col md:flex-row gap-6 p-8 overflow-hidden">
+            <div class="w-full md:w-1/3 lg:w-1/4 flex flex-col gap-4">
+                <div class="card p-4 bg-white flex flex-col h-full">
+                    <label class="form-label">Search Employee</label>
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="pdsSearch" class="form-input" placeholder="ID or Name..." onkeyup="if(event.key === 'Enter') filterPDS()">
+                        <button onclick="filterPDS()" class="bg-[#003811] text-white px-3 rounded text-xs font-bold hover:bg-[#006400]">GO</button>
                     </div>
-                    <div>
-                        <label class="form-label">Year</label>
-                        <select id="viewYear" class="form-input py-1.5 w-24"></select>
+                    <div class="flex-1 overflow-auto border rounded border-gray-200">
+                        <table class="w-full text-[11px] text-left">
+                            <thead class="bg-gray-50 sticky top-0 border-b"><tr><th class="p-2">Emp ID</th><th class="p-2">Full Name</th></tr></thead>
+                            <tbody id="pdsTableBody" class="divide-y cursor-pointer"></tbody>
+                        </table>
                     </div>
-                    <button onclick="generateMonthlyView()" id="btnGenerateView" class="bg-[#003811] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-[#006400]">GENERATE VIEW</button>
-                    
-                    <div class="flex-1"></div>
-                    <button onclick="printMissingLogs()" class="bg-[#C62828] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-red-800 shadow-sm mr-2">PRINT MISSING LOGS</button>
-                    <button onclick="openManualEntryModal()" class="bg-[#D4AF37] text-[#003811] px-4 py-1.5 rounded text-sm font-bold hover:bg-yellow-500 shadow-sm">+ BATCH MANUAL ENTRY</button>
+                    <button onclick="clearPDSForm()" class="w-full bg-[#2E7D32] text-white mt-4 py-2 rounded text-xs font-bold hover:bg-green-700 transition-colors">+ ADD NEW RECORD</button>
+                </div>
+            </div>
+            
+            <div class="flex-1 card flex flex-col overflow-hidden bg-white">
+                <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+                    <h2 id="pdsFormMode" class="font-bold text-[#003811] text-sm uppercase">CREATE NEW EMPLOYEE</h2>
+                    <button onclick="savePDS()" id="btnSavePDS" class="bg-[#003811] text-white px-8 py-2 rounded text-xs font-bold shadow-sm hover:bg-[#006400] transition-colors">SAVE RECORD</button>
+                </div>
+
+                <div id="overrideBanner" class="hidden bg-[#FFF9C4] px-6 py-3 border-b flex justify-between items-center">
+                    <span id="overrideStatusText" class="text-[11px] font-bold text-[#003811]"></span>
+                    <button onclick="clearOverride()" class="bg-red-700 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800">CLEAR OVERRIDE</button>
                 </div>
                 
-                <div class="flex-1 overflow-auto scroll-list">
-                    <table class="w-full text-xs text-left whitespace-nowrap" id="tblLogs">
-                        <thead class="bg-[#003811] text-white sticky top-0 z-10">
-                            <tr>
-                                <th class="p-3 font-bold border-b">EMP ID</th>
-                                <th class="p-3 font-bold border-b">NAME</th>
-                                <th class="p-3 font-bold border-b text-center">DATE</th>
-                                <th class="p-3 font-bold border-b text-center">AM IN</th>
-                                <th class="p-3 font-bold border-b text-center">AM OUT</th>
-                                <th class="p-3 font-bold border-b text-center">PM IN</th>
-                                <th class="p-3 font-bold border-b text-center">PM OUT</th>
-                                <th class="p-3 font-bold border-b text-center">UNDERTIME</th>
-                                <th class="p-3 font-bold border-b text-center">STATUS</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logsTableBody" class="divide-y">
-                            <tr><td colspan="9" class="p-8 text-center text-gray-400 italic">Select Month & Year, then click Generate View...</td></tr>
-                        </tbody>
-                    </table>
+                <div class="flex-1 p-6 overflow-y-auto scroll-list">
+                    <form id="pdsForm" class="space-y-6 max-w-5xl mx-auto">
+                        <input type="hidden" id="pds_id">
+                        
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">PRIMARY IDENTIFICATION</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div><label class="form-label">Employee ID</label><input type="text" id="f_emp_id" class="form-input"></div>
+                                <div><label class="form-label">Full Name (Display)</label><input type="text" id="f_full_name" class="form-input"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div><label class="form-label">Last Name</label><input type="text" id="f_last_name" class="form-input"></div>
+                                <div><label class="form-label">First Name</label><input type="text" id="f_first_name" class="form-input"></div>
+                                <div><label class="form-label">Middle Name</label><input type="text" id="f_middle_name" class="form-input"></div>
+                                <div>
+                                    <label class="form-label">Extension</label>
+                                    <select id="f_name_extension" class="form-input">
+                                        <option value=""></option><option value="Jr.">Jr.</option><option value="Sr.">Sr.</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">DEMOGRAPHICS</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div><label class="form-label">Date of Birth</label><input type="date" id="f_date_of_birth" class="form-input"></div>
+                                <div class="col-span-2"><label class="form-label">Place of Birth</label><input type="text" id="f_place_of_birth" class="form-input"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div>
+                                    <label class="form-label">Sex</label>
+                                    <select id="f_sex" class="form-input"><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option><option value="Prefer not to say">Prefer not to say</option></select>
+                                </div>
+                                <div>
+                                    <label class="form-label">Civil Status</label>
+                                    <select id="f_civil_status" class="form-input"><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select>
+                                </div>
+                                <div>
+                                    <label class="form-label">Citizenship</label>
+                                    <select id="f_citizenship" class="form-input"><option value="Filipino">Filipino</option><option value="Dual Citizenship">Dual Citizenship</option></select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div><label class="form-label">Height (m)</label><input type="text" id="f_height" class="form-input"></div>
+                                <div><label class="form-label">Weight (kg)</label><input type="text" id="f_weight" class="form-input"></div>
+                                <div>
+                                    <label class="form-label">Blood Type</label>
+                                    <select id="f_blood_type" class="form-input"><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option><option value="Unknown">Unknown</option></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">GOVERNMENT IDENTIFICATION</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div><label class="form-label">GSIS No.</label><input type="text" id="f_gsis_id_no" class="form-input"></div>
+                                <div><label class="form-label">Pag-IBIG No.</label><input type="text" id="f_pag_ibig_id_no" class="form-input"></div>
+                                <div><label class="form-label">PhilHealth No.</label><input type="text" id="f_philhealth_no" class="form-input"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div><label class="form-label">SSS No.</label><input type="text" id="f_sss_no" class="form-input"></div>
+                                <div><label class="form-label">TIN No.</label><input type="text" id="f_tin_no" class="form-input"></div>
+                                <div><label class="form-label">Agency Emp No.</label><input type="text" id="f_agency_employee_no" class="form-input"></div>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">CONTACT & ADDRESS</h3>
+                            <div class="grid grid-cols-1 gap-4 mb-4">
+                                <div><label class="form-label">Residential Address</label><input type="text" id="f_residential_address" class="form-input"></div>
+                                <div><label class="form-label">Permanent Address</label><input type="text" id="f_permanent_address" class="form-input"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label class="form-label">Mobile Number</label><input type="text" id="f_mobile_number" class="form-input"></div>
+                                <div><label class="form-label">Email Address</label><input type="email" id="f_email_address" class="form-input"></div>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">EMPLOYMENT DETAILS</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div><label class="form-label">Position</label><input type="text" id="f_position" class="form-input"></div>
+                                <div><label class="form-label">Salary Grade</label><input type="text" id="f_salary" class="form-input"></div>
+                                <div>
+                                    <label class="form-label">Station</label>
+                                    <select id="f_station" class="form-input">
+                                        <option value="Provincial Office">Provincial Office</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <label class="form-label">Division</label>
+                                    <select id="f_division" class="form-input">
+                                        <option value="OFFICE OF THE PARPO">OFFICE OF THE PARPO</option>
+                                        <option value="PARAD">PARAD</option><option value="LTSP">LTSP</option>
+                                        <option value="AJDP">AJDP</option><option value="PBDD">PBDD</option>
+                                        <option value="STOD">STOD</option><option value="SPLIT">SPLIT</option>
+                                        <option value="DARMO">DARMO</option>
+                                    </select>
+                                </div>
+                                <div><label class="form-label">Unit</label><input type="text" id="f_unit" class="form-input"></div>
+                            </div>
+
+                            <div class="p-4 bg-gray-50 border rounded grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="form-label">Sched Type</label>
+                                    <select id="f_schedule_type" class="form-input"><option value="Flexi">Flexi</option><option value="Fixed">Fixed</option></select>
+                                </div>
+                                <div><label class="form-label">Time 1 (In/Earliest)</label><input type="time" id="f_flexi_range_start" class="form-input"></div>
+                                <div><label class="form-label">Time 2 (Out/Latest)</label><input type="time" id="f_flexi_range_end" class="form-input"></div>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
 
-        <div id="module-f48" class="hidden flex-1 p-8 overflow-y-auto">
-            <div class="card p-8 max-w-4xl mx-auto border-t-4 border-[#003811]">
-                <h3 class="text-2xl font-bold text-[#003811] mb-2">Civil Service Form 48 Generation</h3>
-                <p class="text-sm text-gray-500 mb-6 italic pb-4 border-b">Generate official DTR forms capturing Travel Orders, PSOs, Leaves, and Schedule Overrides.</p>
+        <div id="module-sched" class="hidden flex-1 p-8 overflow-y-auto">
+            <div class="card p-8 max-w-3xl mx-auto border-t-4 border-[#003811]">
+                <h3 class="text-2xl font-bold text-[#003811] mb-2">Work Schedule Configuration</h3>
+                <p class="text-sm text-gray-500 mb-8 italic pb-4 border-b">Set Expected Time-In / Time-Out for DTR Late/Undertime Computation (OP MO 114 Support)</p>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="space-y-6">
+                <div class="bg-[#FFF9C4] p-4 rounded mb-8 border border-yellow-200">
+                    <p id="sched_current_setup" class="text-sm font-bold text-[#003811]">Status: Select an employee to view current active setup.</p>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <label class="form-label">TARGET EMPLOYEE(S)</label>
+                        <select id="s_target" class="form-input text-lg py-3" onchange="checkActiveSetup()">
+                            <option value="ALL">All Employees (Global Override)</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6">
+                        <div><label class="form-label">Start Date</label><input type="date" id="s_start_date" class="form-input"></div>
+                        <div><label class="form-label">End Date</label><input type="date" id="s_end_date" class="form-input"></div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 bg-gray-50 border rounded mt-4">
                         <div>
-                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">1. Select Period</h4>
-                            <div class="flex gap-4">
-                                <div class="w-1/2">
-                                    <label class="form-label">Month</label>
-                                    <select id="f48Month" class="form-input"></select>
-                                </div>
-                                <div class="w-1/2">
-                                    <label class="form-label">Year</label>
-                                    <select id="f48Year" class="form-input"></select>
-                                </div>
-                            </div>
+                            <label class="form-label">Sched Setup</label>
+                            <select id="s_schedule_type" class="form-input"><option value="Flexi">Flexi</option><option value="Fixed">Fixed</option></select>
                         </div>
+                        <div><label class="form-label">Time 1 (In/Earliest)</label><input type="time" id="s_start_time" class="form-input"></div>
+                        <div><label class="form-label">Time 2 (Out/Latest)</label><input type="time" id="s_end_time" class="form-input"></div>
+                    </div>
 
-                        <div>
-                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">2. Select Target Scope</h4>
-                            
-                            <div class="flex gap-4 mb-4">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="f48Mode" value="individual" checked onchange="toggleF48Mode()" class="accent-[#003811]">
-                                    <span class="text-sm font-bold text-gray-700">Individual Employee</span>
-                                </label>
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="f48Mode" value="batch" onchange="toggleF48Mode()" class="accent-[#003811]">
-                                    <span class="text-sm font-bold text-gray-700">Batch Generate</span>
-                                </label>
-                            </div>
-                            
-                            <div class="h-[75px] bg-gray-50 p-3 rounded border">
-                                <div id="divIndividual" class="w-full">
-                                    <label class="form-label text-[10px]">Select Employee</label>
-                                    <select id="f48Employee" class="form-input py-1"></select>
-                                </div>
-
-                                <div id="divBatch" class="hidden w-full flex gap-3">
-                                    <div class="w-1/2">
-                                        <label class="form-label text-[10px]">Division / Office</label>
-                                        <select id="f48Division" class="form-input py-1 text-xs">
-                                            <option value="ALL">ALL (DARPO-CS1)</option>
-                                            <option value="OFFICE OF THE PARPO">OFFICE OF THE PARPO</option>
-                                            <option value="MARPOs">MARPOs</option>
-                                            <option value="PARAD">PARAD</option>
-                                            <option value="LTSP">LTSP</option>
-                                            <option value="AJDP">AJDP</option>
-                                            <option value="PBDD">PBDD</option>
-                                            <option value="STOD">STOD</option>
-                                        </select>
-                                    </div>
-                                    <div class="w-1/2">
-                                        <label class="form-label text-[10px]">Employee Type</label>
-                                        <select id="f48Type" class="form-input py-1 text-xs">
-                                            <option value="ALL">All Types</option>
-                                            <option value="REGULAR">Regular</option>
-                                            <option value="SPLIT">Split</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
+                    <div class="p-4 bg-gray-50 border rounded mt-4">
+                        <label class="form-label mb-2">Active Working Days (OP MO 114 Compressed Week)</label>
+                        <div class="flex flex-wrap gap-4">
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="1" checked class="w-4 h-4 accent-[#003811]"> Mon</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="2" checked class="w-4 h-4 accent-[#003811]"> Tue</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="3" checked class="w-4 h-4 accent-[#003811]"> Wed</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="4" checked class="w-4 h-4 accent-[#003811]"> Thu</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="5" checked class="w-4 h-4 accent-[#003811]"> Fri</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="6" class="w-4 h-4 accent-[#003811]"> Sat</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="0" class="w-4 h-4 accent-[#003811]"> Sun</label>
                         </div>
                     </div>
 
-                    <div class="flex flex-col justify-center items-center bg-gray-50 rounded-lg border border-dashed border-gray-300 p-6">
-                        <svg class="w-16 h-16 text-[#003811] mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <button onclick="generateForm48Trigger()" id="btnGenerateF48" class="w-full bg-[#003811] text-white py-4 rounded-lg font-bold text-lg shadow-lg hover:bg-[#006400] transition-colors">
-                            GENERATE FORM 48
-                        </button>
-                        <p id="f48Status" class="mt-4 text-sm font-bold text-[#D4AF37] text-center"></p>
+                    <div class="flex items-center gap-4 mt-8 pt-4 border-t">
+                        <button onclick="applySchedule()" id="btnApplySched" class="bg-[#003811] text-white px-8 py-3 rounded font-bold shadow hover:bg-[#006400] transition-colors">UPDATE SCHEDULE</button>
+                        <p id="sched_status_lbl" class="text-sm font-bold text-[#2E7D32]"></p>
                     </div>
                 </div>
             </div>
@@ -203,804 +263,328 @@
 
     </main>
 
-    <div id="modalManual" class="fixed inset-0 modal-bg hidden z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-2xl w-[500px]">
-            <div class="px-6 py-4 bg-[#003811] text-white rounded-t-lg flex justify-between items-center">
-                <h3 class="font-bold text-lg">Resolve Absences / Manual Entry</h3>
-                <button onclick="closeModal('modalManual')" class="text-white hover:text-gray-300 font-bold text-xl">&times;</button>
-            </div>
-            <div class="p-6">
-                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4 text-xs text-yellow-800">
-                    Logs entered manually will be securely tagged with your HR credentials (<strong><span id="lblHrName"></span></strong>) and the current date.
-                </div>
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div><label class="form-label">Log Date</label><input type="date" id="mDate" class="form-input"></div>
-                    <div><label class="form-label">Log Time</label><input type="time" id="mTime" class="form-input"></div>
-                </div>
-                <label class="form-label">Select Employees</label>
-                <select id="mEmployees" multiple class="form-input h-32 font-mono text-xs"></select>
-            </div>
-            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
-                <button onclick="closeModal('modalManual')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded font-bold text-sm hover:bg-gray-400">CANCEL</button>
-                <button onclick="submitManualLogs()" id="btnSubmitManual" class="px-4 py-2 bg-[#D4AF37] text-[#003811] rounded font-bold text-sm shadow hover:bg-yellow-500">INSERT LOGS</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modalLock" class="fixed inset-0 modal-bg hidden z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-2xl w-[400px]">
-            <div class="px-6 py-4 bg-red-700 text-white rounded-t-lg flex justify-between items-center">
-                <h3 class="font-bold text-lg">Lock Attendance Month</h3>
-                <button onclick="closeModal('modalLock')" class="text-white hover:text-gray-300 font-bold text-xl">&times;</button>
-            </div>
-            <div class="p-6 space-y-4">
-                <p class="text-sm text-gray-600">Locking a month records your signature and finalizes the ledger. <strong>This requires Super Admin confirmation.</strong></p>
-                <div class="flex gap-4">
-                    <div class="w-1/2">
-                        <label class="form-label">Month</label>
-                        <select id="lockMonth" class="form-input"></select>
-                    </div>
-                    <div class="w-1/2">
-                        <label class="form-label">Year</label>
-                        <select id="lockYear" class="form-input"></select>
-                    </div>
-                </div>
-                <div class="bg-gray-50 p-4 border rounded mt-2">
-                    <label class="form-label text-red-700">HR Super Password</label>
-                    <input type="password" id="lockPass" class="form-input" placeholder="Enter HR Password...">
-                </div>
-            </div>
-            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
-                <button onclick="closeModal('modalLock')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded font-bold text-sm hover:bg-gray-400">CANCEL</button>
-                <button onclick="submitLock()" id="btnSubmitLock" class="px-4 py-2 bg-red-700 text-white rounded font-bold text-sm shadow hover:bg-red-800">AUTHORIZE & LOCK</button>
-            </div>
-        </div>
-    </div>
-
 <script>
+    // --- SESSION & RBAC AUTH ---
     const userData = sessionStorage.getItem('currentUser');
-    if (!userData) window.location.href = 'index.html';
+    if (!userData) { window.location.href = 'index.html'; }
     const currentUser = JSON.parse(userData);
     
-    if (!currentUser.role.toUpperCase().includes('HR') && !currentUser.role.toUpperCase().includes('ADMIN')) {
+    // Only allow HRMO/ADMIN to access PDS
+    const role = currentUser.role.toUpperCase();
+    if (!role.includes('HR') && !role.includes('ADMIN')) {
         alert("Unauthorized Access. HRMO personnel only.");
         window.location.href = 'dashboard.html';
     }
 
     document.getElementById('activeUser').innerText = currentUser.full_name;
     document.getElementById('userRoleBadge').innerText = currentUser.role;
-    document.getElementById('lblHrName').innerText = currentUser.username;
 
     function logout() {
         sessionStorage.removeItem('currentUser');
         window.location.href = 'index.html';
     }
 
+    // --- TAB LOGIC ---
     function switchTab(tab) {
-        document.getElementById('module-logs').classList.add('hidden');
-        document.getElementById('module-f48').classList.add('hidden');
-        document.getElementById('tab-logs').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg';
-        document.getElementById('tab-f48').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
+        document.getElementById('module-pds').classList.add('hidden');
+        document.getElementById('module-sched').classList.add('hidden');
+        
+        document.getElementById('tab-pds').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg';
+        document.getElementById('tab-sched').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
 
-        if (tab === 'logs') {
-            document.getElementById('module-logs').classList.remove('hidden');
-            document.getElementById('module-logs').classList.add('flex');
-            document.getElementById('tab-logs').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg';
+        if (tab === 'pds') {
+            document.getElementById('module-pds').classList.remove('hidden');
+            document.getElementById('module-pds').classList.add('flex');
+            document.getElementById('tab-pds').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg';
         } else {
-            document.getElementById('module-f48').classList.remove('hidden');
-            document.getElementById('module-f48').classList.add('flex');
-            document.getElementById('tab-f48').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
+            document.getElementById('module-sched').classList.remove('hidden');
+            document.getElementById('tab-sched').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
         }
     }
 
+    // --- SHARED DATA ---
     let allEmployees = [];
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    let currentViewData = []; 
+    const fields = [
+        "id", "emp_id", "full_name", "position", "station", "division", "pass", "unit", 
+        "salary", "role", "spl_balance", "vl_balance", "sl_balance", "wl_balance", 
+        "cto_balance", "flexi_range_start", "flexi_range_end", "last_name", "first_name", 
+        "middle_name", "name_extension", "date_of_birth", "place_of_birth", "sex", 
+        "civil_status", "citizenship", "height", "weight", "blood_type", "gsis_id_no", 
+        "pag_ibig_id_no", "philhealth_no", "sss_no", "tin_no", "agency_employee_no", 
+        "residential_address", "permanent_address", "mobile_number", "email_address", 
+        "mobile_device_id", "laptop_device_id", "mobile_device", "schedule_type", "type"
+    ];
 
     window.onload = async () => {
-        const today = new Date();
-        document.getElementById('mDate').value = today.toISOString().split('T')[0];
-
-        const currYear = today.getFullYear();
-        const yHtml = `<option value="${currYear}">${currYear}</option><option value="${currYear-1}">${currYear-1}</option>`;
-        document.getElementById('viewYear').innerHTML = yHtml;
-        document.getElementById('f48Year').innerHTML = yHtml;
-        document.getElementById('lockYear').innerHTML = yHtml;
-
-        document.getElementById('viewMonth').value = today.getMonth() + 1;
-        document.getElementById('f48Month').innerHTML = document.getElementById('viewMonth').innerHTML;
-        document.getElementById('lockMonth').innerHTML = document.getElementById('viewMonth').innerHTML;
-        document.getElementById('f48Month').value = today.getMonth() + 1;
-        document.getElementById('lockMonth').value = today.getMonth() + 1;
-
         await fetchEmployees();
+        
+        // Setup Date Pickers Defaults
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('s_start_date').value = today;
+        document.getElementById('s_end_date').value = today;
     };
 
     async function fetchEmployees() {
         try {
-            const { data } = await supabaseClient.from('employees').select('*').order('full_name');
+            const { data, error } = await supabaseClient.from('employees').select('*').order('full_name');
+            if (error) throw error;
             allEmployees = data || [];
             
-            let f48Html = '', mHtml = '';
+            // Populate PDS List
+            filterPDS();
+            
+            // Populate Sched List
+            const sTarget = document.getElementById('s_target');
+            sTarget.innerHTML = '<option value="ALL">All Employees (Global Override)</option>';
             allEmployees.forEach(e => {
-                f48Html += `<option value="${e.emp_id}">${e.emp_id} - ${e.full_name}</option>`;
-                mHtml += `<option value="${e.emp_id}">${e.emp_id.padEnd(12, ' ')} | ${e.full_name}</option>`;
-            });
-            document.getElementById('f48Employee').innerHTML = f48Html;
-            document.getElementById('mEmployees').innerHTML = mHtml;
-        } catch (e) {
-            console.error("Fetch employees failed.", e);
-        }
-    }
-
-    function formatTime12(dateObj) {
-        if (!dateObj) return "";
-        return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).replace(' AM', '').replace(' PM','');
-    }
-
-    // ==========================================
-    // MONTHLY LOG VIEW LOGIC (WITH INLINE EDITING)
-    // ==========================================
-    async function generateMonthlyView() {
-        const btn = document.getElementById('btnGenerateView');
-        const tbody = document.getElementById('logsTableBody');
-        
-        const m = parseInt(document.getElementById('viewMonth').value);
-        const y = parseInt(document.getElementById('viewYear').value);
-        
-        btn.disabled = true; btn.innerText = "LOADING...";
-        tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-[#D4AF37] font-bold">Aggregating Monthly Data...</td></tr>';
-        currentViewData = [];
-
-        try {
-            const startDtStr = `${y}-${String(m).padStart(2,'0')}-01`;
-            const endDt = new Date(y, m, 0);
-            const endDtStr = `${y}-${String(m).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
-
-            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes] = await Promise.all([
-                supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59"),
-                supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED'),
-                supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr),
-                supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr),
-                supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr),
-                supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)
-            ]);
-
-            const logMap = {};
-            (logsRes.data || []).forEach(l => {
-                const dateStr = l.log_time.split('T')[0];
-                const key = `${l.emp_id}_${dateStr}`;
-                if(!logMap[key]) logMap[key] = [];
-                logMap[key].push(new Date(l.log_time));
+                sTarget.innerHTML += `<option value="${e.emp_id}">${e.emp_id} - ${e.full_name}</option>`;
             });
 
-            const validTOs = new Set((toRes.data || []).map(t => t.to_no));
-            const toSet = new Set();
-            (itinRes.data || []).forEach(i => {
-                if(validTOs.has(i.to_no)) {
-                    const t = toRes.data.find(x => x.to_no === i.to_no);
-                    if(t) toSet.add(`${t.emp_id}_${i.travel_date}`);
+            // Populate DARMO stations dynamically based on existing entries
+            const stationSet = new Set(allEmployees.map(e => String(e.station).trim()).filter(s => s.toUpperCase().includes('DARMO')));
+            const stationSelect = document.getElementById('f_station');
+            stationSet.forEach(s => {
+                if(!Array.from(stationSelect.options).some(opt => opt.value === s)) {
+                    stationSelect.innerHTML += `<option value="${s}">${s}</option>`;
                 }
             });
 
-            const psoList = psoRes.data || [];
-            const leaveSet = new Set((leaveRes.data || []).map(l => `${l.emp_id}_${l.date}`));
-            const ovrList = ovrRes.data || [];
-
-            let html = '';
-            
-            for(let d = 1; d <= endDt.getDate(); d++) {
-                const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                const dObj = new Date(y, m - 1, d);
-                const dayOfWeek = dObj.getDay().toString();
-
-                allEmployees.forEach(e => {
-                    const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
-                    const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
-                    const isRegular = String(e.type || '').toUpperCase().includes('REGULAR');
-                    
-                    // STRICT FILTER: Only DARPO-CS1 or MARPO Exception, allow SPLIT/REGULAR processing
-                    if (!isDarpo && !isMarpo && !isSplit && !isRegular) return;
-
-                    let expectedDays = ['1', '2', '3', '4', '5'];
-                    const override = ovrList.find(o => o.emp_id === e.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
-                    if (override && override.working_days) {
-                        expectedDays = override.working_days.split(',');
-                    }
-
-                    if (!expectedDays.includes(dayOfWeek)) return;
-
-                    let status = "PRESENT";
-                    let cssClass = "";
-                    let amIn = "-", amOut = "-", pmIn = "-", pmOut = "-", ud = "0:00";
-
-                    const key = `${e.emp_id}_${dateStr}`;
-                    const isTO = toSet.has(key);
-                    const isLeave = leaveSet.has(key);
-                    const isPSO = psoList.some(p => p.emp_id === e.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
-                    
-                    // Strict Hierarchy: LEAVE > PSO > TO
-                    let overrideLogs = false;
-
-                    if (isLeave) { status = "ON LEAVE"; cssClass = "status-onleave"; overrideLogs = true; }
-                    else if (isPSO) { status = "ON PSO"; cssClass = "status-onpso"; overrideLogs = true; }
-                    else if (isTO) { status = "ON TO"; cssClass = "status-onto"; overrideLogs = true; }
-                    
-                    if (!overrideLogs) {
-                        const dayLogs = (logMap[key] || []).sort((a,b) => a-b);
-                        if (dayLogs.length === 0) { 
-                            status = "ABSENT"; cssClass = "status-absent"; 
-                        } else {
-                            dayLogs.forEach(time => {
-                                const hr = time.getHours();
-                                const fmt = formatTime12(time);
-                                if(hr < 12 && amIn === "-") amIn = fmt;
-                                else if(hr <= 12 && time.getMinutes() <= 30 && amOut === "-") amOut = fmt;
-                                else if(hr <= 14 && pmIn === "-") pmIn = fmt;
-                                else pmOut = fmt;
-                            });
-                            
-                            if (amIn === "-" || pmOut === "-") {
-                                status = "INCOMPLETE"; cssClass = "status-incomplete";
-                            }
-                        }
-                    }
-
-                    currentViewData.push({ 
-                        emp_id: e.emp_id, 
-                        full_name: e.full_name, 
-                        division: e.division, 
-                        type: e.type,
-                        date: dateStr, 
-                        amIn, amOut, pmIn, pmOut, status 
-                    });
-
-                    html += `
-                        <tr class="hover:bg-gray-50 border-b">
-                            <td class="p-2 text-[#003811] font-mono">${e.emp_id}</td>
-                            <td class="p-2 font-bold text-gray-800 truncate max-w-[150px]" title="${e.full_name}">${e.full_name}</td>
-                            <td class="p-2 text-center text-gray-600">${dateStr}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${amIn}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${amOut}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${pmIn}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${pmOut}</td>
-                            <td class="p-2 text-center font-mono text-red-600">${ud}</td>
-                            <td class="p-2 text-center ${cssClass}">${status}</td>
-                        </tr>
-                    `;
-                });
-            }
-
-            tbody.innerHTML = html || '<tr><td colspan="9" class="p-8 text-center text-gray-400 italic">No attendance expected for this period.</td></tr>';
-
         } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-red-600 font-bold">Error: ${e.message}</td></tr>`;
-        } finally {
-            btn.disabled = false; btn.innerText = "GENERATE VIEW";
+            console.error(e);
+            alert("Failed to fetch employees.");
         }
     }
 
-    // --- INLINE EDITING LOGIC ---
-    function inlineEdit(td, emp_id, dateStr) {
-        if (td.querySelector('input')) return; 
-        const oldVal = td.innerText;
-        td.innerHTML = `<input type="text" value="${oldVal === '-' ? '' : oldVal}" class="w-20 text-center font-mono border border-gray-400 px-1 py-0.5" placeholder="HH:MM AM" onblur="cancelEdit(this, '${oldVal}')" onkeydown="saveEdit(event, this, '${emp_id}', '${dateStr}', '${oldVal}')">`;
-        const input = td.querySelector('input');
-        input.focus();
-        input.select();
+    // ==========================================
+    // PDS MANAGER LOGIC
+    // ==========================================
+    let currentEmpId = null;
+
+    function filterPDS() {
+        const query = document.getElementById('pdsSearch').value.toLowerCase().trim();
+        const tbody = document.getElementById('pdsTableBody');
+        tbody.innerHTML = '';
+        
+        allEmployees.forEach(e => {
+            const id = String(e.emp_id).toLowerCase();
+            const name = String(e.full_name).toLowerCase();
+            if (id.includes(query) || name.includes(query)) {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-green-50 transition-colors";
+                tr.onclick = () => loadFullRecord(e.emp_id);
+                tr.innerHTML = `<td class="p-2 border-b text-gray-500 font-mono">${e.emp_id}</td><td class="p-2 border-b font-bold text-[#003811]">${e.full_name}</td>`;
+                tbody.appendChild(tr);
+            }
+        });
     }
 
-    function cancelEdit(input, oldVal) {
-        input.parentElement.innerText = oldVal;
+    async function loadFullRecord(eid) {
+        const emp = allEmployees.find(e => e.emp_id === eid);
+        if (!emp) return;
+
+        currentEmpId = eid;
+        document.getElementById('pdsFormMode').innerText = `UPDATE RECORD: ${emp.full_name}`;
+        
+        fields.forEach(f => {
+            const el = document.getElementById(`f_${f}`);
+            if(el) {
+                if(f.includes('time') || f.includes('range')) {
+                    // Extract HH:MM
+                    el.value = emp[f] ? emp[f].substring(0, 5) : '';
+                } else {
+                    el.value = emp[f] || '';
+                }
+            }
+        });
+        document.getElementById('pds_id').value = eid;
+
+        // Check active overrides
+        const today = new Date().toISOString().split('T')[0];
+        const { data: ovr } = await supabaseClient.from('schedule_overrides').select('*').eq('emp_id', eid).lte('start_date', today).gte('end_date', today).order('id', {ascending: false}).limit(1);
+        
+        const banner = document.getElementById('overrideBanner');
+        const statusText = document.getElementById('overrideStatusText');
+        
+        if (ovr && ovr.length > 0) {
+            banner.classList.remove('hidden');
+            banner.classList.add('flex');
+            const o = ovr[0];
+            const tIn = o.start_time ? o.start_time.substring(0,5) : '';
+            const tOut = o.end_time ? o.end_time.substring(0,5) : '';
+            const wDays = o.working_days ? `[Days: ${o.working_days}] ` : '';
+            statusText.innerText = `⚠️ ACTIVE OVERRIDE: ${o.schedule_type} (${tIn} - ${tOut}) ${wDays}until ${o.end_date}`;
+        } else {
+            banner.classList.add('hidden');
+            banner.classList.remove('flex');
+        }
     }
 
-    async function saveEdit(event, input, emp_id, dateStr, oldVal) {
-        if (event.key !== 'Enter') return;
-        const val = input.value.trim();
-        const td = input.parentElement;
+    function clearPDSForm() {
+        currentEmpId = null;
+        document.getElementById('pdsFormMode').innerText = "CREATE NEW EMPLOYEE";
+        document.getElementById('pdsForm').reset();
+        document.getElementById('pds_id').value = '';
+        document.getElementById('f_schedule_type').value = 'Flexi';
+        document.getElementById('overrideBanner').classList.add('hidden');
+        document.getElementById('overrideBanner').classList.remove('flex');
+    }
 
-        if (!val) { td.innerText = oldVal; return; }
+    async function savePDS() {
+        const btn = document.getElementById('btnSavePDS');
+        btn.innerText = "SAVING..."; btn.disabled = true;
 
-        let parsedTime;
-        try {
-            const match = val.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-            if (!match) throw new Error();
-            let [_, h, m, ampm] = match;
-            h = parseInt(h);
-            if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
-            if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
-            
-            parsedTime = `${String(h).padStart(2, '0')}:${m}:00`;
-        } catch {
-            alert("Invalid time format. Please use HH:MM AM/PM (e.g. 08:00 AM)");
-            td.innerText = oldVal;
+        let payload = {};
+        fields.forEach(f => {
+            const el = document.getElementById(`f_${f}`);
+            if(el) {
+                let val = el.value.trim();
+                // Format time back to HH:MM:SS for postgres time type
+                if((f.includes('time') || f.includes('range')) && val) {
+                    if(val.length === 5) val += ":00";
+                }
+                payload[f] = val;
+            }
+        });
+
+        if (!payload.emp_id || !payload.full_name) {
+            alert("Employee ID and Full Name are required.");
+            btn.innerText = "SAVE RECORD"; btn.disabled = false;
             return;
         }
 
-        td.innerText = "Saving...";
-        
         try {
-            const timestamp = `${dateStr}T${parsedTime}`;
-            const payload = {
-                emp_id: emp_id,
-                log_time: timestamp,
-                device_id: 'HR_MANUAL_EDIT',
-                manual_log_name: currentUser.username,
-                manual_log_date: new Date().toISOString()
-            };
+            if (!currentEmpId) {
+                // New Employee Defaults
+                payload.pass = "1111"; // Default PIN
+                ['spl_balance', 'vl_balance', 'sl_balance', 'wl_balance', 'cto_balance'].forEach(b => payload[b] = 0.0);
+            }
 
-            const { error } = await supabaseClient.from('attendance_logs').insert(payload);
+            const { error } = await supabaseClient.from('employees').upsert(payload, { onConflict: 'emp_id' });
             if (error) throw error;
+            
+            alert(currentEmpId ? "Database Updated Successfully." : "New Employee Saved to Database.");
+            clearPDSForm();
+            await fetchEmployees(); // Refresh list
 
-            generateMonthlyView(); 
         } catch (e) {
             alert(`Save failed: ${e.message}`);
-            td.innerText = oldVal;
+        } finally {
+            btn.innerText = "SAVE RECORD"; btn.disabled = false;
         }
     }
 
-    // --- PRINT MISSING LOGS ---
-    function printMissingLogs() {
-        const missing = currentViewData.filter(d => d.status === 'ABSENT' || d.status === 'INCOMPLETE');
-        if (missing.length === 0) return alert("No missing logs to print for this period.");
-
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const m = document.getElementById('viewMonth').options[document.getElementById('viewMonth').selectedIndex].text;
-        const y = document.getElementById('viewYear').value;
-
-        // Group by division/type logic (Ensuring SPLIT gets its own group)
-        const byDiv = {};
-        missing.forEach(r => {
-            let div = String(r.division || 'UNASSIGNED').toUpperCase();
-            let type = String(r.type || '').toUpperCase();
-            
-            // If they are explicitly SPLIT in either column, group them as SPLIT
-            if (div.includes('SPLIT') || type === 'SPLIT') div = 'SPLIT';
-            else if (!div) div = 'UNASSIGNED';
-            
-            if(!byDiv[div]) byDiv[div] = [];
-            byDiv[div].push(r);
-        });
-
-        let isFirst = true;
-        for (const div in byDiv) {
-            if (!isFirst) doc.addPage();
-            isFirst = false;
-
-            doc.setFont("helvetica", "bold"); doc.setFontSize(12);
-            doc.text(`MISSING / INCOMPLETE LOGS REPORT - ${div}`, 105, 15, { align: "center" });
-            doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-            doc.text(`Period: ${m} ${y}`, 105, 22, { align: "center" });
-
-            let yPos = 35;
-            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-            doc.rect(10, yPos, 20, 6); doc.text("ID", 20, yPos + 4, { align: "center" });
-            doc.rect(30, yPos, 50, 6); doc.text("NAME", 55, yPos + 4, { align: "center" });
-            doc.rect(80, yPos, 25, 6); doc.text("DATE", 92.5, yPos + 4, { align: "center" });
-            doc.rect(105, yPos, 20, 6); doc.text("AM IN", 115, yPos + 4, { align: "center" });
-            doc.rect(125, yPos, 20, 6); doc.text("AM OUT", 135, yPos + 4, { align: "center" });
-            doc.rect(145, yPos, 20, 6); doc.text("PM IN", 155, yPos + 4, { align: "center" });
-            doc.rect(165, yPos, 20, 6); doc.text("PM OUT", 175, yPos + 4, { align: "center" });
-            doc.rect(185, yPos, 15, 6); doc.text("STAT", 192.5, yPos + 4, { align: "center" });
-
-            yPos += 6;
-            doc.setFont("helvetica", "normal"); doc.setFontSize(8);
-            
-            byDiv[div].forEach(r => {
-                doc.rect(10, yPos, 20, 6); doc.text(r.emp_id, 20, yPos + 4, { align: "center" });
-                doc.rect(30, yPos, 50, 6); doc.text(r.full_name.substring(0,25), 32, yPos + 4);
-                doc.rect(80, yPos, 25, 6); doc.text(r.date, 92.5, yPos + 4, { align: "center" });
-                doc.rect(105, yPos, 20, 6); doc.text(r.amIn, 115, yPos + 4, { align: "center" });
-                doc.rect(125, yPos, 20, 6); doc.text(r.amOut, 135, yPos + 4, { align: "center" });
-                doc.rect(145, yPos, 20, 6); doc.text(r.pmIn, 155, yPos + 4, { align: "center" });
-                doc.rect(165, yPos, 20, 6); doc.text(r.pmOut, 175, yPos + 4, { align: "center" });
-                doc.rect(185, yPos, 15, 6); doc.text(r.status === 'ABSENT' ? 'ABS' : 'INC', 192.5, yPos + 4, { align: "center" });
-                
-                yPos += 6;
-                if (yPos > 270) {
-                    doc.addPage();
-                    yPos = 20;
-                }
-            });
-
-            yPos += 15;
-            doc.text("Certified Correct:", 15, yPos);
-            yPos += 15;
-            doc.text("_______________________", 15, yPos);
-            doc.text("HR Officer Signature", 15, yPos + 5);
-        }
-
-        doc.save(`Missing_Logs_${m}_${y}.pdf`);
-    }
-
-    // ==========================================
-    // MANUAL BATCH ENTRY & LOCK LOGIC
-    // ==========================================
-    function openManualEntryModal() { document.getElementById('modalManual').classList.remove('hidden'); }
-    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-    async function submitManualLogs() {
-        const dStr = document.getElementById('mDate').value;
-        let tStr = document.getElementById('mTime').value;
-        const select = document.getElementById('mEmployees');
-        const selectedOptions = Array.from(select.selectedOptions);
-
-        if(!dStr || !tStr || selectedOptions.length === 0) return alert("Date, Time, and at least one Employee are required.");
-        if (tStr.length === 5) tStr += ":00"; 
-        
-        const timestamp = `${dStr}T${tStr}`;
-        const currentIso = new Date().toISOString();
-
-        const btn = document.getElementById('btnSubmitManual');
-        btn.innerText = "INSERTING..."; btn.disabled = true;
+    async function clearOverride() {
+        if (!currentEmpId) return;
+        if (!confirm("Are you sure you want to clear the active schedule override?\nThe employee will immediately return to their base PDS schedule.")) return;
 
         try {
-            const payload = selectedOptions.map(opt => ({
-                emp_id: opt.value,
-                log_time: timestamp,
-                device_id: 'HR_MANUAL',
-                manual_log_name: currentUser.username,
-                manual_log_date: currentIso
+            const today = new Date().toISOString().split('T')[0];
+            const { error } = await supabaseClient.from('schedule_overrides').delete().eq('emp_id', currentEmpId).lte('start_date', today).gte('end_date', today);
+            if (error) throw error;
+            
+            alert("Schedule override successfully cleared.");
+            loadFullRecord(currentEmpId); // Refresh banner
+        } catch(e) {
+            alert(`Failed to clear override: ${e.message}`);
+        }
+    }
+
+
+    // ==========================================
+    // WORK SCHEDULE CONFIGURATOR LOGIC
+    // ==========================================
+    async function checkActiveSetup() {
+        const target = document.getElementById('s_target').value;
+        const lbl = document.getElementById('sched_current_setup');
+
+        if (target === "ALL") {
+            lbl.innerText = "Status: Bulk update mode. This will apply to ALL employees.";
+            lbl.className = "text-sm font-bold text-orange-700";
+            return;
+        }
+
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const { data: ovr } = await supabaseClient.from('schedule_overrides').select('*').eq('emp_id', target).lte('start_date', today).gte('end_date', today).order('id', {ascending: false}).limit(1);
+            
+            if (ovr && ovr.length > 0) {
+                const o = ovr[0];
+                const tIn = o.start_time ? o.start_time.substring(0,5) : '';
+                const tOut = o.end_time ? o.end_time.substring(0,5) : '';
+                const wDays = o.working_days ? `[Days: ${o.working_days}] ` : '';
+                lbl.innerText = `Status: Currently on OVERRIDE ${o.schedule_type} (${tIn} - ${tOut}) ${wDays}until ${o.end_date}.`;
+                lbl.className = "text-sm font-bold text-red-700";
+            } else {
+                lbl.innerText = "Status: No active overrides. Following Base PDS profile.";
+                lbl.className = "text-sm font-bold text-green-700";
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    }
+
+    async function applySchedule() {
+        const target = document.getElementById('s_target').value;
+        const sDate = document.getElementById('s_start_date').value;
+        const eDate = document.getElementById('s_end_date').value;
+        const sType = document.getElementById('s_schedule_type').value;
+        let sTime = document.getElementById('s_start_time').value;
+        let eTime = document.getElementById('s_end_time').value;
+        
+        // NEW: Gather Working Days
+        const selectedDays = Array.from(document.querySelectorAll('input[name="s_work_days"]:checked')).map(cb => cb.value).join(',');
+
+        if (!sDate || !eDate || !sTime || !eTime) {
+            return alert("All fields (Dates and Times) are required.");
+        }
+        if (!selectedDays) {
+            return alert("Please select at least one working day.");
+        }
+
+        if (new Date(eDate) < new Date(sDate)) {
+            return alert("End Date cannot be before Start Date.");
+        }
+
+        const msg = target === "ALL" 
+            ? `Are you sure you want to apply this schedule override to ALL EMPLOYEES from ${sDate} to ${eDate}?`
+            : `Schedule override for ${target} from ${sDate} to ${eDate}?`;
+
+        if (!confirm(msg)) return;
+
+        const btn = document.getElementById('btnApplySched');
+        const lbl = document.getElementById('sched_status_lbl');
+        btn.innerText = "UPDATING..."; btn.disabled = true;
+        lbl.innerText = "";
+
+        // Format to Postgres Time
+        if(sTime.length === 5) sTime += ":00";
+        if(eTime.length === 5) eTime += ":00";
+
+        try {
+            const targetIds = target === "ALL" ? allEmployees.map(e => e.emp_id) : [target];
+            const payload = targetIds.map(eid => ({
+                emp_id: eid,
+                schedule_type: sType,
+                start_date: sDate,
+                end_date: eDate,
+                start_time: sTime,
+                end_time: eTime,
+                working_days: selectedDays
             }));
 
-            const { error } = await supabaseClient.from('attendance_logs').insert(payload);
+            const { error } = await supabaseClient.from('schedule_overrides').insert(payload);
             if (error) throw error;
 
-            alert(`Successfully inserted logs for ${selectedOptions.length} employee(s).`);
-            closeModal('modalManual');
-            
-            const viewM = document.getElementById('viewMonth').value;
-            const insertM = parseInt(dStr.split('-')[1]).toString();
-            if (viewM === insertM) generateMonthlyView();
+            lbl.innerText = `Successfully scheduled shifts for ${targetIds.length} employee(s).`;
+            alert("Work schedule dates configured successfully in the database.");
+            checkActiveSetup();
 
         } catch (e) {
-            alert(`Insert failed: ${e.message}`);
+            alert(`Error updating schedule: ${e.message}`);
         } finally {
-            btn.innerText = "INSERT LOGS"; btn.disabled = false;
+            btn.innerText = "UPDATE SCHEDULE"; btn.disabled = false;
         }
     }
-
-    function openLockModal() { document.getElementById('modalLock').classList.remove('hidden'); }
-    async function submitLock() {
-        const pass = document.getElementById('lockPass').value;
-        if (!pass) return alert("HR Password required to authorize.");
-        
-        try {
-            const { data: u, error } = await supabaseClient.from('users').select('password').eq('username', currentUser.username).single();
-            if (error || !u) throw new Error("Authentication failed.");
-            
-            if (u.password !== pass) throw new Error("Invalid Password.");
-
-            alert("Month successfully locked. Further modifications are restricted.");
-            closeModal('modalLock');
-            document.getElementById('lockPass').value = '';
-
-        } catch(e) {
-            alert(e.message);
-        }
-    }
-
-    // ==========================================
-    // FORM 48 GENERATION LOGIC
-    // ==========================================
-    function toggleF48Mode() {
-        const mode = document.querySelector('input[name="f48Mode"]:checked').value;
-        document.getElementById('divIndividual').classList.toggle('hidden', mode !== 'individual');
-        document.getElementById('divBatch').classList.toggle('hidden', mode !== 'batch');
-    }
-
-    async function urlToBase64(url) {
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
-        } catch(e) { return null; }
-    }
-
-    window.generateForm48Trigger = async function() {
-        const mode = document.querySelector('input[name="f48Mode"]:checked').value;
-        const month = parseInt(document.getElementById('f48Month').value) - 1;
-        const year = parseInt(document.getElementById('f48Year').value);
-        
-        const btn = document.getElementById('btnGenerateF48');
-        const status = document.getElementById('f48Status');
-        
-        btn.disabled = true; btn.innerText = "GENERATING PDF...";
-        status.innerText = "Processing data. Please wait...";
-
-        try {
-            let targetEmps = [];
-            if (mode === 'individual') {
-                const eVal = document.getElementById('f48Employee').value;
-                const found = allEmployees.find(e => e.emp_id === eVal);
-                if (found) {
-                    const isMarpo = String(found.position || '').toUpperCase().includes('MARPO');
-                    const isDarpo = String(found.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(found.division || '').toUpperCase().includes('SPLIT');
-                    if (isDarpo || isMarpo || isSplit) targetEmps = [found];
-                }
-            } else {
-                const div = document.getElementById('f48Division').value;
-                const empTypeFilter = document.getElementById('f48Type').value;
-
-                targetEmps = allEmployees.filter(e => {
-                    const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
-                    const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
-                    
-                    if (!isDarpo && !isMarpo && !isSplit) return false;
-
-                    let eDiv = String(e.division || '').toUpperCase().trim();
-                    let eType = String(e.type || '').toUpperCase().trim();
-                    
-                    if (isMarpo) eDiv = 'LTSP'; 
-                    if (eDiv === 'PARPO') eDiv = 'OFFICE OF THE PARPO';
-
-                    // Apply Type Filter
-                    if (empTypeFilter !== 'ALL' && eType !== empTypeFilter) return false;
-
-                    // Apply Division Filter
-                    if (div === 'ALL') return true;
-                    return eDiv === div;
-                });
-            }
-
-            if (targetEmps.length === 0) throw new Error("No employees found for the selected criteria.");
-
-            // Initialize PDF
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            const mName = monthNames[month];
-
-            const startDtStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
-            const endDt = new Date(year, month + 1, 0);
-            const endDtStr = `${year}-${String(month+1).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
-
-            const empIds = targetEmps.map(e => e.emp_id);
-            
-            // Fetch Chiefs for Division lookup
-            status.innerText = "Fetching signatories...";
-            const { data: chiefUsers } = await supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF');
-            const chiefMap = {};
-            (chiefUsers || []).forEach(u => {
-                if(u.division) {
-                    const divBase = u.division.split(',')[0].trim().toUpperCase();
-                    chiefMap[divBase] = u.full_name.toUpperCase();
-                }
-            });
-
-            status.innerText = "Fetching attendance logs...";
-            const { data: allLogs } = await supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', empIds).gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59");
-            
-            status.innerText = "Fetching schedule overrides...";
-            const { data: allOverrides } = await supabaseClient.from('schedule_overrides').select('*').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr);
-
-            status.innerText = "Fetching TO, PSO, and Leaves...";
-            const [toRes, itinRes, psoRes, leaveRes] = await Promise.all([
-                supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED'),
-                supabaseClient.from('itinerary').select('to_no, travel_date, destination').gte('travel_date', startDtStr).lte('travel_date', endDtStr),
-                supabaseClient.from('pso_records').select('emp_id, start_date, end_date, pso_no').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr),
-                supabaseClient.from('leave_ledger').select('emp_id, date, type').eq('transaction_t', 'APPROVED').in('emp_id', empIds).gte('date', startDtStr).lte('date', endDtStr)
-            ]);
-
-            const validTOs = new Set((toRes.data || []).map(t => t.to_no));
-            const toMap = {};
-            (itinRes.data || []).forEach(i => {
-                if(validTOs.has(i.to_no)) {
-                    const t = toRes.data.find(x => x.to_no === i.to_no);
-                    if(t) toMap[`${t.emp_id}_${i.travel_date}`] = i.destination;
-                }
-            });
-
-            const psoList = psoRes.data || [];
-            const leaveMap = {};
-            (leaveRes.data || []).forEach(l => { leaveMap[`${l.emp_id}_${l.date}`] = l.type; });
-
-            for (let i = 0; i < targetEmps.length; i++) {
-                const emp = targetEmps[i];
-                status.innerText = `Processing ${i+1}/${targetEmps.length}: ${emp.full_name}...`;
-
-                if (i > 0) doc.addPage();
-
-                const myLogs = (allLogs || []).filter(l => l.emp_id === emp.emp_id);
-                const logsByDate = {};
-                myLogs.forEach(l => {
-                    const dateObj = new Date(l.log_time.split('+')[0].trim().replace(' ', 'T'));
-                    const isoStr = dateObj.getFullYear() + "-" + String(dateObj.getMonth() + 1).padStart(2, '0') + "-" + String(dateObj.getDate()).padStart(2, '0');
-                    if(!logsByDate[isoStr]) logsByDate[isoStr] = [];
-                    logsByDate[isoStr].push(dateObj);
-                });
-
-                const schedOverrides = (allOverrides || []).filter(o => o.emp_id === emp.emp_id);
-
-                let validationId = crypto.randomUUID();
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${validationId}`;
-                const dtr_qr = await urlToBase64(qrUrl);
-
-                // --- DIVISION CHIEF LOGIC ---
-                let chiefName = "_________________________";
-                let chiefPos = "DIVISION CHIEF";
-                let empDiv = (emp.division || "").toUpperCase().trim();
-                const isMarpo = String(emp.position || '').toUpperCase().includes('MARPO');
-                
-                if (isMarpo) empDiv = "LTSP"; // Treat MARPOs as LTSP for signatory mapping
-
-                if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO") {
-                    chiefName = "RICARDO C. GARCIA";
-                    chiefPos = "PARPO II";
-                } else {
-                    const baseDiv = empDiv.split(',')[0].trim();
-                    if (chiefMap[baseDiv]) chiefName = chiefMap[baseDiv];
-                    chiefPos = "DIVISION CHIEF";
-                }
-
-                const drawForm = (startX, startY) => {
-                    if (dtr_qr) { try { doc.addImage(dtr_qr, 'PNG', startX + 73, startY, 12, 12); } catch(e){} }
-                    
-                    doc.setFont("helvetica", "italic"); doc.setFontSize(6);
-                    doc.text("CIVIL SERVICE FORM 48", startX, startY + 3);
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(9);
-                    doc.text("DAILY TIME RECORD", startX + 42.5, startY + 7, { align: "center" });
-
-                    doc.setFontSize(8);
-                    doc.text(emp.full_name, startX + 42.5, startY + 15, { align: "center" });
-                    doc.line(startX, startY + 16, startX + 85, startY + 16);
-                    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
-                    doc.text("Name", startX + 42.5, startY + 19, { align: "center" });
-
-                    doc.text("For the month of", startX, startY + 23);
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-                    doc.text(`${mName} ${year}`, startX + 25, startY + 23);
-                    doc.line(startX + 22, startY + 24, startX + 55, startY + 24);
-
-                    let ty = startY + 30;
-                    let cw_day = 8, cw_time = 14, cw_u = 11;
-                    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
-
-                    doc.rect(startX, ty, cw_day, 8); doc.text("Days", startX + 4, ty + 5, { align: "center" });
-                    doc.rect(startX + cw_day, ty, cw_time * 2, 4); doc.text("A.M.", startX + cw_day + cw_time, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time * 2, 4); doc.text("P.M.", startX + cw_day + (cw_time * 3), ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u * 2, 4); doc.text("UNDERTIME", startX + cw_day + (cw_time * 4) + cw_u, ty + 3, { align: "center" });
-
-                    ty += 4;
-                    doc.rect(startX + cw_day, ty, cw_time, 4); doc.text("Arrival", startX + cw_day + 7, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + cw_time, ty, cw_time, 4); doc.text("Departure", startX + cw_day + cw_time + 7, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, 4); doc.text("Arrival", startX + cw_day + (cw_time * 2) + 7, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, 4); doc.text("Departure", startX + cw_day + (cw_time * 3) + 7, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, 4); doc.text("Hours", startX + cw_day + (cw_time * 4) + 5.5, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, 4); doc.text("Min.", startX + cw_day + (cw_time * 4) + cw_u + 5.5, ty + 3, { align: "center" });
-
-                    ty += 4;
-                    let row_h = 4.2;
-
-                    for (let d = 1; d <= 31; d++) {
-                        doc.rect(startX, ty, cw_day, row_h);
-                        doc.text(String(d), startX + 4, ty + 3, { align: "center" });
-
-                        if (d <= endDt.getDate()) {
-                            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                            const dayLogs = (logsByDate[dateStr] || []).sort((a,b) => a-b);
-                            
-                            const dateObj = new Date(year, month, d);
-                            const dayOfWeek = dateObj.getDay().toString();
-                            
-                            let expectedDays = ['1', '2', '3', '4', '5'];
-                            let activeOverride = schedOverrides.find(s => dateStr >= s.start_date && dateStr <= s.end_date);
-                            if (activeOverride && activeOverride.working_days) {
-                                expectedDays = activeOverride.working_days.split(',');
-                            }
-                            
-                            let isWeekend = !expectedDays.includes(dayOfWeek);
-                            let special = "";
-                            
-                            if (isWeekend) {
-                                if (dayOfWeek === '0') special = "SUNDAY";
-                                else if (dayOfWeek === '6') special = "SATURDAY";
-                                else if (dayOfWeek === '5') special = "(FRIDAY - COMPRESSED WORKWEEK)";
-                                else special = "DAY OFF";
-                            }
-                            
-                            const key = `${emp.emp_id}_${dateStr}`;
-                            let isOverrideLog = false;
-
-                            // Strict Hierarchy: Leave > PSO > TO
-                            if (leaveMap[key]) {
-                                special = leaveMap[key].toUpperCase();
-                                isOverrideLog = true;
-                            } else {
-                                const pso = psoList.find(p => p.emp_id === emp.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
-                                if(pso) {
-                                    special = `PSO ${pso.pso_no || ''}`.toUpperCase();
-                                    isOverrideLog = true;
-                                } else if (toMap[key]) {
-                                    special = `TO - ${toMap[key]}`.toUpperCase();
-                                    isOverrideLog = true;
-                                }
-                            }
-
-                            if (isOverrideLog || (special && dayLogs.length === 0)) {
-                                doc.setFont("helvetica", "bold"); doc.setFontSize(5);
-                                doc.rect(startX + cw_day, ty, cw_time * 4, row_h);
-                                doc.text(special.substring(0, 45), startX + cw_day + (cw_time * 2), ty + 3, { align: "center" });
-                                doc.setFont("helvetica", "normal"); doc.setFontSize(7);
-                            } else {
-                                let amIn="", amOut="", pmIn="", pmOut="";
-                                dayLogs.forEach(time => {
-                                    const hr = time.getHours();
-                                    const fmt = formatTime12(time);
-                                    if(hr < 12 && !amIn) amIn = fmt;
-                                    else if(hr <= 12 && time.getMinutes() <= 30 && !amOut) amOut = fmt;
-                                    else if(hr <= 14 && !pmIn) pmIn = fmt;
-                                    else pmOut = fmt;
-                                });
-
-                                doc.rect(startX + cw_day, ty, cw_time, row_h); doc.text(amIn, startX + cw_day + 7, ty + 3, { align: "center" });
-                                doc.rect(startX + cw_day + cw_time, ty, cw_time, row_h); doc.text(amOut, startX + cw_day + cw_time + 7, ty + 3, { align: "center" });
-                                doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, row_h); doc.text(pmIn, startX + cw_day + (cw_time * 2) + 7, ty + 3, { align: "center" });
-                                doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, row_h); doc.text(pmOut, startX + cw_day + (cw_time * 3) + 7, ty + 3, { align: "center" });
-                            }
-                            
-                            doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h); 
-                            doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h); 
-
-                        } else {
-                            doc.rect(startX + cw_day, ty, cw_time, row_h);
-                            doc.rect(startX + cw_day + cw_time, ty, cw_time, row_h);
-                            doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, row_h);
-                            doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, row_h);
-                            doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h);
-                            doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h);
-                        }
-                        ty += row_h;
-                    }
-                    
-                    doc.text("Total", startX + cw_day + (cw_time * 4) - 2, ty + 3, { align: "right" });
-                    doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, 5); 
-                    doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, 5);
-
-                    ty += 8;
-                    doc.setFont("helvetica", "italic");
-                    const cert = "I certify on my honor that the above is true and correct report of the hours of work performed, record of which was made daily at the time of arrival and departure from office.";
-                    doc.text(cert, startX, ty, { maxWidth: 85, align: "justify" });
-
-                    ty += 12;
-                    doc.line(startX + 10, ty, startX + 75, ty);
-                    doc.setFont("helvetica", "normal");
-                    doc.text("(Employee's Signature)", startX + 42.5, ty + 3, { align: "center" });
-
-                    ty += 8;
-                    doc.text("Verified as to prescribed office hours:", startX, ty);
-                    
-                    ty += 8;
-                    doc.setFont("helvetica", "bold");
-                    doc.text(chiefName, startX + 42.5, ty, { align: "center" });
-                    doc.line(startX + 10, ty + 1, startX + 75, ty + 1);
-                    doc.setFont("helvetica", "normal");
-                    doc.text(chiefPos, startX + 42.5, ty + 4, { align: "center" });
-                };
-
-                drawForm(10, 10);
-                drawForm(110, 10);
-            }
-            
-            const fName = mode === 'individual' ? `Form48_${targetEmps[0].full_name}_${mName}${year}.pdf` : `Form48_BATCH_${mName}${year}.pdf`;
-            doc.save(fName);
-            status.innerText = "PDF Generated Successfully!";
-
-        } catch (e) {
-            status.innerText = `Error: ${e.message}`;
-            alert(e.message);
-        } finally {
-            btn.disabled = false; btn.innerText = "GENERATE FORM 48";
-        }
-    };
 </script>
 </body>
 </html>
