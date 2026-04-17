@@ -394,24 +394,33 @@
                     const isTO = toSet.has(key);
                     const isLeave = leaveSet.has(key);
                     const isPSO = psoList.some(p => p.emp_id === e.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
-                    const dayLogs = (logMap[key] || []).sort((a,b) => a-b);
+                    
+                    // Strict Hierarchy: LEAVE > PSO > TO
+                    // If any of these are true, we don't care if there are physical logs, we override the display.
+                    let overrideLogs = false;
 
-                    if (isTO) { status = "ON TO"; cssClass = "status-onto"; }
-                    else if (isPSO) { status = "ON PSO"; cssClass = "status-onpso"; }
-                    else if (isLeave) { status = "ON LEAVE"; cssClass = "status-onleave"; }
-                    else if (dayLogs.length === 0) { status = "ABSENT"; cssClass = "status-absent"; }
-                    else {
-                        dayLogs.forEach(time => {
-                            const hr = time.getHours();
-                            const fmt = formatTime12(time);
-                            if(hr < 12 && amIn === "-") amIn = fmt;
-                            else if(hr <= 12 && time.getMinutes() <= 30 && amOut === "-") amOut = fmt;
-                            else if(hr <= 14 && pmIn === "-") pmIn = fmt;
-                            else pmOut = fmt;
-                        });
-                        
-                        if (amIn === "-" || pmOut === "-") {
-                            status = "INCOMPLETE"; cssClass = "status-incomplete";
+                    if (isLeave) { status = "ON LEAVE"; cssClass = "status-onleave"; overrideLogs = true; }
+                    else if (isPSO) { status = "ON PSO"; cssClass = "status-onpso"; overrideLogs = true; }
+                    else if (isTO) { status = "ON TO"; cssClass = "status-onto"; overrideLogs = true; }
+                    
+                    if (!overrideLogs) {
+                        const dayLogs = (logMap[key] || []).sort((a,b) => a-b);
+                        if (dayLogs.length === 0) { 
+                            status = "ABSENT"; cssClass = "status-absent"; 
+                        } else {
+                            dayLogs.forEach(time => {
+                                const hr = time.getHours();
+                                const fmt = formatTime12(time);
+                                if(hr < 12 && amIn === "-") amIn = fmt;
+                                else if(hr <= 12 && time.getMinutes() <= 30 && amOut === "-") amOut = fmt;
+                                else if(hr <= 14 && pmIn === "-") pmIn = fmt;
+                                else pmOut = fmt;
+                            });
+                            
+                            // Basic completion check
+                            if (amIn === "-" || pmOut === "-") {
+                                status = "INCOMPLETE"; cssClass = "status-incomplete";
+                            }
                         }
                     }
 
@@ -714,6 +723,7 @@
 
             const empIds = targetEmps.map(e => e.emp_id);
             
+            // Fetch Chiefs for Division lookup
             status.innerText = "Fetching signatories...";
             const { data: chiefUsers } = await supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF');
             const chiefMap = {};
@@ -849,14 +859,25 @@
                             let special = isWeekend ? (dayOfWeek === '0' ? "SUNDAY" : "SATURDAY") : "";
                             
                             const key = `${emp.emp_id}_${dateStr}`;
-                            if (toMap[key]) special = `TO - ${toMap[key]}`.toUpperCase();
-                            else if (leaveMap[key]) special = leaveMap[key].toUpperCase();
-                            else {
+                            let isOverrideLog = false;
+
+                            // Hierarchy: Leave > PSO > TO
+                            if (leaveMap[key]) {
+                                special = leaveMap[key].toUpperCase();
+                                isOverrideLog = true;
+                            } else {
                                 const pso = psoList.find(p => p.emp_id === emp.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
-                                if(pso) special = `PSO ${pso.pso_no || ''}`.toUpperCase();
+                                if(pso) {
+                                    special = `PSO ${pso.pso_no || ''}`.toUpperCase();
+                                    isOverrideLog = true;
+                                } else if (toMap[key]) {
+                                    special = `TO - ${toMap[key]}`.toUpperCase();
+                                    isOverrideLog = true;
+                                }
                             }
 
-                            if (special && dayLogs.length === 0) {
+                            // If we have a special override (Leave, PSO, TO), ignore physical logs completely
+                            if (isOverrideLog || (special && dayLogs.length === 0)) {
                                 doc.setFont("helvetica", "bold"); doc.setFontSize(5);
                                 doc.rect(startX + cw_day, ty, cw_time * 4, row_h);
                                 doc.text(special.substring(0, 45), startX + cw_day + (cw_time * 2), ty + 3, { align: "center" });
