@@ -376,9 +376,11 @@
                 allEmployees.forEach(e => {
                     const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
+                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
+                    const isRegular = String(e.type || '').toUpperCase().includes('REGULAR');
                     
-                    // STRICT FILTER: Only DARPO-CS1 or MARPO Exception
-                    if (!isDarpo && !isMarpo) return;
+                    // STRICT FILTER: Only DARPO-CS1 or MARPO Exception, allow SPLIT/REGULAR processing
+                    if (!isDarpo && !isMarpo && !isSplit && !isRegular) return;
 
                     let expectedDays = ['1', '2', '3', '4', '5'];
                     const override = ovrList.find(o => o.emp_id === e.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
@@ -424,7 +426,6 @@
                         }
                     }
 
-                    // Push to memory for Missing Logs PDF (Including SPLIT tracking)
                     currentViewData.push({ 
                         emp_id: e.emp_id, 
                         full_name: e.full_name, 
@@ -701,15 +702,17 @@
                 if (found) {
                     const isMarpo = String(found.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(found.station || '').toUpperCase().includes('DARPO-CS1');
-                    if (isDarpo || isMarpo) targetEmps = [found];
+                    const isSplit = String(found.division || '').toUpperCase().includes('SPLIT');
+                    if (isDarpo || isMarpo || isSplit) targetEmps = [found];
                 }
             } else {
                 const div = document.getElementById('f48Division').value;
                 targetEmps = allEmployees.filter(e => {
                     const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
+                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
                     
-                    if (!isDarpo && !isMarpo) return false;
+                    if (!isDarpo && !isMarpo && !isSplit) return false;
 
                     let eDiv = String(e.division || '').toUpperCase().trim();
                     let eType = String(e.type || '').toUpperCase().trim();
@@ -868,8 +871,8 @@
                             }
                             
                             let isWeekend = !expectedDays.includes(dayOfWeek);
-                            
                             let special = "";
+                            
                             if (isWeekend) {
                                 if (dayOfWeek === '0') special = "SUNDAY";
                                 else if (dayOfWeek === '6') special = "SATURDAY";
