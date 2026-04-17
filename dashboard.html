@@ -94,7 +94,7 @@
                     <h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4>
                 </div>
                 <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
-                    <div class="w-full">PSO NUMBER, NAME - DETAILS</div>
+                    <div class="w-full">PSO NUMBER, DETAILS</div>
                 </div>
                 <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
                     <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
@@ -206,7 +206,6 @@
 
         // Maps for quick lookup
         const travelMap = Object.fromEntries((travel.data || []).map(i => [i.emp_id, i.destination]));
-        const psoMap = Object.fromEntries((pso.data || []).map(p => [p.emp_id, { no: p.pso_no, subject: p.subject }]));
         const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
         
         const overrideMap = {};
@@ -220,11 +219,27 @@
             if (!logMap[l.emp_id] || time < logMap[l.emp_id]) logMap[l.emp_id] = time;
         });
 
+        // Map and Group PSOs specifically for the "arrange per PSO" display
+        const psoGroups = {};
+        const psoSet = new Set();
+        (pso.data || []).forEach(p => {
+            if (empIds.has(p.emp_id)) {
+                psoSet.add(p.emp_id);
+                let psoNo = p.pso_no || "PSO";
+                let details = (p.subject || "").trim();
+                if (details.length > 50) details = details.substring(0, 47) + '...';
+                let key = `${psoNo}, ${details}`;
+                
+                if (!psoGroups[key]) psoGroups[key] = [];
+                const empMatch = (emps || []).find(e => e.emp_id === p.emp_id);
+                if (empMatch) psoGroups[key].push(empMatch.full_name);
+            }
+        });
+
         // 3. Populate Summary Counts
-        let countTravel = 0, countPSO = 0;
+        let countTravel = 0, countPSO = psoSet.size;
         (emps || []).forEach(e => {
             if (travelMap[e.emp_id]) countTravel++;
-            if (psoMap[e.emp_id]) countPSO++;
         });
         document.getElementById('statTravel').innerText = countTravel;
         document.getElementById('statPSO').innerText = countPSO;
@@ -237,23 +252,20 @@
 
         listT.innerHTML = ''; listP.innerHTML = ''; listL.innerHTML = ''; listLA.innerHTML = '';
 
+        // Render Grouped PSOs
+        Object.keys(psoGroups).forEach(key => {
+            let namesHtml = psoGroups[key].map(n => `<div class="text-gray-800 font-bold ml-2 mt-1 truncate pr-2" title="${n}">• ${n}</div>`).join('');
+            listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded mb-2 text-[11px]">
+                <div class="text-red-800 font-mono font-bold border-b border-red-200 pb-1 mb-1 truncate" title="${key}">${key}</div>
+                ${namesHtml}
+            </div>`;
+        });
+
         (emps || []).forEach(e => {
             // On Travel
             if (travelMap[e.emp_id]) {
                 listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded mb-1 text-[11px] truncate">
                     <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-blue-700 italic">${travelMap[e.emp_id]}</span>
-                </div>`;
-            }
-            
-            // On PSO
-            if (psoMap[e.emp_id]) {
-                let pData = psoMap[e.emp_id];
-                let psoNo = pData.no || "PSO";
-                let details = (pData.subject || "").trim();
-                if(details.length > 50) details = details.substring(0, 50) + '...';
-                
-                listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded mb-1 text-[11px] truncate">
-                    <span class="text-red-700 font-mono font-bold">${psoNo}</span>, <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-gray-600">${details}</span>
                 </div>`;
             }
 
@@ -264,12 +276,12 @@
                 </div>`;
             }
 
-            // Late & Absent
-            if (!travelMap[e.emp_id] && !psoMap[e.emp_id] && !leaveMap[e.emp_id] && String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
+            // Late & Absent (STRICT FILTER DARPO-CS1)
+            if (!travelMap[e.emp_id] && !psoSet.has(e.emp_id) && !leaveMap[e.emp_id] && String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
                 if (logMap[e.emp_id]) {
                     let cutoffStr = e.flexi_range_end || '08:00:00';
                     if (overrideMap[e.emp_id] && overrideMap[e.emp_id].start) {
-                        cutoffStr = overrideMap[e.emp_id].start;
+                        cutoffStr = overrideMap[e.emp_id].start; // Override fixed start dictates cutoff
                     }
                     
                     const cutoffSplit = cutoffStr.split(':');
@@ -282,13 +294,15 @@
                         const diffMins = Math.floor((firstLog - cutoffDate) / 60000);
                         const lateLabel = formatMinutesToHours(diffMins);
                         
-                        listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] truncate">
-                            <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-orange-700 font-bold">LATE (${lateLabel})</span>
+                        listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between">
+                            <span class="font-bold text-gray-800 truncate">${e.full_name}</span>
+                            <span class="text-orange-700 font-bold ml-2 shrink-0">LATE (${lateLabel})</span>
                         </div>`;
                     }
                 } else if (new Date().getHours() >= 9) {
-                    listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] truncate">
-                        <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-gray-500 font-bold italic">ABSENT</span>
+                    listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between">
+                        <span class="font-bold text-gray-800 truncate">${e.full_name}</span>
+                        <span class="text-gray-500 font-bold italic ml-2 shrink-0">ABSENT</span>
                     </div>`;
                 }
             }
@@ -387,6 +401,7 @@
         });
 
         (emps || []).forEach(e => {
+            // STRICT FILTER DARPO-CS1 for Civil Service Violations
             if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
             
             // Calculate Absences (Current Month only, bounded by sysStart)
