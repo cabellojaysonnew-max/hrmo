@@ -12,22 +12,19 @@
             --color-primary: #003811;
             --color-secondary: #D4AF37;
         }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
         .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
-        
-        /* Custom Scrollbar for inner lists */
         .scroll-list::-webkit-scrollbar { width: 4px; }
         .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
         .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
-        .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
     </style>
 </head>
-<body class="flex h-screen overflow-hidden text-[#1F2937]">
+<body class="flex h-screen overflow-hidden">
 
     <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
         <div class="p-6 hidden md:block border-b border-[#006400]">
             <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
-            <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1"></p>
+            <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
             <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
@@ -46,288 +43,162 @@
         <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
             <div>
                 <h2 class="text-3xl font-bold text-[#003811]">Operations Dashboard</h2>
-                <p id="divisionFilterLabel" class="text-sm text-gray-500 font-bold mt-1"></p>
+                <p id="scopeLabel" class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide"></p>
             </div>
             <p id="dashDate" class="text-[#D4AF37] font-bold text-lg bg-white px-4 py-2 rounded shadow-sm border border-gray-200"></p>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="card p-6 border-l-4 border-[#003811] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Staff</p>
-                    <h3 id="statTotal" class="text-4xl font-bold text-[#003811] mt-1">...</h3>
-                </div>
-                <div class="bg-green-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#003811]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
+            <div class="card p-6 border-l-4 border-[#003811]">
+                <p class="text-xs font-bold text-gray-400 uppercase">Total Personnel</p>
+                <h3 id="statTotal" class="text-4xl font-bold text-[#003811] mt-1">0</h3>
             </div>
-            <div class="card p-6 border-l-4 border-[#1976D2] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On Travel</p>
-                    <h3 id="statTravel" class="text-4xl font-bold text-[#1976D2] mt-1">...</h3>
-                </div>
-                <div class="bg-blue-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#1976D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+            <div class="card p-6 border-l-4 border-[#1976D2]">
+                <p class="text-xs font-bold text-gray-400 uppercase">On Travel</p>
+                <h3 id="statTravel" class="text-4xl font-bold text-[#1976D2] mt-1">0</h3>
             </div>
-            <div class="card p-6 border-l-4 border-[#C62828] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
-                    <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">...</h3>
-                </div>
-                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+            <div class="card p-6 border-l-4 border-[#C62828]">
+                <p class="text-xs font-bold text-gray-400 uppercase">On PSO</p>
+                <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
             </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
-            <div class="card bg-white flex flex-col h-[400px]">
+            <div class="card flex flex-col h-[450px]">
                 <div class="bg-[#1976D2] text-white p-3 rounded-t-lg">
-                    <h4 class="font-bold text-sm text-center tracking-wider">ON TRAVEL</h4>
+                    <h4 class="font-bold text-sm text-center">ON TRAVEL</h4>
                 </div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
-                    <div class="w-1/2">EMPLOYEE</div>
-                    <div class="w-1/2 text-right">DESTINATION</div>
-                </div>
-                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
-                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
-                </div>
+                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-3 space-y-2"></div>
             </div>
 
-            <div class="card bg-white flex flex-col h-[400px]">
+            <div class="card flex flex-col h-[450px]">
                 <div class="bg-[#C62828] text-white p-3 rounded-t-lg">
-                    <h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4>
+                    <h4 class="font-bold text-sm text-center">ON PSO</h4>
                 </div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
-                    <div class="w-1/2">EMPLOYEE</div>
-                    <div class="w-1/2 text-right">PSO NUMBER</div>
-                </div>
-                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
-                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
-                </div>
+                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-3 space-y-2"></div>
             </div>
 
-            <div class="card bg-white flex flex-col h-[400px]">
+            <div class="card flex flex-col h-[450px]">
                 <div class="bg-[#006400] text-white p-3 rounded-t-lg">
-                    <h4 class="font-bold text-sm text-center tracking-wider">ON LEAVE</h4>
+                    <h4 class="font-bold text-sm text-center">ON LEAVE</h4>
                 </div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
-                    <div class="w-1/2">EMPLOYEE</div>
-                    <div class="w-1/2 text-right">LEAVE TYPE</div>
-                </div>
-                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
-                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
-                </div>
+                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-3 space-y-2"></div>
             </div>
 
-            <div class="card bg-white flex flex-col h-[400px]">
+            <div class="card flex flex-col h-[450px]">
                 <div class="bg-gray-700 text-white p-3 rounded-t-lg">
-                    <h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4>
+                    <h4 class="font-bold text-sm text-center">LATE & ABSENT</h4>
                 </div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
-                    <div class="w-2/3">EMPLOYEE</div>
-                    <div class="w-1/3 text-right">STATUS</div>
-                </div>
-                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
-                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
-                </div>
+                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-3 space-y-2"></div>
             </div>
 
         </div>
     </main>
 
 <script>
-    // --- AUTHENTICATION & SESSION ---
+    // --- SESSION & RBAC AUTH ---
     const userData = sessionStorage.getItem('currentUser');
     if (!userData) { window.location.href = 'index.html'; }
     const currentUser = JSON.parse(userData);
     
-    document.getElementById('activeUser').innerText = `${currentUser.full_name}`;
-    document.getElementById('userRoleBadge').innerText = `${currentUser.role}`;
+    document.getElementById('activeUser').innerText = currentUser.full_name;
+    document.getElementById('userRoleBadge').innerText = currentUser.role;
+
+    const isChief = currentUser.role.toUpperCase() === 'CHIEF';
+    const isPARPO = currentUser.role.toUpperCase() === 'PARPO';
+    const isHRMO = currentUser.role.toUpperCase() === 'HRMO';
 
     function logout() {
         sessionStorage.removeItem('currentUser');
         window.location.href = 'index.html';
     }
 
-    // --- DASHBOARD DATA LOGIC ---
+    // --- DASHBOARD CORE LOGIC ---
     window.onload = async () => {
-        // 1. Date Setup
-        const todayDate = new Date();
-        const todayStr = todayDate.toISOString().split('T')[0];
-        document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-        // 2. Role-Based Access Control (RBAC) Setup
-        const isChief = currentUser.role.toUpperCase() === 'CHIEF';
-        const targetDivision = currentUser.division;
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('dashDate').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
-        if (isChief) {
-            document.getElementById('divisionFilterLabel').innerText = `Filtered view: ${targetDivision.toUpperCase()}`;
-        } else {
-            document.getElementById('divisionFilterLabel').innerText = `Provincial View (All Divisions)`;
-        }
+        // Update view label
+        document.getElementById('scopeLabel').innerText = isChief ? `Division: ${currentUser.division}` : "Provincial Oversight";
 
-        // 3. Fetch Employees (Filtered by RBAC)
-        let empQuery = supabaseClient.from('employees').select('emp_id, full_name, division, flexi_range_start, flexi_range_end, station');
-        if (isChief && targetDivision) {
-            empQuery = empQuery.eq('division', targetDivision);
-        }
-        
-        const { data: empsData } = await empQuery;
-        const emps = empsData || [];
-        const empIds = new Set(emps.map(e => e.emp_id));
-
+        // 1. Fetch Employees (Filter by Division if Chief)
+        let empQuery = supabaseClient.from('employees').select('emp_id, full_name, division, flexi_range_end, station');
+        if (isChief) empQuery = empQuery.eq('division', currentUser.division);
+        const { data: emps } = await empQuery;
+        const empIds = (emps || []).map(e => e.emp_id);
         document.getElementById('statTotal').innerText = emps.length;
 
-        // 4. Fetch Daily Activity Data
-        // A. Travel Orders
-        const { data: itinData } = await supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr);
-        const activeTravel = (itinData || []).filter(i => empIds.has(i.emp_id));
-        document.getElementById('statTravel').innerText = new Set(activeTravel.map(i => i.emp_id)).size;
+        // 2. Fetch Daily Activities
+        const [travel, pso, leave, logs] = await Promise.all([
+            supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr).in('emp_id', empIds),
+            supabaseClient.from('pso_records').select('emp_id, subject').lte('start_date', todayStr).gte('end_date', todayStr).in('emp_id', empIds),
+            supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).in('emp_id', empIds).eq('transaction_t', 'APPROVED'),
+            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59').in('emp_id', empIds)
+        ]);
 
-        // B. PSO Records
-        const { data: psoData } = await supabaseClient.from('pso_records').select('emp_id, subject').lte('start_date', todayStr).gte('end_date', todayStr);
-        const activePSO = (psoData || []).filter(p => empIds.has(p.emp_id));
-        document.getElementById('statPSO').innerText = new Set(activePSO.map(p => p.emp_id)).size;
-
-        // C. Leave Records (Fetching applications spanning today)
-        const { data: leaveLedger } = await supabaseClient.from('leave_ledger').select('emp_id, type, transaction_t, date').eq('date', todayStr);
-        const activeLeave = (leaveLedger || []).filter(l => 
-            empIds.has(l.emp_id) && 
-            (String(l.transaction_t).toUpperCase() === 'APPROVED' || String(l.transaction_type || '').toUpperCase() === 'APPROVED')
-        );
-
-        // D. Attendance Logs
-        const { data: logsData } = await supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59');
-        const logs = logsData || [];
+        // Map activities for lookup
+        const travelMap = Object.fromEntries((travel.data || []).map(i => [i.emp_id, i.destination]));
+        const psoMap = Object.fromEntries((pso.data || []).map(p => [p.emp_id, p.subject]));
+        const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
+        
+        // Find earliest log (Time IN)
         const logMap = {};
-        
-        // Find earliest log (Time IN) for each employee today
-        logs.forEach(l => { 
-            const t = new Date(l.log_time);
-            if (!logMap[l.emp_id] || t < logMap[l.emp_id]) {
-                logMap[l.emp_id] = t; 
-            }
+        (logs.data || []).forEach(l => {
+            const time = new Date(l.log_time);
+            if (!logMap[l.emp_id] || time < logMap[l.emp_id]) logMap[l.emp_id] = time;
         });
 
-        // 5. Categorization Sets (To prevent marking someone on TO/PSO as Absent)
-        const travelSet = new Set(activeTravel.map(t => t.emp_id));
-        const psoSet = new Set(activePSO.map(p => p.emp_id));
-        const leaveSet = new Set(activeLeave.map(l => l.emp_id));
+        // 3. Populate Summary Counts
+        document.getElementById('statTravel').innerText = Object.keys(travelMap).length;
+        document.getElementById('statPSO').innerText = Object.keys(psoMap).length;
 
-        // 6. UI DOM Elements
-        const listTravel = document.getElementById('listTravel');
-        const listPSO = document.getElementById('listPSO');
-        const listLeave = document.getElementById('listLeave');
-        const listLateAbsent = document.getElementById('listLateAbsent');
+        // 4. Render Detail Lists
+        const listT = document.getElementById('listTravel');
+        const listP = document.getElementById('listPSO');
+        const listL = document.getElementById('listLeave');
+        const listLA = document.getElementById('listLateAbsent');
 
-        listTravel.innerHTML = '';
-        listPSO.innerHTML = '';
-        listLeave.innerHTML = '';
-        listLateAbsent.innerHTML = '';
-
-        // 7. Populate Detailed Lists
-        
-        // A. Populate Travel
-        const uniqueTravelRendered = new Set();
-        activeTravel.forEach(t => {
-            if (uniqueTravelRendered.has(t.emp_id)) return;
-            const emp = emps.find(e => e.emp_id === t.emp_id);
-            if(emp) {
-                listTravel.innerHTML += `
-                    <div class="flex justify-between items-center text-xs p-2 bg-blue-50 border-l-4 border-[#1976D2] rounded shadow-sm hover:bg-blue-100 transition-colors">
-                        <span class="font-bold text-gray-800 truncate pr-2 w-1/2" title="${emp.full_name}">${emp.full_name}</span>
-                        <span class="text-blue-800 truncate w-1/2 text-right text-[10px]">${t.destination}</span>
-                    </div>`;
-                uniqueTravelRendered.add(t.emp_id);
+        emps.forEach(e => {
+            const nameHtml = `<div class="font-bold text-gray-800">${e.full_name}</div>`;
+            
+            // On Travel
+            if (travelMap[e.emp_id]) {
+                listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded text-[11px]">${nameHtml}<div class="text-blue-700 italic">${travelMap[e.emp_id]}</div></div>`;
             }
-        });
-
-        // B. Populate PSO
-        const uniquePSORendered = new Set();
-        activePSO.forEach(p => {
-            if(uniquePSORendered.has(p.emp_id)) return;
-            const emp = emps.find(e => e.emp_id === p.emp_id);
-            if(emp) {
-                // Extract just the PSO Number if possible, or show subject
-                let psoLabel = p.subject;
-                if(p.subject && p.subject.toUpperCase().includes('PSO')) {
-                    const match = p.subject.match(/PSO[\s-]*\d+/i);
-                    if(match) psoLabel = match[0];
-                }
-                
-                listPSO.innerHTML += `
-                    <div class="flex justify-between items-center text-xs p-2 bg-red-50 border-l-4 border-[#C62828] rounded shadow-sm hover:bg-red-100 transition-colors">
-                        <span class="font-bold text-gray-800 truncate pr-2 w-1/2" title="${emp.full_name}">${emp.full_name}</span>
-                        <span class="text-red-800 truncate w-1/2 text-right font-mono text-[10px]">${psoLabel}</span>
-                    </div>`;
-                uniquePSORendered.add(p.emp_id);
-            }
-        });
-
-        // C. Populate Leave
-        const uniqueLeaveRendered = new Set();
-        activeLeave.forEach(l => {
-            if(uniqueLeaveRendered.has(l.emp_id)) return;
-            const emp = emps.find(e => e.emp_id === l.emp_id);
-            if(emp) {
-                listLeave.innerHTML += `
-                    <div class="flex justify-between items-center text-xs p-2 bg-green-50 border-l-4 border-[#006400] rounded shadow-sm hover:bg-green-100 transition-colors">
-                        <span class="font-bold text-gray-800 truncate pr-2 w-1/2" title="${emp.full_name}">${emp.full_name}</span>
-                        <span class="text-green-800 truncate w-1/2 text-right text-[10px] font-bold">${l.type}</span>
-                    </div>`;
-                uniqueLeaveRendered.add(l.emp_id);
-            }
-        });
-
-        // D. Populate Late & Absent
-        emps.forEach(emp => {
-            // Field Offices usually don't log in local scanner
-            if (String(emp.station).toUpperCase().includes('DARMO')) return;
-
-            // Skip if on official business/leave
-            if (travelSet.has(emp.emp_id) || psoSet.has(emp.emp_id) || leaveSet.has(emp.emp_id)) {
-                return; 
+            
+            // On PSO
+            if (psoMap[e.emp_id]) {
+                listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded text-[11px]">${nameHtml}<div class="text-red-700 font-mono">${psoMap[e.emp_id]}</div></div>`;
             }
 
-            if (logMap[emp.emp_id]) {
-                // Employee has timed in - Check if Late
-                const cutoffStr = emp.flexi_range_end || '08:00:00';
-                
-                // Parse cutoff dynamically for today
-                const cutoffSplit = cutoffStr.split(':');
-                const cutoffDate = new Date();
-                cutoffDate.setHours(parseInt(cutoffSplit[0]), parseInt(cutoffSplit[1]), 0, 0);
-                
-                const firstLog = logMap[emp.emp_id];
-                
-                if (firstLog > cutoffDate) {
-                    const diffMins = Math.floor((firstLog - cutoffDate) / 60000);
-                    listLateAbsent.innerHTML += `
-                        <div class="flex justify-between items-center text-xs p-2 bg-orange-50 border-l-4 border-orange-500 rounded shadow-sm">
-                            <span class="font-bold text-gray-800 truncate pr-2 w-2/3" title="${emp.full_name}">${emp.full_name}</span>
-                            <span class="text-orange-700 font-bold w-1/3 text-right text-[10px] bg-orange-200 px-1 py-0.5 rounded">LATE (${diffMins}m)</span>
-                        </div>`;
-                }
-            } else {
-                // No time in record found at all - Absent
-                // Only mark absent if it's past 9 AM (to avoid mass absent marking early in the morning)
-                if(todayDate.getHours() >= 9) {
-                    listLateAbsent.innerHTML += `
-                        <div class="flex justify-between items-center text-xs p-2 bg-gray-100 border-l-4 border-gray-600 rounded shadow-sm">
-                            <span class="font-bold text-gray-800 truncate pr-2 w-2/3" title="${emp.full_name}">${emp.full_name}</span>
-                            <span class="text-gray-700 font-bold w-1/3 text-right text-[10px] bg-gray-300 px-1 py-0.5 rounded">ABSENT</span>
-                        </div>`;
+            // On Leave
+            if (leaveMap[e.emp_id]) {
+                listL.innerHTML += `<div class="p-2 bg-green-50 border-l-4 border-green-600 rounded text-[11px]">${nameHtml}<div class="text-green-700 font-bold">${leaveMap[e.emp_id]}</div></div>`;
+            }
+
+            // Late & Absent Calculation
+            if (!travelMap[e.emp_id] && !psoMap[e.emp_id] && !leaveMap[e.emp_id] && !String(e.station).includes('DARMO')) {
+                if (logMap[e.emp_id]) {
+                    const cutoff = new Date(todayStr + 'T' + (e.flexi_range_end || '08:00:00'));
+                    if (logMap[e.emp_id] > cutoff) {
+                        const diffMins = Math.floor((logMap[e.emp_id] - cutoff) / 60000);
+                        const h = Math.floor(diffMins / 60);
+                        const m = diffMins % 60;
+                        const lateLabel = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                        
+                        listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded text-[11px] flex justify-between"><span>${nameHtml}</span><span class="text-orange-700 font-bold uppercase">LATE (${lateLabel})</span></div>`;
+                    }
+                } else if (new Date().getHours() >= 9) {
+                    listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded text-[11px] flex justify-between"><span>${nameHtml}</span><span class="text-gray-500 font-bold italic">ABSENT</span></div>`;
                 }
             }
         });
 
-        // 8. Empty State Handlers
-        const emptyState = '<div class="text-center text-gray-400 text-xs italic mt-6 border border-dashed border-gray-200 p-4 rounded">No records for today</div>';
-        if(!listTravel.innerHTML.trim()) listTravel.innerHTML = emptyState;
-        if(!listPSO.innerHTML.trim()) listPSO.innerHTML = emptyState;
-        if(!listLeave.innerHTML.trim()) listLeave.innerHTML = emptyState;
-        if(!listLateAbsent.innerHTML.trim()) {
-            listLateAbsent.innerHTML = todayDate.getHours() < 9 ? 
-                '<div class="text-center text-gray-400 text-xs italic mt-6 border border-dashed border-gray-200 p-4 rounded">Attendance calculating... (Updates after 9 AM)</div>' : 
-                emptyState;
-        }
+        // Handle Empty States
+        [listT, listP, listL, listLA].forEach(l => {
+            if (!l.innerHTML) l.innerHTML = `<div class="text-center text-gray-400 text-xs mt-10 italic">No records today</div>`;
+        });
     };
 </script>
 </body>
