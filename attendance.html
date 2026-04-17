@@ -146,7 +146,7 @@
                             <label class="form-label">Generation Mode</label>
                             <select id="f48Mode" class="form-input" onchange="toggleF48Mode()">
                                 <option value="individual">Individual Employee</option>
-                                <option value="batch">Batch (By Division)</option>
+                                <option value="batch">Batch (By Division/Type)</option>
                             </select>
                         </div>
                         
@@ -156,13 +156,15 @@
                         </div>
 
                         <div id="divBatch" class="hidden">
-                            <label class="form-label">Division / Station</label>
+                            <label class="form-label">Division / Type</label>
                             <select id="f48Division" class="form-input">
-                                <option value="ALL">All Divisions</option>
+                                <option value="ALL">ALL (DARPO-CS1)</option>
+                                <option value="REGULAR">REGULAR</option>
+                                <option value="SPLIT">SPLIT</option>
                                 <option value="OFFICE OF THE PARPO">OFFICE OF THE PARPO</option>
                                 <option value="PARAD">PARAD</option><option value="LTSP">LTSP</option>
                                 <option value="AJDP">AJDP</option><option value="PBDD">PBDD</option>
-                                <option value="STOD">STOD</option><option value="SPLIT">SPLIT</option>
+                                <option value="STOD">STOD</option>
                             </select>
                         </div>
                     </div>
@@ -272,7 +274,7 @@
 
     let allEmployees = [];
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    let currentViewData = []; // Store current view for printing
+    let currentViewData = []; 
 
     window.onload = async () => {
         const today = new Date();
@@ -374,9 +376,9 @@
                 allEmployees.forEach(e => {
                     const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
                     
-                    if (!isDarpo && !isMarpo && !isSplit) return;
+                    // STRICT FILTER: Only DARPO-CS1 or MARPO Exception
+                    if (!isDarpo && !isMarpo) return;
 
                     let expectedDays = ['1', '2', '3', '4', '5'];
                     const override = ovrList.find(o => o.emp_id === e.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
@@ -396,7 +398,6 @@
                     const isPSO = psoList.some(p => p.emp_id === e.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
                     
                     // Strict Hierarchy: LEAVE > PSO > TO
-                    // If any of these are true, we don't care if there are physical logs, we override the display.
                     let overrideLogs = false;
 
                     if (isLeave) { status = "ON LEAVE"; cssClass = "status-onleave"; overrideLogs = true; }
@@ -417,14 +418,21 @@
                                 else pmOut = fmt;
                             });
                             
-                            // Basic completion check
                             if (amIn === "-" || pmOut === "-") {
                                 status = "INCOMPLETE"; cssClass = "status-incomplete";
                             }
                         }
                     }
 
-                    currentViewData.push({ emp_id: e.emp_id, full_name: e.full_name, division: e.division, date: dateStr, amIn, amOut, pmIn, pmOut, status });
+                    // Push to memory for Missing Logs PDF (Including SPLIT tracking)
+                    currentViewData.push({ 
+                        emp_id: e.emp_id, 
+                        full_name: e.full_name, 
+                        division: e.division, 
+                        type: e.type,
+                        date: dateStr, 
+                        amIn, amOut, pmIn, pmOut, status 
+                    });
 
                     html += `
                         <tr class="hover:bg-gray-50 border-b">
@@ -453,7 +461,7 @@
 
     // --- INLINE EDITING LOGIC ---
     function inlineEdit(td, emp_id, dateStr) {
-        if (td.querySelector('input')) return; // Already editing
+        if (td.querySelector('input')) return; 
         const oldVal = td.innerText;
         td.innerHTML = `<input type="text" value="${oldVal === '-' ? '' : oldVal}" class="w-20 text-center font-mono border border-gray-400 px-1 py-0.5" placeholder="HH:MM AM" onblur="cancelEdit(this, '${oldVal}')" onkeydown="saveEdit(event, this, '${emp_id}', '${dateStr}', '${oldVal}')">`;
         const input = td.querySelector('input');
@@ -474,7 +482,6 @@
 
         let parsedTime;
         try {
-            // Simple parsing for HH:MM AM/PM
             const match = val.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
             if (!match) throw new Error();
             let [_, h, m, ampm] = match;
@@ -504,7 +511,7 @@
             const { error } = await supabaseClient.from('attendance_logs').insert(payload);
             if (error) throw error;
 
-            generateMonthlyView(); // Reload the whole table to update status
+            generateMonthlyView(); 
         } catch (e) {
             alert(`Save failed: ${e.message}`);
             td.innerText = oldVal;
@@ -521,12 +528,16 @@
         const m = document.getElementById('viewMonth').options[document.getElementById('viewMonth').selectedIndex].text;
         const y = document.getElementById('viewYear').value;
 
-        // Group by division
+        // Group by division/type logic (Ensuring SPLIT gets its own group)
         const byDiv = {};
         missing.forEach(r => {
-            let div = (r.division || 'UNASSIGNED').toUpperCase();
-            if (div.includes('SPLIT')) div = 'SPLIT';
+            let div = String(r.division || 'UNASSIGNED').toUpperCase();
+            let type = String(r.type || '').toUpperCase();
+            
+            // If they are explicitly SPLIT in either column, group them as SPLIT
+            if (div.includes('SPLIT') || type === 'SPLIT') div = 'SPLIT';
             else if (!div) div = 'UNASSIGNED';
+            
             if(!byDiv[div]) byDiv[div] = [];
             byDiv[div].push(r);
         });
@@ -690,22 +701,23 @@
                 if (found) {
                     const isMarpo = String(found.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(found.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(found.division || '').toUpperCase().includes('SPLIT');
-                    if (isDarpo || isMarpo || isSplit) targetEmps = [found];
+                    if (isDarpo || isMarpo) targetEmps = [found];
                 }
             } else {
                 const div = document.getElementById('f48Division').value;
                 targetEmps = allEmployees.filter(e => {
                     const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
                     
-                    if (!isDarpo && !isMarpo && !isSplit) return false;
+                    if (!isDarpo && !isMarpo) return false;
 
                     let eDiv = String(e.division || '').toUpperCase().trim();
+                    let eType = String(e.type || '').toUpperCase().trim();
                     if (isMarpo) eDiv = 'LTSP';
 
                     if (div === 'ALL') return true;
+                    if (div === 'SPLIT') return eType === 'SPLIT' || eDiv === 'SPLIT';
+                    if (div === 'REGULAR') return eType === 'REGULAR';
                     return eDiv === div;
                 });
             }
@@ -856,12 +868,18 @@
                             }
                             
                             let isWeekend = !expectedDays.includes(dayOfWeek);
-                            let special = isWeekend ? (dayOfWeek === '0' ? "SUNDAY" : "SATURDAY") : "";
+                            
+                            let special = "";
+                            if (isWeekend) {
+                                if (dayOfWeek === '0') special = "SUNDAY";
+                                else if (dayOfWeek === '6') special = "SATURDAY";
+                                else special = "DAY OFF";
+                            }
                             
                             const key = `${emp.emp_id}_${dateStr}`;
                             let isOverrideLog = false;
 
-                            // Hierarchy: Leave > PSO > TO
+                            // Strict Hierarchy: Leave > PSO > TO
                             if (leaveMap[key]) {
                                 special = leaveMap[key].toUpperCase();
                                 isOverrideLog = true;
@@ -876,7 +894,6 @@
                                 }
                             }
 
-                            // If we have a special override (Leave, PSO, TO), ignore physical logs completely
                             if (isOverrideLog || (special && dayLogs.length === 0)) {
                                 doc.setFont("helvetica", "bold"); doc.setFontSize(5);
                                 doc.rect(startX + cw_day, ty, cw_time * 4, row_h);
