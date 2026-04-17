@@ -305,12 +305,14 @@
     // --- SHARED DATA ---
     let allEmployees = [];
     const fields = [
-        "emp_id", "full_name", "position", "station", "division", "unit", "salary", 
-        "schedule_type", "flexi_range_start", "flexi_range_end", "last_name", "first_name", 
-        "middle_name", "name_extension", "date_of_birth", "place_of_birth", "sex", "civil_status", 
-        "citizenship", "height", "weight", "blood_type", "gsis_id_no", "pag_ibig_id_no", 
-        "philhealth_no", "sss_no", "tin_no", "agency_employee_no", "residential_address", 
-        "permanent_address", "mobile_number", "email_address"
+        "id", "emp_id", "full_name", "position", "station", "division", "pass", "unit", 
+        "salary", "role", "spl_balance", "vl_balance", "sl_balance", "wl_balance", 
+        "cto_balance", "flexi_range_start", "flexi_range_end", "last_name", "first_name", 
+        "middle_name", "name_extension", "date_of_birth", "place_of_birth", "sex", 
+        "civil_status", "citizenship", "height", "weight", "blood_type", "gsis_id_no", 
+        "pag_ibig_id_no", "philhealth_no", "sss_no", "tin_no", "agency_employee_no", 
+        "residential_address", "permanent_address", "mobile_number", "email_address", 
+        "mobile_device_id", "laptop_device_id", "mobile_device", "schedule_type", "type"
     ];
 
     window.onload = async () => {
