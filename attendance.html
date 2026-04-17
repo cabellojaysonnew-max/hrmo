@@ -35,6 +35,9 @@
         .status-onleave { color: #8E24AA; font-weight: bold; }
         .status-absent { color: #D32F2F; font-weight: bold; font-style: italic; }
         .status-incomplete { color: #E64A19; font-weight: bold; }
+        
+        .editable-cell { cursor: pointer; transition: background-color 0.2s; }
+        .editable-cell:hover { background-color: #FEF3C7; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
@@ -92,11 +95,12 @@
                     <button onclick="generateMonthlyView()" id="btnGenerateView" class="bg-[#003811] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-[#006400]">GENERATE VIEW</button>
                     
                     <div class="flex-1"></div>
+                    <button onclick="printMissingLogs()" class="bg-[#C62828] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-red-800 shadow-sm mr-2">PRINT MISSING LOGS</button>
                     <button onclick="openManualEntryModal()" class="bg-[#D4AF37] text-[#003811] px-4 py-1.5 rounded text-sm font-bold hover:bg-yellow-500 shadow-sm">+ BATCH MANUAL ENTRY</button>
                 </div>
                 
                 <div class="flex-1 overflow-auto scroll-list">
-                    <table class="w-full text-xs text-left whitespace-nowrap">
+                    <table class="w-full text-xs text-left whitespace-nowrap" id="tblLogs">
                         <thead class="bg-[#003811] text-white sticky top-0 z-10">
                             <tr>
                                 <th class="p-3 font-bold border-b">EMP ID</th>
@@ -231,7 +235,6 @@
     </div>
 
 <script>
-    // --- AUTHENTICATION & ACCESS CONTROL ---
     const userData = sessionStorage.getItem('currentUser');
     if (!userData) window.location.href = 'index.html';
     const currentUser = JSON.parse(userData);
@@ -250,7 +253,6 @@
         window.location.href = 'index.html';
     }
 
-    // --- TAB SWITCHING ---
     function switchTab(tab) {
         document.getElementById('module-logs').classList.add('hidden');
         document.getElementById('module-f48').classList.add('hidden');
@@ -268,9 +270,9 @@
         }
     }
 
-    // --- DATA INITIALIZATION ---
     let allEmployees = [];
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    let currentViewData = []; // Store current view for printing
 
     window.onload = async () => {
         const today = new Date();
@@ -308,14 +310,13 @@
         }
     }
 
-    // --- FORMATTING HELPERS ---
     function formatTime12(dateObj) {
         if (!dateObj) return "";
         return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).replace(' AM', '').replace(' PM','');
     }
 
     // ==========================================
-    // MONTHLY LOG VIEW LOGIC
+    // MONTHLY LOG VIEW LOGIC (WITH INLINE EDITING)
     // ==========================================
     async function generateMonthlyView() {
         const btn = document.getElementById('btnGenerateView');
@@ -326,6 +327,7 @@
         
         btn.disabled = true; btn.innerText = "LOADING...";
         tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-[#D4AF37] font-bold">Aggregating Monthly Data...</td></tr>';
+        currentViewData = [];
 
         try {
             const startDtStr = `${y}-${String(m).padStart(2,'0')}-01`;
@@ -372,9 +374,9 @@
                 allEmployees.forEach(e => {
                     const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
+                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
                     
-                    // Display filter: Station DARPO-CS1 OR Position contains MARPO
-                    if (!isDarpo && !isMarpo) return;
+                    if (!isDarpo && !isMarpo && !isSplit) return;
 
                     let expectedDays = ['1', '2', '3', '4', '5'];
                     const override = ovrList.find(o => o.emp_id === e.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
@@ -413,15 +415,17 @@
                         }
                     }
 
+                    currentViewData.push({ emp_id: e.emp_id, full_name: e.full_name, division: e.division, date: dateStr, amIn, amOut, pmIn, pmOut, status });
+
                     html += `
                         <tr class="hover:bg-gray-50 border-b">
                             <td class="p-2 text-[#003811] font-mono">${e.emp_id}</td>
                             <td class="p-2 font-bold text-gray-800 truncate max-w-[150px]" title="${e.full_name}">${e.full_name}</td>
                             <td class="p-2 text-center text-gray-600">${dateStr}</td>
-                            <td class="p-2 text-center font-mono">${amIn}</td>
-                            <td class="p-2 text-center font-mono">${amOut}</td>
-                            <td class="p-2 text-center font-mono">${pmIn}</td>
-                            <td class="p-2 text-center font-mono">${pmOut}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${amIn}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${amOut}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${pmIn}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${pmOut}</td>
                             <td class="p-2 text-center font-mono text-red-600">${ud}</td>
                             <td class="p-2 text-center ${cssClass}">${status}</td>
                         </tr>
@@ -436,6 +440,137 @@
         } finally {
             btn.disabled = false; btn.innerText = "GENERATE VIEW";
         }
+    }
+
+    // --- INLINE EDITING LOGIC ---
+    function inlineEdit(td, emp_id, dateStr) {
+        if (td.querySelector('input')) return; // Already editing
+        const oldVal = td.innerText;
+        td.innerHTML = `<input type="text" value="${oldVal === '-' ? '' : oldVal}" class="w-20 text-center font-mono border border-gray-400 px-1 py-0.5" placeholder="HH:MM AM" onblur="cancelEdit(this, '${oldVal}')" onkeydown="saveEdit(event, this, '${emp_id}', '${dateStr}', '${oldVal}')">`;
+        const input = td.querySelector('input');
+        input.focus();
+        input.select();
+    }
+
+    function cancelEdit(input, oldVal) {
+        input.parentElement.innerText = oldVal;
+    }
+
+    async function saveEdit(event, input, emp_id, dateStr, oldVal) {
+        if (event.key !== 'Enter') return;
+        const val = input.value.trim();
+        const td = input.parentElement;
+
+        if (!val) { td.innerText = oldVal; return; }
+
+        let parsedTime;
+        try {
+            // Simple parsing for HH:MM AM/PM
+            const match = val.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (!match) throw new Error();
+            let [_, h, m, ampm] = match;
+            h = parseInt(h);
+            if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+            if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+            
+            parsedTime = `${String(h).padStart(2, '0')}:${m}:00`;
+        } catch {
+            alert("Invalid time format. Please use HH:MM AM/PM (e.g. 08:00 AM)");
+            td.innerText = oldVal;
+            return;
+        }
+
+        td.innerText = "Saving...";
+        
+        try {
+            const timestamp = `${dateStr}T${parsedTime}`;
+            const payload = {
+                emp_id: emp_id,
+                log_time: timestamp,
+                device_id: 'HR_MANUAL_EDIT',
+                manual_log_name: currentUser.username,
+                manual_log_date: new Date().toISOString()
+            };
+
+            const { error } = await supabaseClient.from('attendance_logs').insert(payload);
+            if (error) throw error;
+
+            generateMonthlyView(); // Reload the whole table to update status
+        } catch (e) {
+            alert(`Save failed: ${e.message}`);
+            td.innerText = oldVal;
+        }
+    }
+
+    // --- PRINT MISSING LOGS ---
+    function printMissingLogs() {
+        const missing = currentViewData.filter(d => d.status === 'ABSENT' || d.status === 'INCOMPLETE');
+        if (missing.length === 0) return alert("No missing logs to print for this period.");
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const m = document.getElementById('viewMonth').options[document.getElementById('viewMonth').selectedIndex].text;
+        const y = document.getElementById('viewYear').value;
+
+        // Group by division
+        const byDiv = {};
+        missing.forEach(r => {
+            let div = (r.division || 'UNASSIGNED').toUpperCase();
+            if (div.includes('SPLIT')) div = 'SPLIT';
+            else if (!div) div = 'UNASSIGNED';
+            if(!byDiv[div]) byDiv[div] = [];
+            byDiv[div].push(r);
+        });
+
+        let isFirst = true;
+        for (const div in byDiv) {
+            if (!isFirst) doc.addPage();
+            isFirst = false;
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+            doc.text(`MISSING / INCOMPLETE LOGS REPORT - ${div}`, 105, 15, { align: "center" });
+            doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+            doc.text(`Period: ${m} ${y}`, 105, 22, { align: "center" });
+
+            let yPos = 35;
+            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+            doc.rect(10, yPos, 20, 6); doc.text("ID", 20, yPos + 4, { align: "center" });
+            doc.rect(30, yPos, 50, 6); doc.text("NAME", 55, yPos + 4, { align: "center" });
+            doc.rect(80, yPos, 25, 6); doc.text("DATE", 92.5, yPos + 4, { align: "center" });
+            doc.rect(105, yPos, 20, 6); doc.text("AM IN", 115, yPos + 4, { align: "center" });
+            doc.rect(125, yPos, 20, 6); doc.text("AM OUT", 135, yPos + 4, { align: "center" });
+            doc.rect(145, yPos, 20, 6); doc.text("PM IN", 155, yPos + 4, { align: "center" });
+            doc.rect(165, yPos, 20, 6); doc.text("PM OUT", 175, yPos + 4, { align: "center" });
+            doc.rect(185, yPos, 15, 6); doc.text("STAT", 192.5, yPos + 4, { align: "center" });
+
+            yPos += 6;
+            doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+            
+            byDiv[div].forEach(r => {
+                doc.rect(10, yPos, 20, 6); doc.text(r.emp_id, 20, yPos + 4, { align: "center" });
+                doc.rect(30, yPos, 50, 6); doc.text(r.full_name.substring(0,25), 32, yPos + 4);
+                doc.rect(80, yPos, 25, 6); doc.text(r.date, 92.5, yPos + 4, { align: "center" });
+                doc.rect(105, yPos, 20, 6); doc.text(r.amIn, 115, yPos + 4, { align: "center" });
+                doc.rect(125, yPos, 20, 6); doc.text(r.amOut, 135, yPos + 4, { align: "center" });
+                doc.rect(145, yPos, 20, 6); doc.text(r.pmIn, 155, yPos + 4, { align: "center" });
+                doc.rect(165, yPos, 20, 6); doc.text(r.pmOut, 175, yPos + 4, { align: "center" });
+                doc.rect(185, yPos, 15, 6); doc.text(r.status === 'ABSENT' ? 'ABS' : 'INC', 192.5, yPos + 4, { align: "center" });
+                
+                yPos += 6;
+                if (yPos > 270) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+            });
+
+            yPos += 15;
+            doc.text("Certified Correct:", 15, yPos);
+            yPos += 15;
+            doc.text("_______________________", 15, yPos);
+            doc.text("HR Officer Signature", 15, yPos + 5);
+        }
+
+        doc.save(`Missing_Logs_${m}_${y}.pdf`);
     }
 
     // ==========================================
@@ -546,15 +681,17 @@
                 if (found) {
                     const isMarpo = String(found.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(found.station || '').toUpperCase().includes('DARPO-CS1');
-                    if (isDarpo || isMarpo) targetEmps = [found];
+                    const isSplit = String(found.division || '').toUpperCase().includes('SPLIT');
+                    if (isDarpo || isMarpo || isSplit) targetEmps = [found];
                 }
             } else {
                 const div = document.getElementById('f48Division').value;
                 targetEmps = allEmployees.filter(e => {
                     const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
+                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
                     
-                    if (!isDarpo && !isMarpo) return false;
+                    if (!isDarpo && !isMarpo && !isSplit) return false;
 
                     let eDiv = String(e.division || '').toUpperCase().trim();
                     if (isMarpo) eDiv = 'LTSP';
@@ -577,7 +714,6 @@
 
             const empIds = targetEmps.map(e => e.emp_id);
             
-            // Fetch Chiefs for Division lookup
             status.innerText = "Fetching signatories...";
             const { data: chiefUsers } = await supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF');
             const chiefMap = {};
@@ -615,7 +751,6 @@
             const leaveMap = {};
             (leaveRes.data || []).forEach(l => { leaveMap[`${l.emp_id}_${l.date}`] = l.type; });
 
-
             for (let i = 0; i < targetEmps.length; i++) {
                 const emp = targetEmps[i];
                 status.innerText = `Processing ${i+1}/${targetEmps.length}: ${emp.full_name}...`;
@@ -643,7 +778,7 @@
                 let empDiv = (emp.division || "").toUpperCase().trim();
                 const isMarpo = String(emp.position || '').toUpperCase().includes('MARPO');
                 
-                if (isMarpo) empDiv = "LTSP"; // Treat MARPOs as LTSP for signatory purposes
+                if (isMarpo) empDiv = "LTSP";
 
                 if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO") {
                     chiefName = "RICARDO C. GARCIA";
