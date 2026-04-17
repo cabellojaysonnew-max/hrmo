@@ -198,7 +198,7 @@
         // Fetch Data for Today's panels
         const [travel, pso, leave, logs, scheduleOverrides] = await Promise.all([
             supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr),
-            supabaseClient.from('pso_records').select('emp_id, subject').lte('start_date', todayStr).gte('end_date', todayStr),
+            supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr),
             supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).eq('transaction_t', 'APPROVED'),
             supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59'),
             supabaseClient.from('schedule_overrides').select('*').lte('start_date', todayStr).gte('end_date', todayStr)
@@ -206,7 +206,7 @@
 
         // Maps for quick lookup
         const travelMap = Object.fromEntries((travel.data || []).map(i => [i.emp_id, i.destination]));
-        const psoMap = Object.fromEntries((pso.data || []).map(p => [p.emp_id, p.subject]));
+        const psoMap = Object.fromEntries((pso.data || []).map(p => [p.emp_id, { no: p.pso_no, subject: p.subject }]));
         const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
         
         const overrideMap = {};
@@ -247,19 +247,13 @@
             
             // On PSO
             if (psoMap[e.emp_id]) {
-                let psoSubject = psoMap[e.emp_id];
-                let psoLabel = psoSubject;
-                if(psoLabel.toUpperCase().includes('PSO')) {
-                    const match = psoLabel.match(/PSO[\s-]*\d+/i);
-                    if(match) psoLabel = match[0];
-                }
+                let pData = psoMap[e.emp_id];
+                let psoNo = pData.no || "PSO";
+                let details = (pData.subject || "").trim();
+                if(details.length > 50) details = details.substring(0, 50) + '...';
                 
-                let details = psoSubject.replace(psoLabel, '').trim();
-                if(details.startsWith('-') || details.startsWith(',')) details = details.substring(1).trim();
-                if(details.length > 50) details = details.substring(0, 50);
-
                 listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded mb-1 text-[11px] truncate">
-                    <span class="text-red-700 font-mono font-bold">${psoLabel}</span>, <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-gray-600">${details}</span>
+                    <span class="text-red-700 font-mono font-bold">${psoNo}</span>, <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-gray-600">${details}</span>
                 </div>`;
             }
 
@@ -408,20 +402,21 @@
             const myLogs = empLogDates[e.emp_id];
             if(!myLogs) return;
 
-            // Handle Schedule Overrides via OP MO 114
-            let startReqStr = e.flexi_range_start || '08:00:00';
-            let cutoffStr = e.flexi_range_end || '08:00:00';
-            
             Object.keys(myLogs).forEach(dateStr => {
                 const logsForDay = myLogs[dateStr].sort((a,b) => a-b);
                 const firstLog = logsForDay[0];
                 const lastLog = logsForDay[logsForDay.length - 1];
 
+                let startReqStr = e.flexi_range_start || '08:00:00';
+                let cutoffStr = e.flexi_range_end || '08:00:00';
+                let overrideEndStr = null;
+
                 if (histOverrideMap[e.emp_id]) {
                     const override = histOverrideMap[e.emp_id].find(o => o.date === dateStr);
                     if (override) {
                         startReqStr = override.start;
-                        cutoffStr = override.start; // Override uses fixed schedule, start is the cutoff
+                        cutoffStr = override.start; // Fixed start implies start is the exact cutoff
+                        overrideEndStr = override.end; // Override dictates working hour duration
                     }
                 }
 
@@ -445,8 +440,14 @@
 
                 // UNDERTIME check (Current month only)
                 if(firstLog.getMonth() === currMonth) {
-                    let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
-                    const requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
+                    let requiredEnd;
+                    if (overrideEndStr) {
+                        requiredEnd = new Date(dateStr + 'T' + overrideEndStr);
+                    } else {
+                        let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
+                        requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
+                    }
+
                     if (lastLog < requiredEnd && firstLog !== lastLog) {
                         habMap[e.emp_id].totalUtMins += Math.floor((requiredEnd - lastLog) / 60000);
                     }
