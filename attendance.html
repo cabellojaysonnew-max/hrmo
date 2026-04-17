@@ -129,8 +129,7 @@
                         <div class="flex gap-4">
                             <div class="w-1/2">
                                 <label class="form-label">Month</label>
-                                <select id="f48Month" class="form-input">
-                                    </select>
+                                <select id="f48Month" class="form-input"></select>
                             </div>
                             <div class="w-1/2">
                                 <label class="form-label">Year</label>
@@ -299,7 +298,6 @@
             
             let f48Html = '', mHtml = '';
             allEmployees.forEach(e => {
-                // Focus DARPO-CS1 primarily for UI rendering unless specific exceptions exist
                 f48Html += `<option value="${e.emp_id}">${e.emp_id} - ${e.full_name}</option>`;
                 mHtml += `<option value="${e.emp_id}">${e.emp_id.padEnd(12, ' ')} | ${e.full_name}</option>`;
             });
@@ -334,7 +332,6 @@
             const endDt = new Date(y, m, 0);
             const endDtStr = `${y}-${String(m).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
 
-            // Fetch Everything for the month
             const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes] = await Promise.all([
                 supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59"),
                 supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED'),
@@ -344,7 +341,6 @@
                 supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)
             ]);
 
-            // Map Logs
             const logMap = {};
             (logsRes.data || []).forEach(l => {
                 const dateStr = l.log_time.split('T')[0];
@@ -353,24 +349,17 @@
                 logMap[key].push(new Date(l.log_time));
             });
 
-            // Map TOs
             const validTOs = new Set((toRes.data || []).map(t => t.to_no));
             const toSet = new Set();
             (itinRes.data || []).forEach(i => {
                 if(validTOs.has(i.to_no)) {
-                    // Reverse lookup emp_id from travel_orders
                     const t = toRes.data.find(x => x.to_no === i.to_no);
                     if(t) toSet.add(`${t.emp_id}_${i.travel_date}`);
                 }
             });
 
-            // Map PSOs
             const psoList = psoRes.data || [];
-            
-            // Map Leaves
             const leaveSet = new Set((leaveRes.data || []).map(l => `${l.emp_id}_${l.date}`));
-
-            // Map Overrides
             const ovrList = ovrRes.data || [];
 
             let html = '';
@@ -381,8 +370,11 @@
                 const dayOfWeek = dObj.getDay().toString();
 
                 allEmployees.forEach(e => {
-                    // Strict DARPO-CS1 filter
-                    if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
+                    const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
+                    const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
+                    
+                    // Display filter: Station DARPO-CS1 OR Position contains MARPO
+                    if (!isDarpo && !isMarpo) return;
 
                     let expectedDays = ['1', '2', '3', '4', '5'];
                     const override = ovrList.find(o => o.emp_id === e.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
@@ -390,7 +382,6 @@
                         expectedDays = override.working_days.split(',');
                     }
 
-                    // Skip if not a scheduled working day
                     if (!expectedDays.includes(dayOfWeek)) return;
 
                     let status = "PRESENT";
@@ -417,7 +408,6 @@
                             else pmOut = fmt;
                         });
                         
-                        // Basic completion check
                         if (amIn === "-" || pmOut === "-") {
                             status = "INCOMPLETE"; cssClass = "status-incomplete";
                         }
@@ -449,7 +439,7 @@
     }
 
     // ==========================================
-    // MANUAL BATCH ENTRY LOGIC
+    // MANUAL BATCH ENTRY & LOCK LOGIC
     // ==========================================
     function openManualEntryModal() { document.getElementById('modalManual').classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
@@ -461,7 +451,7 @@
         const selectedOptions = Array.from(select.selectedOptions);
 
         if(!dStr || !tStr || selectedOptions.length === 0) return alert("Date, Time, and at least one Employee are required.");
-        if (tStr.length === 5) tStr += ":00"; // Add seconds
+        if (tStr.length === 5) tStr += ":00"; 
         
         const timestamp = `${dStr}T${tStr}`;
         const currentIso = new Date().toISOString();
@@ -474,7 +464,7 @@
                 emp_id: opt.value,
                 log_time: timestamp,
                 device_id: 'HR_MANUAL',
-                manual_log_name: currentUser.username, // Record the HR who did it
+                manual_log_name: currentUser.username,
                 manual_log_date: currentIso
             }));
 
@@ -484,7 +474,6 @@
             alert(`Successfully inserted logs for ${selectedOptions.length} employee(s).`);
             closeModal('modalManual');
             
-            // If the view currently matches the inserted month, reload it
             const viewM = document.getElementById('viewMonth').value;
             const insertM = parseInt(dStr.split('-')[1]).toString();
             if (viewM === insertM) generateMonthlyView();
@@ -496,11 +485,7 @@
         }
     }
 
-    // ==========================================
-    // LOCK MONTH LOGIC
-    // ==========================================
     function openLockModal() { document.getElementById('modalLock').classList.remove('hidden'); }
-    
     async function submitLock() {
         const pass = document.getElementById('lockPass').value;
         if (!pass) return alert("HR Password required to authorize.");
@@ -511,7 +496,6 @@
             
             if (u.password !== pass) throw new Error("Invalid Password.");
 
-            // Standard mock behavior for locking month (could write to a `system_logs` or `locked_months` table)
             alert("Month successfully locked. Further modifications are restricted.");
             closeModal('modalLock');
             document.getElementById('lockPass').value = '';
@@ -558,17 +542,29 @@
             let targetEmps = [];
             if (mode === 'individual') {
                 const eVal = document.getElementById('f48Employee').value;
-                targetEmps = [allEmployees.find(e => e.emp_id === eVal)];
+                const found = allEmployees.find(e => e.emp_id === eVal);
+                if (found) {
+                    const isMarpo = String(found.position || '').toUpperCase().includes('MARPO');
+                    const isDarpo = String(found.station || '').toUpperCase().includes('DARPO-CS1');
+                    if (isDarpo || isMarpo) targetEmps = [found];
+                }
             } else {
                 const div = document.getElementById('f48Division').value;
                 targetEmps = allEmployees.filter(e => {
+                    const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
+                    const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
+                    
+                    if (!isDarpo && !isMarpo) return false;
+
+                    let eDiv = String(e.division || '').toUpperCase().trim();
+                    if (isMarpo) eDiv = 'LTSP';
+
                     if (div === 'ALL') return true;
-                    if (div === 'DARMO') return String(e.station).toUpperCase().includes('DARMO');
-                    return String(e.division).toUpperCase() === div;
+                    return eDiv === div;
                 });
             }
 
-            if (targetEmps.length === 0 || !targetEmps[0]) throw new Error("No employees found for the selected criteria.");
+            if (targetEmps.length === 0) throw new Error("No employees found for the selected criteria.");
 
             // Initialize PDF
             const { jsPDF } = window.jspdf;
@@ -579,9 +575,19 @@
             const endDt = new Date(year, month + 1, 0);
             const endDtStr = `${year}-${String(month+1).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
 
-            // Bulk Queries
             const empIds = targetEmps.map(e => e.emp_id);
             
+            // Fetch Chiefs for Division lookup
+            status.innerText = "Fetching signatories...";
+            const { data: chiefUsers } = await supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF');
+            const chiefMap = {};
+            (chiefUsers || []).forEach(u => {
+                if(u.division) {
+                    const divBase = u.division.split(',')[0].trim().toUpperCase();
+                    chiefMap[divBase] = u.full_name.toUpperCase();
+                }
+            });
+
             status.innerText = "Fetching attendance logs...";
             const { data: allLogs } = await supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', empIds).gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59");
             
@@ -631,13 +637,22 @@
                 const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${validationId}`;
                 const dtr_qr = await urlToBase64(qrUrl);
 
+                // --- DIVISION CHIEF LOGIC ---
                 let chiefName = "_________________________";
                 let chiefPos = "DIVISION CHIEF";
-                const empDiv = (emp.division || "").toUpperCase().trim();
-                const empUnit = (emp.unit || "").toUpperCase().trim();
+                let empDiv = (emp.division || "").toUpperCase().trim();
+                const isMarpo = String(emp.position || '').toUpperCase().includes('MARPO');
                 
-                if (empDiv === "PARPO") { chiefName = "RICARDO C. GARCIA"; chiefPos = "PARPO II"; }
-                else if (empDiv === "LTSP" && empUnit.startsWith("DARMO")) { chiefPos = "MARPO"; }
+                if (isMarpo) empDiv = "LTSP"; // Treat MARPOs as LTSP for signatory purposes
+
+                if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO") {
+                    chiefName = "RICARDO C. GARCIA";
+                    chiefPos = "PARPO II";
+                } else {
+                    const baseDiv = empDiv.split(',')[0].trim();
+                    if (chiefMap[baseDiv]) chiefName = chiefMap[baseDiv];
+                    chiefPos = "DIVISION CHIEF";
+                }
 
                 const drawForm = (startX, startY) => {
                     if (dtr_qr) { try { doc.addImage(dtr_qr, 'PNG', startX + 73, startY, 12, 12); } catch(e){} }
@@ -696,7 +711,6 @@
                             }
                             
                             let isWeekend = !expectedDays.includes(dayOfWeek);
-
                             let special = isWeekend ? (dayOfWeek === '0' ? "SUNDAY" : "SATURDAY") : "";
                             
                             const key = `${emp.emp_id}_${dateStr}`;
