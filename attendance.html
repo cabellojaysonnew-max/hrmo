@@ -529,13 +529,11 @@
         const m = document.getElementById('viewMonth').options[document.getElementById('viewMonth').selectedIndex].text;
         const y = document.getElementById('viewYear').value;
 
-        // Group by division/type logic (Ensuring SPLIT gets its own group)
         const byDiv = {};
         missing.forEach(r => {
             let div = String(r.division || 'UNASSIGNED').toUpperCase();
             let type = String(r.type || '').toUpperCase();
             
-            // If they are explicitly SPLIT in either column, group them as SPLIT
             if (div.includes('SPLIT') || type === 'SPLIT') div = 'SPLIT';
             else if (!div) div = 'UNASSIGNED';
             
@@ -738,7 +736,6 @@
 
             const empIds = targetEmps.map(e => e.emp_id);
             
-            // Fetch Chiefs for Division lookup
             status.innerText = "Fetching signatories...";
             const { data: chiefUsers } = await supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF');
             const chiefMap = {};
@@ -797,7 +794,6 @@
                 const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${validationId}`;
                 const dtr_qr = await urlToBase64(qrUrl);
 
-                // --- DIVISION CHIEF LOGIC ---
                 let chiefName = "_________________________";
                 let chiefPos = "DIVISION CHIEF";
                 let empDiv = (emp.division || "").toUpperCase().trim();
@@ -876,6 +872,7 @@
                             if (isWeekend) {
                                 if (dayOfWeek === '0') special = "SUNDAY";
                                 else if (dayOfWeek === '6') special = "SATURDAY";
+                                else if (dayOfWeek === '5') special = "(FRIDAY - COMPRESSED WORKWEEK)";
                                 else special = "DAY OFF";
                             }
                             
