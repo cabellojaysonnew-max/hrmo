@@ -185,7 +185,7 @@
     }
 
     // --- PDF DRAWING LOGIC ---
-    function drawTableGroup(doc, divisionName, groupData, headers, widths, rowFormatter, startY, isAppend) {
+    function drawTableGroup(doc, divisionName, groupData, headers, widths, rowFormatter, isAppend, appendLvl, startY) {
         let cy = startY;
         const lMargin = 15;
 
@@ -434,8 +434,6 @@
                 
                 for (const e of emps) {
                     const eid = cleanId(e.emp_id);
-                    // Memos shouldn't actually fetch Compliance data if it's strictly removed, 
-                    // but it was retained in your prompt code snippet, so here it is as requested.
                     const { data: compData } = await supabaseClient.from('annual_compliance').select('*').eq('emp_id', eid).eq('year', year).single();
                     
                     let missing = [];
@@ -639,11 +637,11 @@
 
             // 5. MRUA REPORT
             else if (type === "MRUA") {
-                const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
+                const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: [215.9, 330.2] });
                 const mruaBgData = await getAssetBase64('mrua_bg.jpg');
                 const { data: logsData } = await supabaseClient.from('attendance_logs').select('*').gte('log_time', startIso).lte('log_time', endIso);
                 const logs = logsData || [];
-                const { data: leavesData } = await supabaseClient.from('leave_ledger').select('*').gte('date', startIso).lte('date', endIso).eq('transaction_t', 'APPROVED');
+                const { data: leavesData } = await supabaseClient.from('leave_ledger').select('*').gte('date', startIso.split('T')[0]).lte('date', endIso.split('T')[0]).eq('transaction_t', 'APPROVED');
                 const leaves = leavesData || [];
                 
                 let empGroups = {};
@@ -659,13 +657,13 @@
                 const sortedDivs = Object.keys(empGroups).sort();
                 const colWidths = [55, 20, 22, 40, 22, 40, 26, 10, 10, 80.6];
                 let currY = 45;
-                if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 355.6, 215.9);
+                if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 330.2, 215.9);
                 currY = drawMRUAColHeaders(doc, currY);
                 
                 sortedDivs.forEach(div => {
                     if(currY > 170) { 
                         doc.addPage(); 
-                        if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 355.6, 215.9);
+                        if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 330.2, 215.9);
                         currY = 15; currY = drawMRUAColHeaders(doc, currY);
                     }
 
@@ -687,7 +685,7 @@
                             absCount++;
                         });
                         
-                        let utCount = 0, totUtMins = 0; 
+                        let utCount = 0; 
                         
                         const rowVals = [
                             emp.full_name.toUpperCase(), eid, 
@@ -699,7 +697,7 @@
                         let rowH = 6; let cx = 15;
                         if (currY + rowH > 185) {
                             doc.addPage();
-                            if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 355.6, 215.9);
+                            if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 330.2, 215.9);
                             currY = 15; currY = drawMRUAColHeaders(doc, currY);
                         }
 
@@ -716,7 +714,7 @@
                     });
                 });
                 
-                if(currY > 170) { doc.addPage(); if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 355.6, 215.9); currY = 15; }
+                if(currY > 170) { doc.addPage(); if(mruaBgData) doc.addImage(mruaBgData, 'JPEG', 0, 0, 330.2, 215.9); currY = 15; }
                 currY += 5;
                 doc.setFontSize(8); doc.setFont("helvetica", "bold");
                 doc.text("New Assumption(s):", 15, currY); doc.setFont("helvetica", "normal");
@@ -741,24 +739,25 @@
 
             // 6. GENERIC LANDSCAPE TABLES
             else {
-                const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'legal' });
+                const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: [215.9, 330.2] });
                 let currY = 45;
                 
                 if (isAppend) {
                     currY = 15 + (levelNum * 45);
                     doc.setFontSize(7); doc.setFont("helvetica", "italic");
-                    doc.text(`-- Continuation of ${type.toUpperCase()} --`, 340, currY, {align: 'right'});
+                    doc.text(`-- Continuation of ${type.toUpperCase()} --`, 315, currY, {align: 'right'});
                     currY += 5;
                 } else {
                     doc.setFontSize(10); doc.setFont("helvetica", "bold");
-                    doc.text("REPUBLIC OF THE PHILIPPINES", 177.8, 15, { align: "center" });
-                    doc.text("Department of Agrarian Reform", 177.8, 20, { align: "center" });
-                    doc.text("Provincial Office of Camarines Sur 1", 177.8, 25, { align: "center" });
+                    doc.text("REPUBLIC OF THE PHILIPPINES", 165, 15, { align: "center" });
+                    doc.text("Department of Agrarian Reform", 165, 20, { align: "center" });
+                    doc.text("Provincial Office of Camarines Sur 1", 165, 25, { align: "center" });
                     doc.setFontSize(12);
-                    doc.text(`CONSOLIDATED REPORT: ${type.toUpperCase()} - ${period === 'MONTHLY' ? monthName + ' ' + year : period}`, 177.8, 35, { align: "center" });
+                    doc.text(`CONSOLIDATED REPORT: ${type.toUpperCase()} - ${period === 'MONTHLY' ? monthName + ' ' + year : period}`, 165, 35, { align: "center" });
                     currY = 45;
                 }
 
+                // USER REQUIREMENT: Travel Order Summary
                 if (type === "Travel Order Summary") {
                     const { data: tosData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
                     const tos = tosData || [];
@@ -781,23 +780,24 @@
                         empGroups[div].push(t);
                     });
 
-                    const headers = ["EMPL NO.", "NAME", "INCLUSIVE DATES", "DESTINATION", "PURPOSE", "REPORT TO", "DATE", "SIGNATURE"];
-                    const widths = [25, 45, 40, 50, 60, 45, 25, 30.6];
+                    // Explicitly defined columns from the prompt
+                    const headers = ["EMP NUMBER", "NAME", "INCLUSIVE DATES", "NUMBER OF DAYS", "DESTINATION", "DATE", "SIGNATURE"];
+                    const widths = [25, 45, 45, 30, 60, 25, 37];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
                         currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
                             const il = itin.filter(i => i.to_no === r.to_no);
-                            let rawPurp = il.map(i=>i.purpose).join("; ") || '-';
-                            let purpWords = rawPurp.split(/\s+/);
-                            if (purpWords.length > 30) rawPurp = purpWords.slice(0, 30).join(" ") + "...";
+                            const uniqueDates = [...new Set(il.map(i=>i.travel_date))];
+                            const numDays = uniqueDates.length;
+                            const dests = [...new Set(il.map(i=>i.destination))].join("; ");
                             
-                            return [r.emp_id, (nameMap[cleanId(r.emp_id)] || r.emp_name || '').toUpperCase(), getInclusiveDates(il.map(i=>i.travel_date)), [...new Set(il.map(i=>i.destination))].join("; "), rawPurp, r.report_to || '-', '', ''];
+                            return [r.emp_id, (nameMap[cleanId(r.emp_id)] || r.emp_name || '').toUpperCase(), getInclusiveDates(uniqueDates), String(numDays), dests, '', ''];
                         }, isAppend, levelNum, currY);
                     });
 
                 } else if (type === "Gate Pass") {
-                    const { data: gpData } = await supabaseClient.from('gate_pass_logs').select('*').eq('status', 'PROCESSED').gte('date', startIso).lte('date', endIso);
+                    const { data: gpData } = await supabaseClient.from('gate_pass_logs').select('*').eq('status', 'PROCESSED').gte('date', startIso.split('T')[0]).lte('date', endIso.split('T')[0]);
                     const gp = gpData || [];
                     let empGroups = {};
                     gp.forEach(t => {
@@ -806,8 +806,8 @@
                         empGroups[div].push(t);
                     });
 
-                    const headers = ["CTRL NO", "NAME OF EMPLOYEE", "TYPE", "DESTINATION", "PURPOSE", "DEPARTURE", "ARRIVAL", "CREDIT VL"];
-                    const widths = [20, 50, 20, 50, 75, 25, 25, 25];
+                    const headers = ["CTRL NO", "NAME OF EMPLOYEE", "TYPE", "DESTINATION", "PURPOSE", "DEPARTURE", "ARRIVAL", "HOURS", "MINUTES", "CREDIT VL"];
+                    const widths = [20, 50, 20, 40, 65, 25, 25, 20, 20, 25];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
@@ -815,12 +815,20 @@
                             let purpStr = String(r.purpose || '-');
                             let dest = "-", purp = purpStr;
                             if(purpStr.includes(" - ")) { let parts = purpStr.split(" - "); dest = parts[0]; purp = parts[1]; }
-                            return [r.id, (nameMap[cleanId(r.emp_id)] || '').toUpperCase(), r.pass_type, dest, purp, formatTime12h(r.time_out), formatTime12h(r.time_in), parseFloat(r.deduction_credit||0).toFixed(3)];
+                            
+                            let hr = "0", mn = "0";
+                            if (r.time_out && r.time_in) {
+                                const o = new Date(`1970-01-01T${r.time_out}`); const i = new Date(`1970-01-01T${r.time_in}`);
+                                const m = (i - o) / 60000;
+                                if (m > 0) { hr = Math.floor(m/60).toString(); mn = (m%60).toString(); }
+                            }
+                            
+                            return [r.id, (nameMap[cleanId(r.emp_id)] || '').toUpperCase(), r.pass_type, dest, purp, formatTime12h(r.time_out), formatTime12h(r.time_in), hr, mn, parseFloat(r.deduction_credit||0).toFixed(3)];
                         }, isAppend, levelNum, currY);
                     });
 
                 } else if (type === "Leave Summary") {
-                    const { data: llData } = await supabaseClient.from('leave_ledger').select('*').in('transaction_t', ['APPROVED', 'PROCESSED']).gte('date', startIso).lte('date', endIso);
+                    const { data: llData } = await supabaseClient.from('leave_ledger').select('*').in('transaction_t', ['APPROVED', 'PROCESSED']).gte('date', startIso.split('T')[0]).lte('date', endIso.split('T')[0]);
                     const ll = llData || [];
                     
                     let empGroups = {};
@@ -841,7 +849,7 @@
                     });
 
                 } else if (type === "Tardiness / Undertime") {
-                    const { data: llData } = await supabaseClient.from('leave_ledger').select('*').gte('date', startIso).lte('date', endIso);
+                    const { data: llData } = await supabaseClient.from('leave_ledger').select('*').gte('date', startIso.split('T')[0]).lte('date', endIso.split('T')[0]);
                     const ll = llData || [];
                     const tu = ll.filter(l => String(l.transaction_t).toUpperCase().includes("TARDINESS") || String(l.transaction_t).toUpperCase().includes("UNDERTIME"));
                     
@@ -908,9 +916,9 @@
                 } else if (type === "PSO / TO Conflicts") {
                     const { data: tosData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
                     const tos = tosData || [];
-                    const { data: itinData } = await supabaseClient.from('itinerary').select('*');
+                    const { data: itinData } = await supabaseClient.from('itinerary').select('*').gte('travel_date', startIso.split('T')[0]).lte('travel_date', endIso.split('T')[0]);
                     const itin = itinData || [];
-                    const { data: psoData } = await supabaseClient.from('pso_records').select('*');
+                    const { data: psoData } = await supabaseClient.from('pso_records').select('*').lte('start_date', endIso.split('T')[0]).gte('end_date', startIso.split('T')[0]);
                     const pso = psoData || [];
                     
                     let conflicts = [];
