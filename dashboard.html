@@ -227,7 +227,6 @@
                 psoSet.add(p.emp_id);
                 let psoNo = p.pso_no || "PSO";
                 let details = (p.subject || "").trim();
-                if (details.length > 50) details = details.substring(0, 47) + '...';
                 let key = `${psoNo}, ${details}`;
                 
                 if (!psoGroups[key]) psoGroups[key] = [];
@@ -256,7 +255,7 @@
         Object.keys(psoGroups).forEach(key => {
             let namesHtml = psoGroups[key].map(n => `<div class="text-gray-800 font-bold ml-2 mt-1 truncate pr-2" title="${n}">• ${n}</div>`).join('');
             listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded mb-2 text-[11px]">
-                <div class="text-red-800 font-mono font-bold border-b border-red-200 pb-1 mb-1 truncate" title="${key}">${key}</div>
+                <div class="text-red-800 font-mono font-bold border-b border-red-200 pb-1 mb-1 break-words" title="${key}">${key}</div>
                 ${namesHtml}
             </div>`;
         });
