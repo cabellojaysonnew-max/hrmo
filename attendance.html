@@ -448,8 +448,12 @@
                     }
 
                     currentViewData.push({ 
-                        emp_id: e.emp_id, full_name: e.full_name, division: e.division, type: e.type,
-                        date: dateStr, amIn, amOut, pmIn, pmOut, status 
+                        emp_id: e.emp_id, 
+                        full_name: e.full_name, 
+                        division: e.division, 
+                        type: e.type,
+                        date: dateStr, 
+                        amIn, amOut, pmIn, pmOut, status 
                     });
 
                     html += `
@@ -546,11 +550,13 @@
         const m = document.getElementById('viewMonth').options[document.getElementById('viewMonth').selectedIndex].text;
         const y = document.getElementById('viewYear').value;
 
+        // Group by division/type logic (Ensuring SPLIT gets its own group)
         const byDiv = {};
         missing.forEach(r => {
             let div = String(r.division || 'UNASSIGNED').toUpperCase();
             let type = String(r.type || '').toUpperCase();
             
+            // If they are explicitly SPLIT in either column, group them as SPLIT
             if (div.includes('SPLIT') || type === 'SPLIT') div = 'SPLIT';
             else if (!div) div = 'UNASSIGNED';
             
@@ -734,7 +740,7 @@
                     let eDiv = String(e.division || '').toUpperCase().trim();
                     let eType = String(e.type || '').toUpperCase().trim();
                     
-                    if (isMarpo) eDiv = 'MARPOS'; // Special grouping for MARPOs
+                    if (isMarpo) eDiv = 'LTSP'; 
                     if (eDiv === 'PARPO') eDiv = 'OFFICE OF THE PARPO';
 
                     // Apply Type Filter
@@ -748,6 +754,7 @@
 
             if (targetEmps.length === 0) throw new Error("No employees found for the selected criteria.");
 
+            // Initialize PDF
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
             const mName = monthNames[month];
