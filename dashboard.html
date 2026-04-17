@@ -81,7 +81,10 @@
                 <div class="bg-[#1976D2] text-white p-3 rounded-t-lg">
                     <h4 class="font-bold text-sm text-center tracking-wider">ON TRAVEL</h4>
                 </div>
-                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-3 space-y-2">
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
+                    <div class="w-full">NAME - DESTINATION</div>
+                </div>
+                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
                     <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
                 </div>
             </div>
@@ -90,7 +93,10 @@
                 <div class="bg-[#C62828] text-white p-3 rounded-t-lg">
                     <h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4>
                 </div>
-                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-3 space-y-2">
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
+                    <div class="w-full">PSO NUMBER, NAME - DETAILS</div>
+                </div>
+                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
                     <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
                 </div>
             </div>
@@ -99,7 +105,10 @@
                 <div class="bg-[#006400] text-white p-3 rounded-t-lg">
                     <h4 class="font-bold text-sm text-center tracking-wider">ON LEAVE</h4>
                 </div>
-                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-3 space-y-2">
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
+                    <div class="w-full">NAME - LEAVE TYPE</div>
+                </div>
+                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
                     <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
                 </div>
             </div>
@@ -108,7 +117,10 @@
                 <div class="bg-gray-700 text-white p-3 rounded-t-lg">
                     <h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4>
                 </div>
-                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-3 space-y-2">
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
+                    <div class="w-full">NAME - STATUS</div>
+                </div>
+                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
                     <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
                 </div>
             </div>
@@ -226,14 +238,14 @@
         listT.innerHTML = ''; listP.innerHTML = ''; listL.innerHTML = ''; listLA.innerHTML = '';
 
         (emps || []).forEach(e => {
-            // On Travel: Name - Destination
+            // On Travel
             if (travelMap[e.emp_id]) {
-                listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded mb-1 text-[11px]">
+                listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded mb-1 text-[11px] truncate">
                     <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-blue-700 italic">${travelMap[e.emp_id]}</span>
                 </div>`;
             }
             
-            // On PSO: PSO Number, Name - Details
+            // On PSO
             if (psoMap[e.emp_id]) {
                 let psoSubject = psoMap[e.emp_id];
                 let psoLabel = psoSubject;
@@ -241,20 +253,25 @@
                     const match = psoLabel.match(/PSO[\s-]*\d+/i);
                     if(match) psoLabel = match[0];
                 }
-                listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded mb-1 text-[11px]">
-                    <span class="text-red-700 font-mono font-bold">${psoLabel}</span>, <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-gray-600">${psoSubject}</span>
+                
+                let details = psoSubject.replace(psoLabel, '').trim();
+                if(details.startsWith('-') || details.startsWith(',')) details = details.substring(1).trim();
+                if(details.length > 50) details = details.substring(0, 50);
+
+                listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded mb-1 text-[11px] truncate">
+                    <span class="text-red-700 font-mono font-bold">${psoLabel}</span>, <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-gray-600">${details}</span>
                 </div>`;
             }
 
-            // On Leave: Name - Type of Leave
+            // On Leave
             if (leaveMap[e.emp_id]) {
-                listL.innerHTML += `<div class="p-2 bg-green-50 border-l-4 border-green-600 rounded mb-1 text-[11px]">
+                listL.innerHTML += `<div class="p-2 bg-green-50 border-l-4 border-green-600 rounded mb-1 text-[11px] truncate">
                     <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-green-700 font-bold">${leaveMap[e.emp_id]}</span>
                 </div>`;
             }
 
-            // Late & Absent: Name - Status
-            if (!travelMap[e.emp_id] && !psoMap[e.emp_id] && !leaveMap[e.emp_id] && !String(e.station).toUpperCase().includes('DARMO')) {
+            // Late & Absent
+            if (!travelMap[e.emp_id] && !psoMap[e.emp_id] && !leaveMap[e.emp_id] && String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
                 if (logMap[e.emp_id]) {
                     let cutoffStr = e.flexi_range_end || '08:00:00';
                     if (overrideMap[e.emp_id] && overrideMap[e.emp_id].start) {
@@ -271,15 +288,13 @@
                         const diffMins = Math.floor((firstLog - cutoffDate) / 60000);
                         const lateLabel = formatMinutesToHours(diffMins);
                         
-                        listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between">
-                            <span class="font-bold text-gray-800">${e.full_name}</span>
-                            <span class="text-orange-700 font-bold">LATE (${lateLabel})</span>
+                        listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] truncate">
+                            <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-orange-700 font-bold">LATE (${lateLabel})</span>
                         </div>`;
                     }
                 } else if (new Date().getHours() >= 9) {
-                    listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between">
-                        <span class="font-bold text-gray-800">${e.full_name}</span>
-                        <span class="text-gray-500 font-bold italic">ABSENT</span>
+                    listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] truncate">
+                        <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-gray-500 font-bold italic">ABSENT</span>
                     </div>`;
                 }
             }
@@ -378,7 +393,7 @@
         });
 
         (emps || []).forEach(e => {
-            if (String(e.station).toUpperCase().includes('DARMO')) return;
+            if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
             
             // Calculate Absences (Current Month only, bounded by sysStart)
             datesToCheck.forEach(dateStr => {
@@ -401,6 +416,14 @@
                 const logsForDay = myLogs[dateStr].sort((a,b) => a-b);
                 const firstLog = logsForDay[0];
                 const lastLog = logsForDay[logsForDay.length - 1];
+
+                if (histOverrideMap[e.emp_id]) {
+                    const override = histOverrideMap[e.emp_id].find(o => o.date === dateStr);
+                    if (override) {
+                        startReqStr = override.start;
+                        cutoffStr = override.start; // Override uses fixed schedule, start is the cutoff
+                    }
+                }
 
                 const startDate = new Date(dateStr + 'T' + startReqStr);
                 const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
