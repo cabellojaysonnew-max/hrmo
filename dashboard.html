@@ -14,9 +14,12 @@
         }
         body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
         .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+        
+        /* Custom Scrollbar for inner lists */
         .scroll-list::-webkit-scrollbar { width: 4px; }
         .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
         .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
@@ -94,6 +97,28 @@
             </div>
 
         </div>
+
+        <div class="card mt-8 p-6">
+            <h3 class="text-xl font-bold text-red-700 border-b pb-2 mb-4">Habitual Tardiness & Absenteeism Monitoring (Civil Service Rules)</h3>
+            <p class="text-xs text-gray-500 mb-4">Under Civil Service rules, employees incurring 10 or more late arrivals within a month for two consecutive months, or excessive absent days, are subject to disciplinary action.</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-red-50 text-red-800">
+                        <tr>
+                            <th class="p-3 font-bold border-b">Employee Name</th>
+                            <th class="p-3 font-bold border-b text-center">Prev. Month Late Count</th>
+                            <th class="p-3 font-bold border-b text-center">Curr. Month Late Count</th>
+                            <th class="p-3 font-bold border-b text-center">Total Tardiness/Undertime</th>
+                            <th class="p-3 font-bold border-b text-center">Status/Warning Level</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listHabitual" class="divide-y">
+                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Calculating Civil Service Violations...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </main>
 
 <script>
@@ -106,43 +131,51 @@
     document.getElementById('userRoleBadge').innerText = currentUser.role;
 
     const isChief = currentUser.role.toUpperCase() === 'CHIEF';
-    const isPARPO = currentUser.role.toUpperCase() === 'PARPO';
-    const isHRMO = currentUser.role.toUpperCase() === 'HRMO';
+    const targetDivision = currentUser.division;
 
     function logout() {
         sessionStorage.removeItem('currentUser');
         window.location.href = 'index.html';
     }
 
+    // Helper: Convert total minutes into an "Xh Ym" formatted string
+    function formatMinutesToHours(totalMinutes) {
+        if (!totalMinutes || totalMinutes <= 0) return "0m";
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        if (h > 0 && m > 0) return `${h}h ${m}m`;
+        if (h > 0) return `${h}h`;
+        return `${m}m`;
+    }
+
     // --- DASHBOARD CORE LOGIC ---
     window.onload = async () => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        document.getElementById('dashDate').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const todayDate = new Date();
+        const todayStr = todayDate.toISOString().split('T')[0];
+        document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
-        // Update view label
-        document.getElementById('scopeLabel').innerText = isChief ? `Division: ${currentUser.division}` : "Provincial Oversight";
+        document.getElementById('scopeLabel').innerText = isChief ? `Division: ${targetDivision}` : "Provincial Oversight";
 
         // 1. Fetch Employees (Filter by Division if Chief)
         let empQuery = supabaseClient.from('employees').select('emp_id, full_name, division, flexi_range_end, station');
-        if (isChief) empQuery = empQuery.eq('division', currentUser.division);
+        if (isChief) empQuery = empQuery.eq('division', targetDivision);
         const { data: emps } = await empQuery;
-        const empIds = (emps || []).map(e => e.emp_id);
-        document.getElementById('statTotal').innerText = emps.length;
+        const empIds = new Set((emps || []).map(e => e.emp_id));
+        document.getElementById('statTotal').innerText = emps?.length || 0;
 
-        // 2. Fetch Daily Activities
+        // Fetch Data
         const [travel, pso, leave, logs] = await Promise.all([
-            supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr).in('emp_id', empIds),
-            supabaseClient.from('pso_records').select('emp_id, subject').lte('start_date', todayStr).gte('end_date', todayStr).in('emp_id', empIds),
-            supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).in('emp_id', empIds).eq('transaction_t', 'APPROVED'),
-            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59').in('emp_id', empIds)
+            supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr),
+            supabaseClient.from('pso_records').select('emp_id, subject').lte('start_date', todayStr).gte('end_date', todayStr),
+            supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).eq('transaction_t', 'APPROVED'),
+            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59')
         ]);
 
-        // Map activities for lookup
+        // Maps for quick lookup
         const travelMap = Object.fromEntries((travel.data || []).map(i => [i.emp_id, i.destination]));
         const psoMap = Object.fromEntries((pso.data || []).map(p => [p.emp_id, p.subject]));
         const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
         
-        // Find earliest log (Time IN)
         const logMap = {};
         (logs.data || []).forEach(l => {
             const time = new Date(l.log_time);
@@ -150,8 +183,13 @@
         });
 
         // 3. Populate Summary Counts
-        document.getElementById('statTravel').innerText = Object.keys(travelMap).length;
-        document.getElementById('statPSO').innerText = Object.keys(psoMap).length;
+        let countTravel = 0, countPSO = 0;
+        (emps || []).forEach(e => {
+            if (travelMap[e.emp_id]) countTravel++;
+            if (psoMap[e.emp_id]) countPSO++;
+        });
+        document.getElementById('statTravel').innerText = countTravel;
+        document.getElementById('statPSO').innerText = countPSO;
 
         // 4. Render Detail Lists
         const listT = document.getElementById('listTravel');
@@ -159,46 +197,159 @@
         const listL = document.getElementById('listLeave');
         const listLA = document.getElementById('listLateAbsent');
 
-        emps.forEach(e => {
-            const nameHtml = `<div class="font-bold text-gray-800">${e.full_name}</div>`;
+        (emps || []).forEach(e => {
+            const nameHtml = `<div class="font-bold text-gray-800 truncate" title="${e.full_name}">${e.full_name}</div>`;
             
             // On Travel
             if (travelMap[e.emp_id]) {
-                listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded text-[11px]">${nameHtml}<div class="text-blue-700 italic">${travelMap[e.emp_id]}</div></div>`;
+                listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded flex justify-between items-center"><div class="w-1/2 text-[11px] truncate">${nameHtml}</div><div class="w-1/2 text-right text-[10px] text-blue-700 italic truncate" title="${travelMap[e.emp_id]}">${travelMap[e.emp_id]}</div></div>`;
             }
             
             // On PSO
             if (psoMap[e.emp_id]) {
-                listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded text-[11px]">${nameHtml}<div class="text-red-700 font-mono">${psoMap[e.emp_id]}</div></div>`;
+                let psoLabel = psoMap[e.emp_id];
+                if(psoLabel.toUpperCase().includes('PSO')) {
+                    const match = psoLabel.match(/PSO[\s-]*\d+/i);
+                    if(match) psoLabel = match[0];
+                }
+                listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded flex justify-between items-center"><div class="w-1/2 text-[11px] truncate">${nameHtml}</div><div class="w-1/2 text-right text-[10px] text-red-700 font-mono truncate" title="${psoLabel}">${psoLabel}</div></div>`;
             }
 
             // On Leave
             if (leaveMap[e.emp_id]) {
-                listL.innerHTML += `<div class="p-2 bg-green-50 border-l-4 border-green-600 rounded text-[11px]">${nameHtml}<div class="text-green-700 font-bold">${leaveMap[e.emp_id]}</div></div>`;
+                listL.innerHTML += `<div class="p-2 bg-green-50 border-l-4 border-green-600 rounded flex justify-between items-center"><div class="w-1/2 text-[11px] truncate">${nameHtml}</div><div class="w-1/2 text-right text-[10px] text-green-700 font-bold truncate">${leaveMap[e.emp_id]}</div></div>`;
             }
 
-            // Late & Absent Calculation
-            if (!travelMap[e.emp_id] && !psoMap[e.emp_id] && !leaveMap[e.emp_id] && !String(e.station).includes('DARMO')) {
+            // Late & Absent
+            if (!travelMap[e.emp_id] && !psoMap[e.emp_id] && !leaveMap[e.emp_id] && !String(e.station).toUpperCase().includes('DARMO')) {
                 if (logMap[e.emp_id]) {
                     const cutoff = new Date(todayStr + 'T' + (e.flexi_range_end || '08:00:00'));
                     if (logMap[e.emp_id] > cutoff) {
                         const diffMins = Math.floor((logMap[e.emp_id] - cutoff) / 60000);
-                        const h = Math.floor(diffMins / 60);
-                        const m = diffMins % 60;
-                        const lateLabel = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                        const lateLabel = formatMinutesToHours(diffMins);
                         
-                        listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded text-[11px] flex justify-between"><span>${nameHtml}</span><span class="text-orange-700 font-bold uppercase">LATE (${lateLabel})</span></div>`;
+                        listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded flex justify-between items-center"><div class="w-2/3 text-[11px] truncate">${nameHtml}</div><div class="w-1/3 text-right text-[10px]"><span class="text-orange-700 font-bold bg-orange-200 px-1 rounded">LATE (${lateLabel})</span></div></div>`;
                     }
                 } else if (new Date().getHours() >= 9) {
-                    listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded text-[11px] flex justify-between"><span>${nameHtml}</span><span class="text-gray-500 font-bold italic">ABSENT</span></div>`;
+                    listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded flex justify-between items-center"><div class="w-2/3 text-[11px] truncate">${nameHtml}</div><div class="w-1/3 text-right text-[10px]"><span class="text-gray-500 font-bold italic bg-gray-200 px-1 rounded">ABSENT</span></div></div>`;
                 }
             }
         });
 
-        // Handle Empty States
-        [listT, listP, listL, listLA].forEach(l => {
-            if (!l.innerHTML) l.innerHTML = `<div class="text-center text-gray-400 text-xs mt-10 italic">No records today</div>`;
+        const emptyState = '<div class="text-center text-gray-400 text-xs mt-10 italic">No records today</div>';
+        if(!listT.innerHTML) listT.innerHTML = emptyState;
+        if(!listP.innerHTML) listP.innerHTML = emptyState;
+        if(!listL.innerHTML) listL.innerHTML = emptyState;
+        if(!listLA.innerHTML) listLA.innerHTML = (new Date().getHours() < 9) ? '<div class="text-center text-gray-400 text-xs mt-10 italic">Calculating... (Updates post-9AM)</div>' : emptyState;
+
+        // --- HABITUAL TARDINESS CALCULATION (Civil Service Rules) ---
+        // Fetch logs for Current Month and Previous Month
+        const currMonth = todayDate.getMonth(); 
+        const currYear = todayDate.getFullYear();
+        const prevMonth = currMonth === 0 ? 11 : currMonth - 1;
+        const prevYear = currMonth === 0 ? currYear - 1 : currYear;
+
+        const startPrevMonth = new Date(prevYear, prevMonth, 1).toISOString().split('T')[0];
+        const endCurrMonth = new Date(currYear, currMonth + 1, 0).toISOString().split('T')[0]; // Last day of current month
+
+        const { data: histLogs } = await supabaseClient.from('attendance_logs')
+            .select('emp_id, log_time')
+            .gte('log_time', startPrevMonth + 'T00:00:00')
+            .lte('log_time', endCurrMonth + 'T23:59:59');
+
+        const habMap = {};
+        (emps || []).forEach(e => {
+            habMap[e.emp_id] = { name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0 };
         });
+
+        // Group logs by employee and date
+        const empLogDates = {};
+        (histLogs || []).forEach(l => {
+            if (!empIds.has(l.emp_id)) return; // Skip if filtered out by division
+            const d = l.log_time.split('T')[0];
+            if (!empLogDates[l.emp_id]) empLogDates[l.emp_id] = {};
+            if (!empLogDates[l.emp_id][d]) empLogDates[l.emp_id][d] = [];
+            empLogDates[l.emp_id][d].push(new Date(l.log_time));
+        });
+
+        // Calculate Lates & Undertimes per day
+        (emps || []).forEach(e => {
+            if (String(e.station).toUpperCase().includes('DARMO')) return;
+            const myLogs = empLogDates[e.emp_id];
+            if(!myLogs) return;
+
+            const cutoff = e.flexi_range_end || '08:00:00';
+            const startReq = e.flexi_range_start || '08:00:00';
+            
+            Object.keys(myLogs).forEach(dateStr => {
+                const logsForDay = myLogs[dateStr].sort((a,b) => a-b);
+                const firstLog = logsForDay[0];
+                const lastLog = logsForDay[logsForDay.length - 1];
+
+                const cutoffDate = new Date(dateStr + 'T' + cutoff);
+                const startDate = new Date(dateStr + 'T' + startReq);
+                
+                let isLate = false;
+                
+                // LATE check
+                if (firstLog > cutoffDate) {
+                    isLate = true;
+                    habMap[e.emp_id].totalLateMins += Math.floor((firstLog - cutoffDate) / 60000);
+                }
+
+                if (isLate) {
+                    const logMonth = firstLog.getMonth();
+                    if (logMonth === prevMonth) habMap[e.emp_id].prevCount++;
+                    if (logMonth === currMonth) habMap[e.emp_id].currCount++;
+                }
+
+                // UNDERTIME check (9 hours from counted start time)
+                let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
+                const requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
+                
+                if (lastLog < requiredEnd && firstLog !== lastLog) {
+                    habMap[e.emp_id].totalUtMins += Math.floor((requiredEnd - lastLog) / 60000);
+                }
+            });
+        });
+
+        // Filter and Render Habitual Tardiness Table
+        const listHabitual = document.getElementById('listHabitual');
+        listHabitual.innerHTML = '';
+        let hasHabitual = false;
+
+        Object.values(habMap).forEach(h => {
+            const isHabitual = (h.prevCount >= 10 && h.currCount >= 10);
+            const totalMins = h.totalLateMins + h.totalUtMins;
+            const isExcessive = totalMins > 0;
+
+            if (isHabitual || isExcessive) {
+                hasHabitual = true;
+                
+                let statusBadge = '';
+                if (isHabitual) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">HABITUAL (CS WARNING)</span>`;
+                } else if (totalMins >= 480) { // 8 hours = 1 day absent
+                    statusBadge = `<span class="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold">EXCESSIVE (LEAVE DEDUCT)</span>`;
+                } else {
+                    statusBadge = `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-bold">MONITORING</span>`;
+                }
+
+                listHabitual.innerHTML += `
+                    <tr class="hover:bg-red-50">
+                        <td class="p-3 border-b text-gray-800 font-bold">${h.name}</td>
+                        <td class="p-3 border-b text-center ${h.prevCount >= 10 ? 'text-red-600 font-bold' : ''}">${h.prevCount}</td>
+                        <td class="p-3 border-b text-center ${h.currCount >= 10 ? 'text-red-600 font-bold' : ''}">${h.currCount}</td>
+                        <td class="p-3 border-b text-center font-mono">${formatMinutesToHours(totalMins)}</td>
+                        <td class="p-3 border-b text-center">${statusBadge}</td>
+                    </tr>
+                `;
+            }
+        });
+
+        if (!hasHabitual) {
+            listHabitual.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No employees met Civil Service violation criteria.</td></tr>`;
+        }
     };
 </script>
 </body>
