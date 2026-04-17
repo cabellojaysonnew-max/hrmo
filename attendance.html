@@ -125,47 +125,68 @@
         <div id="module-f48" class="hidden flex-1 p-8 overflow-y-auto">
             <div class="card p-8 max-w-4xl mx-auto border-t-4 border-[#003811]">
                 <h3 class="text-2xl font-bold text-[#003811] mb-2">Civil Service Form 48 Generation</h3>
-                <p class="text-sm text-gray-500 mb-8 italic pb-4 border-b">Generate official DTR forms capturing Travel Orders, PSOs, Leaves, and Schedule Overrides.</p>
+                <p class="text-sm text-gray-500 mb-6 italic pb-4 border-b">Generate official DTR forms capturing Travel Orders, PSOs, Leaves, and Schedule Overrides.</p>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="space-y-4">
-                        <h4 class="font-bold text-[#D4AF37] border-b pb-2">1. Select Period</h4>
-                        <div class="flex gap-4">
-                            <div class="w-1/2">
-                                <label class="form-label">Month</label>
-                                <select id="f48Month" class="form-input"></select>
-                            </div>
-                            <div class="w-1/2">
-                                <label class="form-label">Year</label>
-                                <select id="f48Year" class="form-input"></select>
-                            </div>
-                        </div>
-
-                        <h4 class="font-bold text-[#D4AF37] border-b pb-2 mt-6">2. Select Target</h4>
+                    <div class="space-y-6">
                         <div>
-                            <label class="form-label">Generation Mode</label>
-                            <select id="f48Mode" class="form-input" onchange="toggleF48Mode()">
-                                <option value="individual">Individual Employee</option>
-                                <option value="batch">Batch (By Division/Type)</option>
-                            </select>
-                        </div>
-                        
-                        <div id="divIndividual">
-                            <label class="form-label">Employee</label>
-                            <select id="f48Employee" class="form-input"></select>
+                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">1. Select Period</h4>
+                            <div class="flex gap-4">
+                                <div class="w-1/2">
+                                    <label class="form-label">Month</label>
+                                    <select id="f48Month" class="form-input"></select>
+                                </div>
+                                <div class="w-1/2">
+                                    <label class="form-label">Year</label>
+                                    <select id="f48Year" class="form-input"></select>
+                                </div>
+                            </div>
                         </div>
 
-                        <div id="divBatch" class="hidden">
-                            <label class="form-label">Division / Type</label>
-                            <select id="f48Division" class="form-input">
-                                <option value="ALL">ALL (DARPO-CS1)</option>
-                                <option value="REGULAR">REGULAR</option>
-                                <option value="SPLIT">SPLIT</option>
-                                <option value="OFFICE OF THE PARPO">OFFICE OF THE PARPO</option>
-                                <option value="PARAD">PARAD</option><option value="LTSP">LTSP</option>
-                                <option value="AJDP">AJDP</option><option value="PBDD">PBDD</option>
-                                <option value="STOD">STOD</option>
-                            </select>
+                        <div>
+                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">2. Select Target Scope</h4>
+                            
+                            <div class="flex gap-4 mb-4">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="f48Mode" value="individual" checked onchange="toggleF48Mode()" class="accent-[#003811]">
+                                    <span class="text-sm font-bold text-gray-700">Individual Employee</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="f48Mode" value="batch" onchange="toggleF48Mode()" class="accent-[#003811]">
+                                    <span class="text-sm font-bold text-gray-700">Batch Generate</span>
+                                </label>
+                            </div>
+                            
+                            <div class="h-[75px] bg-gray-50 p-3 rounded border">
+                                <div id="divIndividual" class="w-full">
+                                    <label class="form-label text-[10px]">Select Employee</label>
+                                    <select id="f48Employee" class="form-input py-1"></select>
+                                </div>
+
+                                <div id="divBatch" class="hidden w-full flex gap-3">
+                                    <div class="w-1/2">
+                                        <label class="form-label text-[10px]">Division / Office</label>
+                                        <select id="f48Division" class="form-input py-1 text-xs">
+                                            <option value="ALL">ALL (DARPO-CS1)</option>
+                                            <option value="OFFICE OF THE PARPO">OFFICE OF THE PARPO</option>
+                                            <option value="MARPOs">MARPOs</option>
+                                            <option value="PARAD">PARAD</option>
+                                            <option value="LTSP">LTSP</option>
+                                            <option value="AJDP">AJDP</option>
+                                            <option value="PBDD">PBDD</option>
+                                            <option value="STOD">STOD</option>
+                                        </select>
+                                    </div>
+                                    <div class="w-1/2">
+                                        <label class="form-label text-[10px]">Employee Type</label>
+                                        <select id="f48Type" class="form-input py-1 text-xs">
+                                            <option value="ALL">All Types</option>
+                                            <option value="REGULAR">Regular</option>
+                                            <option value="SPLIT">Split</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -427,12 +448,8 @@
                     }
 
                     currentViewData.push({ 
-                        emp_id: e.emp_id, 
-                        full_name: e.full_name, 
-                        division: e.division, 
-                        type: e.type,
-                        date: dateStr, 
-                        amIn, amOut, pmIn, pmOut, status 
+                        emp_id: e.emp_id, full_name: e.full_name, division: e.division, type: e.type,
+                        date: dateStr, amIn, amOut, pmIn, pmOut, status 
                     });
 
                     html += `
@@ -663,7 +680,7 @@
     // FORM 48 GENERATION LOGIC
     // ==========================================
     function toggleF48Mode() {
-        const mode = document.getElementById('f48Mode').value;
+        const mode = document.querySelector('input[name="f48Mode"]:checked').value;
         document.getElementById('divIndividual').classList.toggle('hidden', mode !== 'individual');
         document.getElementById('divBatch').classList.toggle('hidden', mode !== 'batch');
     }
@@ -682,7 +699,7 @@
     }
 
     window.generateForm48Trigger = async function() {
-        const mode = document.getElementById('f48Mode').value;
+        const mode = document.querySelector('input[name="f48Mode"]:checked').value;
         const month = parseInt(document.getElementById('f48Month').value) - 1;
         const year = parseInt(document.getElementById('f48Year').value);
         
@@ -705,6 +722,8 @@
                 }
             } else {
                 const div = document.getElementById('f48Division').value;
+                const empTypeFilter = document.getElementById('f48Type').value;
+
                 targetEmps = allEmployees.filter(e => {
                     const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
@@ -714,18 +733,21 @@
 
                     let eDiv = String(e.division || '').toUpperCase().trim();
                     let eType = String(e.type || '').toUpperCase().trim();
-                    if (isMarpo) eDiv = 'LTSP';
+                    
+                    if (isMarpo) eDiv = 'MARPOS'; // Special grouping for MARPOs
+                    if (eDiv === 'PARPO') eDiv = 'OFFICE OF THE PARPO';
 
+                    // Apply Type Filter
+                    if (empTypeFilter !== 'ALL' && eType !== empTypeFilter) return false;
+
+                    // Apply Division Filter
                     if (div === 'ALL') return true;
-                    if (div === 'SPLIT') return eType === 'SPLIT' || eDiv === 'SPLIT';
-                    if (div === 'REGULAR') return eType === 'REGULAR';
                     return eDiv === div;
                 });
             }
 
             if (targetEmps.length === 0) throw new Error("No employees found for the selected criteria.");
 
-            // Initialize PDF
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
             const mName = monthNames[month];
@@ -736,6 +758,7 @@
 
             const empIds = targetEmps.map(e => e.emp_id);
             
+            // Fetch Chiefs for Division lookup
             status.innerText = "Fetching signatories...";
             const { data: chiefUsers } = await supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF');
             const chiefMap = {};
@@ -794,12 +817,13 @@
                 const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${validationId}`;
                 const dtr_qr = await urlToBase64(qrUrl);
 
+                // --- DIVISION CHIEF LOGIC ---
                 let chiefName = "_________________________";
                 let chiefPos = "DIVISION CHIEF";
                 let empDiv = (emp.division || "").toUpperCase().trim();
                 const isMarpo = String(emp.position || '').toUpperCase().includes('MARPO');
                 
-                if (isMarpo) empDiv = "LTSP";
+                if (isMarpo) empDiv = "LTSP"; // Treat MARPOs as LTSP for signatory mapping
 
                 if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO") {
                     chiefName = "RICARDO C. GARCIA";
