@@ -192,6 +192,7 @@
         // Header
         doc.setFillColor(200, 220, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
         doc.rect(lMargin, cy, widths.reduce((a,b)=>a+b,0), 8, 'DF');
+        doc.setTextColor(0,0,0);
         doc.text(`DIVISION: ${divisionName}`, lMargin + 2, cy + 5.5);
         cy += 8;
         
@@ -384,13 +385,13 @@
 
                     doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("DESTINATION:", 10, 92);
                     doc.setFont("helvetica", "normal");
-                    const dests = toItins.map(i => `${i.destination} - ${new Date(i.travel_date).toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`).join(", ");
+                    const dests = toItins.map(i => `${i.destination} - ${new Date(i.travel_date).toLocaleDateString('en-US', {month:'long', day:'numeric'})}`).join(", ");
                     const destSplit = doc.splitTextToSize(dests, 160);
                     doc.text(destSplit, 40, 92); doc.line(40, 93 + (destSplit.length-1)*5, 200, 93 + (destSplit.length-1)*5);
 
                     const ny = 102 + (destSplit.length-1)*5;
-                    doc.setFont("helvetica", "bold"); doc.text("DEPARTURE DATE:", 10, ny); doc.setFont("helvetica", "normal"); doc.text(toItins[0].travel_date, 50, ny); doc.line(45, ny+1, 85, ny+1);
-                    doc.setFont("helvetica", "bold"); doc.text("   RETURN DATE:", 90, ny); doc.setFont("helvetica", "normal"); doc.text(toItins[toItins.length-1].travel_date, 125, ny); doc.line(120, ny+1, 160, ny+1);
+                    doc.setFont("helvetica", "bold"); doc.text("DEPARTURE DATE:", 10, ny); doc.setFont("helvetica", "normal"); doc.text(toItins[0].travel_date, 50, ny); doc.line(48, ny+1, 85, ny+1);
+                    doc.setFont("helvetica", "bold"); doc.text("   RETURN DATE:", 90, ny); doc.setFont("helvetica", "normal"); doc.text(toItins[toItins.length-1].travel_date, 125, ny); doc.line(125, ny+1, 160, ny+1);
 
                     doc.setFont("helvetica", "bold"); doc.text("REPORT TO:", 10, ny+8); doc.setFont("helvetica", "normal"); doc.text(t.report_to||'', 35, ny+8); doc.line(35, ny+9, 200, ny+9);
                     
@@ -426,8 +427,6 @@
 
             // 2. COMPLIANCE MEMOS
             else if (type === "Compliance Memos") {
-                const { data: compData } = await supabaseClient.from('annual_compliance').select('*').eq('year', year);
-                const comp = compData || [];
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'legal' });
                 const bgMemo = await getAssetBase64('bg_memo.jpg');
                 const todayStr = new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
@@ -435,15 +434,21 @@
                 
                 for (const e of emps) {
                     const eid = cleanId(e.emp_id);
-                    const rec = comp.find(c => cleanId(c.emp_id) == eid) || {};
-                    let missing = [];
-                    if(!rec.saln_status || String(rec.saln_status).toLowerCase() !== 'true') missing.push("Statement of Assets, Liabilities, and Net Worth (SALN)");
-                    if(!rec.ipcr_plan_status || String(rec.ipcr_plan_status).toLowerCase() !== 'true') missing.push("IPCR Plan");
-                    if(!rec.ipcr_status || String(rec.ipcr_status).toLowerCase() !== 'true') missing.push("IPCR");
-                    if(!rec.lap_status || String(rec.lap_status).toLowerCase() !== 'true') missing.push("Leave Administration Plan (LAP)");
-                    if(!rec.hmo_plan_status || String(rec.hmo_plan_status).toLowerCase() !== 'true') missing.push("HMO Plan submission");
+                    // Memos shouldn't actually fetch Compliance data if it's strictly removed, 
+                    // but it was retained in your prompt code snippet, so here it is as requested.
+                    const { data: compData } = await supabaseClient.from('annual_compliance').select('*').eq('emp_id', eid).eq('year', year).single();
                     
-                    if(missing.length > 0) {
+                    let missing = [];
+                    if (!compData) { missing = ["Statement of Assets, Liabilities, and Net Worth (SALN)", "IPCR Plan", "IPCR", "Leave Administration Plan (LAP)", "HMO Plan submission"]; }
+                    else {
+                        if (String(compData.saln_status).toLowerCase() !== 'true') missing.push("Statement of Assets, Liabilities, and Net Worth (SALN)");
+                        if (String(compData.ipcr_plan_status).toLowerCase() !== 'true') missing.push("IPCR Plan");
+                        if (String(compData.ipcr_status).toLowerCase() !== 'true') missing.push("IPCR");
+                        if (String(compData.lap_status).toLowerCase() !== 'true') missing.push("Leave Administration Plan (LAP)");
+                        if (String(e.hmo_plan_status).toLowerCase() !== 'true') missing.push("HMO Plan submission");
+                    }
+
+                    if (missing.length > 0) {
                         if(count > 0) doc.addPage();
                         if (bgMemo) doc.addImage(bgMemo, 'JPEG', 0, 0, 215.9, 330.2);
 
@@ -944,7 +949,7 @@
             }
 
         } catch (e) { alert(e.message); }
-        finally { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; statusLbl.style.display = 'none'; }
+        finally { btn.disabled = false; btn.innerText = "GENERATE PDF REPORT"; }
     }
 </script>
 </body>
