@@ -159,7 +159,7 @@
         }
     }
 
-    // --- SYSTEM HELPERS ---
+    // --- SYSTEM HELPERS (Python Translations) ---
     function cleanId(val) { return val ? String(val).split('.')[0].trim() : ""; }
 
     function formatTime12h(timeStr) {
@@ -228,20 +228,20 @@
 
         // Group Header
         doc.setFillColor(200, 220, 255); 
+        doc.setTextColor(0, 0, 0); 
         doc.setDrawColor(0, 0, 0);
-        doc.setTextColor(0, 0, 0);
         doc.setFont("helvetica", "bold"); doc.setFontSize(10);
         doc.rect(lMargin, cy, widths.reduce((a,b)=>a+b,0), 8, 'DF');
         doc.text(`DIVISION: ${divisionName}`, lMargin + 2, cy + 5.5);
         cy += 8;
         
         // Column Headers
-        doc.setFillColor(220, 220, 220); 
-        doc.setTextColor(0, 0, 0);
-        doc.setDrawColor(0, 0, 0);
         doc.setFontSize(8); 
         let cx = lMargin;
         headers.forEach((h, i) => {
+            doc.setFillColor(220, 220, 220); 
+            doc.setTextColor(0, 0, 0); 
+            doc.setDrawColor(0, 0, 0);
             doc.rect(cx, cy, widths[i], 8, 'DF');
             doc.text(h, cx + (widths[i]/2), cy + 5, {align: 'center'});
             cx += widths[i];
@@ -262,7 +262,7 @@
             let maxLines = 1;
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
-                if (headers[i] === "DATE" || headers[i] === "SIGNATURE") vStr = "";
+                if (["RECEIVED", "SIGNATURE", "DATE"].includes(headers[i])) vStr = "";
                 let lines = doc.splitTextToSize(vStr, widths[i] - 2);
                 if (lines.length > maxLines) maxLines = lines.length;
             });
@@ -270,15 +270,15 @@
             
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
-                if (headers[i] === "DATE" || headers[i] === "SIGNATURE") vStr = ""; 
+                if (["RECEIVED", "SIGNATURE", "DATE"].includes(headers[i])) vStr = ""; 
                 
                 doc.setFillColor(255, 255, 255); 
+                doc.setTextColor(0, 0, 0); 
                 doc.setDrawColor(0, 0, 0);
-                doc.setTextColor(0, 0, 0);
                 doc.rect(cx, cy, widths[i], rowH, 'DF');
                 
                 let align = 'center';
-                if (["PURPOSE", "DESTINATION", "NAME", "INCLUSIVE DATES", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) align = 'left';
+                if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) align = 'left';
                 const tx = align === 'center' ? cx + (widths[i]/2) : cx + 2;
                 
                 let textLines = doc.splitTextToSize(vStr, widths[i] - 2);
@@ -322,6 +322,9 @@
     window.generatePDFReport = async function() {
         const type = qS('#repType').value;
         const period = qS('#repPeriod').value;
+        const year = parseInt(qS('#repYear').value);
+        const monthIdx = parseInt(qS('#repMonth').value);
+        const monthName = months[monthIdx-1];
         const btn = qS('#btnGenerateReport');
         const isAppend = qS('#repAppendMode').checked;
         const appendLvlStr = qS('#repAppendLevel').value;
@@ -330,13 +333,10 @@
         btn.disabled = true; btn.innerText = "FETCHING DATA...";
 
         let startDt, endDt, titleSuffix;
-        const year = parseInt(qS('#repYear').value);
-        const monthIdx = parseInt(qS('#repMonth').value);
-
         if (period === 'MONTHLY') {
             startDt = new Date(year, monthIdx - 1, 1);
             endDt = new Date(year, monthIdx, 0, 23, 59, 59);
-            titleSuffix = `${months[monthIdx-1].toUpperCase()} ${year}`;
+            titleSuffix = `${monthName.toUpperCase()} ${year}`;
         } else if (period === 'ANNUALLY') {
             startDt = new Date(year, 0, 1);
             endDt = new Date(year, 11, 31, 23, 59, 59);
@@ -834,7 +834,7 @@
 
                     // Explicitly defined columns from the prompt
                     const headers = ["EMP NUMBER", "TO NUMBER", "NAME", "INCLUSIVE DATES", "NO. OF DAYS", "DESTINATION", "DATE", "SIGNATURE"];
-                    const widths = [25, 30, 45, 45, 25, 95.6, 25, 35]; // Total = 325.6
+                    const widths = [25, 30, 45, 40, 25, 75.2, 25, 35]; // Total = 300.2 for Landscape Legal margins
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
