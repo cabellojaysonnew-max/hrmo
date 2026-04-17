@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow hover:bg-red-700">LOGOUT</button>
+        </div>
+    </nav>
+
+    <main class="flex-1 overflow-y-auto p-8">
+        <div class="flex justify-between items-end mb-6">
+            <h2 class="text-2xl font-bold text-[#003811]">Operations Dashboard</h2>
+            <p id="dashDate" class="text-gray-500 font-bold text-sm"></p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="card p-6 border-l-4 border-[#003811]"><p class="text-xs font-bold text-gray-400">Total Staff</p><h3 id="statTotal" class="text-4xl font-bold text-[#003811]">0</h3></div>
+            <div class="card p-6 border-l-4 border-[#1976D2]"><p class="text-xs font-bold text-gray-400">On Travel</p><h3 id="statTravel" class="text-4xl font-bold text-[#1976D2]">0</h3></div>
+            <div class="card p-6 border-l-4 border-[#C62828]"><p class="text-xs font-bold text-gray-400">On PSO</p><h3 id="statPSO" class="text-4xl font-bold text-[#C62828]">0</h3></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="card p-6">
+                <h4 class="font-bold text-sm mb-4 border-b pb-2">TODAY'S LATE (FLEXI Cutoff)</h4>
+                <div id="lateList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+            </div>
+            <div class="card p-6">
+                <h4 class="font-bold text-sm mb-4 border-b pb-2">ACTIVE PSO SUMMARY</h4>
+                <div id="psoSummary" class="space-y-2 max-h-64 overflow-y-auto"></div>
+            </div>
+        </div>
+    </main>
+
+<script>
+    // Session Check
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) { window.location.href = 'index.html'; }
+    const currentUser = JSON.parse(userData);
+    document.getElementById('activeUser').innerText = `User: ${currentUser.full_name.toUpperCase()}`;
+
+    function logout() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    }
+
+    // Dashboard specific logic
+    window.onload = async () => {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dashDate').innerText = new Date().toDateString();
+        
+        const { data: empsData } = await supabaseClient.from('employees').select('emp_id, full_name, flexi_range_end');
+        const emps = empsData || [];
+        const { data: itinData } = await supabaseClient.from('itinerary').select('emp_id').eq('travel_date', today);
+        const { data: psoData } = await supabaseClient.from('pso_records').select('emp_id, subject').lte('start_date', today).gte('end_date', today);
+        
+        document.getElementById('statTotal').innerText = emps.length;
+        document.getElementById('statTravel').innerText = new Set((itinData || []).map(i => i.emp_id)).size;
+        document.getElementById('statPSO').innerText = new Set((psoData || []).map(p => p.emp_id)).size;
+    };
+</script>
+</body>
+</html>
