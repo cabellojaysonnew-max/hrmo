@@ -387,7 +387,7 @@
                 if(!activeTOs.length) throw new Error("No Approved Travel Orders found for this period.");
                 
                 const bgForm = await getAssetBase64('bg_form.jpg');
-                const p2 = await getAssetBase64('p2.png');
+                const p2 = await getAssetBase64('P2.png');
                 const doc = new jsPDF('p', 'mm', 'a4');
                 let isFirst = true;
 
@@ -405,74 +405,130 @@
                     if (!isFirst) doc.addPage();
                     isFirst = false;
 
-                    if (bgForm) doc.addImage(bgForm, 'JPEG', 0, 0, 210, 297);
-                    
-                    let wy = 10;
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 0, 0);
-                    if (String(t.remarks).includes("OVERRIDE")) { doc.text("WITH EXISTING PSO/RSO, subject for PARPO's FINAL APPROVAL", 60, wy); wy += 5; }
-                    if (String(t.transport).toUpperCase().includes("GOV'T")) doc.text("NOT VALID FOR TRANSPORTATION REIMBURSEMENT CLAIM", 60, wy);
-                    
-                    doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "italic"); doc.setFontSize(7);
-                    doc.text("HR FILE COPY", 175, 5, {align: 'center'});
-                    if(qr) doc.addImage(qr, 'PNG', 175, 10, 25, 25);
-                    
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(17);
-                    doc.text(`TRAVEL ORDER NO. ${t.to_no}`, 105, 40, {align: 'center'});
-                    doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-                    doc.text(`Date: ${new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`, 200, 46, {align: 'right'});
+                    const toNo = t.to_no;
+                    const names = String(t.emp_name).toUpperCase();
+                    const positions = String(posMap[cleanId(t.emp_id)] || "").toUpperCase();
+                    const stations = String(stationMap[cleanId(t.emp_id)] || "").toUpperCase();
+                    const rawType = emps.find(e => cleanId(e.emp_id) == cleanId(t.emp_id))?.type?.toUpperCase();
+                    const typeLabel = rawType === 'SPLIT' ? 'SPLIT/COS' : (rawType === 'REGULAR' ? 'REGULAR' : '');
+                    const isMARPO = currentUser.position && currentUser.position.toUpperCase().includes("MARPO");
 
-                    doc.setFont("helvetica", "bold"); doc.text("NAME: ", 10, 56); doc.line(25, 57, 200, 57);
-                    doc.setFont("helvetica", "normal"); doc.text(String(t.emp_name).toUpperCase(), 25, 56);
+                    if (bgForm) { try { doc.addImage(bgForm, 'JPEG', 0, 0, 210, 297); } catch(e){} }
+                    if (qr) { try { doc.addImage(qr, 'PNG', 180, 10, 20, 20); if(typeLabel){ doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.text(typeLabel, 190, 33, {align: 'center'}); } } catch(e){} }
 
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-                    doc.text("POSITION: ", 10, 62); doc.line(32, 63, 100, 63); doc.setFont("helvetica", "normal"); doc.text(posMap[cleanId(t.emp_id)]||'', 32, 62);
-                    doc.setFont("helvetica", "bold"); doc.text("STATION: ", 105, 62); doc.line(125, 63, 200, 63); doc.setFont("helvetica", "normal"); doc.text(stationMap[cleanId(t.emp_id)]||'', 125, 62);
+                    if (t.transport === "GOV'T VEHICLE") {
+                        doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+                        doc.text("NOT VALID FOR TRANSPORTATION REIMBURSEMENT CLAIM", 105, 48, { align: 'center' });
+                    }
+                    if (t.remarks && t.remarks.includes("EXISTING PSO")) {
+                        doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+                        doc.text("WITH EXISTING PSO/RSO, subject for PARPO's FINAL APPROVAL", 105, 28, { align: 'center' });
+                    }
 
-                    doc.setFont("helvetica", "bold"); doc.text("MEANS OF TRANSPORTATION:", 10, 72);
-                    const trans = String(t.transport).toUpperCase();
-                    const chk = (lbl, x, y, c) => { doc.rect(x, y-3, 3, 3); if(c) { doc.setFont("helvetica", "bold"); doc.text("X", x+0.5, y-0.5); doc.setFont("helvetica", "normal"); } doc.text(lbl, x+5, y); };
+                    doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+                    doc.text(`TRAVEL ORDER NO. ${toNo}`, 105, 35, { align: 'center' });
+                    const fDate = new Date(t.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+                    doc.text(`Date: ${fDate}`, 105, 42, { align: 'center' });
+
+                    const renderFlexibleText = (text, x, y, maxWidth, defaultSize) => {
+                        let currentSize = defaultSize;
+                        doc.setFontSize(currentSize);
+                        while (doc.getTextWidth(text) > maxWidth && currentSize > 4) {
+                            currentSize -= 0.5;
+                            doc.setFontSize(currentSize);
+                        }
+                        doc.text(text, x, y);
+                        doc.setFontSize(defaultSize);
+                    };
+
+                    doc.setFontSize(10); 
+                    doc.setFont("helvetica", "bold"); doc.text("NAME:", 20, 48); 
+                    renderFlexibleText(names, 40, 48, 120, 10); doc.line(40, 49, 160, 49);
+
+                    doc.setFont("helvetica", "bold"); doc.text("POSITION:", 20, 54);
+                    doc.setFont("helvetica", "normal"); renderFlexibleText(positions, 40, 54, 45, 10); doc.line(40, 55, 85, 55);
+                    doc.setFont("helvetica", "bold"); doc.text("STATION:", 90, 54);
+                    doc.setFont("helvetica", "normal"); renderFlexibleText(stations, 110, 54, 50, 10); doc.line(110, 55, 160, 55);
+
+                    doc.setFont("helvetica", "bold"); doc.text("MEANS OF TRANSPORTATION:", 20, 61);
                     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-                    chk("AIR", 15, 77, trans.includes("AIR")); chk("GOV'T VEHICLE", 70, 77, trans.includes("GOV'T"));
-                    chk("LAND", 15, 82, trans.includes("LAND")); chk("OTHERS, PLEASE SPECIFY", 70, 82, trans.includes("OTHERS"));
+                    const drawCheck = (label, x, y, isChecked) => {
+                        doc.rect(x, y - 3, 3, 3);
+                        if (isChecked) { doc.setFont("helvetica", "bold"); doc.text("X", x + 0.5, y - 0.2); doc.setFont("helvetica", "normal"); }
+                        doc.text(label, x + 5, y);
+                    };
+                    drawCheck("AIR", 20, 66, t.transport === "AIR");
+                    drawCheck("GOV'T VEHICLE", 70, 66, t.transport === "GOV'T VEHICLE");
+                    drawCheck("LAND", 20, 71, t.transport === "LAND");
+                    drawCheck("OTHERS, PLEASE SPECIFY", 70, 71, t.transport === "OTHERS");
 
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("DESTINATION:", 10, 92);
-                    doc.setFont("helvetica", "normal");
-                    const dests = toItins.map(i => `${i.destination} - ${new Date(i.travel_date).toLocaleDateString('en-US', {month:'long', day:'numeric'})}`).join(", ");
-                    const destSplit = doc.splitTextToSize(dests, 160);
-                    doc.text(destSplit, 40, 92); doc.line(40, 93 + (destSplit.length-1)*5, 200, 93 + (destSplit.length-1)*5);
-
-                    const ny = 102 + (destSplit.length-1)*5;
-                    doc.setFont("helvetica", "bold"); doc.text("DEPARTURE DATE:", 10, ny); doc.setFont("helvetica", "normal"); doc.text(toItins[0].travel_date, 50, ny); doc.line(48, ny+1, 85, ny+1);
-                    doc.setFont("helvetica", "bold"); doc.text("   RETURN DATE:", 90, ny); doc.setFont("helvetica", "normal"); doc.text(toItins[toItins.length-1].travel_date, 125, ny); doc.line(125, ny+1, 160, ny+1);
-
-                    doc.setFont("helvetica", "bold"); doc.text("REPORT TO:", 10, ny+8); doc.setFont("helvetica", "normal"); doc.text(t.report_to||'', 35, ny+8); doc.line(35, ny+9, 200, ny+9);
+                    doc.setFontSize(10); doc.setFont("helvetica", "bold");
+                    doc.text("DESTINATION:", 20, 78);
+                    const formatDestDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+                    let destY = 78;
+                    toItins.forEach(it => {
+                        doc.text(`${formatDestDate(it.travel_date)} - ${it.destination}`, 50, destY);
+                        destY += 4.5;
+                    });
                     
-                    doc.setFont("helvetica", "bold"); doc.text("PURPOSE OF TRAVEL:", 10, ny+16); doc.setFont("helvetica", "normal");
-                    const purpSplit = doc.splitTextToSize(toItins[0].purpose||'', 190);
-                    doc.text(purpSplit, 10, ny+22); doc.line(10, ny+23+(purpSplit.length-1)*5, 200, ny+23+(purpSplit.length-1)*5);
-
-                    const by = ny + 30 + (purpSplit.length-1)*5;
-                    doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.text("In case of seminar/workshop/consultation/briefing, indicate:", 10, by);
-                    const isLI = String(toItins[0].purpose).toUpperCase().includes("LIVE IN");
-                    const isLO = String(toItins[0].purpose).toUpperCase().includes("LIVE OUT");
-                    doc.setFont("helvetica", "normal");
-                    chk("LIVE IN", 15, by+5, isLI); chk("LIVE OUT", 40, by+5, isLO);
-
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("Recommended by:", 10, 160);
-                    let sy = 175;
-                    if(uSign) { try{ doc.addImage(uSign, 'PNG', 35, sy-15, 35, 25); }catch(e){} }
-                    doc.text(uHead || "_______________________", 50, sy, {align: 'center'}); doc.line(20, sy+2, 80, sy+2);
-                    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text("UNIT HEAD", 50, sy+6, {align: 'center'});
+                    let curY = Math.max(destY, 83);
 
                     doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-                    if(dSign) { try{ doc.addImage(dSign, 'PNG', 115, sy-20, 35, 25); }catch(e){} }
-                    doc.text(dc || "_______________________", 130, sy, {align: 'center'}); doc.line(100, sy+2, 160, sy+2);
-                    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text("DIVISION CHIEF", 130, sy+6, {align: 'center'});
+                    doc.text("DEPARTURE DATE:", 20, curY);
+                    doc.setFont("helvetica", "normal"); doc.text(toItins[0]?.travel_date || "", 55, curY); doc.line(55, curY+1, 90, curY+1);
+                    doc.setFont("helvetica", "bold"); doc.text("RETURN DATE:", 95, curY);
+                    doc.setFont("helvetica", "normal"); doc.text(toItins[toItins.length-1]?.travel_date || "", 125, curY); doc.line(125, curY+1, 160, curY+1);
 
-                    sy += 25;
-                    if(p2) { try{ doc.addImage(p2, 'PNG', 115, sy-15, 30, 25); }catch(e){} }
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("RICARDO C. GARCIA", 130, sy, {align: 'center'});
-                    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text("PARPO II", 130, sy+5, {align: 'center'});
+                    curY += 6;
+                    doc.setFont("helvetica", "bold"); doc.text("REPORT TO:", 20, curY);
+                    doc.setFont("helvetica", "normal"); doc.text(t.report_to || "", 50, curY); doc.line(50, curY+1, 160, curY+1);
+                    
+                    curY += 6;
+                    doc.setFont("helvetica", "bold"); doc.text("PURPOSE OF TRAVEL:", 20, curY);
+                    curY += 4;
+                    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+                    const purpLines = doc.splitTextToSize(toItins[0]?.purpose || "", 140);
+                    doc.text(purpLines, 20, curY); doc.line(20, curY+1, 160, curY+1);
+                    curY += Math.max(5, purpLines.length * 4);
+
+                    doc.setFont("helvetica", "italic"); doc.setFontSize(8);
+                    doc.text("In case of seminar/workshop/consultation/briefing, indicate:", 20, curY);
+                    drawCheck("LIVE IN", 110, curY, false);
+                    drawCheck("LIVE OUT", 135, curY, false);
+
+                    doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+                    doc.text("Recommended by:", 20, 156);
+                    
+                    const renderSigs = (list, imgs, startX, width) => {
+                        if (list.length === 0) return;
+                        const count = Math.min(list.length, 2);
+                        const step = width / count;
+                        doc.setFontSize(count > 1 ? 6 : 8);
+                        for (let j = 0; j < count; j++) {
+                            let cx = startX + (step * j) + (step / 2) - 10; 
+                            if (imgs[j]) { try { doc.addImage(imgs[j], 'PNG', cx, 153, 20, 20); } catch(e){} }
+                            doc.text(list[j].full_name.toUpperCase(), cx, 166);
+                        }
+                    };
+
+                    const uList = uHead ? [{full_name: uHead}] : [];
+                    const uImgs = uSign ? [uSign] : [];
+                    const dList = dc ? [{full_name: dc}] : [];
+                    const dImgs = dSign ? [dSign] : [];
+
+                    if (!isMARPO) renderSigs(uList, uImgs, 20, 60);
+                    renderSigs(dList, dImgs, 95, 60);
+
+                    doc.line(25, 168, 80, 168); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(isMARPO ? "" : "MARPO/UNIT HEAD", 52, 172, {align: 'center'});
+                    doc.line(100, 168, 155, 168); doc.text("DIVISION CHIEF", 127, 172, {align: 'center'});
+
+                    if(p2) { try { doc.addImage(p2, 'PNG', 122, 187, 20, 20); } catch(e){} }
+                    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+                    doc.text("RICARDO C. GARCIA", 114, 202);
+                    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+                    doc.text("PARPO II", 128, 206);
                 }
                 doc.save(`Batch_HR_Files_TravelOrders_${titleSuffix.replace(/ /g, '_')}.pdf`);
             }
