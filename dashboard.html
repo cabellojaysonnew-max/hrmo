@@ -164,8 +164,10 @@
         return h > 0 ? `${h}h ${m}m` : `${m}m`;
     }
 
+    // --- Safe Fetch Helper to prevent full failure if one table is locked ---
     const fetchSafe = (query) => query.catch(e => { console.error('Fetch error:', e); return { data: [] }; });
 
+    // --- Helper to fetch background image for PDFs ---
     let cachedBgMemo = null;
     async function getBgMemo() {
         if (cachedBgMemo) return cachedBgMemo;
@@ -191,6 +193,7 @@
         document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         document.getElementById('scopeLabel').innerText = isLimited ? `Division: ${targetDivision}` : "Provincial Oversight";
 
+        // Fetch Employees
         let empQuery = supabaseClient.from('employees').select('*');
         if (isLimited) {
             empQuery = empQuery.eq('division', targetDivision);
@@ -408,6 +411,7 @@
             const isExcessiveLate = totalMins >= 480;
             const isAbsenteeism = h.absentDays >= 3;
 
+            // Only show those with infractions
             if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
                 hasHabitual = true;
                 let statusBadge = '';
@@ -439,16 +443,19 @@
         if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
 
         // --- NEW: Flag Ceremony Monitoring (ALL DATA, NO MAY 1 LIMIT) ---
+        // Fetch ALL flag attendance logs
         const { data: allFlagLogs } = await fetchSafe(supabaseClient.from('flag_attendance').select('emp_id, date, time_in, status'));
             
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
+        // Dynamic valid Mondays set (Any Monday where a ceremony actually happened)
         let validMondays = new Set();
         const flagStartDates = {};
 
         (allFlagLogs || []).forEach(log => {
             validMondays.add(log.date);
             
+            // Identify first log date per employee from flag_attendance explicitly
             const d = new Date(log.date);
             d.setHours(0,0,0,0);
             if (!flagStartDates[log.emp_id] || d < flagStartDates[log.emp_id]) {
@@ -456,8 +463,9 @@
             }
         });
         
-        let mondays = Array.from(validMondays).sort((a,b) => new Date(b) - new Date(a)); 
+        let mondays = Array.from(validMondays).sort((a,b) => new Date(b) - new Date(a)); // Newest first
 
+        // Fetch excused (No start date filter to ensure full history matching)
         const [allFlagTravelRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
             fetchSafe(supabaseClient.from('itinerary').select('emp_id, travel_date')),
             fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED')),
@@ -476,26 +484,11 @@
             }
         });
 
-        const { data: globalLogs } = await fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time'));
-        
         (emps || []).forEach(e => {
             if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
             
-            let firstLogDate = flagStartDates[e.emp_id]; 
-            if (globalLogs) {
-                globalLogs.forEach(l => {
-                    if (l.emp_id === e.emp_id) {
-                        const dStr = l.log_time.split('T')[0];
-                        const d = new Date(dStr);
-                        d.setHours(0,0,0,0);
-                        if (!firstLogDate || d < firstLogDate) {
-                            firstLogDate = d;
-                        }
-                    }
-                });
-            }
-
-            if (!firstLogDate) return; 
+            const startDate = flagStartDates[e.emp_id];
+            if (!startDate) return; // Completely new / no record in flag_attendance at all ever
 
             let missedDates = [];
             let presentCount = 0;
@@ -505,7 +498,8 @@
                 const mDate = new Date(m);
                 mDate.setHours(0,0,0,0);
                 
-                if (mDate >= firstLogDate) {
+                // Only count mondays from their very first log onwards
+                if (mDate >= startDate) {
                     expectedMondays++;
                     const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
                     const isExcused = flagExcused.has(e.emp_id + '_' + m); 
@@ -520,6 +514,7 @@
                 }
             });
 
+            // Only those with absenteeism (missed dates) appear
             if (missedDates.length > 0) {
                 listF.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
@@ -535,13 +530,15 @@
         if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
     };
 
+    // --- MEMO PRINTING FUNCTIONS ---
     async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins) {
         if (!confirm(`Generate memo for ${empName}?`)) return;
 
         try {
             const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); 
+            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); // Legal size
             
+            // Add Background Image First
             const bgBase64 = await getBgMemo();
             if (bgBase64) {
                 pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
@@ -627,6 +624,7 @@
                 }
             }
 
+            // --- ALIGNMENT FIX FOR TARDINESS MEMO ---
             pdf.setMargins(30, 45, 30); 
             pdf.setFont("helvetica", "bold");
             pdf.setFontSize(12);
@@ -654,31 +652,32 @@
 
             pdf.setFont("helvetica", "normal");
             
-            const linesP1 = pdf.splitTextToSize(p1, 155.9);
-            pdf.text(linesP1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesP1.length * 5) + 5;
+            pdf.text(p1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            const splitP1 = pdf.splitTextToSize(p1, 155.9);
+            currentY += (splitP1.length * 5) + 5;
 
-            const linesP2 = pdf.splitTextToSize(p2, 155.9);
-            pdf.text(linesP2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesP2.length * 5) + 5;
+            pdf.text(p2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            const splitP2 = pdf.splitTextToSize(p2, 155.9);
+            currentY += (splitP2.length * 5) + 5;
 
-            const linesP3 = pdf.splitTextToSize(p3, 155.9);
-            pdf.text(linesP3, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesP3.length * 5) + 10;
+            pdf.text(p3, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            const splitP3 = pdf.splitTextToSize(p3, 155.9);
+            currentY += (splitP3.length * 5) + 10;
 
             const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
-            const linesC1 = pdf.splitTextToSize(closing1, 155.9);
-            pdf.text(linesC1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesC1.length * 5) + 5;
+            pdf.text(closing1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            const splitC1 = pdf.splitTextToSize(closing1, 155.9);
+            currentY += (splitC1.length * 5) + 5;
 
             const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
-            const linesC2 = pdf.splitTextToSize(closing2, 155.9);
-            pdf.text(linesC2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesC2.length * 5) + 15;
+            pdf.text(closing2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            const splitC2 = pdf.splitTextToSize(closing2, 155.9);
+            currentY += (splitC2.length * 5) + 15;
 
             pdf.setFont("helvetica", "bold");
             pdf.text("RICARDO C. GARCIA", 30, currentY); 
 
+            // Record memo in DB
             try {
                 await supabaseClient.from('memo_records').insert({
                     emp_id: empId,
@@ -734,6 +733,7 @@
             const { jsPDF } = window.jspdf; 
             const pdf = new jsPDF('p', 'mm', [215.9, 330.2]);
 
+            // Add Background Image First
             const bgBase64 = await getBgMemo();
             if (bgBase64) {
                 pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
@@ -743,6 +743,7 @@
             const currYear = new Date().getFullYear();
             const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 
+            // --- ALIGNMENT FIX FOR FLAG MEMO ---
             pdf.setMargins(30, 45, 30); 
             pdf.setFont("helvetica", "bold"); 
             pdf.setFontSize(12);
@@ -767,27 +768,27 @@
             const p2 = String("Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory for all government officials and employees.");
             const p3 = String("You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you for this violation of office rules. Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.");
 
-            const linesP1 = pdf.splitTextToSize(p1, 155.9);
-            pdf.text(linesP1, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesP1.length * 5) + 5; 
+            pdf.text(p1, 30, y, { maxWidth: 155.9, align: 'justify' });
+            const splitP1 = pdf.splitTextToSize(p1, 155.9);
+            y += (splitP1.length * 5) + 5; 
             
-            const linesP2 = pdf.splitTextToSize(p2, 155.9);
-            pdf.text(linesP2, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesP2.length * 5) + 5; 
+            pdf.text(p2, 30, y, { maxWidth: 155.9, align: 'justify' });
+            const splitP2 = pdf.splitTextToSize(p2, 155.9);
+            y += (splitP2.length * 5) + 5; 
             
-            const linesP3 = pdf.splitTextToSize(p3, 155.9);
-            pdf.text(linesP3, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesP3.length * 5) + 10; 
+            pdf.text(p3, 30, y, { maxWidth: 155.9, align: 'justify' });
+            const splitP3 = pdf.splitTextToSize(p3, 155.9);
+            y += (splitP3.length * 5) + 10; 
 
             const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
-            const linesC1 = pdf.splitTextToSize(closing1, 155.9);
-            pdf.text(linesC1, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesC1.length * 5) + 5;
+            pdf.text(closing1, 30, y, { maxWidth: 155.9, align: 'justify' });
+            const splitC1 = pdf.splitTextToSize(closing1, 155.9);
+            y += (splitC1.length * 5) + 5;
 
             const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
-            const linesC2 = pdf.splitTextToSize(closing2, 155.9);
-            pdf.text(linesC2, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesC2.length * 5) + 15;
+            pdf.text(closing2, 30, y, { maxWidth: 155.9, align: 'justify' });
+            const splitC2 = pdf.splitTextToSize(closing2, 155.9);
+            y += (splitC2.length * 5) + 15;
             
             pdf.setFont("helvetica", "bold"); 
             pdf.text("RICARDO C. GARCIA", 30, y); 
