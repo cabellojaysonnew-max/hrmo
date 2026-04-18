@@ -6,6 +6,8 @@
     <title>Dashboard - DAR HRMO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="supabase-config.js"></script>
     <style>
         :root {
@@ -142,10 +144,11 @@
                             <th class="p-3 font-bold border-b text-center">Total Late/UT (Curr)</th>
                             <th class="p-3 font-bold border-b text-center">Absent Days (Curr)</th>
                             <th class="p-3 font-bold border-b text-center">Status/Warning Level</th>
+                            <th class="p-3 font-bold border-b text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody id="listHabitual" class="divide-y">
-                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Calculating Civil Service Violations...</td></tr>
+                        <tr><td colspan="6" class="p-4 text-center text-gray-400 text-xs italic">Calculating Civil Service Violations...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -398,7 +401,8 @@
 
         const habMap = {};
         (emps || []).forEach(e => {
-            habMap[e.emp_id] = { name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
+            // NEW: Added e.emp_id to the object
+            habMap[e.emp_id] = { id: e.emp_id, name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
         });
 
         const empLogDates = {};
@@ -539,15 +543,199 @@
                         <td class="p-3 border-b text-center font-mono text-orange-700 font-bold text-xs">${formatMinutesToHours(totalMins)}</td>
                         <td class="p-3 border-b text-center font-mono text-xs ${h.absentDays >= 3 ? 'text-red-600 font-bold' : ''}">${h.absentDays}</td>
                         <td class="p-3 border-b text-center">${statusBadge}</td>
+                        <td class="p-3 border-b text-center">
+                            <button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>
+                        </td>
                     </tr>
                 `;
             }
         });
 
         if (!hasHabitual) {
-            listHabitual.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>`;
+            listHabitual.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>`;
         }
     };
+
+    // --- NEW: TARDINESS MEMO PRINTING LOGIC ---
+    async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins) {
+        if (!confirm(`Generate memo for ${empName}?`)) return;
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); // Legal size
+        
+        const todayDate = new Date();
+        const todayStr = todayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const currYear = todayDate.getFullYear();
+        const currMonthName = todayDate.toLocaleDateString('en-US', { month: 'long' });
+        
+        // Calculate prev month name
+        const prevMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+        const prevMonthName = prevMonthDate.toLocaleDateString('en-US', { month: 'long' });
+        const prevYearStr = prevMonthDate.getFullYear();
+
+        const isHabitualLate = (prevCount >= 10 && currCount >= 10);
+        let memoType = "";
+        let memoTypeDb = "";
+        
+        if (isHabitualLate) {
+            memoType = "HABITUAL TARDINESS";
+            memoTypeDb = "Habitual Tardiness";
+        } else if (totalMins > 0) {
+            memoType = "ACCUMULATED TARDINESS AND ATTENDANCE MONITORING";
+            memoTypeDb = "Accumulated Tardiness";
+        } else {
+            alert("No tardiness criteria met for a memo.");
+            return;
+        }
+
+        // Fetch offense count
+        let offenseCount = 1;
+        try {
+            const { data: pastMemos } = await supabaseClient
+                .from('memo_records')
+                .select('*')
+                .eq('emp_id', empId)
+                .eq('memo_type', memoTypeDb)
+                .neq('month', currMonthName); // Exclude current month to count previous offenses
+            
+            if (pastMemos) {
+                offenseCount = pastMemos.length + 1;
+            }
+        } catch(e) {
+            console.error("Could not fetch past memos, defaulting to 1st offense.", e);
+        }
+
+        let offenseText = "";
+        let penaltyText = "";
+        let p1 = "";
+        let p2 = "";
+        let p3 = "";
+
+        if (memoTypeDb === "Habitual Tardiness") {
+            if (offenseCount === 1) {
+                offenseText = "FIRST OFFENSE";
+                penaltyText = "Suspension of one (1) month and one (1) day to six (6) months.";
+            } else {
+                offenseText = "SECOND OFFENSE / FINAL WARNING";
+                penaltyText = "Dismissal from the service.";
+            }
+            p1 = `A review of your Daily Time Records (DTR) shows that you incurred tardiness as follows:\n\n    ${prevMonthName} ${prevYearStr} - ${prevCount} instances of tardiness\n    ${currMonthName} ${currYear} - ${currCount} instances of tardiness`;
+            p2 = `Under the Revised Rules on Administrative Cases in the Civil Service (RRACCS), an employee is considered habitually tardy if he or she incurs at least ten (10) times of tardiness in a month for at least two (2) consecutive months. This constitutes a Less Grave Offense. As this is your ${offenseText}, the prescribed penalty is ${penaltyText}`;
+            p3 = "In view thereof, you are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative case should be filed against you.\n\nFailure to respond within the prescribed period shall be deemed a waiver of your right to be heard.";
+        } else {
+            const totalHrs = (totalMins / 60.0).toFixed(2);
+            const daysEq = (totalMins / 60.0 / 8.0).toFixed(3);
+            
+            if (offenseCount === 1) {
+                offenseText = "FIRST WARNING";
+            } else if (offenseCount === 2) {
+                offenseText = "NOTICE TO EXPLAIN";
+                memoType = `${memoType} (NOTICE TO EXPLAIN)`;
+            } else {
+                offenseText = "FINAL WARNING";
+            }
+
+            p1 = `Based on the review of your Daily Time Records (DTR) for the month of ${currMonthName} ${currYear}, you have incurred a total of ${totalMins} minutes (${totalHrs} hours) of accumulated tardiness/undertime.`;
+            p2 = `Under Civil Service Commission (CSC) rules on attendance and leave, tardiness and undertime accumulated to eight (8) hours is equivalent to one (1) day absence. Accordingly, your accumulated tardiness is equivalent to ${daysEq} day/s, which shall be deducted from your available leave credits (Vacation Leave first, if available).`;
+            
+            if (offenseCount === 2) {
+                p3 = `This serves as your NOTICE TO EXPLAIN. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative action should be taken against you for excessive tardiness. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`;
+            } else {
+                p3 = `This serves as your ${offenseText}. You are strongly advised to improve your attendance. Continued excessive tardiness may result in an administrative case should it eventually qualify as Habitual Tardiness under Civil Service rules.`;
+            }
+        }
+
+        // Draw PDF
+        pdf.setMargins(25.4, 45, 25.4);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(12);
+        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
+        pdf.setFontSize(11);
+        pdf.text(`Series of ${currYear}`, 25.4, 51);
+
+        pdf.setFontSize(11);
+        let currentY = 65;
+        const lineH = 8;
+        
+        pdf.text("TO", 25.4, currentY); pdf.text(":", 50, currentY); pdf.text(`${empName}`, 55, currentY); currentY += lineH;
+        pdf.text("FROM", 25.4, currentY); pdf.text(":", 50, currentY); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 55, currentY); currentY += lineH;
+        pdf.text("DATE", 25.4, currentY); pdf.text(":", 50, currentY); pdf.text(`${todayStr}`, 55, currentY); currentY += lineH;
+        pdf.text("SUBJECT", 25.4, currentY); pdf.text(":", 50, currentY); 
+        
+        const splitSubject = pdf.splitTextToSize(memoType, 135);
+        pdf.text(splitSubject, 55, currentY);
+        currentY += (splitSubject.length * lineH);
+
+        pdf.setLineWidth(0.6);
+        pdf.line(25.4, currentY, 215.9 - 25.4, currentY);
+        currentY += 8;
+
+        pdf.setFont("helvetica", "normal");
+        
+        const splitP1 = pdf.splitTextToSize(p1, 165);
+        pdf.text(splitP1, 25.4, currentY);
+        currentY += (splitP1.length * 5) + 5;
+
+        const splitP2 = pdf.splitTextToSize(p2, 165);
+        pdf.text(splitP2, 25.4, currentY);
+        currentY += (splitP2.length * 5) + 5;
+
+        const splitP3 = pdf.splitTextToSize(p3, 165);
+        pdf.text(splitP3, 25.4, currentY);
+        currentY += (splitP3.length * 5) + 10;
+
+        const closing1 = "All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.";
+        const splitC1 = pdf.splitTextToSize(closing1, 165);
+        pdf.text(splitC1, 25.4, currentY);
+        currentY += (splitC1.length * 5) + 5;
+
+        const closing2 = "_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.";
+        const splitC2 = pdf.splitTextToSize(closing2, 165);
+        pdf.text(splitC2, 25.4, currentY);
+        currentY += (splitC2.length * 5) + 15;
+
+        pdf.setFont("helvetica", "bold");
+        pdf.text("RICARDO C. GARCIA", 25.4, currentY);
+
+        // Record memo in DB
+        try {
+            await supabaseClient.from('memo_records').insert({
+                emp_id: empId,
+                memo_type: memoTypeDb,
+                offense_level: offenseCount,
+                month: currMonthName,
+                year: currYear
+            });
+        } catch(e) {
+            console.error("Error logging memo to DB", e);
+        }
+
+        // Generate QR
+        const traceId = `TRC-${empId}-${Math.floor(Date.now() / 1000)}`;
+        const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: ${memoType}\nLevel: ${offenseText}\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+        
+        // Use a hidden div to render QR
+        let qrContainer = document.getElementById('hiddenQrContainer');
+        if (!qrContainer) {
+            qrContainer = document.createElement('div');
+            qrContainer.id = 'hiddenQrContainer';
+            qrContainer.style.display = 'none';
+            document.body.appendChild(qrContainer);
+        }
+        qrContainer.innerHTML = '';
+        
+        new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
+        
+        setTimeout(() => {
+            const qrCanvas = qrContainer.querySelector('canvas');
+            if (qrCanvas) {
+                const qrDataUrl = qrCanvas.toDataURL('image/png');
+                pdf.addImage(qrDataUrl, 'PNG', 25.4, currentY + 5, 22, 22);
+            }
+            pdf.save(`Memo_${empId}_${memoTypeDb.replace(" ", "_")}_${currMonthName}_${currYear}.pdf`);
+            alert("Memo Generated Successfully.");
+        }, 300);
+    }
 </script>
 </body>
 </html>
