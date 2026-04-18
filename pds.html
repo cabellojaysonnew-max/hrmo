@@ -33,7 +33,7 @@
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
 
     <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 hidden md:block">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
             <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
         </div>
@@ -46,9 +46,9 @@
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
             <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">USERS</a>
         </div>
-        <div class="p-6 hidden md:block mt-auto">
-            <p id="activeUser" class="text-sm text-gray-300 truncate mb-3 font-bold"></p>
-            <button onclick="logout()" class="w-full bg-[#A51C30] hover:bg-red-800 text-white py-2 text-sm font-bold rounded shadow transition-colors">LOGOUT</button>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
         </div>
     </nav>
 
