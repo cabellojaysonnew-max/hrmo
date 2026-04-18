@@ -442,7 +442,7 @@
                 return;
             }
 
-            const filteredData = data.filter(gp => ['APPROVED', 'PROCESSED', 'POSTED', 'ISSUED'].includes(gp.status));
+            const filteredData = data.filter(gp => ['PROCESSED', 'POSTED', 'ISSUED'].includes(gp.status));
 
             if(filteredData.length === 0) {
                  list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No gate passes found for this view.</td></tr>`;
