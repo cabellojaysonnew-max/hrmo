@@ -103,6 +103,7 @@
 
         <div class="card mt-8 p-6">
             <h3 class="text-xl font-bold text-red-700 border-b pb-2 mb-4">Habitual Tardiness & Absenteeism Monitoring (Civil Service Rules)</h3>
+            <p class="text-xs text-gray-500 mb-4">Under Civil Service rules, employees incurring 10 or more late arrivals within a month for two consecutive months, or excessive unauthorized absent days, are subject to disciplinary action.</p>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
                     <thead class="bg-red-50 text-red-800">
@@ -123,20 +124,19 @@
         </div>
 
         <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (Every Monday)</h3>
+            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1 Mondays Only)</h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
                     <thead class="bg-blue-50 text-blue-800">
                         <tr>
                             <th class="p-3 font-bold border-b">Employee Name</th>
-                            <th class="p-3 font-bold border-b text-center">Last Ceremony Date</th>
-                            <th class="p-3 font-bold border-b text-center">Consecutive Absences</th>
-                            <th class="p-3 font-bold border-b text-center">Status</th>
+                            <th class="p-3 font-bold border-b text-center">Total Missed Mondays</th>
+                            <th class="p-3 font-bold border-b text-center">Last Missed Date</th>
                             <th class="p-3 font-bold border-b text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody id="listFlagAttendance" class="divide-y">
-                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Scanning Monday Logs...</td></tr>
+                        <tr><td colspan="4" class="p-4 text-center text-gray-400 text-xs italic">Scanning Monday Logs...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -169,7 +169,7 @@
         document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         document.getElementById('scopeLabel').innerText = isLimited ? `Division: ${targetDivision}` : "Provincial Oversight";
 
-        // Fix 1: Properly filter based on RBAC rules
+        // Fetch Employees
         let empQuery = supabaseClient.from('employees').select('*');
         if (isLimited) {
             empQuery = empQuery.eq('division', targetDivision);
@@ -210,79 +210,540 @@
         });
 
         // --- Tardiness & Habitual Monitoring ---
+        const currMonth = todayDate.getMonth(); 
+        const currYear = todayDate.getFullYear();
+        const prevMonth = currMonth === 0 ? 11 : currMonth - 1;
+        const prevYear = currMonth === 0 ? currYear - 1 : currYear;
+
         const sysStart = new Date(SYSTEM_START_DATE);
-        const { data: histLogs } = await supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', sysStart.toISOString());
-        const habMap = {}; (emps || []).forEach(e => habMap[e.emp_id] = { id: e.emp_id, name: e.full_name, prevCount: 0, currCount: 0, totalMins: 0, absentDays: 0 });
         
-        // --- Process logs logic would go here to populate habMap (reused from previous response) ---
+        let reqStartPrevMonth = new Date(prevYear, prevMonth, 1);
+        if (reqStartPrevMonth < sysStart) reqStartPrevMonth = sysStart;
+
+        let reqStartCurrMonth = new Date(currYear, currMonth, 1);
+        if (reqStartCurrMonth < sysStart) reqStartCurrMonth = sysStart;
+
+        const startPrevMonth = reqStartPrevMonth.toISOString().split('T')[0];
+        const startCurrMonth = reqStartCurrMonth.toISOString().split('T')[0];
+        const endCurrMonth = new Date(currYear, currMonth + 1, 0).toISOString().split('T')[0]; 
+
+        const [histLogsRes, histTravel, histPso, histLeave, histOverrides] = await Promise.all([
+            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59'),
+            supabaseClient.from('itinerary').select('emp_id, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr),
+            supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth),
+            supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startCurrMonth).lte('date', todayStr),
+            supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth)
+        ]);
+
+        const histLogs = histLogsRes.data || [];
+        const excused = new Set();
         
-        const listH = document.getElementById('listHabitual'); listH.innerHTML = '';
-        Object.values(habMap).forEach(h => {
-            listH.innerHTML += `<tr class="hover:bg-gray-50"><td class="p-3 font-bold">${h.name}</td><td class="text-center">${h.prevCount}/${h.currCount}</td><td class="text-center">${formatMinutesToHours(h.totalMins)}</td><td class="text-center">${h.absentDays}</td><td class="text-center">MONITORING</td><td class="text-center"><button onclick="printTardinessMemo('${h.id}', '${h.name}')" class="bg-red-800 text-white px-2 py-1 rounded text-xs">PRINT</button></td></tr>`;
+        (histTravel.data || []).forEach(t => excused.add(t.emp_id + '_' + t.travel_date));
+        (histLeave.data || []).forEach(l => excused.add(l.emp_id + '_' + l.date));
+        (histPso.data || []).forEach(p => {
+            let currD = new Date(p.start_date);
+            let endD = new Date(p.end_date);
+            while(currD <= endD) {
+                if (currD >= sysStart) {
+                    excused.add(p.emp_id + '_' + currD.toISOString().split('T')[0]);
+                }
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
+        
+        const histOverrideMap = {};
+        (histOverrides.data || []).forEach(o => {
+            if (!histOverrideMap[o.emp_id]) histOverrideMap[o.emp_id] = [];
+            let currD = new Date(o.start_date);
+            let endD = new Date(o.end_date);
+            while(currD <= endD) {
+                if (currD >= sysStart) {
+                    histOverrideMap[o.emp_id].push({
+                        date: currD.toISOString().split('T')[0],
+                        start: o.start_time,
+                        end: o.end_time,
+                        working_days: o.working_days
+                    });
+                }
+                currD.setDate(currD.getDate() + 1);
+            }
         });
 
-        // --- NEW: Flag Ceremony Monitoring ---
-        // Fix 2: Fetch all records without sysStart limitation, specifically for DARPO-CS1 personnel
-        let flagData = [];
-        const cs1Ids = (emps || []).filter(e => e.station === 'DARPO-CS1').map(e => e.emp_id);
-        
-        if (cs1Ids.length > 0) {
-            const { data } = await supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', cs1Ids);
-            flagData = data || [];
+        const datesToCheck = [];
+        let dCheck = new Date(reqStartCurrMonth); 
+        while(dCheck <= todayDate) {
+            datesToCheck.push(dCheck.toISOString().split('T')[0]);
+            dCheck.setDate(dCheck.getDate() + 1);
         }
-        
-        const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
-        
-        // Find last 4 Mondays
-        let mondays = []; let d = new Date(); while(mondays.length < 4) { if(d.getDay() === 1) mondays.push(d.toISOString().split('T')[0]); d.setDate(d.getDate()-1); }
+
+        const habMap = {};
+        (emps || []).forEach(e => {
+            habMap[e.emp_id] = { id: e.emp_id, name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
+        });
+
+        const empLogDates = {};
+        histLogs.forEach(l => {
+            if (!empIds.has(l.emp_id)) return; 
+            const d = l.log_time.split('T')[0];
+            if (!empLogDates[l.emp_id]) empLogDates[l.emp_id] = {};
+            if (!empLogDates[l.emp_id][d]) empLogDates[l.emp_id][d] = [];
+            empLogDates[l.emp_id][d].push(new Date(l.log_time));
+        });
 
         (emps || []).forEach(e => {
-            if (e.station !== 'DARPO-CS1') return;
-            let missedCount = 0; mondays.forEach(m => {
-                const hasLog = flagData.some(l => l.emp_id === e.emp_id && l.log_time.startsWith(m));
-                if (!hasLog) missedCount++;
+            if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
+            
+            datesToCheck.forEach(dateStr => {
+                let expectedDays = ['1', '2', '3', '4', '5'];
+                if (histOverrideMap[e.emp_id]) {
+                    const override = histOverrideMap[e.emp_id].find(o => o.date === dateStr);
+                    if (override && override.working_days) {
+                        expectedDays = override.working_days.split(',');
+                    }
+                }
+                
+                const dObj = new Date(dateStr);
+                const dayOfWeek = dObj.getDay().toString();
+                
+                if (expectedDays.includes(dayOfWeek)) {
+                    const hasLog = empLogDates[e.emp_id] && empLogDates[e.emp_id][dateStr];
+                    const isExcused = excused.has(e.emp_id + '_' + dateStr);
+                    if (!hasLog && !isExcused) {
+                        if (dateStr === todayStr && todayDate.getHours() < 9) return; 
+                        habMap[e.emp_id].absentDays++;
+                    }
+                }
             });
 
-            if (missedCount > 0) {
-                listF.innerHTML += `<tr class="hover:bg-gray-50">
-                    <td class="p-3 font-bold">${e.full_name}</td>
-                    <td class="text-center text-xs">${mondays[0]}</td>
-                    <td class="text-center font-bold text-red-600">${missedCount}</td>
-                    <td class="text-center"><span class="px-2 py-0.5 rounded-full text-[10px] bg-red-100 text-red-700 font-bold">${missedCount >= 2 ? 'FOR MEMO' : 'WARNING'}</span></td>
-                    <td class="text-center"><button onclick="printFlagMemo('${e.emp_id}', '${e.full_name}', '${mondays.join(", ")}')" class="bg-blue-800 text-white px-2 py-1 rounded text-xs shadow hover:bg-blue-700">PRINT MEMO</button></td>
+            const myLogs = empLogDates[e.emp_id];
+            if(!myLogs) return;
+
+            Object.keys(myLogs).forEach(dateStr => {
+                const logsForDay = myLogs[dateStr].sort((a,b) => a-b);
+                const firstLog = logsForDay[0];
+                const lastLog = logsForDay[logsForDay.length - 1];
+
+                let expectedDays = ['1', '2', '3', '4', '5'];
+                let startReqStr = e.flexi_range_start || '08:00:00';
+                let cutoffStr = e.flexi_range_end || '08:00:00';
+                let overrideEndStr = null;
+
+                if (histOverrideMap[e.emp_id]) {
+                    const override = histOverrideMap[e.emp_id].find(o => o.date === dateStr);
+                    if (override) {
+                        if(override.working_days) expectedDays = override.working_days.split(',');
+                        startReqStr = override.start;
+                        cutoffStr = override.start; 
+                        overrideEndStr = override.end; 
+                    }
+                }
+                
+                const dObj = new Date(dateStr);
+                const dayOfWeek = dObj.getDay().toString();
+                
+                if (!expectedDays.includes(dayOfWeek)) {
+                    return; 
+                }
+
+                const startDate = new Date(dateStr + 'T' + startReqStr);
+                const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
+                
+                let isLate = false;
+                
+                if (firstLog > cutoffDate) {
+                    isLate = true;
+                    if(firstLog.getMonth() === currMonth) {
+                        habMap[e.emp_id].totalLateMins += Math.floor((firstLog - cutoffDate) / 60000);
+                    }
+                }
+
+                if (isLate) {
+                    if (firstLog.getMonth() === prevMonth) habMap[e.emp_id].prevCount++;
+                    if (firstLog.getMonth() === currMonth) habMap[e.emp_id].currCount++;
+                }
+
+                if(firstLog.getMonth() === currMonth) {
+                    let requiredEnd;
+                    if (overrideEndStr) {
+                        requiredEnd = new Date(dateStr + 'T' + overrideEndStr);
+                    } else {
+                        let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
+                        requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
+                    }
+
+                    if (lastLog < requiredEnd && firstLog !== lastLog) {
+                        habMap[e.emp_id].totalUtMins += Math.floor((requiredEnd - lastLog) / 60000);
+                    }
+                }
+            });
+        });
+
+        const listH = document.getElementById('listHabitual'); listH.innerHTML = '';
+        let hasHabitual = false;
+        
+        Object.values(habMap).forEach(h => {
+            const isHabitualLate = (h.prevCount >= 10 && h.currCount >= 10);
+            const totalMins = h.totalLateMins + h.totalUtMins;
+            const isExcessiveLate = totalMins >= 480;
+            const isAbsenteeism = h.absentDays >= 3;
+
+            // Only show those with infractions
+            if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
+                hasHabitual = true;
+                let statusBadge = '';
+                if (isHabitualLate && isAbsenteeism) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE & ABSENT</span>`;
+                } else if (isHabitualLate) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE (CS WARNING)</span>`;
+                } else if (isAbsenteeism) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">UNAUTH. ABSENTEEISM</span>`;
+                } else if (isExcessiveLate) {
+                    statusBadge = `<span class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] font-bold">EXCESSIVE LATE (DEDUCT VL)</span>`;
+                } else {
+                    statusBadge = `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-bold border border-yellow-300">MONITORING</span>`;
+                }
+
+                listH.innerHTML += `<tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold">${h.name}</td>
+                    <td class="text-center">${h.prevCount}/${h.currCount}</td>
+                    <td class="text-center">${formatMinutesToHours(totalMins)}</td>
+                    <td class="text-center">${h.absentDays}</td>
+                    <td class="text-center">${statusBadge}</td>
+                    <td class="text-center">
+                        <button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>
+                    </td>
                 </tr>`;
             }
         });
-        if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Full attendance for all personnel.</td></tr>';
+        
+        if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
+
+        // --- NEW: Flag Ceremony Monitoring ---
+        const { data: allFlagLogs } = await supabaseClient.from('attendance_logs').select('emp_id, log_time');
+        const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
+        
+        // Fetch excused absences specifically for flag ceremony checking
+        const { data: allFlagTravel } = await supabaseClient.from('itinerary').select('emp_id, travel_date');
+        const { data: allFlagLeave } = await supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED');
+        const { data: allFlagPso } = await supabaseClient.from('pso_records').select('emp_id, start_date, end_date');
+        
+        const flagExcused = new Set();
+        (allFlagTravel || []).forEach(t => flagExcused.add(t.emp_id + '_' + t.travel_date));
+        (allFlagLeave || []).forEach(l => flagExcused.add(l.emp_id + '_' + l.date));
+        (allFlagPso || []).forEach(p => {
+            let currD = new Date(p.start_date);
+            let endD = new Date(p.end_date);
+            while(currD <= endD) {
+                flagExcused.add(p.emp_id + '_' + currD.toISOString().split('T')[0]);
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
+
+        // Find all Mondays in the system
+        let mondays = []; 
+        if (allFlagLogs && allFlagLogs.length > 0) {
+            // Find earliest log date to start checking from
+            let earliestLogStr = allFlagLogs.reduce((min, p) => p.log_time < min ? p.log_time : min, allFlagLogs[0].log_time);
+            let start = new Date(earliestLogStr);
+            start.setHours(0,0,0,0);
+            let endCheck = new Date();
+            endCheck.setHours(0,0,0,0);
+            
+            while (start <= endCheck) {
+                if (start.getDay() === 1) { // 1 is Monday
+                    mondays.push(start.toISOString().split('T')[0]);
+                }
+                start.setDate(start.getDate() + 1);
+            }
+        }
+        mondays.reverse(); // Most recent first
+
+        (emps || []).forEach(e => {
+            if (e.station !== 'DARPO-CS1') return;
+            
+            let missedDates = [];
+            mondays.forEach(m => {
+                const hasLog = (allFlagLogs || []).some(l => l.emp_id === e.emp_id && l.log_time.startsWith(m));
+                const isExcused = flagExcused.has(e.emp_id + '_' + m);
+                
+                if (!hasLog && !isExcused) {
+                    missedDates.push(m);
+                }
+            });
+
+            if (missedDates.length > 0) {
+                listF.innerHTML += `<tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
+                    <td class="text-center font-bold text-red-600">${missedDates.length}</td>
+                    <td class="text-center text-xs text-gray-500">${missedDates[0]}</td>
+                    <td class="text-center">
+                        <button onclick="printFlagMemo('${e.emp_id}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>
+                    </td>
+                </tr>`;
+            }
+        });
+        if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
     };
 
     // --- MEMO PRINTING FUNCTIONS ---
-    async function printTardinessMemo(id, name) { /* Logic provided in previous response */ alert(`Generating Tardiness Memo for ${name}`); }
+    async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins) {
+        if (!confirm(`Generate memo for ${empName}?`)) return;
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); // Legal size
+        
+        const todayDate = new Date();
+        const todayStr = todayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const currYear = todayDate.getFullYear();
+        const currMonthName = todayDate.toLocaleDateString('en-US', { month: 'long' });
+        
+        // Calculate prev month name
+        const prevMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+        const prevMonthName = prevMonthDate.toLocaleDateString('en-US', { month: 'long' });
+        const prevYearStr = prevMonthDate.getFullYear();
+
+        const isHabitualLate = (prevCount >= 10 && currCount >= 10);
+        let memoType = "";
+        let memoTypeDb = "";
+        
+        if (isHabitualLate) {
+            memoType = "HABITUAL TARDINESS";
+            memoTypeDb = "Habitual Tardiness";
+        } else if (totalMins > 0) {
+            memoType = "ACCUMULATED TARDINESS AND ATTENDANCE MONITORING";
+            memoTypeDb = "Accumulated Tardiness";
+        } else {
+            alert("No tardiness criteria met for a memo.");
+            return;
+        }
+
+        // Fetch offense count
+        let offenseCount = 1;
+        try {
+            const { data: pastMemos } = await supabaseClient
+                .from('memo_records')
+                .select('*')
+                .eq('emp_id', empId)
+                .eq('memo_type', memoTypeDb)
+                .neq('month', currMonthName); // Exclude current month to count previous offenses
+            
+            if (pastMemos) {
+                offenseCount = pastMemos.length + 1;
+            }
+        } catch(e) {
+            console.error("Could not fetch past memos, defaulting to 1st offense.", e);
+        }
+
+        let offenseText = "";
+        let penaltyText = "";
+        let p1 = "";
+        let p2 = "";
+        let p3 = "";
+
+        if (memoTypeDb === "Habitual Tardiness") {
+            if (offenseCount === 1) {
+                offenseText = "FIRST OFFENSE";
+                penaltyText = "Suspension of one (1) month and one (1) day to six (6) months.";
+            } else {
+                offenseText = "SECOND OFFENSE / FINAL WARNING";
+                penaltyText = "Dismissal from the service.";
+            }
+            p1 = `A review of your Daily Time Records (DTR) shows that you incurred tardiness as follows:\n\n    ${prevMonthName} ${prevYearStr} - ${prevCount} instances of tardiness\n    ${currMonthName} ${currYear} - ${currCount} instances of tardiness`;
+            p2 = `Under the Revised Rules on Administrative Cases in the Civil Service (RRACCS), an employee is considered habitually tardy if he or she incurs at least ten (10) times of tardiness in a month for at least two (2) consecutive months. This constitutes a Less Grave Offense. As this is your ${offenseText}, the prescribed penalty is ${penaltyText}`;
+            p3 = "In view thereof, you are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative case should be filed against you.\n\nFailure to respond within the prescribed period shall be deemed a waiver of your right to be heard.";
+        } else {
+            const totalHrs = (totalMins / 60.0).toFixed(2);
+            const daysEq = (totalMins / 60.0 / 8.0).toFixed(3);
+            
+            if (offenseCount === 1) {
+                offenseText = "FIRST WARNING";
+            } else if (offenseCount === 2) {
+                offenseText = "NOTICE TO EXPLAIN";
+                memoType = `${memoType} (NOTICE TO EXPLAIN)`;
+            } else {
+                offenseText = "FINAL WARNING";
+            }
+
+            p1 = `Based on the review of your Daily Time Records (DTR) for the month of ${currMonthName} ${currYear}, you have incurred a total of ${totalMins} minutes (${totalHrs} hours) of accumulated tardiness/undertime.`;
+            p2 = `Under Civil Service Commission (CSC) rules on attendance and leave, tardiness and undertime accumulated to eight (8) hours is equivalent to one (1) day absence. Accordingly, your accumulated tardiness is equivalent to ${daysEq} day/s, which shall be deducted from your available leave credits (Vacation Leave first, if available).`;
+            
+            if (offenseCount === 2) {
+                p3 = `This serves as your NOTICE TO EXPLAIN. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative action should be taken against you for excessive tardiness. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`;
+            } else {
+                p3 = `This serves as your ${offenseText}. You are strongly advised to improve your attendance. Continued excessive tardiness may result in an administrative case should it eventually qualify as Habitual Tardiness under Civil Service rules.`;
+            }
+        }
+
+        // Draw PDF
+        pdf.setMargins(25.4, 45, 25.4);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(12);
+        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
+        pdf.setFontSize(11);
+        pdf.text(`Series of ${currYear}`, 25.4, 51);
+
+        pdf.setFontSize(11);
+        let currentY = 65;
+        const lineH = 8;
+        
+        pdf.text("TO", 25.4, currentY); pdf.text(":", 50, currentY); pdf.text(`${empName}`, 55, currentY); currentY += lineH;
+        pdf.text("FROM", 25.4, currentY); pdf.text(":", 50, currentY); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 55, currentY); currentY += lineH;
+        pdf.text("DATE", 25.4, currentY); pdf.text(":", 50, currentY); pdf.text(`${todayStr}`, 55, currentY); currentY += lineH;
+        pdf.text("SUBJECT", 25.4, currentY); pdf.text(":", 50, currentY); 
+        
+        const splitSubject = pdf.splitTextToSize(memoType, 135);
+        pdf.text(splitSubject, 55, currentY);
+        currentY += (splitSubject.length * lineH);
+
+        pdf.setLineWidth(0.6);
+        pdf.line(25.4, currentY, 215.9 - 25.4, currentY);
+        currentY += 8;
+
+        pdf.setFont("helvetica", "normal");
+        
+        const splitP1 = pdf.splitTextToSize(p1, 165);
+        pdf.text(splitP1, 25.4, currentY);
+        currentY += (splitP1.length * 5) + 5;
+
+        const splitP2 = pdf.splitTextToSize(p2, 165);
+        pdf.text(splitP2, 25.4, currentY);
+        currentY += (splitP2.length * 5) + 5;
+
+        const splitP3 = pdf.splitTextToSize(p3, 165);
+        pdf.text(splitP3, 25.4, currentY);
+        currentY += (splitP3.length * 5) + 10;
+
+        const closing1 = "All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.";
+        const splitC1 = pdf.splitTextToSize(closing1, 165);
+        pdf.text(splitC1, 25.4, currentY);
+        currentY += (splitC1.length * 5) + 5;
+
+        const closing2 = "_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.";
+        const splitC2 = pdf.splitTextToSize(closing2, 165);
+        pdf.text(splitC2, 25.4, currentY);
+        currentY += (splitC2.length * 5) + 15;
+
+        pdf.setFont("helvetica", "bold");
+        pdf.text("RICARDO C. GARCIA", 25.4, currentY);
+
+        // Record memo in DB
+        try {
+            await supabaseClient.from('memo_records').insert({
+                emp_id: empId,
+                memo_type: memoTypeDb,
+                offense_level: offenseCount,
+                month: currMonthName,
+                year: currYear
+            });
+        } catch(e) {
+            console.error("Error logging memo to DB", e);
+        }
+
+        // Generate QR
+        const traceId = `TRC-${empId}-${Math.floor(Date.now() / 1000)}`;
+        const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: ${memoType}\nLevel: ${offenseText}\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+        
+        let qrContainer = document.getElementById('hiddenQrContainer');
+        if (!qrContainer) {
+            qrContainer = document.createElement('div');
+            qrContainer.id = 'hiddenQrContainer';
+            qrContainer.style.display = 'none';
+            document.body.appendChild(qrContainer);
+        }
+        qrContainer.innerHTML = '';
+        
+        new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
+        
+        setTimeout(() => {
+            const qrCanvas = qrContainer.querySelector('canvas');
+            if (qrCanvas) {
+                const qrDataUrl = qrCanvas.toDataURL('image/png');
+                pdf.addImage(qrDataUrl, 'PNG', 25.4, currentY + 5, 22, 22);
+            }
+            pdf.save(`Memo_${empId}_${memoTypeDb.replace(" ", "_")}_${currMonthName}_${currYear}.pdf`);
+        }, 300);
+    }
 
     async function printFlagMemo(empId, empName, missedDates) {
         if (!confirm(`Generate Flag Ceremony Memo for ${empName}?`)) return;
-        const { jsPDF } = window.jspdf; const pdf = new jsPDF('p', 'mm', [215.9, 330.2]);
+        const { jsPDF } = window.jspdf; 
+        const pdf = new jsPDF('p', 'mm', [215.9, 330.2]);
         const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+        const currYear = new Date().getFullYear();
+        const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 
         pdf.setFont("helvetica", "bold"); pdf.setFontSize(12);
         pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
-        pdf.setFontSize(11); pdf.text(`Series of ${new Date().getFullYear()}`, 25.4, 51);
+        pdf.setFontSize(11); pdf.text(`Series of ${currYear}`, 25.4, 51);
         
-        let y = 65; pdf.text("TO", 25.4, y); pdf.text(":", 50, y); pdf.text(empName, 55, y); y += 8;
-        pdf.text("FROM", 25.4, y); pdf.text(":", 50, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 55, y); y += 8;
-        pdf.text("DATE", 25.4, y); pdf.text(":", 50, y); pdf.text(today, 55, y); y += 8;
+        let y = 65; 
+        const lineH = 8;
+        pdf.text("TO", 25.4, y); pdf.text(":", 50, y); pdf.text(empName, 55, y); y += lineH;
+        pdf.text("FROM", 25.4, y); pdf.text(":", 50, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 55, y); y += lineH;
+        pdf.text("DATE", 25.4, y); pdf.text(":", 50, y); pdf.text(today, 55, y); y += lineH;
         pdf.text("SUBJECT", 25.4, y); pdf.text(":", 50, y); pdf.text("NON-ATTENDANCE TO FLAG CEREMONY", 55, y);
-        pdf.line(25.4, y+5, 190, y+5); y += 15;
+        pdf.setLineWidth(0.6); pdf.line(25.4, y+5, 190, y+5); y += 15;
 
         pdf.setFont("helvetica", "normal");
-        const p1 = `Based on the records of the Human Resource Management Office (HRMO), you failed to attend the Flag Raising/Lowering Ceremony on the following date/s: ${missedDates}.`;
-        const p2 = "Please be reminded that under Civil Service Commission (CSC) Memorandum Circular No. 19, s. 1999, all government officials and employees are required to attend the Flag Raising Ceremony every Monday.";
-        const p3 = "In view thereof, you are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative disciplinary action should be taken against you.";
+        const p1 = `Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following Monday(s): ${missedDates}.`;
+        const p2 = "Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory for all government officials and employees.";
+        const p3 = "You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you for this violation of office rules. Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.";
 
-        [p1, p2, p3].forEach(txt => { const split = pdf.splitTextToSize(txt, 165); pdf.text(split, 25.4, y); y += (split.length * 5) + 5; });
+        [p1, p2, p3].forEach(txt => { 
+            const split = pdf.splitTextToSize(txt, 165); 
+            pdf.text(split, 25.4, y); 
+            y += (split.length * 5) + 5; 
+        });
+
+        const closing1 = "All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.";
+        const splitC1 = pdf.splitTextToSize(closing1, 165);
+        pdf.text(splitC1, 25.4, y);
+        y += (splitC1.length * 5) + 5;
+
+        const closing2 = "_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.";
+        const splitC2 = pdf.splitTextToSize(closing2, 165);
+        pdf.text(splitC2, 25.4, y);
+        y += (splitC2.length * 5) + 15;
         
-        y += 10; pdf.setFont("helvetica", "bold"); pdf.text("RICARDO C. GARCIA", 25.4, y);
-        pdf.save(`Flag_Memo_${empId}.pdf`);
+        pdf.setFont("helvetica", "bold"); pdf.text("RICARDO C. GARCIA", 25.4, y);
+
+        // Record memo in DB
+        try {
+            await supabaseClient.from('memo_records').insert({
+                emp_id: empId,
+                memo_type: "Flag Ceremony Non-Attendance",
+                offense_level: 1, // You can expand this logic if you want to track multiple flag offenses
+                month: currMonthName,
+                year: currYear
+            });
+        } catch(e) {
+            console.error("Error logging memo to DB", e);
+        }
+
+        // Generate QR
+        const traceId = `TRC-FLAG-${empId}-${Math.floor(Date.now() / 1000)}`;
+        const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: Non-Attendance to Flag Ceremony\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+        
+        let qrContainer = document.getElementById('hiddenQrContainer');
+        if (!qrContainer) {
+            qrContainer = document.createElement('div');
+            qrContainer.id = 'hiddenQrContainer';
+            qrContainer.style.display = 'none';
+            document.body.appendChild(qrContainer);
+        }
+        qrContainer.innerHTML = '';
+        
+        new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
+        
+        setTimeout(() => {
+            const qrCanvas = qrContainer.querySelector('canvas');
+            if (qrCanvas) {
+                const qrDataUrl = qrCanvas.toDataURL('image/png');
+                pdf.addImage(qrDataUrl, 'PNG', 25.4, y + 5, 22, 22);
+            }
+            pdf.save(`Flag_Ceremony_Memo_${empId}_${currMonthName}_${currYear}.pdf`);
+        }, 300);
     }
 </script>
 </body>
