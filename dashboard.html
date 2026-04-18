@@ -150,7 +150,8 @@
     document.getElementById('activeUser').innerText = currentUser.full_name;
     document.getElementById('userRoleBadge').innerText = currentUser.role;
 
-    const isChief = currentUser.role.toUpperCase() === 'CHIEF';
+    const userRole = currentUser.role.toUpperCase();
+    const isLimited = userRole === 'CHIEF' || userRole === 'UNIT HEAD';
     const targetDivision = currentUser.division;
     const SYSTEM_START_DATE = "2026-05-01";
 
@@ -166,9 +167,15 @@
         const todayDate = new Date();
         const todayStr = todayDate.toISOString().split('T')[0];
         document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        document.getElementById('scopeLabel').innerText = isChief ? `Division: ${targetDivision}` : "Provincial Oversight";
+        document.getElementById('scopeLabel').innerText = isLimited ? `Division: ${targetDivision}` : "Provincial Oversight";
 
-        const { data: emps } = await supabaseClient.from('employees').select('*').eq(isChief ? 'division' : 'id', isChief ? targetDivision : 'id');
+        // Fix 1: Properly filter based on RBAC rules
+        let empQuery = supabaseClient.from('employees').select('*');
+        if (isLimited) {
+            empQuery = empQuery.eq('division', targetDivision);
+        }
+        const { data: emps } = await empQuery;
+        
         const empIds = new Set((emps || []).map(e => e.emp_id));
         document.getElementById('statTotal').innerText = emps?.length || 0;
 
@@ -215,7 +222,15 @@
         });
 
         // --- NEW: Flag Ceremony Monitoring ---
-        const { data: flagData } = await supabaseClient.from('attendance_logs').select('emp_id, log_time'); // Normally filtered for Mondays 7am-9am
+        // Fix 2: Fetch all records without sysStart limitation, specifically for DARPO-CS1 personnel
+        let flagData = [];
+        const cs1Ids = (emps || []).filter(e => e.station === 'DARPO-CS1').map(e => e.emp_id);
+        
+        if (cs1Ids.length > 0) {
+            const { data } = await supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', cs1Ids);
+            flagData = data || [];
+        }
+        
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
         // Find last 4 Mondays
