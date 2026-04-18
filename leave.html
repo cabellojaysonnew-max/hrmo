@@ -6,6 +6,7 @@
     <title>Leave Processing - DAR HRMO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="supabase-config.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
@@ -63,7 +64,7 @@
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr>
-                                    <th class="table-th">Trans ID</th>
+                                    <th class="table-th">Emp ID</th>
                                     <th class="table-th">Employee</th>
                                     <th class="table-th">Type</th>
                                     <th class="table-th">Dates</th>
@@ -81,9 +82,13 @@
 
             <div id="monitorTab" class="tab-content">
                 <div class="card">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex flex-wrap justify-between items-center gap-4">
                         <h3 class="font-bold text-[#003811]">Leave Credits (REGULAR Employees)</h3>
-                        <button onclick="loadCreditsMonitor()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
+                        <div class="flex gap-2">
+                            <button onclick="printLackingForceLeave()" class="text-xs bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded shadow">Print Lacking FL</button>
+                            <button onclick="processForceLeaveForfeiture()" class="text-xs bg-red-700 hover:bg-red-800 text-white font-bold py-1 px-3 rounded shadow">Process FL Forfeiture</button>
+                            <button onclick="loadCreditsMonitor()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
+                        </div>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
@@ -151,16 +156,16 @@
                     <div class="p-4 bg-yellow-50 border-b border-gray-200">
                         <h4 class="font-bold text-yellow-800">Pending For Deduction (Unposted)</h4>
                     </div>
-                    <div class="overflow-x-auto max-h-64">
+                    <div class="overflow-x-auto max-h-64 border-b border-gray-200">
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr>
-                                    <th class="table-th">Date</th>
-                                    <th class="table-th">Emp ID</th>
-                                    <th class="table-th">Name</th>
-                                    <th class="table-th">Purpose</th>
-                                    <th class="table-th">Deduction (VL)</th>
-                                    <th class="table-th text-center">Action</th>
+                                    <th class="table-th bg-yellow-100">Date</th>
+                                    <th class="table-th bg-yellow-100">Emp ID</th>
+                                    <th class="table-th bg-yellow-100">Name</th>
+                                    <th class="table-th bg-yellow-100">Purpose</th>
+                                    <th class="table-th bg-yellow-100">Deduction (VL)</th>
+                                    <th class="table-th bg-yellow-100 text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="gp-pending-list">
@@ -169,18 +174,18 @@
                         </table>
                     </div>
 
-                    <div class="p-4 bg-green-50 border-y border-gray-200 mt-4">
+                    <div class="p-4 bg-green-50 border-b border-gray-200">
                         <h4 class="font-bold text-green-800">Already Posted / Credited</h4>
                     </div>
                     <div class="overflow-x-auto max-h-64">
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr>
-                                    <th class="table-th">Date</th>
-                                    <th class="table-th">Emp ID</th>
-                                    <th class="table-th">Name</th>
-                                    <th class="table-th">Purpose</th>
-                                    <th class="table-th">Deducted (VL)</th>
+                                    <th class="table-th bg-green-100">Date</th>
+                                    <th class="table-th bg-green-100">Emp ID</th>
+                                    <th class="table-th bg-green-100">Name</th>
+                                    <th class="table-th bg-green-100">Purpose</th>
+                                    <th class="table-th bg-green-100">Deducted (VL)</th>
                                 </tr>
                             </thead>
                             <tbody id="gp-posted-list">
@@ -193,16 +198,26 @@
 
             <div id="ledgerTab" class="tab-content">
                 <div class="card mb-6">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        <div>
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div class="md:col-span-2">
                             <label class="form-label">Select Employee</label>
                             <select id="ledgEmp" class="form-input"></select>
+                        </div>
+                        <div>
+                            <label class="form-label">Leave Type</label>
+                            <select id="ledgType" class="form-input">
+                                <option value="VL">Vacation Leave (VL)</option>
+                                <option value="SL">Sick Leave (SL)</option>
+                                <option value="SPL">Special Privilege Leave (SPL)</option>
+                                <option value="WL">Mandatory/Women's Leave (WL)</option>
+                                <option value="CTO">Compensatory Time-Off (CTO)</option>
+                            </select>
                         </div>
                         <div>
                             <label class="form-label">Select Month/Year</label>
                             <input type="month" id="ledgMonth" class="form-input">
                         </div>
-                        <div>
+                        <div class="md:col-span-4 mt-2">
                             <button onclick="loadLedgerStatement()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow w-full">View Statement</button>
                         </div>
                     </div>
@@ -235,7 +250,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="ledger-list">
-                                    <tr><td colspan="5" class="table-td text-center text-gray-500">Select an employee and month to view ledger.</td></tr>
+                                    <tr><td colspan="5" class="table-td text-center text-gray-500">Select an employee, leave type, and month to view ledger.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -268,10 +283,15 @@
 
     let empDataMap = {};
     let currentGatePasses = [];
+    let currentForceLeaveStatus = {}; // Tracks { emp_id: VL_taken }
 
-    // Load Once Strategy for Employees
+    // Ensure we process REGULAR employees only
     async function loadEmployeeMaps() {
-        const { data } = await supabaseClient.from('employees').select('*').order('full_name');
+        const { data } = await supabaseClient.from('employees')
+            .select('*')
+            .eq('type', 'REGULAR')
+            .order('full_name');
+            
         if(data) {
             const ledgEmpSelect = document.getElementById('ledgEmp');
             ledgEmpSelect.innerHTML = '<option value="">-- Select Employee --</option>';
@@ -300,10 +320,10 @@
         if(tabId === 'monitorTab') loadCreditsMonitor();
     }
 
-    // Load Maps initially
+    // Initialize Maps
     loadEmployeeMaps();
 
-    // --- TAB 1: APPLICATIONS (Approve/Disapprove with 1.5 Multiplier Logic) ---
+    // --- TAB 1: APPLICATIONS ---
     async function loadApplications() {
         const list = document.getElementById('app-list');
         list.innerHTML = `<tr><td colspan="6" class="table-td text-center">Loading...</td></tr>`;
@@ -323,7 +343,7 @@
             const dates = app.end_date ? `${app.start_date} to ${app.end_date}` : app.start_date;
             html += `
                 <tr>
-                    <td class="table-td font-mono text-xs">${app.transaction_id || app.id}</td>
+                    <td class="table-td font-mono font-bold text-xs">${app.emp_id}</td>
                     <td class="table-td font-bold">${name.toUpperCase()}</td>
                     <td class="table-td">${(app.type || '').toUpperCase()}</td>
                     <td class="table-td">${dates}</td>
@@ -342,7 +362,7 @@
         if(!confirm("Are you sure you want to approve this leave?")) return;
         
         try {
-            // Logic 6: Check for schedule override for multiplier (1 or 1.5)
+            // Schedule override multiplier check
             let multiplier = 1;
             const sDate = start_date;
             const eDate = end_date || start_date;
@@ -360,15 +380,14 @@
             const final_debit = base_debit * multiplier;
             const tType = type.toUpperCase();
 
-            // Deduct from Employee Balances
             const empData = empDataMap[emp_id];
-            if (!empData) throw new Error("Employee not found in registry.");
+            if (!empData) throw new Error("Employee not found in registry (Ensure type=REGULAR).");
 
             let updates = {};
-            if(tType.includes('VL') || tType.includes('VACATION')) updates.vl_balance = (parseFloat(empData.vl_balance || 0) - final_debit).toFixed(3);
+            if(tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE')) updates.vl_balance = (parseFloat(empData.vl_balance || 0) - final_debit).toFixed(3);
             else if(tType.includes('SL') || tType.includes('SICK')) updates.sl_balance = (parseFloat(empData.sl_balance || 0) - final_debit).toFixed(3);
             else if(tType.includes('SPL')) updates.spl_balance = (parseFloat(empData.spl_balance || 0) - final_debit).toFixed(3);
-            else if(tType.includes('WL')) updates.wl_balance = (parseFloat(empData.wl_balance || 0) - final_debit).toFixed(3);
+            else if(tType.includes('WL') || tType.includes('MANDATORY')) updates.wl_balance = (parseFloat(empData.wl_balance || 0) - final_debit).toFixed(3);
             else if(tType.includes('CTO')) updates.cto_balance = (parseFloat(empData.cto_balance || 0) - final_debit).toFixed(3);
 
             if(Object.keys(updates).length > 0) {
@@ -384,7 +403,7 @@
                 .eq('id', id);
             
             alert(`Leave Approved successfully. Deducted ${final_debit} days.`);
-            await loadEmployeeMaps(); // Refresh cache
+            await loadEmployeeMaps(); 
             loadApplications();
         } catch(e) {
             alert("Error: " + e.message);
@@ -415,12 +434,14 @@
     async function loadCreditsMonitor() {
         const list = document.getElementById('monitor-list');
         list.innerHTML = `<tr><td colspan="8" class="table-td text-center">Loading...</td></tr>`;
+        currentForceLeaveStatus = {};
         
         try {
-            const { data: emps, error: eErr } = await supabaseClient.from('employees').select('*').eq('type', 'REGULAR').order('full_name');
-            if (eErr) throw eErr;
+            // Emps already filtered to REGULAR in loadEmployeeMaps
+            const emps = Object.values(empDataMap);
+            if (emps.length === 0) throw new Error("No REGULAR employees found.");
 
-            // Force Leave: Any VL (APPROVED or DISAPPROVED) per year. Max 5.
+            // Force Leave: Any VL (APPROVED or DISAPPROVED) per year. Max 5 requirement.
             const currentYear = new Date().getFullYear();
             const { data: vlData } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, debit')
@@ -429,17 +450,16 @@
                 .gte('start_date', `${currentYear}-01-01`)
                 .lte('start_date', `${currentYear}-12-31`);
 
-            let forceLeaveMap = {};
             if(vlData) {
                 vlData.forEach(fl => {
-                    if(!forceLeaveMap[fl.emp_id]) forceLeaveMap[fl.emp_id] = 0;
-                    forceLeaveMap[fl.emp_id] += Math.abs(parseFloat(fl.debit || 0));
+                    if(!currentForceLeaveStatus[fl.emp_id]) currentForceLeaveStatus[fl.emp_id] = 0;
+                    currentForceLeaveStatus[fl.emp_id] += Math.abs(parseFloat(fl.debit || 0));
                 });
             }
 
             let html = '';
             emps.forEach(emp => {
-                const flCount = forceLeaveMap[emp.emp_id] || 0;
+                const flCount = currentForceLeaveStatus[emp.emp_id] || 0;
                 const flProgress = Math.min(flCount, 5); 
                 const flColor = flProgress >= 5 ? 'text-green-600 font-bold' : 'text-red-600 font-bold';
                 
@@ -462,15 +482,115 @@
         }
     }
 
+    async function printLackingForceLeave() {
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const year = new Date().getFullYear();
+            
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("LACKING FORCE LEAVE REPORT", 14, 20);
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Year: ${year} | Regular Employees Only`, 14, 28);
+
+            let y = 40;
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("EMP ID", 14, y);
+            doc.text("NAME", 50, y);
+            doc.text("VL TAKEN", 130, y);
+            doc.text("DEFICIENCY", 170, y);
+            doc.line(14, y+2, 196, y+2);
+            y += 8;
+
+            doc.setFont("helvetica", "normal");
+            
+            let count = 0;
+            Object.values(empDataMap).forEach(emp => {
+                let taken = currentForceLeaveStatus[emp.emp_id] || 0;
+                if (taken < 5) {
+                    if(y > 280) { doc.addPage(); y = 20; }
+                    let deficiency = 5 - taken;
+                    doc.text(emp.emp_id, 14, y);
+                    doc.text(emp.full_name ? emp.full_name.toUpperCase() : '', 50, y);
+                    doc.text(taken.toFixed(3), 130, y);
+                    doc.text(deficiency.toFixed(3), 170, y);
+                    y += 6;
+                    count++;
+                }
+            });
+
+            if (count === 0) {
+                doc.text("All regular employees have met the 5-day force leave requirement.", 14, y);
+            }
+            
+            doc.save(`Lacking_Force_Leave_Report_${year}.pdf`);
+        } catch (e) { alert(e.message); }
+    }
+
+    async function processForceLeaveForfeiture() {
+        const year = new Date().getFullYear();
+        if(!confirm(`This will DEDUCT lacking force leave days from VL balances for all employees who have less than 5 days VL recorded for ${year}. Are you sure you want to proceed?`)) return;
+
+        try {
+            const updates = [];
+            const ledgers = [];
+
+            for (const emp of Object.values(empDataMap)) {
+                let taken = currentForceLeaveStatus[emp.emp_id] || 0;
+                if (taken < 5) {
+                    let deficiency = 5 - taken;
+                    let newVl = (parseFloat(emp.vl_balance || 0) - deficiency).toFixed(3);
+
+                    updates.push( supabaseClient.from('employees').update({ vl_balance: newVl }).eq('emp_id', emp.emp_id) );
+                    
+                    ledgers.push({
+                        emp_id: emp.emp_id,
+                        type: 'FORCE LEAVE (VL)',
+                        debit: deficiency,
+                        transaction_type: 'FORFEITURE',
+                        remarks: `Year-End Forfeiture of Unused Force Leave (${year})`,
+                        start_date: `${year}-12-31`
+                    });
+                }
+            }
+
+            if (updates.length === 0) {
+                alert("All employees have met the 5-day requirement. No deductions needed.");
+                return;
+            }
+
+            await Promise.all(updates);
+            await supabaseClient.from('leave_ledger').insert(ledgers);
+            
+            alert(`Successfully deducted unused force leave for ${updates.length} employees.`);
+            await loadEmployeeMaps();
+            loadCreditsMonitor();
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
+    }
+
     // --- TAB 3: GENERATE CREDITS ---
     async function generateMonthlyCredits() {
         const monthVal = document.getElementById('genMonth').value;
         if(!monthVal) { alert("Please select a month."); return; }
+        
+        // Prevent double crediting
+        const { data: existing } = await supabaseClient.from('leave_ledger')
+            .select('id').eq('type', 'VL/SL EARNED').eq('start_date', `${monthVal}-01`).limit(1);
+        if(existing && existing.length > 0) {
+            alert(`Credits for ${monthVal} have already been generated in the ledger!`);
+            return;
+        }
+
         if(!confirm(`Are you sure you want to add 1.25 VL and 1.25 SL credits for ALL REGULAR employees for ${monthVal}?`)) return;
 
         try {
-            const { data: emps } = await supabaseClient.from('employees').select('*').eq('type', 'REGULAR');
-            if(!emps || emps.length === 0) { alert("No regular employees found."); return; }
+            const emps = Object.values(empDataMap);
+            if(emps.length === 0) { alert("No regular employees found."); return; }
 
             const updates = [];
             const ledgers = [];
@@ -481,10 +601,11 @@
                 
                 updates.push( supabaseClient.from('employees').update({ vl_balance: newVl, sl_balance: newSl }).eq('emp_id', emp.emp_id) );
                 
+                // Track SL and VL together for simplicity as requested
                 ledgers.push({
                     emp_id: emp.emp_id,
                     type: 'VL/SL EARNED',
-                    credit: 2.50, // Display total combined or split? Best to track as 1 entry or 2. We'll do 1 for brevity.
+                    credit: 2.50, 
                     transaction_type: 'CREDIT',
                     remarks: `Monthly Earned Credits (1.25 VL / 1.25 SL) - ${monthVal}`,
                     start_date: `${monthVal}-01`
@@ -504,11 +625,20 @@
     async function generateYearlyCredits() {
         const yearVal = document.getElementById('genYear').value;
         if(!yearVal) { alert("Please enter a year."); return; }
+        
+        // Prevent double crediting
+        const { data: existing } = await supabaseClient.from('leave_ledger')
+            .select('id').eq('type', 'SPL/WL GRANTED').eq('start_date', `${yearVal}-01-01`).limit(1);
+        if(existing && existing.length > 0) {
+            alert(`Yearly credits for ${yearVal} have already been granted in the ledger!`);
+            return;
+        }
+
         if(!confirm(`Are you sure you want to GRANT 3 SPL and 5 WL credits for ALL REGULAR employees for the year ${yearVal}? This will OVERWRITE their current balances.`)) return;
 
         try {
-            const { data: emps } = await supabaseClient.from('employees').select('*').eq('type', 'REGULAR');
-            if(!emps || emps.length === 0) { alert("No regular employees found."); return; }
+            const emps = Object.values(empDataMap);
+            if(emps.length === 0) { alert("No regular employees found."); return; }
 
             const updates = [];
             const ledgers = [];
@@ -547,10 +677,14 @@
         dList.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching...</td></tr>`;
         
         try {
+            // FIX: Proper End Date calculation to avoid "date out of range"
+            const parts = monthVal.split('-');
+            const yy = parseInt(parts[0], 10);
+            const mm = parseInt(parts[1], 10);
+            const lastDay = new Date(yy, mm, 0).getDate();
             const startDate = `${monthVal}-01`;
-            const endDate = `${monthVal}-31`;
+            const endDate = `${monthVal}-${lastDay}`;
 
-            // Need PROCESSED (pending deduction) and POSTED (already deducted)
             const { data, error } = await supabaseClient.from('gate_pass_logs')
                 .select('*')
                 .gte('date', startDate)
@@ -564,17 +698,17 @@
             let pendingHtml = '';
             let postedHtml = '';
             let hasPending = false;
-            currentGatePasses = []; // Reset global for 'Post All' button
+            currentGatePasses = [];
 
             (data || []).forEach(gp => {
                 const emp = empDataMap[gp.emp_id];
-                const name = emp ? emp.full_name : gp.emp_id;
+                const name = emp && emp.full_name ? emp.full_name : gp.emp_id;
                 
                 if (gp.status !== 'POSTED') {
                     hasPending = true;
                     currentGatePasses.push(gp);
                     pendingHtml += `
-                        <tr>
+                        <tr class="hover:bg-yellow-50">
                             <td class="table-td">${gp.date}</td>
                             <td class="table-td">${gp.emp_id}</td>
                             <td class="table-td font-bold">${name.toUpperCase()}</td>
@@ -638,9 +772,8 @@
         }
     }
 
-    // Core Gate Pass Deduction Logic
     async function applyGatePassDeduction(gpArray) {
-        await loadEmployeeMaps(); // ensure fresh balances
+        await loadEmployeeMaps(); 
         let empDeductions = {};
         let ledgers = [];
         let gpIdsToUpdate = [];
@@ -652,7 +785,7 @@
 
             ledgers.push({
                 emp_id: gp.emp_id,
-                type: 'GATE PASS',
+                type: 'VL (GATE PASS)',
                 debit: gp.deduction_credit,
                 transaction_type: 'GATE_PASS_DEDUCTION',
                 remarks: `Gate Pass Deduction - ${gp.purpose || ''}`,
@@ -660,7 +793,6 @@
             });
         });
 
-        // Batch Update Employee Balances
         const updates = [];
         for (const [eId, amount] of Object.entries(empDeductions)) {
             const emp = empDataMap[eId];
@@ -670,21 +802,19 @@
             }
         }
         await Promise.all(updates);
-
-        // Insert into Ledger
         await supabaseClient.from('leave_ledger').insert(ledgers);
 
-        // Update Gate Pass status
         const gpUpdates = gpIdsToUpdate.map(id => supabaseClient.from('gate_pass_logs').update({ status: 'POSTED' }).eq('id', id));
         await Promise.all(gpUpdates);
         
-        await loadEmployeeMaps(); // refresh local cache
+        await loadEmployeeMaps(); 
     }
 
     // --- TAB 5: DETAILED LEDGER MONITORING ---
     async function loadLedgerStatement() {
         const empId = document.getElementById('ledgEmp').value;
         const monthVal = document.getElementById('ledgMonth').value;
+        const ledgType = document.getElementById('ledgType').value;
         const list = document.getElementById('ledger-list');
         const sumDiv = document.getElementById('ledgerSummary');
 
@@ -697,51 +827,73 @@
         sumDiv.classList.add('hidden');
 
         try {
+            const parts = monthVal.split('-');
+            const yy = parseInt(parts[0], 10);
+            const mm = parseInt(parts[1], 10);
+            const lastDay = new Date(yy, mm, 0).getDate();
             const startDate = `${monthVal}-01`;
-            const endDate = `${monthVal}-31`;
+            const endDate = `${monthVal}-${lastDay}`;
 
-            // We need current balance of the employee to reverse-calculate the beginning balance.
-            // Since "Leave Credits" usually groups VL, SL, etc., we will track VL as the primary for this statement, 
-            // OR sum them up. Usually, statements are per type. To keep it simple, we track VL by default.
             await loadEmployeeMaps();
             const emp = empDataMap[empId];
             if(!emp) throw new Error("Employee data missing.");
             
-            // Fetch ledger for the month
-            const { data, error } = await supabaseClient.from('leave_ledger')
+            // Map selected type to balance column
+            let balField = ledgType.toLowerCase() + '_balance';
+            let currentBal = parseFloat(emp[balField] || 0);
+
+            // Fetch ALL historical ledger for this employee related to the chosen type
+            const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
                 .eq('emp_id', empId)
-                .gte('created_at', startDate) // Using created_at or start_date based on structure
-                .lte('created_at', endDate)
-                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'DISAPPROVED'])
+                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'DISAPPROVED', 'FORFEITURE'])
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
 
-            // Fetch ALL transactions AFTER this month to accurately reverse-calculate ending balance of the selected month
-            const { data: futureData } = await supabaseClient.from('leave_ledger')
-                .select('debit, credit')
-                .eq('emp_id', empId)
-                .gt('created_at', endDate)
-                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION']);
+            // Filter specific Leave Type transactions
+            let relevantData = (allData || []).filter(t => {
+                const tType = (t.type || '').toUpperCase();
+                if (ledgType === 'VL') return tType.includes('VL') || tType.includes('VACATION') || tType.includes('GATE PASS') || tType.includes('FORCE LEAVE');
+                if (ledgType === 'SL') return tType.includes('SL') || tType.includes('SICK');
+                if (ledgType === 'SPL') return tType.includes('SPL') || tType.includes('SPECIAL');
+                if (ledgType === 'WL') return tType.includes('WL') || tType.includes('WOMEN') || tType.includes('MANDATORY');
+                if (ledgType === 'CTO') return tType.includes('CTO') || tType.includes('COMPENSATORY');
+                return false;
+            });
 
-            let currentVL = parseFloat(emp.vl_balance || 0);
+            // Split into 'this month' and 'future' to reverse-calculate balances
+            const dtEnd = new Date(`${endDate}T23:59:59`);
+            const dtStart = new Date(`${startDate}T00:00:00`);
             
+            let futureData = [];
+            let monthData = [];
+
+            relevantData.forEach(t => {
+                const tDate = new Date(t.created_at || t.start_date);
+                if(tDate > dtEnd) {
+                    futureData.push(t);
+                } else if(tDate >= dtStart && tDate <= dtEnd) {
+                    monthData.push(t);
+                }
+            });
+
             // Reverse future transactions to get End of Month Balance
-            let endOfMonthBal = currentVL;
-            if(futureData) {
-                futureData.forEach(f => {
-                    endOfMonthBal += parseFloat(f.debit || 0);
+            let endOfMonthBal = currentBal;
+            futureData.forEach(f => {
+                if (f.transaction_type !== 'DISAPPROVED') {
+                    // Reverse operation: if it was credit, subtract. if debit, add.
                     endOfMonthBal -= parseFloat(f.credit || 0);
-                });
-            }
+                    endOfMonthBal += parseFloat(f.debit || 0);
+                }
+            });
 
             // Reverse current month transactions to get Beginning Balance
             let begBal = endOfMonthBal;
             let totalCreditMonth = 0;
             let totalDebitMonth = 0;
 
-            (data || []).forEach(t => {
+            monthData.forEach(t => {
                 if (t.transaction_type !== 'DISAPPROVED') {
                     const c = parseFloat(t.credit || 0);
                     const d = parseFloat(t.debit || 0);
@@ -761,7 +913,7 @@
             document.getElementById('lblEndBal').innerText = endOfMonthBal.toFixed(3);
             sumDiv.classList.remove('hidden');
 
-            if (!data || data.length === 0) {
+            if (monthData.length === 0) {
                 list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this month.</td></tr>`;
                 return;
             }
@@ -769,7 +921,7 @@
             let html = '';
             let runningBal = begBal;
 
-            data.forEach(t => {
+            monthData.forEach(t => {
                 const isDisapproved = t.transaction_type === 'DISAPPROVED';
                 const cred = parseFloat(t.credit || 0);
                 const deb = parseFloat(t.debit || 0);
