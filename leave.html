@@ -945,7 +945,7 @@
             (ctoData || []).forEach(cto => {
                 const emp = empDataMap[cto.emp_id];
                 const name = emp && emp.full_name ? emp.full_name : cto.emp_id;
-                const creditVal = cto.calculated_hours ? parseFloat(cto.calculated_hours) / 8 : 0;
+                const creditVal = cto.calculated_hours ? parseFloat(cto.calculated_hours) : 0;
                 
                 if (!postedCtoIds.includes(String(cto.id))) {
                     hasPending = true;
