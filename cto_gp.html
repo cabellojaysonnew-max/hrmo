@@ -462,18 +462,30 @@
                 let actionBtn = '';
 
                 if(gp.status === 'ISSUED') {
-                    // Pre-populate with values if they were recorded by scanner
-                    let outVal = gp.time_out ? String(gp.time_out).substring(0,5) : '';
-                    let inVal = gp.time_in ? String(gp.time_in).substring(0,5) : '';
+                    // Civil Service Matrix calculation logic for auto-display
+                    let calcDeduct = 0;
+                    if(gp.time_out && gp.time_in) {
+                        const dO = new Date(`1970-01-01T${gp.time_out}`);
+                        const dI = new Date(`1970-01-01T${gp.time_in}`);
+                        let diffMins = (dI - dO) / 60000;
+                        
+                        if (gp.pass_type === 'OFFICIAL') {
+                            diffMins -= 180; // deduct 3 hours
+                        }
+
+                        if(diffMins > 0) {
+                            calcDeduct = diffMins / 480; 
+                        }
+                    }
                     
                     timeCell = `
                         <div class="flex flex-col gap-1 items-center">
-                            <input type="time" id="tOut_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${outVal}">
-                            <input type="time" id="tIn_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${inVal}">
+                            <input type="time" id="tOut_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_out ? String(gp.time_out).substring(0,5) : ''}">
+                            <input type="time" id="tIn_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_in ? String(gp.time_in).substring(0,5) : ''}">
                             <button onclick="calcGP('${gp.id}', '${gp.pass_type}')" class="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-0.5 rounded mt-1 shadow">Calc Deduction</button>
                         </div>
                     `;
-                    dedCell = `<input type="number" step="0.001" id="ded_${gp.id}" class="border rounded px-1 text-xs w-20 text-center bg-white" value="${gp.deduction_credit || '0.000'}">`;
+                    dedCell = `<input type="number" step="0.001" id="ded_${gp.id}" class="border rounded px-1 text-xs w-20 text-center bg-white" value="${calcDeduct.toFixed(3)}">`;
                     actionBtn = `<button onclick="processGP('${gp.id}')" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mt-1">Process</button>`;
                 } else {
                     let tOutStr = formatTime12h(gp.time_out);
@@ -534,20 +546,7 @@
             return;
         }
 
-        // Civil Service Matrix Exact Mathematical Equivalent
-        let d = 0;
-        let hrs = Math.floor(diffMins / 60);
-        let mns = diffMins % 60;
-        
-        if(hrs === 1) d+=0.125; else if(hrs===2) d+=0.250; else if(hrs===3) d+=0.375; else if(hrs===4) d+=0.500; else if(hrs===5) d+=0.625; else if(hrs===6) d+=0.750; else if(hrs===7) d+=0.875; else if(hrs>=8) d+=1.000;
-        
-        if(mns >= 1 && mns <= 10) {
-            const minMap = {1:0.002, 2:0.004, 3:0.006, 4:0.008, 5:0.010, 6:0.012, 7:0.015, 8:0.017, 9:0.019, 10:0.021};
-            d += minMap[mns];
-        } else if (mns > 10) {
-            d += mns * 0.002083; // 1 / 480 equivalent per minute above 10
-        }
-
+        let d = diffMins / 480;
         document.getElementById(`ded_${id}`).value = d.toFixed(3);
     }
 
