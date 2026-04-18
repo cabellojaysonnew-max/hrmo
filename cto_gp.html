@@ -307,65 +307,66 @@
             if(error) throw error;
             const newRecord = data[0];
 
-            // Print PDF
+            // Print PDF Layout (1/2 8.5x13 landscape split vertically into two 6.5x8.5 portrait slips)
+            // Using mm: 13 inches = 330.2mm (Width), 8.5 inches = 215.9mm (Height)
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
+            const doc = new jsPDF('l', 'mm', [215.9, 330.2]);
             const empName = empDataMap[empId].full_name.toUpperCase();
             
-            const renderSlip = (yOffset, copyType) => {
+            const renderSlip = (xOffset, copyType) => {
                 doc.setFontSize(10); doc.setFont("helvetica", "bold");
-                doc.text("DEPARTMENT OF AGRARIAN REFORM", 105, yOffset + 15, {align: 'center'});
+                doc.text("DEPARTMENT OF AGRARIAN REFORM", xOffset + 82.55, 20, {align: 'center'});
                 doc.setFontSize(8); doc.setFont("helvetica", "normal");
-                doc.text("Camarines Sur 1 Provincial Office", 105, yOffset + 20, {align: 'center'});
-                doc.text("H.L. Building Carnation St., Triangulo, Naga City", 105, yOffset + 24, {align: 'center'});
+                doc.text("Camarines Sur 1 Provincial Office", xOffset + 82.55, 25, {align: 'center'});
+                doc.text("H.L. Building Carnation St., Triangulo, Naga City", xOffset + 82.55, 29, {align: 'center'});
                 
                 doc.setFontSize(12); doc.setFont("helvetica", "bold");
-                doc.text("PERMISSION SLIP", 105, yOffset + 32, {align: 'center'});
+                doc.text("PERMISSION SLIP", xOffset + 82.55, 40, {align: 'center'});
 
                 doc.setFontSize(9); doc.setFont("helvetica", "normal");
-                doc.text("Date:", 140, yOffset + 40); doc.text(new Date(dateStr).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}), 155, yOffset + 40); doc.line(152, yOffset + 41, 190, yOffset + 41);
-                doc.text("No.:", 140, yOffset + 47); doc.text(`GP-${new Date().getFullYear()}-${String(newRecord.id).padStart(4, '0')}`, 155, yOffset + 47); doc.line(152, yOffset + 48, 190, yOffset + 48);
+                doc.text("Date:", xOffset + 90, 50); doc.text(new Date(dateStr).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}), xOffset + 110, 50); doc.line(xOffset + 108, 51, xOffset + 150, 51);
+                doc.text("No.:", xOffset + 90, 58); doc.text(`GP-${new Date().getFullYear()}-${String(newRecord.id).padStart(4, '0')}`, xOffset + 110, 58); doc.line(xOffset + 108, 59, xOffset + 150, 59);
 
-                doc.rect(20, yOffset + 38, 4, 4); doc.text("Personal", 26, yOffset + 41);
-                if(pType === 'PERSONAL') doc.text("X", 20.5, yOffset + 41);
+                doc.rect(xOffset + 15, 48, 4, 4); doc.text("Personal", xOffset + 21, 51);
+                if(pType === 'PERSONAL') doc.text("X", xOffset + 15.5, 51.5);
                 
-                doc.rect(20, yOffset + 44, 4, 4); doc.text("Official", 26, yOffset + 47);
-                if(pType === 'OFFICIAL') doc.text("X", 20.5, yOffset + 47);
+                doc.rect(xOffset + 15, 55, 4, 4); doc.text("Official", xOffset + 21, 58);
+                if(pType === 'OFFICIAL') doc.text("X", xOffset + 15.5, 58.5);
 
-                doc.text("The Chief: ______________________________________________________________", 20, yOffset + 58);
-                doc.text("It is requested that I be allowed to leave the Office during Office hours.", 35, yOffset + 64);
+                doc.text("The Chief: ____________________________________________________________________", xOffset + 15, 70);
+                doc.text("It is requested that I be allowed to leave the Office during Office hours.", xOffset + 25, 78);
 
-                doc.text("Date:", 20, yOffset + 75); doc.text(new Date(dateStr).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}), 45, yOffset + 75); doc.line(40, yOffset + 76, 190, yOffset + 76);
-                doc.text("Destination:", 20, yOffset + 82); doc.text(dest, 45, yOffset + 82); doc.line(40, yOffset + 83, 190, yOffset + 83);
-                doc.text("Purpose:", 20, yOffset + 89); doc.text(purp, 45, yOffset + 89); doc.line(40, yOffset + 90, 190, yOffset + 90);
+                doc.text("Date:", xOffset + 15, 90); doc.text(new Date(dateStr).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}), xOffset + 40, 90); doc.line(xOffset + 38, 91, xOffset + 150, 91);
+                doc.text("Destination:", xOffset + 15, 98); doc.text(dest, xOffset + 40, 98); doc.line(xOffset + 38, 99, xOffset + 150, 99);
+                doc.text("Purpose:", xOffset + 15, 106); doc.text(purp, xOffset + 40, 106); doc.line(xOffset + 38, 107, xOffset + 150, 107);
                 
-                doc.text("Time:  From:", 20, yOffset + 98); doc.line(40, yOffset + 99, 90, yOffset + 99);
-                doc.text("To:", 100, yOffset + 98); doc.line(108, yOffset + 99, 160, yOffset + 99);
+                doc.text("Time:  From:", xOffset + 15, 116); doc.line(xOffset + 38, 117, xOffset + 80, 117);
+                doc.text("To:", xOffset + 95, 116); doc.line(xOffset + 105, 117, xOffset + 150, 117);
 
-                doc.setFont("helvetica", "bold"); doc.text(empName, 105, yOffset + 115, {align: 'center'});
-                doc.line(60, yOffset + 116, 150, yOffset + 116);
-                doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.text("Printed Name & Signature of Employee", 105, yOffset + 119, {align: 'center'});
+                doc.setFont("helvetica", "bold"); doc.text(empName, xOffset + 82.55, 135, {align: 'center'});
+                doc.line(xOffset + 40, 136, xOffset + 125, 136);
+                doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.text("Printed Name & Signature of Employee", xOffset + 82.55, 140, {align: 'center'});
 
-                doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.text("APPROVED:", 20, yOffset + 130);
-                doc.line(40, yOffset + 140, 100, yOffset + 140);
-                doc.setFont("helvetica", "normal"); doc.text("Division Chief", 70, yOffset + 144, {align: 'center'});
+                doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.text("APPROVED:", xOffset + 15, 155);
+                doc.line(xOffset + 30, 165, xOffset + 90, 165);
+                doc.setFont("helvetica", "normal"); doc.text("Division Chief", xOffset + 60, 170, {align: 'center'});
 
-                doc.rect(40, yOffset + 150, 130, 30);
-                doc.text("CERTIFICATE OF APPEARANCE", 105, yOffset + 155, {align: 'center'});
-                doc.line(60, yOffset + 170, 150, yOffset + 170); doc.text("(Certifying Officer)", 105, yOffset + 174, {align: 'center'});
-                doc.line(80, yOffset + 178, 130, yOffset + 178); doc.text("Date", 105, yOffset + 182, {align: 'center'});
+                doc.rect(xOffset + 30, 175, 105, 30);
+                doc.text("CERTIFICATE OF APPEARANCE", xOffset + 82.55, 182, {align: 'center'});
+                doc.line(xOffset + 50, 195, xOffset + 115, 195); doc.text("(Certifying Officer)", xOffset + 82.55, 199, {align: 'center'});
+                doc.line(xOffset + 65, 203, xOffset + 100, 203); doc.text("Date", xOffset + 82.55, 207, {align: 'center'});
 
-                doc.setFont("helvetica", "italic"); doc.text(copyType, 105, yOffset + 188, {align: 'center'});
+                doc.setFont("helvetica", "italic"); doc.text(copyType, xOffset + 82.55, 213, {align: 'center'});
             }
 
             renderSlip(0, "PERSONAL COPY");
-            renderSlip(148.5, "SECURITY OFFICER COPY");
+            renderSlip(165.1, "SECURITY OFFICER COPY");
 
             const qrDataStr = `GP-${newRecord.id}-${empId}`;
             const qrBase64 = await getQRBase64(qrDataStr);
             if(qrBase64) {
-                doc.addImage(qrBase64, 'PNG', 20, 15, 25, 25);
-                doc.addImage(qrBase64, 'PNG', 20, 15 + 148.5, 25, 25);
+                doc.addImage(qrBase64, 'PNG', 15, 15, 25, 25);
+                doc.addImage(qrBase64, 'PNG', 165.1 + 15, 15, 25, 25);
             }
 
             doc.save(`GatePass_${empId}_${dateStr}.pdf`);
@@ -426,8 +427,6 @@
                 
                 if(mn >= 1 && mn <= 10) d += mn === 1 ? 0.002 : mn === 2 ? 0.004 : mn === 3 ? 0.006 : mn === 4 ? 0.008 : mn === 5 ? 0.010 : mn === 6 ? 0.012 : mn === 7 ? 0.015 : mn === 8 ? 0.017 : mn === 9 ? 0.019 : 0.021;
                 else if (mn > 10) {
-                   // simple extrapolation for the rest if needed, or stick to provided chart logic. 
-                   // Providing basic mapping up to 60 for robustness.
                    d += mn * 0.00208; // Roughly 0.125 / 60 
                 }
                 return d;
@@ -441,7 +440,7 @@
                 if(gp.status === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800';
                 if(gp.status === 'POSTED') sCls = 'bg-green-100 text-green-800';
                 
-                // Calculate time if available, otherwise just show inputs for processing
+                // Use automated time out/in from table
                 let tOutStr = formatTime12h(gp.time_out);
                 let tInStr = formatTime12h(gp.time_in);
                 
@@ -450,18 +449,34 @@
                 let actionBtn = '';
 
                 if(gp.status === 'ISSUED') {
-                    // Not processed yet. Show UI to input times and calculate.
+                    // Calculate and show what the deduction will be based on logs
+                    let calcDeduct = 0;
+                    if(gp.time_out && gp.time_in) {
+                        const dO = new Date(`1970-01-01T${gp.time_out}`);
+                        const dI = new Date(`1970-01-01T${gp.time_in}`);
+                        let diffMins = (dI - dO) / 60000;
+                        if(diffMins > 0) {
+                            let hrs = Math.floor(diffMins / 60);
+                            let mns = diffMins % 60;
+                            calcDeduct = getDedDay(hrs, mns);
+                        }
+                    }
+                    
                     timeCell = `
-                        <div class="flex flex-col gap-1 items-center">
-                            <input type="time" id="tOut_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_out||''}">
-                            <input type="time" id="tIn_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_in||''}">
-                            <button onclick="calcGP('${gp.id}')" class="text-[10px] bg-gray-200 px-2 py-0.5 rounded mt-1">Calc</button>
+                        <div class="text-xs text-center">
+                            <span class="text-gray-500">Out:</span> ${tOutStr}<br>
+                            <span class="text-gray-500">In:</span> ${tInStr}
                         </div>
                     `;
-                    dedCell = `<input type="number" step="0.001" id="ded_${gp.id}" class="border rounded px-1 text-xs w-16 text-center bg-white" value="0.000">`;
-                    actionBtn = `<button onclick="processGP('${gp.id}')" class="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 shadow">Process</button>`;
+                    dedCell = `<div class="font-bold text-red-600 text-center">${calcDeduct.toFixed(3)}</div>`;
+                    
+                    if(gp.time_out && gp.time_in) {
+                        actionBtn = `<button onclick="processGP('${gp.id}', ${calcDeduct})" class="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 shadow mt-1">Process</button>`;
+                    } else {
+                        actionBtn = `<div class="text-[10px] text-gray-400 mt-1 italic">Waiting for scans...</div>`;
+                    }
                 } else {
-                    timeCell = `<div class="text-xs text-center">${tOutStr}<br>to<br>${tInStr}</div>`;
+                    timeCell = `<div class="text-xs text-center"><span class="text-gray-500">Out:</span> ${tOutStr}<br><span class="text-gray-500">In:</span> ${tInStr}</div>`;
                     dedCell = `<div class="font-bold text-red-600 text-center">${parseFloat(gp.deduction_credit).toFixed(3)}</div>`;
                     if(gp.status === 'PROCESSED') {
                         actionBtn = `<div class="text-xs text-gray-500 italic mt-1">Ready for Posting</div>`;
@@ -483,7 +498,7 @@
                         </td>
                         <td class="table-td p-1">${timeCell}</td>
                         <td class="table-td p-1">${dedCell}</td>
-                        <td class="table-td text-center">
+                        <td class="table-td text-center flex flex-col gap-1 items-center">
                             <span class="badge ${sCls} block w-max mx-auto">${gp.status}</span>
                             ${actionBtn}
                         </td>
@@ -496,52 +511,16 @@
         }
     }
 
-    window.calcGP = function(id) {
-        const tO = document.getElementById(`tOut_${id}`).value;
-        const tI = document.getElementById(`tIn_${id}`).value;
-        if(!tO || !tI) { alert("Please input both Out and In times."); return; }
-        
-        const dO = new Date(`1970-01-01T${tO}:00`);
-        const dI = new Date(`1970-01-01T${tI}:00`);
-        let diffMins = (dI - dO) / 60000;
-        
-        if (diffMins < 0) { alert("Time In cannot be earlier than Time Out."); return; }
-        
-        let hrs = Math.floor(diffMins / 60);
-        let mns = diffMins % 60;
-        
-        // Exact conversion mapping logic 
-        let d = 0;
-        if(hrs === 1) d+=0.125; else if(hrs===2) d+=0.250; else if(hrs===3) d+=0.375; else if(hrs===4) d+=0.500; else if(hrs===5) d+=0.625; else if(hrs===6) d+=0.750; else if(hrs===7) d+=0.875; else if(hrs>=8) d+=1.000;
-        
-        if(mns >= 1 && mns <= 10) {
-            const minMap = {1:0.002, 2:0.004, 3:0.006, 4:0.008, 5:0.010, 6:0.012, 7:0.015, 8:0.017, 9:0.019, 10:0.021};
-            d += minMap[mns];
-        } else if (mns > 10) {
-            d += mns * 0.002083; // Approx calculation for > 10 mins based on standard table
-        }
-        
-        document.getElementById(`ded_${id}`).value = d.toFixed(3);
-    }
-
-    window.processGP = async function(id) {
-        const tO = document.getElementById(`tOut_${id}`).value;
-        const tI = document.getElementById(`tIn_${id}`).value;
-        const ded = document.getElementById(`ded_${id}`).value;
-        
-        if(!tO || !tI || ded === "") { alert("Please calculate or input times and deduction."); return; }
-
-        if(!confirm(`Process this Gate Pass with a deduction of ${ded} days?`)) return;
+    window.processGP = async function(id, calcDed) {
+        if(!confirm(`Process this Gate Pass with a deduction of ${calcDed.toFixed(3)} days?`)) return;
 
         try {
             await supabaseClient.from('gate_pass_logs').update({
-                time_out: tO,
-                time_in: tI,
-                deduction_credit: parseFloat(ded),
+                deduction_credit: parseFloat(calcDed),
                 status: 'PROCESSED'
             }).eq('id', id);
             
-            alert("Gate Pass processed and marked for posting.");
+            alert("Gate Pass processed. It is now ready for posting in the Leave Page.");
             loadRecentGatePasses();
         } catch(e) {
             alert("Error: " + e.message);
@@ -695,6 +674,7 @@
             } else {
                 numEl.value = creditableHours.toFixed(2);
             }
+            // Trigger change
             updateBaseHours(emp_id, numEl.value);
             
         } catch(e) {
@@ -719,9 +699,10 @@
             return;
         }
 
+        // Validate base hours
         for(let emp of selectedCtoEmployees) {
             if(emp.baseHours < 2) {
-                alert(`Employee ${emp.name} has ${emp.baseHours} base hours. CTO requires 2 hours or more.`);
+                alert(`Employee ${emp.name} has ${emp.baseHours} base hours. CTO requires 2 hours or more. Please correct or remove the employee.`);
                 return;
             }
         }
@@ -745,6 +726,7 @@
 
             alert("CTO Records successfully saved. They will appear in the Leave Processing -> CTO Posting tab for final crediting.");
             
+            // Clear
             selectedCtoEmployees = [];
             renderCtoEmployees();
             document.getElementById('ctoPso').value = '';
