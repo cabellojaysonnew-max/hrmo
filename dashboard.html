@@ -74,7 +74,7 @@
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
                     <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
                 </div>
-                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
             </div>
         </div>
 
@@ -584,56 +584,59 @@
             }
         }
 
-        pdf.setMargins(25.4, 45, 25.4);
+        // --- ALIGNMENT FIX FOR TARDINESS MEMO ---
+        pdf.setMargins(30, 45, 30); // Set explicit left margin to 30mm for proper alignment
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(12);
-        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
+        
+        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); // Left aligned
         pdf.setFontSize(11);
-        pdf.text(`Series of ${currYear}`, 25.4, 51);
+        pdf.text(`Series of ${currYear}`, 30, 51); // Left aligned
 
         pdf.setFontSize(11);
         let currentY = 65;
         const lineH = 8;
         
-        pdf.text("TO", 25.4, currentY); pdf.text(":", 50, currentY); pdf.text(`${empName}`, 55, currentY); currentY += lineH;
-        pdf.text("FROM", 25.4, currentY); pdf.text(":", 50, currentY); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 55, currentY); currentY += lineH;
-        pdf.text("DATE", 25.4, currentY); pdf.text(":", 50, currentY); pdf.text(`${todayStr}`, 55, currentY); currentY += lineH;
-        pdf.text("SUBJECT", 25.4, currentY); pdf.text(":", 50, currentY); 
+        pdf.text("TO", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${empName}`, 60, currentY); currentY += lineH;
+        pdf.text("FROM", 30, currentY); pdf.text(":", 55, currentY); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, currentY); currentY += lineH;
+        pdf.text("DATE", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${todayStr}`, 60, currentY); currentY += lineH;
+        pdf.text("SUBJECT", 30, currentY); pdf.text(":", 55, currentY); 
         
-        const splitSubject = pdf.splitTextToSize(memoType, 135);
-        pdf.text(splitSubject, 55, currentY);
+        const splitSubject = pdf.splitTextToSize(memoType, 130);
+        pdf.text(splitSubject, 60, currentY);
         currentY += (splitSubject.length * lineH);
 
         pdf.setLineWidth(0.6);
-        pdf.line(25.4, currentY, 215.9 - 25.4, currentY);
+        pdf.line(30, currentY, 215.9 - 30, currentY); // Line drawn matching the margins
         currentY += 8;
 
         pdf.setFont("helvetica", "normal");
         
-        const splitP1 = pdf.splitTextToSize(p1, 165);
-        pdf.text(splitP1, 25.4, currentY);
+        // Use text alignment 'justify' natively supported by jsPDF (needs wrapping parameter)
+        pdf.text(p1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitP1 = pdf.splitTextToSize(p1, 155.9);
         currentY += (splitP1.length * 5) + 5;
 
-        const splitP2 = pdf.splitTextToSize(p2, 165);
-        pdf.text(splitP2, 25.4, currentY);
+        pdf.text(p2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitP2 = pdf.splitTextToSize(p2, 155.9);
         currentY += (splitP2.length * 5) + 5;
 
-        const splitP3 = pdf.splitTextToSize(p3, 165);
-        pdf.text(splitP3, 25.4, currentY);
+        pdf.text(p3, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitP3 = pdf.splitTextToSize(p3, 155.9);
         currentY += (splitP3.length * 5) + 10;
 
         const closing1 = "All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.";
-        const splitC1 = pdf.splitTextToSize(closing1, 165);
-        pdf.text(splitC1, 25.4, currentY);
+        pdf.text(closing1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitC1 = pdf.splitTextToSize(closing1, 155.9);
         currentY += (splitC1.length * 5) + 5;
 
         const closing2 = "_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.";
-        const splitC2 = pdf.splitTextToSize(closing2, 165);
-        pdf.text(splitC2, 25.4, currentY);
+        pdf.text(closing2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitC2 = pdf.splitTextToSize(closing2, 155.9);
         currentY += (splitC2.length * 5) + 15;
 
         pdf.setFont("helvetica", "bold");
-        pdf.text("RICARDO C. GARCIA", 25.4, currentY);
+        pdf.text("RICARDO C. GARCIA", 30, currentY); // Left aligned
 
         try {
             await supabaseClient.from('memo_records').insert({
@@ -665,7 +668,7 @@
             const qrCanvas = qrContainer.querySelector('canvas');
             if (qrCanvas) {
                 const qrDataUrl = qrCanvas.toDataURL('image/png');
-                pdf.addImage(qrDataUrl, 'PNG', 25.4, currentY + 5, 22, 22);
+                pdf.addImage(qrDataUrl, 'PNG', 30, currentY + 5, 22, 22);
             }
             pdf.save(`Memo_${empId}_${memoTypeDb.replace(" ", "_")}_${currMonthName}_${currYear}.pdf`);
         }, 300);
@@ -686,40 +689,56 @@
         const currYear = new Date().getFullYear();
         const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 
-        pdf.setFont("helvetica", "bold"); pdf.setFontSize(12);
-        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 25.4, 45);
-        pdf.setFontSize(11); pdf.text(`Series of ${currYear}`, 25.4, 51);
+        // --- ALIGNMENT FIX FOR FLAG MEMO ---
+        pdf.setMargins(30, 45, 30); // Set explicit left margin to 30mm
+        pdf.setFont("helvetica", "bold"); 
+        pdf.setFontSize(12);
+        
+        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); // Left aligned
+        pdf.setFontSize(11); 
+        pdf.text(`Series of ${currYear}`, 30, 51); // Left aligned
         
         let y = 65; 
         const lineH = 8;
-        pdf.text("TO", 25.4, y); pdf.text(":", 50, y); pdf.text(empName, 55, y); y += lineH;
-        pdf.text("FROM", 25.4, y); pdf.text(":", 50, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 55, y); y += lineH;
-        pdf.text("DATE", 25.4, y); pdf.text(":", 50, y); pdf.text(today, 55, y); y += lineH;
-        pdf.text("SUBJECT", 25.4, y); pdf.text(":", 50, y); pdf.text("NON-ATTENDANCE TO FLAG CEREMONY", 55, y);
-        pdf.setLineWidth(0.6); pdf.line(25.4, y+5, 190, y+5); y += 15;
+        pdf.text("TO", 30, y); pdf.text(":", 55, y); pdf.text(empName, 60, y); y += lineH;
+        pdf.text("FROM", 30, y); pdf.text(":", 55, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, y); y += lineH;
+        pdf.text("DATE", 30, y); pdf.text(":", 55, y); pdf.text(today, 60, y); y += lineH;
+        pdf.text("SUBJECT", 30, y); pdf.text(":", 55, y); pdf.text("NON-ATTENDANCE TO FLAG CEREMONY", 60, y);
+        
+        pdf.setLineWidth(0.6); 
+        pdf.line(30, y+5, 215.9 - 30, y+5); // Line drawn matching the margins
+        y += 15;
 
         pdf.setFont("helvetica", "normal");
         const p1 = `Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following date(s): ${missedDates}.`;
         const p2 = "Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory for all government officials and employees.";
         const p3 = "You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you for this violation of office rules. Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.";
 
-        [p1, p2, p3].forEach(txt => { 
-            const split = pdf.splitTextToSize(txt, 165); 
-            pdf.text(split, 25.4, y); 
-            y += (split.length * 5) + 5; 
-        });
+        // Use text alignment 'justify' natively supported by jsPDF
+        pdf.text(p1, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitP1 = pdf.splitTextToSize(p1, 155.9);
+        y += (splitP1.length * 5) + 5; 
+        
+        pdf.text(p2, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitP2 = pdf.splitTextToSize(p2, 155.9);
+        y += (splitP2.length * 5) + 5; 
+        
+        pdf.text(p3, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitP3 = pdf.splitTextToSize(p3, 155.9);
+        y += (splitP3.length * 5) + 10; 
 
         const closing1 = "All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.";
-        const splitC1 = pdf.splitTextToSize(closing1, 165);
-        pdf.text(splitC1, 25.4, y);
+        pdf.text(closing1, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitC1 = pdf.splitTextToSize(closing1, 155.9);
         y += (splitC1.length * 5) + 5;
 
         const closing2 = "_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.";
-        const splitC2 = pdf.splitTextToSize(closing2, 165);
-        pdf.text(splitC2, 25.4, y);
+        pdf.text(closing2, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitC2 = pdf.splitTextToSize(closing2, 155.9);
         y += (splitC2.length * 5) + 15;
         
-        pdf.setFont("helvetica", "bold"); pdf.text("RICARDO C. GARCIA", 25.4, y);
+        pdf.setFont("helvetica", "bold"); 
+        pdf.text("RICARDO C. GARCIA", 30, y); // Left aligned
 
         try {
             await supabaseClient.from('memo_records').insert({
@@ -751,7 +770,7 @@
             const qrCanvas = qrContainer.querySelector('canvas');
             if (qrCanvas) {
                 const qrDataUrl = qrCanvas.toDataURL('image/png');
-                pdf.addImage(qrDataUrl, 'PNG', 25.4, y + 5, 22, 22);
+                pdf.addImage(qrDataUrl, 'PNG', 30, y + 5, 22, 22);
             }
             pdf.save(`Flag_Ceremony_Memo_${empId}_${currMonthName}_${currYear}.pdf`);
         }, 300);
