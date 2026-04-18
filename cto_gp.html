@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gate Pass & CTO - DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; overflow: hidden; }
+        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; }
+        .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: #003811; margin-bottom: 0.25rem; text-transform: uppercase; }
+        .tab-btn { padding: 0.75rem 1.5rem; font-size: 0.875rem; font-weight: bold; color: #4B5563; border-bottom: 2px solid transparent; transition: all 0.2s; cursor: pointer; }
+        .tab-btn.active { color: #003811; border-bottom-color: #D4AF37; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .table-th { background-color: #f9fafb; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #6b7280; padding: 0.75rem 1.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .table-td { padding: 0.75rem 1.5rem; font-size: 0.875rem; color: #111827; border-bottom: 1px solid #e5e7eb; }
+        .badge { padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: bold; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
+            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
+            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">GATE PASS & CTO</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow hover:bg-red-700">LOGOUT</button>
+        </div>
+    </nav>
+
+    <main class="flex-1 flex flex-col h-full bg-[#F3F4F6]">
+        <div class="p-8 pb-0">
+            <h2 class="text-3xl font-bold text-[#003811] mb-6">Gate Pass & CTO Processing</h2>
+            <div class="flex border-b border-gray-200 mb-6">
+                <button class="tab-btn active" onclick="switchTab('gpTab')">Gate Pass Generation</button>
+                <button class="tab-btn" onclick="switchTab('ctoTab')">CTO Processing</button>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-8 pb-8">
+            
+            <div id="gpTab" class="tab-content active">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-1">
+                        <div class="card p-6">
+                            <h3 class="font-bold text-[#003811] mb-4">Generate Gate Pass</h3>
+                            <div class="space-y-4">
+                                <div class="relative">
+                                    <label class="form-label">Search Employee (DARPO-CS1 Only)</label>
+                                    <input type="text" id="gpSearch" class="form-input" placeholder="Type to search..." autocomplete="off">
+                                    <div id="gpSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
+                                    <input type="hidden" id="gpEmpId">
+                                </div>
+                                <div>
+                                    <label class="form-label">Pass Type</label>
+                                    <select id="gpType" class="form-input">
+                                        <option value="OFFICIAL">Official</option>
+                                        <option value="PERSONAL">Personal</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="form-label">Destination</label>
+                                    <input type="text" id="gpDest" class="form-input" placeholder="e.g. Naga City">
+                                </div>
+                                <div>
+                                    <label class="form-label">Purpose</label>
+                                    <input type="text" id="gpPurpose" class="form-input" placeholder="Specific purpose...">
+                                </div>
+                                <button onclick="generateGatePass()" class="w-full bg-[#003811] hover:bg-[#002200] text-white font-bold py-3 px-4 rounded shadow mt-2">Generate & Print Gate Pass</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2">
+                        <div class="card h-full flex flex-col">
+                            <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                                <h3 class="font-bold text-[#003811]">Recent Gate Passes</h3>
+                                <button onclick="loadRecentGatePasses()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
+                            </div>
+                            <div class="flex-1 overflow-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr>
+                                            <th class="table-th">Date</th>
+                                            <th class="table-th">Emp ID</th>
+                                            <th class="table-th">Name</th>
+                                            <th class="table-th">Type</th>
+                                            <th class="table-th">Destination - Purpose</th>
+                                            <th class="table-th">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="gp-recent-list">
+                                        <tr><td colspan="6" class="table-td text-center text-gray-500">Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ctoTab" class="tab-content">
+                <div class="card mb-6">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50">
+                        <h3 class="font-bold text-[#003811]">CTO Details</h3>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="form-label">PSO / RSO Number</label>
+                            <input type="text" id="ctoPso" class="form-input" placeholder="Enter PSO Number" onblur="checkExistingPSO()">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="form-label">CTO Description (Base Type)</label>
+                            <input type="text" id="ctoDesc" class="form-input" placeholder="e.g. Conduct of validation...">
+                        </div>
+                        <div>
+                            <label class="form-label">Date of Activity</label>
+                            <input type="date" id="ctoDate" class="form-input" onchange="checkWeekend()">
+                        </div>
+                        <div class="md:col-span-4 flex gap-4 items-center mt-2">
+                            <div class="flex items-center gap-2 bg-gray-100 p-2 rounded border">
+                                <input type="checkbox" id="ctoIsWeekend" class="w-4 h-4 accent-[#D4AF37]">
+                                <label class="text-sm font-bold text-gray-700">Weekend / Holiday (Multiplier 1.5x)</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end flex-wrap">
+                        <div class="flex-1 min-w-[200px] relative">
+                            <label class="form-label">Search & Add Employee</label>
+                            <input type="text" id="ctoEmpSearch" class="form-input" placeholder="Type to search..." autocomplete="off">
+                            <div id="ctoSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
+                        </div>
+                        <div class="text-right">
+                            <button onclick="saveCtoBatch()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-8 rounded shadow text-lg">Save CTO Records</button>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="table-th">Emp ID</th>
+                                    <th class="table-th">Name</th>
+                                    <th class="table-th" style="width: 150px;">Base Hours</th>
+                                    <th class="table-th text-center" style="width: 250px;">Logs Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cto-emp-list">
+                                <tr><td colspan="4" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <div id="qrContainer" class="hidden"></div>
+
+<script>
+    // --- SESSION AUTH ---
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) { window.location.href = 'index.html'; }
+    const currentUser = JSON.parse(userData);
+    document.getElementById('activeUser').innerText = `User: ${currentUser.full_name ? currentUser.full_name.toUpperCase() : currentUser.username}`;
+
+    function logout() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    }
+
+    // --- GLOBALS ---
+    let empDataMap = {};
+    let gpSearchList = [];
+    let allEmpSearchList = [];
+    let selectedCtoEmployees = []; // Array of { emp_id, name }
+
+    // --- INIT ---
+    async function loadData() {
+        const { data } = await supabaseClient.from('employees').select('*').order('full_name');
+        if(data) {
+            data.forEach(e => {
+                empDataMap[e.emp_id] = e;
+                if(e.full_name) {
+                    const obj = { id: e.emp_id, name: e.full_name.toUpperCase() };
+                    allEmpSearchList.push(obj);
+                    if(e.station === 'DARPO-CS1') {
+                        gpSearchList.push(obj);
+                    }
+                }
+            });
+        }
+        loadRecentGatePasses();
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    // --- GATE PASS LOGIC ---
+    const gpInput = document.getElementById('gpSearch');
+    const gpResults = document.getElementById('gpSearchResults');
+    const gpEmpId = document.getElementById('gpEmpId');
+
+    gpInput.addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        gpResults.innerHTML = '';
+        if (!val) { gpResults.classList.add('hidden'); return; }
+        
+        const filtered = gpSearchList.filter(e => e.name.toLowerCase().includes(val) || e.id.toLowerCase().includes(val));
+        if (filtered.length > 0) {
+            filtered.forEach(e => {
+                const div = document.createElement('div');
+                div.className = 'p-2 hover:bg-gray-100 cursor-pointer text-sm';
+                div.innerText = `${e.name} (${e.id})`;
+                div.onclick = () => {
+                    gpInput.value = e.name;
+                    gpEmpId.value = e.id;
+                    gpResults.classList.add('hidden');
+                };
+                gpResults.appendChild(div);
+            });
+            gpResults.classList.remove('hidden');
+        } else {
+            gpResults.classList.add('hidden');
+        }
+    });
+
+    async function getQRBase64(text) {
+        return new Promise((resolve) => {
+            const container = document.getElementById('qrContainer');
+            container.innerHTML = "";
+            new QRCode(container, { text: text, width: 150, height: 150 });
+            setTimeout(() => { resolve(container.querySelector("canvas").toDataURL("image/png")); }, 150);
+        });
+    }
+
+    async function generateGatePass() {
+        const empId = gpEmpId.value;
+        const pType = document.getElementById('gpType').value;
+        const dest = document.getElementById('gpDest').value;
+        const purp = document.getElementById('gpPurpose').value;
+
+        if(!empId || !dest || !purp) {
+            alert("Please select an employee and fill all fields.");
+            return;
+        }
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        const fullPurpose = `${dest} - ${purp}`;
+
+        try {
+            // Insert
+            const { data, error } = await supabaseClient.from('gate_pass_logs').insert([{
+                emp_id: empId,
+                date: dateStr,
+                pass_type: pType,
+                purpose: fullPurpose,
+                status: 'ISSUED',
+                deduction_credit: 0
+            }]).select();
+
+            if(error) throw error;
+            const newRecord = data[0];
+
+            // Print PDF
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', [100, 150]); // Receipt size
+            const empName = empDataMap[empId].full_name.toUpperCase();
+            
+            doc.setFontSize(12); doc.setFont("helvetica", "bold");
+            doc.text("DARPO-CS1 GATE PASS", 50, 15, {align: 'center'});
+            doc.setFontSize(9); doc.setFont("helvetica", "normal");
+            doc.text(`Date: ${dateStr}`, 50, 22, {align: 'center'});
+            
+            doc.line(10, 25, 90, 25);
+            
+            doc.setFontSize(10); doc.setFont("helvetica", "bold");
+            doc.text("NAME:", 10, 35); doc.setFont("helvetica", "normal"); doc.text(empName, 10, 41);
+            
+            doc.setFont("helvetica", "bold"); doc.text("TYPE:", 10, 51); doc.setFont("helvetica", "normal"); doc.text(pType, 25, 51);
+            
+            doc.setFont("helvetica", "bold"); doc.text("DESTINATION:", 10, 61); 
+            doc.setFont("helvetica", "normal");
+            const dLines = doc.splitTextToSize(dest, 80);
+            doc.text(dLines, 10, 67);
+            
+            let y = 67 + (dLines.length * 5) + 2;
+            doc.setFont("helvetica", "bold"); doc.text("PURPOSE:", 10, y); 
+            doc.setFont("helvetica", "normal");
+            const pLines = doc.splitTextToSize(purp, 80);
+            doc.text(pLines, 10, y+6);
+
+            // Generate QR
+            const qrDataStr = `GP-${newRecord.id}-${empId}`;
+            const qrBase64 = await getQRBase64(qrDataStr);
+            if(qrBase64) {
+                doc.addImage(qrBase64, 'PNG', 30, 95, 40, 40);
+            }
+            
+            doc.setFontSize(7); doc.setTextColor(100);
+            doc.text("Present to Guard for Exit/Entrance", 50, 140, {align: 'center'});
+
+            doc.save(`GatePass_${empId}_${dateStr}.pdf`);
+            
+            alert("Gate Pass generated and PDF downloaded.");
+            
+            // Clear fields
+            document.getElementById('gpSearch').value = '';
+            gpEmpId.value = '';
+            document.getElementById('gpDest').value = '';
+            document.getElementById('gpPurpose').value = '';
+            
+            loadRecentGatePasses();
+
+        } catch(e) {
+            alert("Error generating Gate Pass: " + e.message);
+        }
+    }
+
+    async function loadRecentGatePasses() {
+        const list = document.getElementById('gp-recent-list');
+        try {
+            const { data, error } = await supabaseClient.from('gate_pass_logs')
+                .select('*')
+                .in('status', ['ISSUED', 'PROCESSED'])
+                .order('date', { ascending: false })
+                .order('id', { ascending: false })
+                .limit(50);
+                
+            if (error) throw error;
+            
+            if(!data || data.length === 0) {
+                list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No recent issued or processed gate passes found.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            data.forEach(gp => {
+                const name = empDataMap[gp.emp_id] ? empDataMap[gp.emp_id].full_name.toUpperCase() : gp.emp_id;
+                let sCls = gp.status === 'PROCESSED' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800';
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="table-td">${gp.date}</td>
+                        <td class="table-td text-xs font-mono">${gp.emp_id}</td>
+                        <td class="table-td font-bold">${name}</td>
+                        <td class="table-td">${gp.pass_type}</td>
+                        <td class="table-td text-xs">${gp.purpose || '-'}</td>
+                        <td class="table-td"><span class="badge ${sCls}">${gp.status}</span></td>
+                    </tr>
+                `;
+            });
+            list.innerHTML = html;
+        } catch(e) {
+            list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+        }
+    }
+
+    // --- CTO LOGIC ---
+    const ctoInput = document.getElementById('ctoEmpSearch');
+    const ctoResults = document.getElementById('ctoSearchResults');
+
+    ctoInput.addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        ctoResults.innerHTML = '';
+        if (!val) { ctoResults.classList.add('hidden'); return; }
+        
+        const filtered = allEmpSearchList.filter(e => e.name.toLowerCase().includes(val) || e.id.toLowerCase().includes(val));
+        if (filtered.length > 0) {
+            filtered.forEach(e => {
+                const div = document.createElement('div');
+                div.className = 'p-2 hover:bg-gray-100 cursor-pointer text-sm';
+                div.innerText = `${e.name} (${e.id})`;
+                div.onclick = () => {
+                    addCtoEmployee(e.id, e.name);
+                    ctoInput.value = '';
+                    ctoResults.classList.add('hidden');
+                };
+                ctoResults.appendChild(div);
+            });
+            ctoResults.classList.remove('hidden');
+        } else {
+            ctoResults.classList.add('hidden');
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target !== gpInput && e.target !== gpResults) gpResults.classList.add('hidden');
+        if (e.target !== ctoInput && e.target !== ctoResults) ctoResults.classList.add('hidden');
+    });
+
+    function checkWeekend() {
+        const dt = document.getElementById('ctoDate').value;
+        if(!dt) return;
+        const day = new Date(dt).getDay();
+        document.getElementById('ctoIsWeekend').checked = (day === 0 || day === 6);
+    }
+
+    async function checkExistingPSO() {
+        const pso = document.getElementById('ctoPso').value.trim();
+        if(!pso) return;
+        try {
+            const { data } = await supabaseClient.from('cto_records').select('*').eq('PSO_Number', pso).limit(1);
+            if(data && data.length > 0) {
+                if(!document.getElementById('ctoDesc').value) document.getElementById('ctoDesc').value = data[0].base_type || '';
+                if(!document.getElementById('ctoDate').value && data[0].date) {
+                    document.getElementById('ctoDate').value = data[0].date;
+                    checkWeekend();
+                }
+            }
+        } catch(e) {}
+    }
+
+    function addCtoEmployee(id, name) {
+        if(selectedCtoEmployees.find(e => e.id === id)) return; // already added
+        selectedCtoEmployees.push({ id, name, baseHours: 0 });
+        renderCtoEmployees();
+    }
+
+    function removeCtoEmployee(id) {
+        selectedCtoEmployees = selectedCtoEmployees.filter(e => e.id !== id);
+        renderCtoEmployees();
+    }
+
+    function updateBaseHours(id, val) {
+        const emp = selectedCtoEmployees.find(e => e.id === id);
+        if(emp) emp.baseHours = parseFloat(val) || 0;
+    }
+
+    function renderCtoEmployees() {
+        const list = document.getElementById('cto-emp-list');
+        if(selectedCtoEmployees.length === 0) {
+            list.innerHTML = `<tr><td colspan="4" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        selectedCtoEmployees.forEach(emp => {
+            html += `
+                <tr class="hover:bg-gray-50">
+                    <td class="table-td text-xs font-mono">${emp.id}</td>
+                    <td class="table-td font-bold">${emp.name}</td>
+                    <td class="table-td">
+                        <input type="number" step="0.1" class="form-input text-center" value="${emp.baseHours}" onchange="updateBaseHours('${emp.id}', this.value)" id="ctoHr_${emp.id}">
+                    </td>
+                    <td class="table-td text-center">
+                        <button onclick="fetchLogsForCTO('${emp.id}', 'ctoHr_${emp.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded shadow mr-2">Check Logs</button>
+                        <button onclick="removeCtoEmployee('${emp.id}')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded shadow">Remove</button>
+                    </td>
+                </tr>
+            `;
+        });
+        list.innerHTML = html;
+    }
+
+    async function fetchLogsForCTO(emp_id, inputId) {
+        const dateStr = document.getElementById('ctoDate').value;
+        if(!dateStr) { alert("Please set the Date of Activity first."); return; }
+        
+        try {
+            const startOfDay = new Date(`${dateStr}T00:00:00+08:00`).toISOString();
+            const endOfDay = new Date(`${dateStr}T23:59:59+08:00`).toISOString();
+            
+            const { data: logs, error } = await supabaseClient.from('attendance_logs')
+                .select('log_time')
+                .eq('emp_id', emp_id)
+                .gte('log_time', startOfDay)
+                .lte('log_time', endOfDay)
+                .order('log_time', { ascending: true });
+                
+            if(error) throw error;
+            if(!logs || logs.length < 2) {
+                alert("Incomplete or no attendance logs found for this date.");
+                return;
+            }
+            
+            const firstLog = new Date(logs[0].log_time);
+            const lastLog = new Date(logs[logs.length-1].log_time);
+            let creditableHours = 0;
+            const isWeekend = document.getElementById('ctoIsWeekend').checked;
+            
+            if(isWeekend) {
+                creditableHours = (lastLog - firstLog) / (1000 * 60 * 60);
+                if(creditableHours > 5) creditableHours -= 1; // Basic 1 hr lunch deduction deduction logic if prolonged
+            } else {
+                const { data: sched } = await supabaseClient.from('schedule_override')
+                    .select('*').eq('emp_id', emp_id).eq('date', dateStr).limit(1);
+                    
+                let endTimeStr = "17:00"; 
+                if(sched && sched.length > 0 && sched[0].end_time) {
+                    endTimeStr = sched[0].end_time.substring(0,5);
+                } else {
+                    const empInfo = empDataMap[emp_id];
+                    if(empInfo && empInfo.flexi_range_end) endTimeStr = empInfo.flexi_range_end.substring(0,5);
+                }
+                
+                const schedEnd = new Date(`${dateStr}T${endTimeStr}:00+08:00`);
+                if(lastLog > schedEnd) {
+                    creditableHours = (lastLog - schedEnd) / (1000 * 60 * 60);
+                }
+            }
+            
+            const numEl = document.getElementById(inputId);
+            if(creditableHours < 2) {
+                alert(`Calculated excess time is ${creditableHours.toFixed(2)} hours. (Must be 2 hours or more to be creditable). Outputting raw value for HR review.`);
+                numEl.value = creditableHours > 0 ? creditableHours.toFixed(2) : 0;
+            } else {
+                numEl.value = creditableHours.toFixed(2);
+            }
+            // Trigger change
+            updateBaseHours(emp_id, numEl.value);
+            
+        } catch(e) {
+            alert("Error fetching logs: " + e.message);
+        }
+    }
+
+    async function saveCtoBatch() {
+        const pso = document.getElementById('ctoPso').value.trim();
+        const desc = document.getElementById('ctoDesc').value.trim();
+        const cDate = document.getElementById('ctoDate').value;
+        const isWeekend = document.getElementById('ctoIsWeekend').checked;
+        const mult = isWeekend ? 1.5 : 1.0;
+
+        if(!pso || !desc || !cDate) {
+            alert("Please fill out PSO Number, Description, and Date.");
+            return;
+        }
+
+        if(selectedCtoEmployees.length === 0) {
+            alert("Please add at least one employee.");
+            return;
+        }
+
+        // Validate base hours
+        for(let emp of selectedCtoEmployees) {
+            if(emp.baseHours < 2) {
+                alert(`Employee ${emp.name} has ${emp.baseHours} base hours. CTO requires 2 hours or more. Please correct or remove the employee.`);
+                return;
+            }
+        }
+
+        if(!confirm(`Saving CTO for ${selectedCtoEmployees.length} employees. Multiplier is ${mult}x. Proceed?`)) return;
+
+        try {
+            const records = selectedCtoEmployees.map(emp => ({
+                emp_id: emp.id,
+                date: cDate,
+                transaction_type: 'EARNED',
+                base_type: desc,
+                base_hours: emp.baseHours,
+                multiplier: mult,
+                calculated_hours: emp.baseHours * mult,
+                PSO_Number: pso
+            }));
+
+            const { error } = await supabaseClient.from('cto_records').insert(records);
+            if(error) throw error;
+
+            alert("CTO Records successfully saved. They will appear in the CTO Posting tab for final crediting.");
+            
+            // Clear
+            selectedCtoEmployees = [];
+            renderCtoEmployees();
+            document.getElementById('ctoPso').value = '';
+            document.getElementById('ctoDesc').value = '';
+
+        } catch(e) {
+            alert("Error saving CTO: " + e.message);
+        }
+    }
+
+    window.onload = loadData;
+</script>
+</body>
+</html>
