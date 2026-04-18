@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leave Processing - DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; overflow: hidden; }
+        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; }
+        .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: #003811; margin-bottom: 0.25rem; text-transform: uppercase; }
+        .tab-btn { padding: 0.75rem 1.5rem; font-size: 0.875rem; font-weight: bold; color: #4B5563; border-bottom: 2px solid transparent; transition: all 0.2s; cursor: pointer; }
+        .tab-btn.active { color: #003811; border-bottom-color: #D4AF37; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .table-th { background-color: #f9fafb; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #6b7280; padding: 0.75rem 1.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .table-td { padding: 0.75rem 1.5rem; font-size: 0.875rem; color: #111827; border-bottom: 1px solid #e5e7eb; }
+        .badge { padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: bold; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
+            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">LEAVE PROCESSING</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow hover:bg-red-700">LOGOUT</button>
+        </div>
+    </nav>
+
+    <main class="flex-1 flex flex-col h-full bg-[#F3F4F6]">
+        <div class="p-8 pb-0">
+            <h2 class="text-3xl font-bold text-[#003811] mb-6">Leave Processing</h2>
+            <div class="flex border-b border-gray-200 mb-6">
+                <button class="tab-btn active" onclick="switchTab('appsTab')">Applications</button>
+                <button class="tab-btn" onclick="switchTab('monitorTab')">Credits & Force Leave</button>
+                <button class="tab-btn" onclick="switchTab('genTab')">Generate Credits</button>
+                <button class="tab-btn" onclick="switchTab('gpTab')">Gate Pass Processing</button>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-8 pb-8">
+            
+            <div id="appsTab" class="tab-content active">
+                <div class="card">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                        <h3 class="font-bold text-[#003811]">Pending Leave Applications</h3>
+                        <button onclick="loadApplications()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="table-th">Trans ID</th>
+                                    <th class="table-th">Employee</th>
+                                    <th class="table-th">Type</th>
+                                    <th class="table-th">Dates</th>
+                                    <th class="table-th">Base Days</th>
+                                    <th class="table-th text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="app-list">
+                                <tr><td colspan="6" class="table-td text-center text-gray-500">Loading applications...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="monitorTab" class="tab-content">
+                <div class="card">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                        <h3 class="font-bold text-[#003811]">Leave Credits (REGULAR Employees)</h3>
+                        <button onclick="loadCreditsMonitor()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="table-th">Emp ID</th>
+                                    <th class="table-th">Name</th>
+                                    <th class="table-th">VL Bal</th>
+                                    <th class="table-th">SL Bal</th>
+                                    <th class="table-th">SPL Bal</th>
+                                    <th class="table-th">WL Bal</th>
+                                    <th class="table-th">CTO Bal</th>
+                                    <th class="table-th">Force Leave (5 Days)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="monitor-list">
+                                <tr><td colspan="8" class="table-td text-center text-gray-500">Loading balances...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="genTab" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="card p-6">
+                        <h3 class="font-bold text-[#003811] mb-4">Monthly Credits (VL & SL)</h3>
+                        <p class="text-sm text-gray-600 mb-6">Generates 1.25 credits each for Vacation Leave and Sick Leave for all REGULAR employees based on Civil Service Rules.</p>
+                        <div class="flex gap-2 items-end">
+                            <div class="flex-1">
+                                <label class="form-label">Select Month</label>
+                                <input type="month" id="genMonth" class="form-input">
+                            </div>
+                            <button onclick="generateMonthlyCredits()" class="bg-[#003811] text-white font-bold py-2 px-4 rounded hover:bg-[#002200] shadow">Add 1.25 Credits</button>
+                        </div>
+                    </div>
+                    
+                    <div class="card p-6">
+                        <h3 class="font-bold text-[#003811] mb-4">Yearly Credits (SPL & WL)</h3>
+                        <p class="text-sm text-gray-600 mb-6">Grants strictly 3 days Special Privilege Leave and 5 days Mandatory/Women's Leave for all REGULAR employees. Overwrites current balances.</p>
+                        <div class="flex gap-2 items-end">
+                            <div class="flex-1">
+                                <label class="form-label">Select Year</label>
+                                <input type="number" id="genYear" class="form-input" value="2026">
+                            </div>
+                            <button onclick="generateYearlyCredits()" class="bg-[#D4AF37] text-black font-bold py-2 px-4 rounded hover:brightness-110 shadow">Grant Yearly Credits</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="gpTab" class="tab-content">
+                <div class="card">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end">
+                        <div class="w-64">
+                            <label class="form-label">Select Month</label>
+                            <input type="month" id="gpMonth" class="form-input">
+                        </div>
+                        <button onclick="loadGatePasses()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded shadow">Fetch Unposted Gate Passes</button>
+                        <div class="flex-1 text-right">
+                            <button onclick="postGatePassesToLedger()" id="btnPostGp" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-6 rounded shadow hidden">Post Deductions to Ledger</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="table-th">Date</th>
+                                    <th class="table-th">Emp ID</th>
+                                    <th class="table-th">Name</th>
+                                    <th class="table-th">Purpose</th>
+                                    <th class="table-th">Deduction (VL)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gp-list">
+                                <tr><td colspan="5" class="table-td text-center text-gray-500">Select a month to fetch gate passes pending for ledger deduction.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+<script>
+    // --- SESSION AUTH ---
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) { window.location.href = 'index.html'; }
+    const currentUser = JSON.parse(userData);
+    document.getElementById('activeUser').innerText = `User: ${currentUser.first_name} ${currentUser.last_name}`.toUpperCase();
+
+    function logout() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    }
+
+    // --- UTILS & GLOBALS ---
+    const d = new Date();
+    document.getElementById('genMonth').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    document.getElementById('gpMonth').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    document.getElementById('genYear').value = d.getFullYear();
+
+    let empNameMap = {};
+    let empDataMap = {};
+    let currentGatePasses = [];
+
+    // Load Once Strategy
+    async function loadEmployeeMaps() {
+        const { data } = await supabaseClient.from('employees').select('*');
+        if(data) {
+            data.forEach(e => {
+                empNameMap[e.emp_id] = `${e.first_name} ${e.last_name}`;
+                empDataMap[e.emp_id] = e;
+            });
+        }
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        event.target.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+
+        if(tabId === 'appsTab') loadApplications();
+        if(tabId === 'monitorTab') loadCreditsMonitor();
+    }
+
+    // --- TAB 1: APPLICATIONS (Approve/Disapprove with 1.5 Multiplier Logic) ---
+    async function loadApplications() {
+        const list = document.getElementById('app-list');
+        list.innerHTML = `<tr><td colspan="6" class="table-td text-center">Loading...</td></tr>`;
+        if(Object.keys(empNameMap).length === 0) await loadEmployeeMaps();
+
+        const { data, error } = await supabaseClient.from('leave_ledger')
+            .select('*')
+            .eq('transaction_type', 'APPLICATION')
+            .order('created_at', { ascending: false });
+
+        if (error) { list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-red-500">Error loading applications.</td></tr>`; return; }
+        if (!data || data.length === 0) { list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No pending leave applications found.</td></tr>`; return; }
+
+        let html = '';
+        data.forEach(app => {
+            const name = empNameMap[app.emp_id] || app.emp_id;
+            const dates = app.end_date ? `${app.start_date} to ${app.end_date}` : app.start_date;
+            html += `
+                <tr>
+                    <td class="table-td font-mono text-xs">${app.transaction_id || app.id}</td>
+                    <td class="table-td font-bold">${name.toUpperCase()}</td>
+                    <td class="table-td">${(app.type || '').toUpperCase()}</td>
+                    <td class="table-td">${dates}</td>
+                    <td class="table-td font-bold">${app.debit}</td>
+                    <td class="table-td text-center">
+                        <button onclick="approveLeave('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700 mr-2 shadow">Approve</button>
+                        <button onclick="disapproveLeave('${app.id}', '${app.emp_id}')" class="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 shadow">Disapprove</button>
+                    </td>
+                </tr>
+            `;
+        });
+        list.innerHTML = html;
+    }
+
+    async function approveLeave(id, emp_id, start_date, end_date, base_debit, type) {
+        if(!confirm("Are you sure you want to approve this leave?")) return;
+        
+        try {
+            // Check for schedule override for multiplier (1 or 1.5)
+            let multiplier = 1;
+            const { data: over } = await supabaseClient.from('schedule_override').select('*').eq('emp_id', emp_id).gte('date', start_date).lte('date', end_date || start_date);
+            if(over && over.length > 0) {
+                if(over.some(o => o.weight == 1.5 || o.multiplier == 1.5)) multiplier = 1.5;
+            }
+
+            const final_debit = base_debit * multiplier;
+            const tType = type.toUpperCase();
+
+            // Fetch latest employee data to ensure accurate balance deduction
+            const { data: empData } = await supabaseClient.from('employees').select('*').eq('emp_id', emp_id).single();
+            if (!empData) throw new Error("Employee not found.");
+
+            let updates = {};
+            if(tType.includes('VL') || tType.includes('VACATION')) updates.vl_balance = (parseFloat(empData.vl_balance || 0) - final_debit).toFixed(3);
+            else if(tType.includes('SL') || tType.includes('SICK')) updates.sl_balance = (parseFloat(empData.sl_balance || 0) - final_debit).toFixed(3);
+            else if(tType.includes('SPL')) updates.spl_balance = (parseFloat(empData.spl_balance || 0) - final_debit).toFixed(3);
+            else if(tType.includes('WL')) updates.wl_balance = (parseFloat(empData.wl_balance || 0) - final_debit).toFixed(3);
+            else if(tType.includes('CTO')) updates.cto_balance = (parseFloat(empData.cto_balance || 0) - final_debit).toFixed(3);
+
+            if(Object.keys(updates).length > 0) {
+                await supabaseClient.from('employees').update(updates).eq('emp_id', emp_id);
+            }
+
+            await supabaseClient.from('leave_ledger')
+                .update({ 
+                    transaction_type: 'APPROVED', 
+                    debit: final_debit, 
+                    remarks: multiplier > 1 ? `Approved (Multiplier ${multiplier}x applied)` : 'Approved' 
+                })
+                .eq('id', id);
+            
+            alert(`Leave Approved successfully. Deducted ${final_debit} days.`);
+            loadApplications();
+            // Refresh map data in background
+            loadEmployeeMaps();
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
+    }
+
+    async function disapproveLeave(id, emp_id) {
+        const reason = prompt("Enter reason for disapproval:");
+        if (reason === null) return; // User cancelled
+        if (reason.trim() === "") { alert("Reason is required to disapprove."); return; }
+
+        try {
+            await supabaseClient.from('leave_ledger')
+                .update({ 
+                    transaction_type: 'DISAPPROVED', 
+                    remarks: `Disapproved: ${reason}` 
+                })
+                .eq('id', id);
+
+            alert("Leave Disapproved.");
+            loadApplications();
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
+    }
+
+
+    // --- TAB 2: MONITOR CREDITS & FORCE LEAVE ---
+    async function loadCreditsMonitor() {
+        const list = document.getElementById('monitor-list');
+        list.innerHTML = `<tr><td colspan="8" class="table-td text-center">Loading...</td></tr>`;
+        
+        try {
+            // Fetch REGULAR employees
+            const { data: emps, error: eErr } = await supabaseClient.from('employees').select('*').eq('type', 'REGULAR');
+            if (eErr) throw eErr;
+
+            // Fetch VL records for current year to calculate Force Leave
+            const currentYear = new Date().getFullYear();
+            const { data: forceLeaveData } = await supabaseClient.from('leave_ledger')
+                .select('emp_id, debit')
+                .in('transaction_type', ['APPROVED', 'DISAPPROVED'])
+                .ilike('type', '%VL%')
+                .gte('start_date', `${currentYear}-01-01`)
+                .lte('start_date', `${currentYear}-12-31`);
+
+            let forceLeaveMap = {};
+            if(forceLeaveData) {
+                forceLeaveData.forEach(fl => {
+                    if(!forceLeaveMap[fl.emp_id]) forceLeaveMap[fl.emp_id] = 0;
+                    forceLeaveMap[fl.emp_id] += parseFloat(fl.debit || 0);
+                });
+            }
+
+            let html = '';
+            emps.forEach(emp => {
+                const flCount = forceLeaveMap[emp.emp_id] || 0;
+                const flProgress = Math.min(flCount, 5); // Max required is 5
+                const flColor = flProgress >= 5 ? 'text-green-600 font-bold' : 'text-red-600';
+                
+                html += `
+                    <tr>
+                        <td class="table-td">${emp.emp_id}</td>
+                        <td class="table-td font-bold">${emp.first_name} ${emp.last_name}</td>
+                        <td class="table-td">${parseFloat(emp.vl_balance || 0).toFixed(3)}</td>
+                        <td class="table-td">${parseFloat(emp.sl_balance || 0).toFixed(3)}</td>
+                        <td class="table-td">${parseFloat(emp.spl_balance || 0).toFixed(3)}</td>
+                        <td class="table-td">${parseFloat(emp.wl_balance || 0).toFixed(3)}</td>
+                        <td class="table-td">${parseFloat(emp.cto_balance || 0).toFixed(3)}</td>
+                        <td class="table-td ${flColor}">${flProgress.toFixed(1)} / 5 Days</td>
+                    </tr>
+                `;
+            });
+            list.innerHTML = html || `<tr><td colspan="8" class="table-td text-center">No regular employees found.</td></tr>`;
+        } catch (e) {
+            list.innerHTML = `<tr><td colspan="8" class="table-td text-center text-red-500">Error loading monitor: ${e.message}</td></tr>`;
+        }
+    }
+
+
+    // --- TAB 3: GENERATE CREDITS ---
+    async function generateMonthlyCredits() {
+        const monthVal = document.getElementById('genMonth').value;
+        if(!monthVal) { alert("Please select a month."); return; }
+        if(!confirm(`Are you sure you want to add 1.25 VL and 1.25 SL credits for ALL REGULAR employees for ${monthVal}?`)) return;
+
+        try {
+            const { data: emps } = await supabaseClient.from('employees').select('emp_id, vl_balance, sl_balance').eq('type', 'REGULAR');
+            if(!emps || emps.length === 0) { alert("No regular employees found."); return; }
+
+            const updates = [];
+            const ledgers = [];
+
+            emps.forEach(emp => {
+                const newVl = (parseFloat(emp.vl_balance || 0) + 1.25).toFixed(3);
+                const newSl = (parseFloat(emp.sl_balance || 0) + 1.25).toFixed(3);
+                
+                // Track update
+                updates.push( supabaseClient.from('employees').update({ vl_balance: newVl, sl_balance: newSl }).eq('emp_id', emp.emp_id) );
+                
+                // Track ledger
+                ledgers.push({
+                    emp_id: emp.emp_id,
+                    type: 'VL/SL',
+                    credit: 2.50, // 1.25 + 1.25
+                    transaction_type: 'CREDIT',
+                    remarks: `Monthly Earned Credits - ${monthVal}`,
+                    start_date: `${monthVal}-01`
+                });
+            });
+
+            await Promise.all(updates);
+            await supabaseClient.from('leave_ledger').insert(ledgers);
+            
+            alert("Monthly credits generated successfully.");
+            loadEmployeeMaps(); // refresh cache
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
+    }
+
+    async function generateYearlyCredits() {
+        const yearVal = document.getElementById('genYear').value;
+        if(!yearVal) { alert("Please enter a year."); return; }
+        if(!confirm(`Are you sure you want to GRANT 3 SPL and 5 WL credits for ALL REGULAR employees for the year ${yearVal}? This will OVERWRITE their current balances.`)) return;
+
+        try {
+            const { data: emps } = await supabaseClient.from('employees').select('emp_id').eq('type', 'REGULAR');
+            if(!emps || emps.length === 0) { alert("No regular employees found."); return; }
+
+            const updates = [];
+            const ledgers = [];
+
+            emps.forEach(emp => {
+                // Track update (Overwrite, non-cumulative)
+                updates.push( supabaseClient.from('employees').update({ spl_balance: 3, wl_balance: 5 }).eq('emp_id', emp.emp_id) );
+                
+                // Track ledger
+                ledgers.push({
+                    emp_id: emp.emp_id,
+                    type: 'SPL/WL',
+                    credit: 8,
+                    transaction_type: 'CREDIT',
+                    remarks: `Yearly Granted Credits - ${yearVal}`,
+                    start_date: `${yearVal}-01-01`
+                });
+            });
+
+            await Promise.all(updates);
+            await supabaseClient.from('leave_ledger').insert(ledgers);
+            
+            alert("Yearly credits granted successfully.");
+            loadEmployeeMaps(); // refresh cache
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
+    }
+
+
+    // --- TAB 4: GATE PASS PROCESSING ---
+    async function loadGatePasses() {
+        const monthVal = document.getElementById('gpMonth').value;
+        if(!monthVal) { alert("Please select a month."); return; }
+        
+        const list = document.getElementById('gp-list');
+        list.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching Gate Passes...</td></tr>`;
+        
+        try {
+            if(Object.keys(empNameMap).length === 0) await loadEmployeeMaps();
+
+            // Fetch gate passes that have a deduction value and are not yet POSTED
+            const startDate = `${monthVal}-01`;
+            const endDate = `${monthVal}-31`;
+
+            const { data, error } = await supabaseClient.from('gate_pass_logs')
+                .select('*')
+                .gte('date', startDate)
+                .lte('date', endDate)
+                .gt('deduction_credit', 0)
+                .not('status', 'eq', 'POSTED')
+                .in('status', ['APPROVED', 'PROCESSED']); // Ensure they are finalized
+
+            if (error) throw error;
+
+            currentGatePasses = data || [];
+            
+            if (currentGatePasses.length === 0) { 
+                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No unposted gate passes requiring deduction found for this month.</td></tr>`;
+                document.getElementById('btnPostGp').classList.add('hidden');
+                return; 
+            }
+
+            let html = '';
+            currentGatePasses.forEach(gp => {
+                const name = empNameMap[gp.emp_id] || gp.emp_id;
+                html += `
+                    <tr>
+                        <td class="table-td">${gp.date}</td>
+                        <td class="table-td">${gp.emp_id}</td>
+                        <td class="table-td font-bold">${name.toUpperCase()}</td>
+                        <td class="table-td">${gp.purpose}</td>
+                        <td class="table-td font-bold text-red-600">${parseFloat(gp.deduction_credit).toFixed(3)}</td>
+                    </tr>
+                `;
+            });
+            list.innerHTML = html;
+            document.getElementById('btnPostGp').classList.remove('hidden');
+
+        } catch(e) {
+            list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+            document.getElementById('btnPostGp').classList.add('hidden');
+        }
+    }
+
+    async function postGatePassesToLedger() {
+        if(currentGatePasses.length === 0) return;
+        if(!confirm(`Are you sure you want to deduct VL balances and post ${currentGatePasses.length} gate passes to the ledger?`)) return;
+
+        document.getElementById('btnPostGp').innerText = "Posting...";
+        document.getElementById('btnPostGp').disabled = true;
+
+        try {
+            // Group by employee to minimize employee updates
+            let empDeductions = {};
+            let ledgers = [];
+            let gpIdsToUpdate = [];
+
+            currentGatePasses.forEach(gp => {
+                if(!empDeductions[gp.emp_id]) empDeductions[gp.emp_id] = 0;
+                empDeductions[gp.emp_id] += parseFloat(gp.deduction_credit);
+                
+                gpIdsToUpdate.push(gp.id);
+
+                ledgers.push({
+                    emp_id: gp.emp_id,
+                    type: 'VL (GATE PASS)',
+                    debit: gp.deduction_credit,
+                    transaction_type: 'GATE_PASS_DEDUCTION',
+                    remarks: `Gate Pass Deduction for ${gp.date} - ${gp.purpose}`,
+                    start_date: gp.date
+                });
+            });
+
+            // Update Employee Balances
+            const { data: empData } = await supabaseClient.from('employees').select('emp_id, vl_balance').in('emp_id', Object.keys(empDeductions));
+            const updates = [];
+            
+            empData.forEach(e => {
+                const deductAmount = empDeductions[e.emp_id];
+                const newBal = (parseFloat(e.vl_balance || 0) - deductAmount).toFixed(3);
+                updates.push( supabaseClient.from('employees').update({ vl_balance: newBal }).eq('emp_id', e.emp_id) );
+            });
+
+            await Promise.all(updates);
+
+            // Insert into Ledger
+            await supabaseClient.from('leave_ledger').insert(ledgers);
+
+            // Update Gate Pass status to POSTED
+            const gpUpdates = gpIdsToUpdate.map(id => supabaseClient.from('gate_pass_logs').update({ status: 'POSTED' }).eq('id', id));
+            await Promise.all(gpUpdates);
+
+            alert("Gate passes successfully posted and deducted from VL balances.");
+            loadGatePasses(); // Refresh the list
+            loadEmployeeMaps(); // Refresh cache
+
+        } catch(e) {
+            alert("Error posting gate passes: " + e.message);
+        } finally {
+            document.getElementById('btnPostGp').innerText = "Post Deductions to Ledger";
+            document.getElementById('btnPostGp').disabled = false;
+        }
+    }
+
+</script>
+</body>
+</html>
