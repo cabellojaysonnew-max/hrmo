@@ -127,53 +127,53 @@
                     <div class="p-4 border-b border-gray-200 bg-gray-50">
                         <h3 class="font-bold text-[#003811]">CTO Details (Encoding)</h3>
                     </div>
-                    <div class="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div>
-                            <label class="form-label">PSO / RSO Number</label>
-                            <input type="text" id="ctoPso" class="form-input" placeholder="Enter PSO Number" onblur="checkExistingPSO()">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="form-label">CTO Description (Base Type)</label>
-                            <input type="text" id="ctoDesc" class="form-input" placeholder="e.g. Conduct of validation...">
-                        </div>
-                        <div>
-                            <label class="form-label">Date of Activity</label>
-                            <input type="date" id="ctoDate" class="form-input" onchange="checkWeekend()">
-                        </div>
-                        <div class="md:col-span-4 flex gap-4 items-center mt-2">
-                            <div class="flex items-center gap-2 bg-gray-100 p-2 rounded border">
-                                <input type="checkbox" id="ctoIsWeekend" class="w-4 h-4 accent-[#D4AF37]">
-                                <label class="text-sm font-bold text-gray-700">Weekend / Holiday (Multiplier 1.5x)</label>
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div>
+                                <label class="form-label">PSO / RSO Number</label>
+                                <input type="text" id="ctoPso" class="form-input" placeholder="Enter PSO Number" onblur="checkExistingPSO()">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="form-label">CTO Description (Base Type)</label>
+                                <input type="text" id="ctoDesc" class="form-input" placeholder="e.g. Conduct of validation...">
+                            </div>
+                            <div>
+                                <label class="form-label">Date of Activity</label>
+                                <input type="date" id="ctoDate" class="form-input" onchange="checkWeekend()">
+                            </div>
+                            <div class="md:col-span-4 flex gap-4 items-center mt-2 border-b border-gray-100 pb-6">
+                                <div class="flex items-center gap-2 bg-gray-50 p-2 rounded border">
+                                    <input type="checkbox" id="ctoIsWeekend" class="w-4 h-4 accent-[#D4AF37]">
+                                    <label class="text-sm font-bold text-gray-700">Weekend / Holiday (Multiplier 1.5x)</label>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div class="card mb-6">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end flex-wrap">
-                        <div class="flex-1 min-w-[200px] relative">
-                            <label class="form-label">Search & Add Employee</label>
-                            <input type="text" id="ctoEmpSearch" class="form-input" placeholder="Type to search..." autocomplete="off">
-                            <div id="ctoSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
+                        <div class="flex gap-4 items-end flex-wrap mb-4">
+                            <div class="flex-1 min-w-[200px] relative">
+                                <label class="form-label">Search & Add Employee</label>
+                                <input type="text" id="ctoEmpSearch" class="form-input" placeholder="Type to search..." autocomplete="off">
+                                <div id="ctoSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
+                            </div>
+                            <div class="text-right">
+                                <button onclick="saveCtoBatch()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-8 rounded shadow text-lg">Save CTO Records</button>
+                            </div>
                         </div>
-                        <div class="text-right">
-                            <button onclick="saveCtoBatch()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-8 rounded shadow text-lg">Save CTO Records</button>
+                        
+                        <div class="overflow-x-auto border rounded-lg">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr>
+                                        <th class="table-th">EMP ID</th>
+                                        <th class="table-th">NAME</th>
+                                        <th class="table-th text-center" style="width: 150px;">ACTION</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cto-emp-list">
+                                    <tr><td colspan="3" class="table-td text-center text-gray-500 py-8">Search and select employees to add to this CTO.</td></tr>
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
-                    
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr>
-                                    <th class="table-th">Emp ID</th>
-                                    <th class="table-th">Name</th>
-                                    <th class="table-th text-center" style="width: 150px;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="cto-emp-list">
-                                <tr><td colspan="3" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>
-                            </tbody>
-                        </table>
                     </div>
                 </div>
 
@@ -186,12 +186,12 @@
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr>
-                                    <th class="table-th">Emp ID / Name</th>
-                                    <th class="table-th">CTO Reference</th>
-                                    <th class="table-th text-center">Creditable Hours</th>
-                                    <th class="table-th text-center">Credited Hour</th>
-                                    <th class="table-th text-center">Remarks</th>
-                                    <th class="table-th text-center">Action</th>
+                                    <th class="table-th">EMP ID / NAME</th>
+                                    <th class="table-th">CTO REFERENCE</th>
+                                    <th class="table-th text-center">CREDITABLE HOURS</th>
+                                    <th class="table-th text-center">CREDITED HOUR</th>
+                                    <th class="table-th text-center">REMARKS</th>
+                                    <th class="table-th text-center">ACTION</th>
                                 </tr>
                             </thead>
                             <tbody id="cto-process-list">
@@ -685,7 +685,7 @@
     function renderCtoEmployees() {
         const list = document.getElementById('cto-emp-list');
         if(selectedCtoEmployees.length === 0) {
-            list.innerHTML = `<tr><td colspan="3" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>`;
+            list.innerHTML = `<tr><td colspan="3" class="table-td text-center text-gray-500 py-8">Search and select employees to add to this CTO.</td></tr>`;
             return;
         }
 
@@ -694,9 +694,9 @@
             html += `
                 <tr class="hover:bg-gray-50 border-b">
                     <td class="table-td text-xs font-mono">${emp.id}</td>
-                    <td class="table-td font-bold">${emp.name}</td>
+                    <td class="table-td font-bold text-sm text-[#003811]">${emp.name}</td>
                     <td class="table-td text-center">
-                        <button onclick="removeCtoEmployee('${emp.id}')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded shadow">Remove</button>
+                        <button onclick="removeCtoEmployee('${emp.id}')" class="bg-[#D32F2F] hover:bg-[#B71C1C] text-white text-xs px-4 py-1.5 rounded shadow">Remove</button>
                     </td>
                 </tr>
             `;
@@ -729,11 +729,11 @@
                 date: cDate,
                 transaction_type: 'EARNED',
                 base_type: desc,
-                base_hours: 0,
-                multiplier: mult,
-                calculated_hours: 0,
+                base_hours: '0', 
+                multiplier: String(mult),
+                calculated_hours: '0',
                 PSO_Number: pso,
-                status: 'ENCODED'
+                remarks: 'ENCODED' // FIX: cto_records does not have a status column, it uses remarks
             }));
 
             const { error } = await supabaseClient.from('cto_records').insert(records);
@@ -760,7 +760,6 @@
         try {
             const { data, error } = await supabaseClient.from('cto_records')
                 .select('*')
-                .order('date', { ascending: false })
                 .order('id', { ascending: false });
                 
             if(error) throw error;
@@ -774,19 +773,20 @@
             data.forEach(r => {
                 const name = empDataMap[r.emp_id] ? empDataMap[r.emp_id].full_name.toUpperCase() : r.emp_id;
                 const ref = r.PSO_Number || '-';
-                const isWeekend = r.multiplier > 1.0;
+                const multValue = parseFloat(r.multiplier) || 1.0;
+                const isWeekend = multValue > 1.0;
                 
                 let sCls = 'bg-gray-100 text-gray-800';
-                if(r.status === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800';
-                if(r.status === 'POSTED') sCls = 'bg-green-100 text-green-800';
+                if(r.remarks === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800';
+                if(r.remarks === 'POSTED') sCls = 'bg-green-100 text-green-800';
                 
                 let creditableCell = '';
                 let actionCell = '';
                 
-                if(r.status === 'ENCODED') {
+                if(r.remarks === 'ENCODED') {
                     creditableCell = `
                         <div class="flex items-center gap-2 justify-center">
-                            <input type="number" step="0.1" id="baseHr_${r.id}" class="border rounded px-2 py-1 w-20 text-center text-sm bg-white" value="${r.base_hours || 0}" oninput="calcCtoCredited('${r.id}', ${r.multiplier})">
+                            <input type="number" step="0.1" id="baseHr_${r.id}" class="border rounded px-2 py-1 w-20 text-center text-sm bg-white" value="${parseFloat(r.base_hours) || 0}" oninput="calcCtoCredited('${r.id}', ${multValue})">
                             <button onclick="fetchLogsForCTOProcess('${r.id}', '${r.emp_id}', '${r.date}', ${isWeekend})" class="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 rounded shadow">Check DTR</button>
                         </div>
                     `;
@@ -795,8 +795,8 @@
                         <button onclick="deleteCTO('${r.id}')" class="text-red-600 text-xs hover:underline block mx-auto mt-1">Delete</button>
                     `;
                 } else {
-                    creditableCell = `<div class="text-center font-bold">${r.base_hours || 0}</div>`;
-                    if(r.status === 'PROCESSED') {
+                    creditableCell = `<div class="text-center font-bold">${parseFloat(r.base_hours) || 0}</div>`;
+                    if(r.remarks === 'PROCESSED') {
                         actionCell = `
                             <div class="text-xs text-gray-500 italic mt-1 mb-1">Ready for Posting</div>
                             <button onclick="deleteCTO('${r.id}')" class="text-red-600 text-xs hover:underline block mx-auto">Delete</button>
@@ -817,8 +817,8 @@
                             <span class="text-gray-500">${r.date}</span>
                         </td>
                         <td class="table-td">${creditableCell}</td>
-                        <td class="table-td text-center font-bold text-[#003811]" id="credHr_${r.id}">${r.calculated_hours || 0}</td>
-                        <td class="table-td text-center flex justify-center"><span class="badge ${sCls}">${r.status}</span></td>
+                        <td class="table-td text-center font-bold text-[#003811]" id="credHr_${r.id}">${parseFloat(r.calculated_hours) || 0}</td>
+                        <td class="table-td text-center flex justify-center"><span class="badge ${sCls}">${r.remarks || 'ENCODED'}</span></td>
                         <td class="table-td text-center">${actionCell}</td>
                     </tr>
                 `;
@@ -916,9 +916,9 @@
 
         try {
             await supabaseClient.from('cto_records').update({
-                base_hours: baseHr,
-                calculated_hours: credHr,
-                status: 'PROCESSED'
+                base_hours: String(baseHr),
+                calculated_hours: String(credHr),
+                remarks: 'PROCESSED'
             }).eq('id', id);
             
             alert('CTO Processed successfully. It will now be ready for posting in the Leave Processing page.');
