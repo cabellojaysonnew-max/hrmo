@@ -18,7 +18,6 @@
         .tab-content.active { display: block; }
         .table-th { background-color: #f9fafb; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #6b7280; padding: 0.75rem 1.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
         .table-td { padding: 0.75rem 1.5rem; font-size: 0.875rem; color: #111827; border-bottom: 1px solid #e5e7eb; }
-        .badge { padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: bold; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
@@ -43,11 +42,12 @@
     <main class="flex-1 flex flex-col h-full bg-[#F3F4F6]">
         <div class="p-8 pb-0">
             <h2 class="text-3xl font-bold text-[#003811] mb-6">Leave Processing</h2>
-            <div class="flex border-b border-gray-200 mb-6">
-                <button class="tab-btn active" onclick="switchTab('appsTab')">Applications</button>
-                <button class="tab-btn" onclick="switchTab('monitorTab')">Credits & Force Leave</button>
-                <button class="tab-btn" onclick="switchTab('genTab')">Generate Credits</button>
-                <button class="tab-btn" onclick="switchTab('gpTab')">Gate Pass Processing</button>
+            <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+                <button class="tab-btn active whitespace-nowrap" onclick="switchTab('appsTab')">Applications</button>
+                <button class="tab-btn whitespace-nowrap" onclick="switchTab('monitorTab')">Credits & Force Leave</button>
+                <button class="tab-btn whitespace-nowrap" onclick="switchTab('genTab')">Generate Credits</button>
+                <button class="tab-btn whitespace-nowrap" onclick="switchTab('gpTab')">Gate Pass Processing</button>
+                <button class="tab-btn whitespace-nowrap" onclick="switchTab('ledgerTab')">Detailed Ledger</button>
             </div>
         </div>
 
@@ -136,18 +136,22 @@
             </div>
 
             <div id="gpTab" class="tab-content">
-                <div class="card">
+                <div class="card mb-6">
                     <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end">
                         <div class="w-64">
                             <label class="form-label">Select Month</label>
                             <input type="month" id="gpMonth" class="form-input">
                         </div>
-                        <button onclick="loadGatePasses()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded shadow">Fetch Unposted Gate Passes</button>
+                        <button onclick="loadGatePasses()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-4 rounded shadow">Fetch Gate Passes</button>
                         <div class="flex-1 text-right">
-                            <button onclick="postGatePassesToLedger()" id="btnPostGp" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-6 rounded shadow hidden">Post Deductions to Ledger</button>
+                            <button onclick="postAllGatePasses()" id="btnPostAllGp" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-6 rounded shadow hidden">Post All Pending to Ledger</button>
                         </div>
                     </div>
-                    <div class="overflow-x-auto">
+                    
+                    <div class="p-4 bg-yellow-50 border-b border-gray-200">
+                        <h4 class="font-bold text-yellow-800">Pending For Deduction (Unposted)</h4>
+                    </div>
+                    <div class="overflow-x-auto max-h-64">
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr>
@@ -156,12 +160,85 @@
                                     <th class="table-th">Name</th>
                                     <th class="table-th">Purpose</th>
                                     <th class="table-th">Deduction (VL)</th>
+                                    <th class="table-th text-center">Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="gp-list">
-                                <tr><td colspan="5" class="table-td text-center text-gray-500">Select a month to fetch gate passes pending for ledger deduction.</td></tr>
+                            <tbody id="gp-pending-list">
+                                <tr><td colspan="6" class="table-td text-center text-gray-500">Select a month to fetch gate passes.</td></tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="p-4 bg-green-50 border-y border-gray-200 mt-4">
+                        <h4 class="font-bold text-green-800">Already Posted / Credited</h4>
+                    </div>
+                    <div class="overflow-x-auto max-h-64">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="table-th">Date</th>
+                                    <th class="table-th">Emp ID</th>
+                                    <th class="table-th">Name</th>
+                                    <th class="table-th">Purpose</th>
+                                    <th class="table-th">Deducted (VL)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gp-posted-list">
+                                <tr><td colspan="5" class="table-td text-center text-gray-500">No posted gate passes shown.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ledgerTab" class="tab-content">
+                <div class="card mb-6">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div>
+                            <label class="form-label">Select Employee</label>
+                            <select id="ledgEmp" class="form-input"></select>
+                        </div>
+                        <div>
+                            <label class="form-label">Select Month/Year</label>
+                            <input type="month" id="ledgMonth" class="form-input">
+                        </div>
+                        <div>
+                            <button onclick="loadLedgerStatement()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow w-full">View Statement</button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div id="ledgerSummary" class="mb-4 grid grid-cols-3 gap-4 text-center hidden">
+                            <div class="bg-gray-100 p-4 rounded border">
+                                <span class="block text-xs font-bold text-gray-500 uppercase">Beginning Balance</span>
+                                <span id="lblBegBal" class="text-xl font-bold text-[#003811]">-</span>
+                            </div>
+                            <div class="bg-gray-100 p-4 rounded border">
+                                <span class="block text-xs font-bold text-gray-500 uppercase">Net Movement</span>
+                                <span id="lblMovement" class="text-xl font-bold text-gray-800">-</span>
+                            </div>
+                            <div class="bg-[#f0fdf4] p-4 rounded border border-green-200">
+                                <span class="block text-xs font-bold text-green-700 uppercase">Ending Balance</span>
+                                <span id="lblEndBal" class="text-xl font-bold text-green-800">-</span>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr>
+                                        <th class="table-th">Date</th>
+                                        <th class="table-th">Particulars / Type</th>
+                                        <th class="table-th">Earned (Credit)</th>
+                                        <th class="table-th">Leave w/ Pay (Debit)</th>
+                                        <th class="table-th">Running Bal</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ledger-list">
+                                    <tr><td colspan="5" class="table-td text-center text-gray-500">Select an employee and month to view ledger.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -174,7 +251,7 @@
     const userData = sessionStorage.getItem('currentUser');
     if (!userData) { window.location.href = 'index.html'; }
     const currentUser = JSON.parse(userData);
-    document.getElementById('activeUser').innerText = `User: ${currentUser.first_name} ${currentUser.last_name}`.toUpperCase();
+    document.getElementById('activeUser').innerText = `User: ${currentUser.full_name ? currentUser.full_name.toUpperCase() : currentUser.username}`;
 
     function logout() {
         sessionStorage.removeItem('currentUser');
@@ -183,21 +260,26 @@
 
     // --- UTILS & GLOBALS ---
     const d = new Date();
-    document.getElementById('genMonth').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    document.getElementById('gpMonth').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const currMonthStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    document.getElementById('genMonth').value = currMonthStr;
+    document.getElementById('gpMonth').value = currMonthStr;
+    document.getElementById('ledgMonth').value = currMonthStr;
     document.getElementById('genYear').value = d.getFullYear();
 
-    let empNameMap = {};
     let empDataMap = {};
     let currentGatePasses = [];
 
-    // Load Once Strategy
+    // Load Once Strategy for Employees
     async function loadEmployeeMaps() {
-        const { data } = await supabaseClient.from('employees').select('*');
+        const { data } = await supabaseClient.from('employees').select('*').order('full_name');
         if(data) {
+            const ledgEmpSelect = document.getElementById('ledgEmp');
+            ledgEmpSelect.innerHTML = '<option value="">-- Select Employee --</option>';
             data.forEach(e => {
-                empNameMap[e.emp_id] = `${e.first_name} ${e.last_name}`;
                 empDataMap[e.emp_id] = e;
+                if(e.full_name) {
+                    ledgEmpSelect.innerHTML += `<option value="${e.emp_id}">${e.full_name.toUpperCase()} (${e.emp_id})</option>`;
+                }
             });
         }
     }
@@ -209,15 +291,22 @@
         event.target.classList.add('active');
         document.getElementById(tabId).classList.add('active');
 
+        if(Object.keys(empDataMap).length === 0) loadEmployeeMaps().then(() => execTabLogic(tabId));
+        else execTabLogic(tabId);
+    }
+
+    function execTabLogic(tabId) {
         if(tabId === 'appsTab') loadApplications();
         if(tabId === 'monitorTab') loadCreditsMonitor();
     }
+
+    // Load Maps initially
+    loadEmployeeMaps();
 
     // --- TAB 1: APPLICATIONS (Approve/Disapprove with 1.5 Multiplier Logic) ---
     async function loadApplications() {
         const list = document.getElementById('app-list');
         list.innerHTML = `<tr><td colspan="6" class="table-td text-center">Loading...</td></tr>`;
-        if(Object.keys(empNameMap).length === 0) await loadEmployeeMaps();
 
         const { data, error } = await supabaseClient.from('leave_ledger')
             .select('*')
@@ -229,7 +318,8 @@
 
         let html = '';
         data.forEach(app => {
-            const name = empNameMap[app.emp_id] || app.emp_id;
+            const emp = empDataMap[app.emp_id];
+            const name = emp ? emp.full_name : app.emp_id;
             const dates = app.end_date ? `${app.start_date} to ${app.end_date}` : app.start_date;
             html += `
                 <tr>
@@ -237,10 +327,10 @@
                     <td class="table-td font-bold">${name.toUpperCase()}</td>
                     <td class="table-td">${(app.type || '').toUpperCase()}</td>
                     <td class="table-td">${dates}</td>
-                    <td class="table-td font-bold">${app.debit}</td>
+                    <td class="table-td font-bold">${parseFloat(app.debit || 0).toFixed(3)}</td>
                     <td class="table-td text-center">
                         <button onclick="approveLeave('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700 mr-2 shadow">Approve</button>
-                        <button onclick="disapproveLeave('${app.id}', '${app.emp_id}')" class="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 shadow">Disapprove</button>
+                        <button onclick="disapproveLeave('${app.id}', '${app.emp_id}', '${app.type}', ${app.debit})" class="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 shadow">Disapprove</button>
                     </td>
                 </tr>
             `;
@@ -252,9 +342,17 @@
         if(!confirm("Are you sure you want to approve this leave?")) return;
         
         try {
-            // Check for schedule override for multiplier (1 or 1.5)
+            // Logic 6: Check for schedule override for multiplier (1 or 1.5)
             let multiplier = 1;
-            const { data: over } = await supabaseClient.from('schedule_override').select('*').eq('emp_id', emp_id).gte('date', start_date).lte('date', end_date || start_date);
+            const sDate = start_date;
+            const eDate = end_date || start_date;
+            
+            const { data: over } = await supabaseClient.from('schedule_override')
+                .select('*')
+                .eq('emp_id', emp_id)
+                .gte('date', sDate)
+                .lte('date', eDate);
+                
             if(over && over.length > 0) {
                 if(over.some(o => o.weight == 1.5 || o.multiplier == 1.5)) multiplier = 1.5;
             }
@@ -262,9 +360,9 @@
             const final_debit = base_debit * multiplier;
             const tType = type.toUpperCase();
 
-            // Fetch latest employee data to ensure accurate balance deduction
-            const { data: empData } = await supabaseClient.from('employees').select('*').eq('emp_id', emp_id).single();
-            if (!empData) throw new Error("Employee not found.");
+            // Deduct from Employee Balances
+            const empData = empDataMap[emp_id];
+            if (!empData) throw new Error("Employee not found in registry.");
 
             let updates = {};
             if(tType.includes('VL') || tType.includes('VACATION')) updates.vl_balance = (parseFloat(empData.vl_balance || 0) - final_debit).toFixed(3);
@@ -286,17 +384,16 @@
                 .eq('id', id);
             
             alert(`Leave Approved successfully. Deducted ${final_debit} days.`);
+            await loadEmployeeMaps(); // Refresh cache
             loadApplications();
-            // Refresh map data in background
-            loadEmployeeMaps();
         } catch(e) {
             alert("Error: " + e.message);
         }
     }
 
-    async function disapproveLeave(id, emp_id) {
+    async function disapproveLeave(id, emp_id, type, base_debit) {
         const reason = prompt("Enter reason for disapproval:");
-        if (reason === null) return; // User cancelled
+        if (reason === null) return; 
         if (reason.trim() === "") { alert("Reason is required to disapprove."); return; }
 
         try {
@@ -314,20 +411,18 @@
         }
     }
 
-
     // --- TAB 2: MONITOR CREDITS & FORCE LEAVE ---
     async function loadCreditsMonitor() {
         const list = document.getElementById('monitor-list');
         list.innerHTML = `<tr><td colspan="8" class="table-td text-center">Loading...</td></tr>`;
         
         try {
-            // Fetch REGULAR employees
-            const { data: emps, error: eErr } = await supabaseClient.from('employees').select('*').eq('type', 'REGULAR');
+            const { data: emps, error: eErr } = await supabaseClient.from('employees').select('*').eq('type', 'REGULAR').order('full_name');
             if (eErr) throw eErr;
 
-            // Fetch VL records for current year to calculate Force Leave
+            // Force Leave: Any VL (APPROVED or DISAPPROVED) per year. Max 5.
             const currentYear = new Date().getFullYear();
-            const { data: forceLeaveData } = await supabaseClient.from('leave_ledger')
+            const { data: vlData } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, debit')
                 .in('transaction_type', ['APPROVED', 'DISAPPROVED'])
                 .ilike('type', '%VL%')
@@ -335,29 +430,29 @@
                 .lte('start_date', `${currentYear}-12-31`);
 
             let forceLeaveMap = {};
-            if(forceLeaveData) {
-                forceLeaveData.forEach(fl => {
+            if(vlData) {
+                vlData.forEach(fl => {
                     if(!forceLeaveMap[fl.emp_id]) forceLeaveMap[fl.emp_id] = 0;
-                    forceLeaveMap[fl.emp_id] += parseFloat(fl.debit || 0);
+                    forceLeaveMap[fl.emp_id] += Math.abs(parseFloat(fl.debit || 0));
                 });
             }
 
             let html = '';
             emps.forEach(emp => {
                 const flCount = forceLeaveMap[emp.emp_id] || 0;
-                const flProgress = Math.min(flCount, 5); // Max required is 5
-                const flColor = flProgress >= 5 ? 'text-green-600 font-bold' : 'text-red-600';
+                const flProgress = Math.min(flCount, 5); 
+                const flColor = flProgress >= 5 ? 'text-green-600 font-bold' : 'text-red-600 font-bold';
                 
                 html += `
                     <tr>
                         <td class="table-td">${emp.emp_id}</td>
-                        <td class="table-td font-bold">${emp.first_name} ${emp.last_name}</td>
+                        <td class="table-td font-bold">${emp.full_name ? emp.full_name.toUpperCase() : ''}</td>
                         <td class="table-td">${parseFloat(emp.vl_balance || 0).toFixed(3)}</td>
                         <td class="table-td">${parseFloat(emp.sl_balance || 0).toFixed(3)}</td>
                         <td class="table-td">${parseFloat(emp.spl_balance || 0).toFixed(3)}</td>
                         <td class="table-td">${parseFloat(emp.wl_balance || 0).toFixed(3)}</td>
                         <td class="table-td">${parseFloat(emp.cto_balance || 0).toFixed(3)}</td>
-                        <td class="table-td ${flColor}">${flProgress.toFixed(1)} / 5 Days</td>
+                        <td class="table-td ${flColor}">${flProgress.toFixed(3)} / 5 Days</td>
                     </tr>
                 `;
             });
@@ -367,7 +462,6 @@
         }
     }
 
-
     // --- TAB 3: GENERATE CREDITS ---
     async function generateMonthlyCredits() {
         const monthVal = document.getElementById('genMonth').value;
@@ -375,7 +469,7 @@
         if(!confirm(`Are you sure you want to add 1.25 VL and 1.25 SL credits for ALL REGULAR employees for ${monthVal}?`)) return;
 
         try {
-            const { data: emps } = await supabaseClient.from('employees').select('emp_id, vl_balance, sl_balance').eq('type', 'REGULAR');
+            const { data: emps } = await supabaseClient.from('employees').select('*').eq('type', 'REGULAR');
             if(!emps || emps.length === 0) { alert("No regular employees found."); return; }
 
             const updates = [];
@@ -385,16 +479,14 @@
                 const newVl = (parseFloat(emp.vl_balance || 0) + 1.25).toFixed(3);
                 const newSl = (parseFloat(emp.sl_balance || 0) + 1.25).toFixed(3);
                 
-                // Track update
                 updates.push( supabaseClient.from('employees').update({ vl_balance: newVl, sl_balance: newSl }).eq('emp_id', emp.emp_id) );
                 
-                // Track ledger
                 ledgers.push({
                     emp_id: emp.emp_id,
-                    type: 'VL/SL',
-                    credit: 2.50, // 1.25 + 1.25
+                    type: 'VL/SL EARNED',
+                    credit: 2.50, // Display total combined or split? Best to track as 1 entry or 2. We'll do 1 for brevity.
                     transaction_type: 'CREDIT',
-                    remarks: `Monthly Earned Credits - ${monthVal}`,
+                    remarks: `Monthly Earned Credits (1.25 VL / 1.25 SL) - ${monthVal}`,
                     start_date: `${monthVal}-01`
                 });
             });
@@ -403,7 +495,7 @@
             await supabaseClient.from('leave_ledger').insert(ledgers);
             
             alert("Monthly credits generated successfully.");
-            loadEmployeeMaps(); // refresh cache
+            await loadEmployeeMaps();
         } catch(e) {
             alert("Error: " + e.message);
         }
@@ -415,23 +507,21 @@
         if(!confirm(`Are you sure you want to GRANT 3 SPL and 5 WL credits for ALL REGULAR employees for the year ${yearVal}? This will OVERWRITE their current balances.`)) return;
 
         try {
-            const { data: emps } = await supabaseClient.from('employees').select('emp_id').eq('type', 'REGULAR');
+            const { data: emps } = await supabaseClient.from('employees').select('*').eq('type', 'REGULAR');
             if(!emps || emps.length === 0) { alert("No regular employees found."); return; }
 
             const updates = [];
             const ledgers = [];
 
             emps.forEach(emp => {
-                // Track update (Overwrite, non-cumulative)
                 updates.push( supabaseClient.from('employees').update({ spl_balance: 3, wl_balance: 5 }).eq('emp_id', emp.emp_id) );
                 
-                // Track ledger
                 ledgers.push({
                     emp_id: emp.emp_id,
-                    type: 'SPL/WL',
+                    type: 'SPL/WL GRANTED',
                     credit: 8,
                     transaction_type: 'CREDIT',
-                    remarks: `Yearly Granted Credits - ${yearVal}`,
+                    remarks: `Yearly Granted Credits (3 SPL / 5 WL) - ${yearVal}`,
                     start_date: `${yearVal}-01-01`
                 });
             });
@@ -440,125 +530,275 @@
             await supabaseClient.from('leave_ledger').insert(ledgers);
             
             alert("Yearly credits granted successfully.");
-            loadEmployeeMaps(); // refresh cache
+            await loadEmployeeMaps();
         } catch(e) {
             alert("Error: " + e.message);
         }
     }
-
 
     // --- TAB 4: GATE PASS PROCESSING ---
     async function loadGatePasses() {
         const monthVal = document.getElementById('gpMonth').value;
         if(!monthVal) { alert("Please select a month."); return; }
         
-        const list = document.getElementById('gp-list');
-        list.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching Gate Passes...</td></tr>`;
+        const pList = document.getElementById('gp-pending-list');
+        const dList = document.getElementById('gp-posted-list');
+        pList.innerHTML = `<tr><td colspan="6" class="table-td text-center">Fetching...</td></tr>`;
+        dList.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching...</td></tr>`;
         
         try {
-            if(Object.keys(empNameMap).length === 0) await loadEmployeeMaps();
-
-            // Fetch gate passes that have a deduction value and are not yet POSTED
             const startDate = `${monthVal}-01`;
             const endDate = `${monthVal}-31`;
 
+            // Need PROCESSED (pending deduction) and POSTED (already deducted)
             const { data, error } = await supabaseClient.from('gate_pass_logs')
                 .select('*')
                 .gte('date', startDate)
                 .lte('date', endDate)
                 .gt('deduction_credit', 0)
-                .not('status', 'eq', 'POSTED')
-                .in('status', ['APPROVED', 'PROCESSED']); // Ensure they are finalized
+                .in('status', ['APPROVED', 'PROCESSED', 'POSTED'])
+                .order('date', { ascending: false });
 
             if (error) throw error;
 
-            currentGatePasses = data || [];
+            let pendingHtml = '';
+            let postedHtml = '';
+            let hasPending = false;
+            currentGatePasses = []; // Reset global for 'Post All' button
+
+            (data || []).forEach(gp => {
+                const emp = empDataMap[gp.emp_id];
+                const name = emp ? emp.full_name : gp.emp_id;
+                
+                if (gp.status !== 'POSTED') {
+                    hasPending = true;
+                    currentGatePasses.push(gp);
+                    pendingHtml += `
+                        <tr>
+                            <td class="table-td">${gp.date}</td>
+                            <td class="table-td">${gp.emp_id}</td>
+                            <td class="table-td font-bold">${name.toUpperCase()}</td>
+                            <td class="table-td">${gp.purpose || '-'}</td>
+                            <td class="table-td font-bold text-red-600">${parseFloat(gp.deduction_credit).toFixed(3)}</td>
+                            <td class="table-td text-center">
+                                <button onclick="postSingleGatePass('${gp.id}', '${gp.emp_id}', ${gp.deduction_credit}, '${gp.date}', '${gp.purpose ? gp.purpose.replace(/'/g, "\\'") : ''}')" class="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 shadow">Post Deduction</button>
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    postedHtml += `
+                        <tr class="bg-gray-50">
+                            <td class="table-td">${gp.date}</td>
+                            <td class="table-td">${gp.emp_id}</td>
+                            <td class="table-td font-bold">${name.toUpperCase()}</td>
+                            <td class="table-td">${gp.purpose || '-'}</td>
+                            <td class="table-td font-bold text-green-700">${parseFloat(gp.deduction_credit).toFixed(3)}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            pList.innerHTML = pendingHtml || `<tr><td colspan="6" class="table-td text-center text-gray-500">No pending gate passes for deduction.</td></tr>`;
+            dList.innerHTML = postedHtml || `<tr><td colspan="5" class="table-td text-center text-gray-500">No posted gate passes for this month.</td></tr>`;
             
-            if (currentGatePasses.length === 0) { 
-                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No unposted gate passes requiring deduction found for this month.</td></tr>`;
-                document.getElementById('btnPostGp').classList.add('hidden');
-                return; 
+            const btnAll = document.getElementById('btnPostAllGp');
+            if(hasPending) btnAll.classList.remove('hidden');
+            else btnAll.classList.add('hidden');
+
+        } catch(e) {
+            pList.innerHTML = `<tr><td colspan="6" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+            dList.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+        }
+    }
+
+    async function postSingleGatePass(gp_id, emp_id, deduction, date, purpose) {
+        if(!confirm(`Deduct ${deduction} VL credits from ${empDataMap[emp_id]?.full_name || emp_id}?`)) return;
+        try {
+            await applyGatePassDeduction([{ id: gp_id, emp_id, deduction_credit: deduction, date, purpose }]);
+            alert("Gate pass posted successfully.");
+            loadGatePasses();
+        } catch(e) { alert("Error: " + e.message); }
+    }
+
+    async function postAllGatePasses() {
+        if(currentGatePasses.length === 0) return;
+        if(!confirm(`Are you sure you want to deduct VL balances and post ${currentGatePasses.length} gate passes to the ledger?`)) return;
+
+        const btn = document.getElementById('btnPostAllGp');
+        btn.innerText = "Posting..."; btn.disabled = true;
+
+        try {
+            await applyGatePassDeduction(currentGatePasses);
+            alert("All gate passes successfully posted and deducted from VL balances.");
+            loadGatePasses(); 
+        } catch(e) {
+            alert("Error posting gate passes: " + e.message);
+        } finally {
+            btn.innerText = "Post All Pending to Ledger"; btn.disabled = false;
+        }
+    }
+
+    // Core Gate Pass Deduction Logic
+    async function applyGatePassDeduction(gpArray) {
+        await loadEmployeeMaps(); // ensure fresh balances
+        let empDeductions = {};
+        let ledgers = [];
+        let gpIdsToUpdate = [];
+
+        gpArray.forEach(gp => {
+            if(!empDeductions[gp.emp_id]) empDeductions[gp.emp_id] = 0;
+            empDeductions[gp.emp_id] += parseFloat(gp.deduction_credit);
+            gpIdsToUpdate.push(gp.id);
+
+            ledgers.push({
+                emp_id: gp.emp_id,
+                type: 'GATE PASS',
+                debit: gp.deduction_credit,
+                transaction_type: 'GATE_PASS_DEDUCTION',
+                remarks: `Gate Pass Deduction - ${gp.purpose || ''}`,
+                start_date: gp.date
+            });
+        });
+
+        // Batch Update Employee Balances
+        const updates = [];
+        for (const [eId, amount] of Object.entries(empDeductions)) {
+            const emp = empDataMap[eId];
+            if (emp) {
+                const newBal = (parseFloat(emp.vl_balance || 0) - amount).toFixed(3);
+                updates.push( supabaseClient.from('employees').update({ vl_balance: newBal }).eq('emp_id', eId) );
+            }
+        }
+        await Promise.all(updates);
+
+        // Insert into Ledger
+        await supabaseClient.from('leave_ledger').insert(ledgers);
+
+        // Update Gate Pass status
+        const gpUpdates = gpIdsToUpdate.map(id => supabaseClient.from('gate_pass_logs').update({ status: 'POSTED' }).eq('id', id));
+        await Promise.all(gpUpdates);
+        
+        await loadEmployeeMaps(); // refresh local cache
+    }
+
+    // --- TAB 5: DETAILED LEDGER MONITORING ---
+    async function loadLedgerStatement() {
+        const empId = document.getElementById('ledgEmp').value;
+        const monthVal = document.getElementById('ledgMonth').value;
+        const list = document.getElementById('ledger-list');
+        const sumDiv = document.getElementById('ledgerSummary');
+
+        if (!empId || !monthVal) {
+            alert("Please select both an Employee and a Month.");
+            return;
+        }
+
+        list.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching ledger data...</td></tr>`;
+        sumDiv.classList.add('hidden');
+
+        try {
+            const startDate = `${monthVal}-01`;
+            const endDate = `${monthVal}-31`;
+
+            // We need current balance of the employee to reverse-calculate the beginning balance.
+            // Since "Leave Credits" usually groups VL, SL, etc., we will track VL as the primary for this statement, 
+            // OR sum them up. Usually, statements are per type. To keep it simple, we track VL by default.
+            await loadEmployeeMaps();
+            const emp = empDataMap[empId];
+            if(!emp) throw new Error("Employee data missing.");
+            
+            // Fetch ledger for the month
+            const { data, error } = await supabaseClient.from('leave_ledger')
+                .select('*')
+                .eq('emp_id', empId)
+                .gte('created_at', startDate) // Using created_at or start_date based on structure
+                .lte('created_at', endDate)
+                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'DISAPPROVED'])
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+
+            // Fetch ALL transactions AFTER this month to accurately reverse-calculate ending balance of the selected month
+            const { data: futureData } = await supabaseClient.from('leave_ledger')
+                .select('debit, credit')
+                .eq('emp_id', empId)
+                .gt('created_at', endDate)
+                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION']);
+
+            let currentVL = parseFloat(emp.vl_balance || 0);
+            
+            // Reverse future transactions to get End of Month Balance
+            let endOfMonthBal = currentVL;
+            if(futureData) {
+                futureData.forEach(f => {
+                    endOfMonthBal += parseFloat(f.debit || 0);
+                    endOfMonthBal -= parseFloat(f.credit || 0);
+                });
+            }
+
+            // Reverse current month transactions to get Beginning Balance
+            let begBal = endOfMonthBal;
+            let totalCreditMonth = 0;
+            let totalDebitMonth = 0;
+
+            (data || []).forEach(t => {
+                if (t.transaction_type !== 'DISAPPROVED') {
+                    const c = parseFloat(t.credit || 0);
+                    const d = parseFloat(t.debit || 0);
+                    totalCreditMonth += c;
+                    totalDebitMonth += d;
+                    begBal -= c;
+                    begBal += d;
+                }
+            });
+
+            // Update Summary Cards
+            document.getElementById('lblBegBal').innerText = begBal.toFixed(3);
+            const net = totalCreditMonth - totalDebitMonth;
+            const netEl = document.getElementById('lblMovement');
+            netEl.innerText = (net > 0 ? '+' : '') + net.toFixed(3);
+            netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
+            document.getElementById('lblEndBal').innerText = endOfMonthBal.toFixed(3);
+            sumDiv.classList.remove('hidden');
+
+            if (!data || data.length === 0) {
+                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this month.</td></tr>`;
+                return;
             }
 
             let html = '';
-            currentGatePasses.forEach(gp => {
-                const name = empNameMap[gp.emp_id] || gp.emp_id;
+            let runningBal = begBal;
+
+            data.forEach(t => {
+                const isDisapproved = t.transaction_type === 'DISAPPROVED';
+                const cred = parseFloat(t.credit || 0);
+                const deb = parseFloat(t.debit || 0);
+                
+                if(!isDisapproved) {
+                    runningBal += cred;
+                    runningBal -= deb;
+                }
+
+                const displayType = t.type ? t.type.toUpperCase() : '-';
+                const dateStr = new Date(t.created_at || t.start_date).toLocaleDateString('en-US');
+                
                 html += `
-                    <tr>
-                        <td class="table-td">${gp.date}</td>
-                        <td class="table-td">${gp.emp_id}</td>
-                        <td class="table-td font-bold">${name.toUpperCase()}</td>
-                        <td class="table-td">${gp.purpose}</td>
-                        <td class="table-td font-bold text-red-600">${parseFloat(gp.deduction_credit).toFixed(3)}</td>
+                    <tr class="${isDisapproved ? 'bg-red-50 opacity-70' : ''}">
+                        <td class="table-td">${dateStr}</td>
+                        <td class="table-td">
+                            <span class="font-bold">${t.transaction_type.replace(/_/g, ' ')}</span><br>
+                            <span class="text-xs text-gray-500">${displayType} | ${t.remarks || ''}</span>
+                        </td>
+                        <td class="table-td text-green-700 font-bold">${cred > 0 ? cred.toFixed(3) : '-'}</td>
+                        <td class="table-td text-red-700 font-bold">${deb > 0 ? deb.toFixed(3) : '-'}</td>
+                        <td class="table-td font-bold">${isDisapproved ? '-' : runningBal.toFixed(3)}</td>
                     </tr>
                 `;
             });
             list.innerHTML = html;
-            document.getElementById('btnPostGp').classList.remove('hidden');
 
-        } catch(e) {
+        } catch (e) {
             list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
-            document.getElementById('btnPostGp').classList.add('hidden');
-        }
-    }
-
-    async function postGatePassesToLedger() {
-        if(currentGatePasses.length === 0) return;
-        if(!confirm(`Are you sure you want to deduct VL balances and post ${currentGatePasses.length} gate passes to the ledger?`)) return;
-
-        document.getElementById('btnPostGp').innerText = "Posting...";
-        document.getElementById('btnPostGp').disabled = true;
-
-        try {
-            // Group by employee to minimize employee updates
-            let empDeductions = {};
-            let ledgers = [];
-            let gpIdsToUpdate = [];
-
-            currentGatePasses.forEach(gp => {
-                if(!empDeductions[gp.emp_id]) empDeductions[gp.emp_id] = 0;
-                empDeductions[gp.emp_id] += parseFloat(gp.deduction_credit);
-                
-                gpIdsToUpdate.push(gp.id);
-
-                ledgers.push({
-                    emp_id: gp.emp_id,
-                    type: 'VL (GATE PASS)',
-                    debit: gp.deduction_credit,
-                    transaction_type: 'GATE_PASS_DEDUCTION',
-                    remarks: `Gate Pass Deduction for ${gp.date} - ${gp.purpose}`,
-                    start_date: gp.date
-                });
-            });
-
-            // Update Employee Balances
-            const { data: empData } = await supabaseClient.from('employees').select('emp_id, vl_balance').in('emp_id', Object.keys(empDeductions));
-            const updates = [];
-            
-            empData.forEach(e => {
-                const deductAmount = empDeductions[e.emp_id];
-                const newBal = (parseFloat(e.vl_balance || 0) - deductAmount).toFixed(3);
-                updates.push( supabaseClient.from('employees').update({ vl_balance: newBal }).eq('emp_id', e.emp_id) );
-            });
-
-            await Promise.all(updates);
-
-            // Insert into Ledger
-            await supabaseClient.from('leave_ledger').insert(ledgers);
-
-            // Update Gate Pass status to POSTED
-            const gpUpdates = gpIdsToUpdate.map(id => supabaseClient.from('gate_pass_logs').update({ status: 'POSTED' }).eq('id', id));
-            await Promise.all(gpUpdates);
-
-            alert("Gate passes successfully posted and deducted from VL balances.");
-            loadGatePasses(); // Refresh the list
-            loadEmployeeMaps(); // Refresh cache
-
-        } catch(e) {
-            alert("Error posting gate passes: " + e.message);
-        } finally {
-            document.getElementById('btnPostGp').innerText = "Post Deductions to Ledger";
-            document.getElementById('btnPostGp').disabled = false;
         }
     }
 
