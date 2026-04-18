@@ -124,7 +124,7 @@
             <div id="ctoTab" class="tab-content">
                 <div class="card mb-6">
                     <div class="p-4 border-b border-gray-200 bg-gray-50">
-                        <h3 class="font-bold text-[#003811]">CTO Details Encoding</h3>
+                        <h3 class="font-bold text-[#003811]">CTO Details</h3>
                     </div>
                     <div class="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
@@ -139,57 +139,39 @@
                             <label class="form-label">Date of Activity</label>
                             <input type="date" id="ctoDate" class="form-input" onchange="checkWeekend()">
                         </div>
-                        <div class="md:col-span-4 flex gap-4 items-center mt-2 pb-4 border-b">
+                        <div class="md:col-span-4 flex gap-4 items-center mt-2">
                             <div class="flex items-center gap-2 bg-gray-100 p-2 rounded border">
                                 <input type="checkbox" id="ctoIsWeekend" class="w-4 h-4 accent-[#D4AF37]">
                                 <label class="text-sm font-bold text-gray-700">Weekend / Holiday (Multiplier 1.5x)</label>
                             </div>
                         </div>
-                        <div class="md:col-span-3 relative pt-2">
-                            <label class="form-label">Search & Add Employee</label>
-                            <input type="text" id="ctoEmpSearch" class="form-input" placeholder="Type to search..." autocomplete="off">
-                            <div id="ctoSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
-                        </div>
-                        <div class="md:col-span-1 pt-8">
-                            <button onclick="saveCtoBatch()" class="w-full bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-4 rounded shadow">Save CTO Records</button>
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto p-6 bg-gray-50">
-                        <h4 class="text-xs font-bold text-gray-500 mb-2 uppercase">Selected Employees for this PSO</h4>
-                        <table class="w-full text-left border-collapse bg-white rounded border">
-                            <thead>
-                                <tr>
-                                    <th class="table-th text-xs py-2">Emp ID</th>
-                                    <th class="table-th text-xs py-2">Name</th>
-                                    <th class="table-th text-xs py-2 text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="cto-emp-list">
-                                <tr><td colspan="3" class="table-td text-center text-xs text-gray-500">Search and select employees above.</td></tr>
-                            </tbody>
-                        </table>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                        <h3 class="font-bold text-[#003811]">Process CTO Records</h3>
-                        <button onclick="loadCTORecords()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh List</button>
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end flex-wrap">
+                        <div class="flex-1 min-w-[200px] relative">
+                            <label class="form-label">Search & Add Employee</label>
+                            <input type="text" id="ctoEmpSearch" class="form-input" placeholder="Type to search..." autocomplete="off">
+                            <div id="ctoSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
+                        </div>
+                        <div class="text-right">
+                            <button onclick="saveCtoBatch()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-8 rounded shadow text-lg">Save CTO Records</button>
+                        </div>
                     </div>
-                    <div class="overflow-x-auto max-h-96">
+                    
+                    <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr>
-                                    <th class="table-th">Date & PSO</th>
-                                    <th class="table-th">Employee</th>
-                                    <th class="table-th text-center">Base Hours</th>
-                                    <th class="table-th text-center">Multiplier</th>
-                                    <th class="table-th text-center">Calculated</th>
-                                    <th class="table-th text-center">Action / Status</th>
+                                    <th class="table-th">Emp ID</th>
+                                    <th class="table-th">Name</th>
+                                    <th class="table-th" style="width: 150px;">Base Hours</th>
+                                    <th class="table-th text-center" style="width: 250px;">Logs Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="cto-records-list">
-                                <tr><td colspan="6" class="table-td text-center text-gray-500">Loading records...</td></tr>
+                            <tbody id="cto-emp-list">
+                                <tr><td colspan="4" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -235,7 +217,6 @@
             });
         }
         loadRecentGatePasses();
-        loadCTORecords();
     }
 
     function switchTab(tabId) {
@@ -245,7 +226,7 @@
         document.getElementById(tabId).classList.add('active');
     }
 
-    // --- GATE PASS LOGIC (KEEP AS IS) ---
+    // --- GATE PASS LOGIC ---
     const gpInput = document.getElementById('gpSearch');
     const gpResults = document.getElementById('gpSearchResults');
     const gpEmpId = document.getElementById('gpEmpId');
@@ -254,17 +235,24 @@
         const val = this.value.toLowerCase();
         gpResults.innerHTML = '';
         if (!val) { gpResults.classList.add('hidden'); return; }
+        
         const filtered = gpSearchList.filter(e => e.name.toLowerCase().includes(val) || e.id.toLowerCase().includes(val));
         if (filtered.length > 0) {
             filtered.forEach(e => {
                 const div = document.createElement('div');
                 div.className = 'p-2 hover:bg-gray-100 cursor-pointer text-sm';
                 div.innerText = `${e.name} (${e.id})`;
-                div.onclick = () => { gpInput.value = e.name; gpEmpId.value = e.id; gpResults.classList.add('hidden'); };
+                div.onclick = () => {
+                    gpInput.value = e.name;
+                    gpEmpId.value = e.id;
+                    gpResults.classList.add('hidden');
+                };
                 gpResults.appendChild(div);
             });
             gpResults.classList.remove('hidden');
-        } else { gpResults.classList.add('hidden'); }
+        } else {
+            gpResults.classList.add('hidden');
+        }
     });
 
     document.addEventListener('click', function(e) {
@@ -297,108 +285,317 @@
         const pType = document.getElementById('gpType').value;
         const dest = document.getElementById('gpDest').value;
         const purp = document.getElementById('gpPurpose').value;
-        if(!empId || !dest || !purp) { alert("Please select an employee and fill all fields."); return; }
+
+        if(!empId || !dest || !purp) {
+            alert("Please select an employee and fill all fields.");
+            return;
+        }
+
         const dateStr = new Date().toISOString().split('T')[0];
         const fullPurpose = `${dest} - ${purp}`;
+
         try {
-            const { data, error } = await supabaseClient.from('gate_pass_logs').insert([{ emp_id: empId, date: dateStr, pass_type: pType, purpose: fullPurpose, status: 'ISSUED', deduction_credit: 0 }]).select();
+            // Capture Division Chief
+            const empDiv = empDataMap[empId].division;
+            const { data: chiefData } = await supabaseClient.from('users').select('full_name').eq('role', 'CHIEF').eq('division', empDiv).limit(1);
+            const chiefName = chiefData && chiefData.length > 0 ? chiefData[0].full_name.toUpperCase() : '';
+
+            // Insert
+            const { data, error } = await supabaseClient.from('gate_pass_logs').insert([{
+                emp_id: empId,
+                date: dateStr,
+                pass_type: pType,
+                purpose: fullPurpose,
+                status: 'ISSUED',
+                deduction_credit: 0
+            }]).select();
+
             if(error) throw error;
             const newRecord = data[0];
+
+            // Print PDF Layout (1/2 8.5x13 landscape split vertically)
+            // 8.5 x 13 inches -> 215.9 x 330.2 mm
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', [100, 150]);
+            const doc = new jsPDF('l', 'mm', [215.9, 330.2]); 
             const empName = empDataMap[empId].full_name.toUpperCase();
-            const renderSlip = (yOffset, copyType) => {
+            
+            const renderSlip = (xOffset, copyType) => {
+                const centerX = xOffset + 82.55; 
+                
                 doc.setFontSize(10); doc.setFont("helvetica", "bold");
-                doc.text("DEPARTMENT OF AGRARIAN REFORM", 50, yOffset + 15, {align: 'center'});
+                doc.text("DEPARTMENT OF AGRARIAN REFORM", centerX, 20, {align: 'center'});
                 doc.setFontSize(8); doc.setFont("helvetica", "normal");
-                doc.text("Camarines Sur 1 Provincial Office", 50, yOffset + 20, {align: 'center'});
-                doc.text("H.L. Building Carnation St., Triangulo, Naga City", 50, yOffset + 24, {align: 'center'});
-                doc.setFontSize(12); doc.setFont("helvetica", "bold");
-                doc.text("PERMISSION SLIP", 50, yOffset + 32, {align: 'center'});
+                doc.text("Camarines Sur 1 Provincial Office", centerX, 24, {align: 'center'});
+                doc.text("H.L. Building Carnation St., Triangulo, Naga City", centerX, 28, {align: 'center'});
+                
+                doc.setFontSize(14); doc.setFont("helvetica", "bold");
+                doc.text("PERMISSION SLIP", centerX, 40, {align: 'center'});
+
                 doc.setFontSize(9); doc.setFont("helvetica", "normal");
-                doc.text("Date:", 140, yOffset + 40); doc.text(new Date(dateStr).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}), 155, yOffset + 40); doc.line(152, yOffset + 41, 190, yOffset + 41);
-                doc.text("No.:", 140, yOffset + 47); doc.text(`GP-${new Date().getFullYear()}-${String(newRecord.id).padStart(4, '0')}`, 155, yOffset + 47); doc.line(152, yOffset + 48, 190, yOffset + 48);
-                doc.rect(20, yOffset + 38, 4, 4); doc.text("Personal", 26, yOffset + 41);
-                if(pType === 'PERSONAL') doc.text("X", 20.5, yOffset + 41);
-                doc.rect(20, yOffset + 44, 4, 4); doc.text("Official", 26, yOffset + 47);
-                if(pType === 'OFFICIAL') doc.text("X", 20.5, yOffset + 47);
-                doc.text("The Chief: ______________________________________________________________", 20, yOffset + 58);
-                doc.text("It is requested that I be allowed to leave the Office during Office hours.", 35, yOffset + 64);
-                doc.text("Date:", 20, yOffset + 75); doc.text(new Date(dateStr).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}), 45, yOffset + 75); doc.line(40, yOffset + 76, 190, yOffset + 76);
-                doc.text("Destination:", 20, yOffset + 82); doc.text(dest, 45, yOffset + 82); doc.line(40, yOffset + 83, 190, yOffset + 83);
-                doc.text("Purpose:", 20, yOffset + 89); doc.text(purp, 45, yOffset + 89); doc.line(40, yOffset + 90, 190, yOffset + 90);
-                doc.text("Time:  From:", 20, yOffset + 98); doc.line(40, yOffset + 99, 90, yOffset + 99);
-                doc.text("To:", 100, yOffset + 98); doc.line(108, yOffset + 99, 160, yOffset + 99);
-                doc.setFont("helvetica", "bold"); doc.text(empName, 105, yOffset + 115, {align: 'center'});
-                doc.line(60, yOffset + 116, 150, yOffset + 116);
-                doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.text("Printed Name & Signature of Employee", 105, yOffset + 119, {align: 'center'});
-                doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.text("APPROVED:", 20, yOffset + 130);
-                doc.line(40, yOffset + 140, 100, yOffset + 140);
-                doc.setFont("helvetica", "normal"); doc.text("Division Chief", 70, yOffset + 144, {align: 'center'});
-                doc.rect(40, yOffset + 150, 130, 30);
-                doc.text("CERTIFICATE OF APPEARANCE", 105, yOffset + 155, {align: 'center'});
-                doc.line(60, yOffset + 170, 150, yOffset + 170); doc.text("(Certifying Officer)", 105, yOffset + 174, {align: 'center'});
-                doc.line(80, yOffset + 178, 130, yOffset + 178); doc.text("Date", 105, yOffset + 182, {align: 'center'});
-                doc.setFont("helvetica", "italic"); doc.text(copyType, 105, yOffset + 188, {align: 'center'});
-            };
+                
+                // Personal Checkbox
+                doc.rect(xOffset + 15, 46, 4, 4); doc.text("Personal", xOffset + 21, 49);
+                if(pType === 'PERSONAL') doc.text("X", xOffset + 15.5, 49.5);
+                
+                // Official Checkbox
+                doc.rect(xOffset + 15, 53, 4, 4); doc.text("Official", xOffset + 21, 56);
+                if(pType === 'OFFICIAL') doc.text("X", xOffset + 15.5, 56.5);
+
+                // Date and No
+                doc.text("Date:", xOffset + 95, 49); doc.text(new Date(dateStr).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}), xOffset + 110, 49); doc.line(xOffset + 108, 50, xOffset + 150, 50);
+                doc.text("No.:", xOffset + 95, 56); doc.text(`GP-${new Date().getFullYear()}-${String(newRecord.id).padStart(4, '0')}`, xOffset + 110, 56); doc.line(xOffset + 108, 57, xOffset + 150, 57);
+
+                // Body
+                doc.text("The Chief: ", xOffset + 15, 68); 
+                doc.setFont("helvetica", "bold"); doc.text(chiefName, xOffset + 32, 68); doc.setFont("helvetica", "normal");
+                doc.line(xOffset + 32, 69, xOffset + 150, 69);
+                
+                doc.text("It is requested that I be allowed to leave the Office during Office hours.", centerX, 78, {align: 'center'});
+
+                doc.text("Date:", xOffset + 15, 90); doc.text(new Date(dateStr).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}), xOffset + 40, 90); doc.line(xOffset + 38, 91, xOffset + 150, 91);
+                doc.text("Destination:", xOffset + 15, 98); doc.text(dest, xOffset + 40, 98); doc.line(xOffset + 38, 99, xOffset + 150, 99);
+                doc.text("Purpose:", xOffset + 15, 106); doc.text(purp, xOffset + 40, 106); doc.line(xOffset + 38, 107, xOffset + 150, 107);
+                
+                doc.text("Time:  From:", xOffset + 15, 116); doc.line(xOffset + 38, 117, xOffset + 80, 117);
+                doc.text("To:", xOffset + 95, 116); doc.line(xOffset + 105, 117, xOffset + 150, 117);
+
+                // Signatures
+                doc.setFont("helvetica", "bold"); doc.text(empName, centerX, 135, {align: 'center'});
+                doc.line(xOffset + 40, 136, xOffset + 125, 136);
+                doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.text("Printed Name & Signature of Employee", centerX, 140, {align: 'center'});
+
+                doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.text("APPROVED:", xOffset + 15, 155);
+                
+                doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(chiefName, xOffset + 60, 163, {align: 'center'});
+                doc.line(xOffset + 30, 164, xOffset + 90, 164);
+                doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text("Division Chief", xOffset + 60, 168, {align: 'center'});
+
+                // Certificate Box
+                doc.rect(xOffset + 25, 180, 115, 30);
+                doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+                doc.text("CERTIFICATE OF APPEARANCE", centerX, 187, {align: 'center'});
+                doc.line(xOffset + 50, 198, xOffset + 115, 198); doc.text("(Certifying Officer)", centerX, 202, {align: 'center'});
+                doc.line(xOffset + 65, 207, xOffset + 100, 207); doc.text("Date", centerX, 211, {align: 'center'});
+
+                doc.setFont("helvetica", "italic"); doc.text(copyType, centerX, 217, {align: 'center'});
+            }
+
             renderSlip(0, "PERSONAL COPY");
-            renderSlip(148.5, "SECURITY OFFICER COPY");
+            renderSlip(165.1, "SECURITY OFFICER COPY");
+
+            // Generate QR
             const qrDataStr = `GP-${newRecord.id}-${empId}`;
             const qrBase64 = await getQRBase64(qrDataStr);
             if(qrBase64) {
-                doc.addImage(qrBase64, 'PNG', 20, 15, 25, 25);
-                doc.addImage(qrBase64, 'PNG', 20, 15 + 148.5, 25, 25);
+                doc.addImage(qrBase64, 'PNG', 15, 15, 25, 25);
+                doc.addImage(qrBase64, 'PNG', 165.1 + 15, 15, 25, 25);
             }
+
             doc.save(`GatePass_${empId}_${dateStr}.pdf`);
             alert("Gate Pass generated and PDF downloaded.");
-            document.getElementById('gpSearch').value = ''; gpEmpId.value = ''; document.getElementById('gpDest').value = ''; document.getElementById('gpPurpose').value = '';
+            
+            document.getElementById('gpSearch').value = '';
+            gpEmpId.value = '';
+            document.getElementById('gpDest').value = '';
+            document.getElementById('gpPurpose').value = '';
+            
             loadRecentGatePasses();
-        } catch(e) { alert("Error generating Gate Pass: " + e.message); }
+
+        } catch(e) {
+            alert("Error generating Gate Pass: " + e.message);
+        }
     }
 
     async function loadRecentGatePasses() {
         const list = document.getElementById('gp-recent-list');
         const filter = document.getElementById('gpViewFilter').value;
         list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">Loading...</td></tr>`;
+        
         try {
             let query = supabaseClient.from('gate_pass_logs').select('*').order('date', { ascending: false }).order('id', { ascending: false });
-            const today = new Date(); const y = today.getFullYear(); const m = String(today.getMonth() + 1).padStart(2, '0'); const dStr = String(today.getDate()).padStart(2, '0'); const todayStr = `${y}-${m}-${dStr}`;
-            if(filter === 'DAILY') query = query.eq('date', todayStr);
-            else if(filter === 'WEEKLY') { const lastWeek = new Date(today); lastWeek.setDate(today.getDate() - 7); query = query.gte('date', lastWeek.toISOString().split('T')[0]).lte('date', todayStr); }
-            else if(filter === 'MONTHLY') query = query.gte('date', `${y}-${m}-01`).lte('date', `${y}-${m}-${new Date(y, today.getMonth() + 1, 0).getDate()}`);
-            else if(filter === 'ANNUAL') query = query.gte('date', `${y}-01-01`).lte('date', `${y}-12-31`);
+
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = String(today.getMonth() + 1).padStart(2, '0');
+            const dStr = String(today.getDate()).padStart(2, '0');
+            const todayStr = `${y}-${m}-${dStr}`;
+
+            if(filter === 'DAILY') {
+                query = query.eq('date', todayStr);
+            } else if(filter === 'WEEKLY') {
+                const lastWeek = new Date(today);
+                lastWeek.setDate(today.getDate() - 7);
+                const lwStr = lastWeek.toISOString().split('T')[0];
+                query = query.gte('date', lwStr).lte('date', todayStr);
+            } else if(filter === 'MONTHLY') {
+                const lastDay = new Date(y, today.getMonth() + 1, 0).getDate();
+                query = query.gte('date', `${y}-${m}-01`).lte('date', `${y}-${m}-${lastDay}`);
+            } else if(filter === 'ANNUAL') {
+                query = query.gte('date', `${y}-01-01`).lte('date', `${y}-12-31`);
+            }
+
             const { data, error } = await query;
             if (error) throw error;
-            if(!data || data.length === 0) { list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No gate passes found.</td></tr>`; return; }
+            
+            if(!data || data.length === 0) {
+                list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No gate passes found for this view.</td></tr>`;
+                return;
+            }
+
+            const filteredData = data.filter(gp => ['PROCESSED', 'POSTED', 'ISSUED'].includes(gp.status));
+
+            if(filteredData.length === 0) {
+                 list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No gate passes found for this view.</td></tr>`;
+                 return;
+            }
+
             let html = '';
-            data.forEach(gp => {
+            filteredData.forEach(gp => {
                 const name = empDataMap[gp.emp_id] ? empDataMap[gp.emp_id].full_name.toUpperCase() : gp.emp_id;
-                let sCls = 'bg-gray-100 text-gray-800'; if(gp.status === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800'; if(gp.status === 'POSTED') sCls = 'bg-green-100 text-green-800';
-                let timeCell = ''; let dedCell = ''; let actionBtn = '';
+                
+                let sCls = 'bg-gray-100 text-gray-800';
+                if(gp.status === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800';
+                if(gp.status === 'POSTED') sCls = 'bg-green-100 text-green-800';
+                
+                let timeCell = '';
+                let dedCell = '';
+                let actionBtn = '';
+
                 if(gp.status === 'ISSUED') {
-                    let outVal = gp.time_out ? String(gp.time_out).substring(0,5) : ''; let inVal = gp.time_in ? String(gp.time_in).substring(0,5) : '';
-                    timeCell = `<div class="flex flex-col gap-1 items-center"><input type="time" id="tOut_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${outVal}"><input type="time" id="tIn_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${inVal}"></div>`;
-                    dedCell = `<input type="number" step="0.001" id="ded_${gp.id}" class="border rounded px-1 text-xs w-20 text-center bg-white" value="${gp.deduction_credit || '0.000'}">`;
-                    actionBtn = `<button onclick="processGP('${gp.id}')" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mt-1">Process</button>`;
+                    // Civil Service Matrix calculation logic for auto-display
+                    let calcDeduct = 0;
+                    if(gp.time_out && gp.time_in) {
+                        const dO = new Date(`1970-01-01T${gp.time_out}`);
+                        const dI = new Date(`1970-01-01T${gp.time_in}`);
+                        let diffMins = (dI - dO) / 60000;
+                        
+                        if (gp.pass_type === 'OFFICIAL') {
+                            diffMins -= 180; // deduct 3 hours
+                        }
+
+                        if(diffMins > 0) {
+                            calcDeduct = diffMins / 480; 
+                        }
+                    }
+                    
+                    timeCell = `
+                        <div class="flex flex-col gap-1 items-center">
+                            <input type="time" id="tOut_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_out ? String(gp.time_out).substring(0,5) : ''}">
+                            <input type="time" id="tIn_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_in ? String(gp.time_in).substring(0,5) : ''}">
+                            <button onclick="calcGP('${gp.id}', '${gp.pass_type}')" class="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-0.5 rounded mt-1 shadow">Calc Deduction</button>
+                        </div>
+                    `;
+                    dedCell = `<div id="ded_${gp.id}" class="font-bold text-red-600 text-center">${calcDeduct.toFixed(3)}</div>`;
+                    actionBtn = `
+                        <button onclick="processGP('${gp.id}')" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mt-1 mb-1">Process</button>
+                        <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline">Delete</button>
+                    `;
                 } else {
-                    timeCell = `<div class="text-xs text-center"><span class="text-gray-500">Out:</span> ${formatTime12h(gp.time_out)}<br><span class="text-gray-500">In:</span> ${formatTime12h(gp.time_in)}</div>`;
+                    let tOutStr = formatTime12h(gp.time_out);
+                    let tInStr = formatTime12h(gp.time_in);
+                    timeCell = `<div class="text-xs text-center"><span class="text-gray-500">Out:</span> ${tOutStr}<br><span class="text-gray-500">In:</span> ${tInStr}</div>`;
                     dedCell = `<div class="font-bold text-red-600 text-center">${parseFloat(gp.deduction_credit).toFixed(3)}</div>`;
-                    actionBtn = gp.status === 'PROCESSED' ? `<div class="text-xs text-gray-500 italic mt-1">Ready for Posting</div>` : `<div class="text-xs text-green-600 font-bold mt-1">Posted</div>`;
+                    
+                    if(gp.status === 'PROCESSED') {
+                        actionBtn = `
+                            <div class="text-xs text-gray-500 italic mt-1 mb-1">Ready for Posting</div>
+                            <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline">Delete</button>
+                        `;
+                    } else {
+                        actionBtn = `<div class="text-xs text-green-600 font-bold mt-1">Posted</div>`;
+                    }
                 }
-                html += `<tr class="hover:bg-gray-50 border-b"><td class="table-td whitespace-nowrap">${gp.date}</td><td class="table-td"><span class="font-bold">${name}</span><br><span class="text-xs font-mono text-gray-500">${gp.emp_id}</span></td><td class="table-td text-xs"><span class="font-bold">${gp.pass_type}</span><br><span class="text-gray-600 truncate max-w-[150px] block" title="${gp.purpose}">${gp.purpose || '-'}</span></td><td class="table-td p-1">${timeCell}</td><td class="table-td p-1">${dedCell}</td><td class="table-td text-center flex flex-col gap-1 items-center"><span class="badge ${sCls} block w-max mx-auto">${gp.status}</span>${actionBtn}</td></tr>`;
+
+                html += `
+                    <tr class="hover:bg-gray-50 border-b">
+                        <td class="table-td whitespace-nowrap">${gp.date}</td>
+                        <td class="table-td">
+                            <span class="font-bold">${name}</span><br>
+                            <span class="text-xs font-mono text-gray-500">${gp.emp_id}</span>
+                        </td>
+                        <td class="table-td text-xs">
+                            <span class="font-bold">${gp.pass_type}</span><br>
+                            <span class="text-gray-600 truncate max-w-[150px] block" title="${gp.purpose}">${gp.purpose || '-'}</span>
+                        </td>
+                        <td class="table-td p-1">${timeCell}</td>
+                        <td class="table-td p-1">${dedCell}</td>
+                        <td class="table-td text-center flex flex-col gap-1 items-center">
+                            <span class="badge ${sCls} block w-max mx-auto">${gp.status}</span>
+                            ${actionBtn}
+                        </td>
+                    </tr>
+                `;
             });
             list.innerHTML = html;
-        } catch(e) { list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`; }
+        } catch(e) {
+            list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+        }
     }
 
-    async function processGP(id) {
-        const tO = document.getElementById(`tOut_${id}`).value; const tI = document.getElementById(`tIn_${id}`).value; const ded = document.getElementById(`ded_${id}`).value;
-        if(!tO || !tI || ded === "") { alert("Please calculate or input times and deduction."); return; }
+    window.calcGP = function(id, passType) {
+        const tO = document.getElementById(`tOut_${id}`).value;
+        const tI = document.getElementById(`tIn_${id}`).value;
+        if(!tO || !tI) { alert("Please input both Out and In times."); return; }
+        
+        const dO = new Date(`1970-01-01T${tO}:00`);
+        const dI = new Date(`1970-01-01T${tI}:00`);
+        let diffMins = (dI - dO) / 60000;
+        
+        if (diffMins < 0) { alert("Time In cannot be earlier than Time Out."); return; }
+        
+        if (passType === 'OFFICIAL') {
+            diffMins -= 180; 
+        }
+
+        if (diffMins <= 0) {
+            document.getElementById(`ded_${id}`).innerText = "0.000";
+            return;
+        }
+
+        let d = diffMins / 480;
+        document.getElementById(`ded_${id}`).innerText = d.toFixed(3);
+    }
+
+    window.processGP = async function(id) {
+        const tO = document.getElementById(`tOut_${id}`).value;
+        const tI = document.getElementById(`tIn_${id}`).value;
+        const ded = document.getElementById(`ded_${id}`).innerText;
+        
+        if(!tO || !tI || ded === "0.000" && document.getElementById(`gpType`)?.value === "PERSONAL") { 
+            // Only require > 0 if personal. Official can be 0. 
+            // Just basic validation
+        }
+
         if(!confirm(`Process this Gate Pass with a deduction of ${ded} days?`)) return;
+
         try {
-            await supabaseClient.from('gate_pass_logs').update({ time_out: tO, time_in: tI, deduction_credit: parseFloat(ded), status: 'PROCESSED' }).eq('id', id);
-            alert("Gate Pass processed."); loadRecentGatePasses();
-        } catch(e) { alert("Error: " + e.message); }
+            await supabaseClient.from('gate_pass_logs').update({
+                time_out: tO,
+                time_in: tI,
+                deduction_credit: parseFloat(ded),
+                status: 'PROCESSED'
+            }).eq('id', id);
+            
+            alert("Gate Pass processed. It is now ready for posting in the Leave Page.");
+            loadRecentGatePasses();
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
+    }
+
+    window.cancelGP = async function(id) {
+        if(!confirm("Are you sure you want to cancel (delete) this unposted Gate Pass?")) return;
+        
+        try {
+            await supabaseClient.from('gate_pass_logs').update({
+                status: 'CANCELLED'
+            }).eq('id', id);
+            
+            alert("Gate Pass cancelled.");
+            loadRecentGatePasses();
+        } catch(e) {
+            alert("Error cancelling Gate Pass: " + e.message);
+        }
     }
 
     // --- CTO LOGIC ---
@@ -409,38 +606,51 @@
         const val = this.value.toLowerCase();
         ctoResults.innerHTML = '';
         if (!val) { ctoResults.classList.add('hidden'); return; }
+        
         const filtered = allEmpSearchList.filter(e => e.name.toLowerCase().includes(val) || e.id.toLowerCase().includes(val));
         if (filtered.length > 0) {
             filtered.forEach(e => {
                 const div = document.createElement('div');
                 div.className = 'p-2 hover:bg-gray-100 cursor-pointer text-sm';
                 div.innerText = `${e.name} (${e.id})`;
-                div.onclick = () => { addCtoEmployee(e.id, e.name); ctoInput.value = ''; ctoResults.classList.add('hidden'); };
+                div.onclick = () => {
+                    addCtoEmployee(e.id, e.name);
+                    ctoInput.value = '';
+                    ctoResults.classList.add('hidden');
+                };
                 ctoResults.appendChild(div);
             });
             ctoResults.classList.remove('hidden');
-        } else { ctoResults.classList.add('hidden'); }
+        } else {
+            ctoResults.classList.add('hidden');
+        }
     });
 
     function checkWeekend() {
-        const dt = document.getElementById('ctoDate').value; if(!dt) return;
-        const day = new Date(dt).getDay(); document.getElementById('ctoIsWeekend').checked = (day === 0 || day === 6);
+        const dt = document.getElementById('ctoDate').value;
+        if(!dt) return;
+        const day = new Date(dt).getDay();
+        document.getElementById('ctoIsWeekend').checked = (day === 0 || day === 6);
     }
 
     async function checkExistingPSO() {
-        const pso = document.getElementById('ctoPso').value.trim(); if(!pso) return;
+        const pso = document.getElementById('ctoPso').value.trim();
+        if(!pso) return;
         try {
             const { data } = await supabaseClient.from('cto_records').select('*').eq('PSO_Number', pso).limit(1);
             if(data && data.length > 0) {
                 if(!document.getElementById('ctoDesc').value) document.getElementById('ctoDesc').value = data[0].base_type || '';
-                if(!document.getElementById('ctoDate').value && data[0].date) { document.getElementById('ctoDate').value = data[0].date; checkWeekend(); }
+                if(!document.getElementById('ctoDate').value && data[0].date) {
+                    document.getElementById('ctoDate').value = data[0].date;
+                    checkWeekend();
+                }
             }
         } catch(e) {}
     }
 
     function addCtoEmployee(id, name) {
-        if(selectedCtoEmployees.find(e => e.id === id)) return; 
-        selectedCtoEmployees.push({ id, name });
+        if(selectedCtoEmployees.find(e => e.id === id)) return; // already added
+        selectedCtoEmployees.push({ id, name, baseHours: 0 });
         renderCtoEmployees();
     }
 
@@ -449,17 +659,96 @@
         renderCtoEmployees();
     }
 
+    function updateBaseHours(id, val) {
+        const emp = selectedCtoEmployees.find(e => e.id === id);
+        if(emp) emp.baseHours = parseFloat(val) || 0;
+    }
+
     function renderCtoEmployees() {
         const list = document.getElementById('cto-emp-list');
         if(selectedCtoEmployees.length === 0) {
-            list.innerHTML = `<tr><td colspan="3" class="table-td text-center text-xs text-gray-500">Search and select employees above.</td></tr>`;
+            list.innerHTML = `<tr><td colspan="4" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>`;
             return;
         }
+
         let html = '';
         selectedCtoEmployees.forEach(emp => {
-            html += `<tr><td class="table-td text-xs font-mono">${emp.id}</td><td class="table-td font-bold text-xs">${emp.name}</td><td class="table-td text-center py-1"><button onclick="removeCtoEmployee('${emp.id}')" class="bg-red-600 hover:bg-red-700 text-white text-[10px] px-2 py-1 rounded shadow">Remove</button></td></tr>`;
+            html += `
+                <tr class="hover:bg-gray-50">
+                    <td class="table-td text-xs font-mono">${emp.id}</td>
+                    <td class="table-td font-bold">${emp.name}</td>
+                    <td class="table-td">
+                        <input type="number" step="0.1" class="form-input text-center" value="${emp.baseHours}" onchange="updateBaseHours('${emp.id}', this.value)" id="ctoHr_${emp.id}">
+                    </td>
+                    <td class="table-td text-center">
+                        <button onclick="fetchLogsForCTO('${emp.id}', 'ctoHr_${emp.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded shadow mr-2">Check Logs</button>
+                        <button onclick="removeCtoEmployee('${emp.id}')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded shadow">Remove</button>
+                    </td>
+                </tr>
+            `;
         });
         list.innerHTML = html;
+    }
+
+    async function fetchLogsForCTO(emp_id, inputId) {
+        const dateStr = document.getElementById('ctoDate').value;
+        if(!dateStr) { alert("Please set the Date of Activity first."); return; }
+        
+        try {
+            const startOfDay = new Date(`${dateStr}T00:00:00+08:00`).toISOString();
+            const endOfDay = new Date(`${dateStr}T23:59:59+08:00`).toISOString();
+            
+            const { data: logs, error } = await supabaseClient.from('attendance_logs')
+                .select('log_time')
+                .eq('emp_id', emp_id)
+                .gte('log_time', startOfDay)
+                .lte('log_time', endOfDay)
+                .order('log_time', { ascending: true });
+                
+            if(error) throw error;
+            if(!logs || logs.length < 2) {
+                alert("Incomplete or no attendance logs found for this date.");
+                return;
+            }
+            
+            const firstLog = new Date(logs[0].log_time);
+            const lastLog = new Date(logs[logs.length-1].log_time);
+            let creditableHours = 0;
+            const isWeekend = document.getElementById('ctoIsWeekend').checked;
+            
+            if(isWeekend) {
+                creditableHours = (lastLog - firstLog) / (1000 * 60 * 60);
+                if(creditableHours > 5) creditableHours -= 1; // Basic 1 hr lunch deduction deduction logic if prolonged
+            } else {
+                const { data: sched } = await supabaseClient.from('schedule_override')
+                    .select('*').eq('emp_id', emp_id).eq('date', dateStr).limit(1);
+                    
+                let endTimeStr = "17:00"; 
+                if(sched && sched.length > 0 && sched[0].end_time) {
+                    endTimeStr = sched[0].end_time.substring(0,5);
+                } else {
+                    const empInfo = empDataMap[emp_id];
+                    if(empInfo && empInfo.flexi_range_end) endTimeStr = empInfo.flexi_range_end.substring(0,5);
+                }
+                
+                const schedEnd = new Date(`${dateStr}T${endTimeStr}:00+08:00`);
+                if(lastLog > schedEnd) {
+                    creditableHours = (lastLog - schedEnd) / (1000 * 60 * 60);
+                }
+            }
+            
+            const numEl = document.getElementById(inputId);
+            if(creditableHours < 2) {
+                alert(`Calculated excess time is ${creditableHours.toFixed(2)} hours. (Must be 2 hours or more to be creditable). Outputting raw value for HR review.`);
+                numEl.value = creditableHours > 0 ? creditableHours.toFixed(2) : 0;
+            } else {
+                numEl.value = creditableHours.toFixed(2);
+            }
+            updateBaseHours(emp_id, numEl.value);
+            
+        } catch(e) {
+            alert("Error fetching logs: " + e.message);
+        }
     }
 
     async function saveCtoBatch() {
@@ -468,78 +757,52 @@
         const cDate = document.getElementById('ctoDate').value;
         const isWeekend = document.getElementById('ctoIsWeekend').checked;
         const mult = isWeekend ? 1.5 : 1.0;
-        if(!pso || !desc || !cDate) { alert("Please fill out PSO Number, Description, and Date."); return; }
-        if(selectedCtoEmployees.length === 0) { alert("Please add at least one employee."); return; }
-        if(!confirm(`Saving CTO for ${selectedCtoEmployees.length} employees. Proceed?`)) return;
+
+        if(!pso || !desc || !cDate) {
+            alert("Please fill out PSO Number, Description, and Date.");
+            return;
+        }
+
+        if(selectedCtoEmployees.length === 0) {
+            alert("Please add at least one employee.");
+            return;
+        }
+
+        for(let emp of selectedCtoEmployees) {
+            if(emp.baseHours < 2) {
+                alert(`Employee ${emp.name} has ${emp.baseHours} base hours. CTO requires 2 hours or more. Please correct or remove the employee.`);
+                return;
+            }
+        }
+
+        if(!confirm(`Saving CTO for ${selectedCtoEmployees.length} employees. Multiplier is ${mult}x. Proceed?`)) return;
+
         try {
-            const records = selectedCtoEmployees.map(emp => ({ emp_id: emp.id, date: cDate, transaction_type: 'ENCODED', base_type: desc, base_hours: 0, multiplier: mult, calculated_hours: 0, PSO_Number: pso }));
+            const records = selectedCtoEmployees.map(emp => ({
+                emp_id: emp.id,
+                date: cDate,
+                transaction_type: 'EARNED',
+                base_type: desc,
+                base_hours: emp.baseHours,
+                multiplier: mult,
+                calculated_hours: emp.baseHours * mult,
+                PSO_Number: pso,
+                status: 'PROCESSED'
+            }));
+
             const { error } = await supabaseClient.from('cto_records').insert(records);
             if(error) throw error;
-            alert("CTO Records successfully ENCODED. Please process hours below.");
-            selectedCtoEmployees = []; renderCtoEmployees();
-            document.getElementById('ctoPso').value = ''; document.getElementById('ctoDesc').value = '';
-            loadCTORecords();
-        } catch(e) { alert("Error saving CTO: " + e.message); }
-    }
 
-    async function loadCTORecords() {
-        const list = document.getElementById('cto-records-list');
-        list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">Loading...</td></tr>`;
-        try {
-            const { data, error } = await supabaseClient.from('cto_records').select('*').order('date', { ascending: false }).order('id', { ascending: false }).limit(100);
-            if (error) throw error;
-            if (!data || data.length === 0) { list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No records found.</td></tr>`; return; }
-            let html = '';
-            data.forEach(cto => {
-                const name = empDataMap[cto.emp_id] ? empDataMap[gp.emp_id]?.full_name?.toUpperCase() || cto.emp_id : cto.emp_id;
-                const status = cto.transaction_type || 'ENCODED';
-                let sCls = 'bg-gray-100 text-gray-800'; if(status === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800'; if(status === 'POSTED') sCls = 'bg-green-100 text-green-800';
-                let hrsCell = '', actionBtn = '';
-                if (status === 'ENCODED') {
-                    hrsCell = `<div class="flex flex-col items-center gap-1"><input type="number" step="0.1" id="cto_hrs_${cto.id}" class="border rounded px-1 text-xs w-16 text-center bg-white" value="${cto.base_hours||0}"><button onclick="fetchLogsForCTORow('${cto.id}','${cto.emp_id}','${cto.date}',${cto.multiplier>1})" class="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-0.5 rounded shadow">Check Logs</button></div>`;
-                    actionBtn = `<button onclick="processCTO('${cto.id}', ${cto.multiplier})" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow">Process</button>`;
-                } else {
-                    hrsCell = `<div class="font-bold text-center">${parseFloat(cto.base_hours).toFixed(2)}</div>`;
-                    actionBtn = status === 'PROCESSED' ? `<div class="text-xs text-blue-600 italic">Ready for Posting</div>` : `<div class="text-xs text-green-600 font-bold">Posted</div>`;
-                }
-                html += `<tr class="hover:bg-gray-50 border-b"><td class="table-td"><span class="font-bold">${cto.date}</span><br><span class="text-xs text-gray-500">${cto.PSO_Number || '-'}</span></td><td class="table-td"><span class="font-bold">${empDataMap[cto.emp_id]?.full_name || cto.emp_id}</span><br><span class="text-xs text-gray-500">${cto.base_type || '-'}</span></td><td class="table-td p-1">${hrsCell}</td><td class="table-td text-center text-xs">x${cto.multiplier}</td><td class="table-td text-center font-bold text-green-700">${parseFloat(cto.calculated_hours || 0).toFixed(2)}</td><td class="table-td text-center flex flex-col gap-1 items-center"><span class="badge ${sCls} block w-max mx-auto">${status}</span>${actionBtn}</td></tr>`;
-            });
-            list.innerHTML = html;
-        } catch(e) { list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`; }
-    }
+            alert("CTO Records successfully saved. They will appear in the Leave Processing -> CTO Posting tab for final crediting.");
+            
+            selectedCtoEmployees = [];
+            renderCtoEmployees();
+            document.getElementById('ctoPso').value = '';
+            document.getElementById('ctoDesc').value = '';
 
-    async function fetchLogsForCTORow(id, emp_id, dateStr, isWeekend) {
-        try {
-            const startOfDay = new Date(`${dateStr}T00:00:00+08:00`).toISOString();
-            const endOfDay = new Date(`${dateStr}T23:59:59+08:00`).toISOString();
-            const { data: logs, error } = await supabaseClient.from('attendance_logs').select('log_time').eq('emp_id', emp_id).gte('log_time', startOfDay).lte('log_time', endOfDay).order('log_time', { ascending: true });
-            if(error) throw error;
-            if(!logs || logs.length < 2) { alert("No sufficient logs found for this date. Manual entry allowed."); return; }
-            const firstLog = new Date(logs[0].log_time), lastLog = new Date(logs[logs.length-1].log_time);
-            let credHrs = 0;
-            if(isWeekend) { credHrs = (lastLog - firstLog) / 3600000; if(credHrs > 5) credHrs -= 1; }
-            else {
-                const { data: sched } = await supabaseClient.from('schedule_override').select('*').eq('emp_id', emp_id).eq('date', dateStr).limit(1);
-                let endTime = "17:00";
-                if(sched && sched.length > 0) endTime = sched[0].end_time.substring(0,5);
-                else if(empDataMap[emp_id]?.flexi_range_end) endTime = empDataMap[emp_id].flexi_range_end.substring(0,5);
-                const schedEnd = new Date(`${dateStr}T${endTime}:00+08:00`);
-                if(lastLog > schedEnd) credHrs = (lastLog - schedEnd) / 3600000;
-            }
-            const input = document.getElementById(`cto_hrs_${id}`);
-            if(credHrs < 2) { alert(`Excess time calculated is only ${credHrs.toFixed(2)} hours. (Minimum 2 hours required). Setting to 0.`); input.value = 0; }
-            else { input.value = credHrs.toFixed(2); alert(`Captured ${credHrs.toFixed(2)} hours from logs.`); }
-        } catch(e) { alert("Error: " + e.message); }
-    }
-
-    async function processCTO(id, multiplier) {
-        const base = parseFloat(document.getElementById(`cto_hrs_${id}`).value) || 0;
-        if(base > 0 && base < 2) { alert("Minimum 2 hours required for CTO."); return; }
-        if(!confirm(`Process CTO with ${base} base hours?`)) return;
-        try {
-            await supabaseClient.from('cto_records').update({ base_hours: base, calculated_hours: base * multiplier, transaction_type: 'PROCESSED' }).eq('id', id);
-            loadCTORecords();
-        } catch(e) { alert("Error: " + e.message); }
+        } catch(e) {
+            alert("Error saving CTO: " + e.message);
+        }
     }
 
     window.onload = loadData;
