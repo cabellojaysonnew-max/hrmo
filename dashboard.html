@@ -1,551 +1,550 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - DAR HRMO</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-config.js"></script>
-    <style>
-        :root {
-            --color-primary: #003811;
-            --color-secondary: #D4AF37;
-        }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
-        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
-        
-        /* Custom Scrollbar for inner lists */
-        .scroll-list::-webkit-scrollbar { width: 4px; }
-        .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
-        .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
-        .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        :root {
+            --color-primary: #003811;
+            --color-secondary: #D4AF37;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+        
+        /* Custom Scrollbar for inner lists */
+        .scroll-list::-webkit-scrollbar { width: 4px; }
+        .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
+        .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
 
-    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 hidden md:block border-b border-[#006400]">
-            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
-        </div>
-        <div class="flex-1 overflow-y-auto py-2">
-            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
-            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
-            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
-            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
-            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
-            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
-            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">SYSTEM USERS</a>
-        </div>
-        <div class="p-4 bg-black/20 hidden md:block">
-            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
-            <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow hover:bg-red-700">LOGOUT</button>
-        </div>
-    </nav>
-    <main class="flex-1 overflow-y-auto p-8 relative">
-        
-        <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
-            <div>
-                <h2 class="text-3xl font-bold text-[#003811]">Operations Dashboard</h2>
-                <p id="scopeLabel" class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide"></p>
-            </div>
-            <p id="dashDate" class="text-[#D4AF37] font-bold text-lg bg-white px-4 py-2 rounded shadow-sm border border-gray-200"></p>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="card p-6 border-l-4 border-[#003811] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Staff</p>
-                    <h3 id="statTotal" class="text-4xl font-bold text-[#003811] mt-1">0</h3>
-                </div>
-                <div class="bg-green-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#003811]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
-            </div>
-            <div class="card p-6 border-l-4 border-[#1976D2] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On Travel</p>
-                    <h3 id="statTravel" class="text-4xl font-bold text-[#1976D2] mt-1">0</h3>
-                </div>
-                <div class="bg-blue-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#1976D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
-            </div>
-            <div class="card p-6 border-l-4 border-[#C62828] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
-                    <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
-                </div>
-                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
-            </div>
-        </div>
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
+            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
+            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">USERS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow hover:bg-red-700">LOGOUT</button>
+        </div>
+    </nav>
+    <main class="flex-1 overflow-y-auto p-8 relative">
+        
+        <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
+            <div>
+                <h2 class="text-3xl font-bold text-[#003811]">Operations Dashboard</h2>
+                <p id="scopeLabel" class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide"></p>
+            </div>
+            <p id="dashDate" class="text-[#D4AF37] font-bold text-lg bg-white px-4 py-2 rounded shadow-sm border border-gray-200"></p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="card p-6 border-l-4 border-[#003811] flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Staff</p>
+                    <h3 id="statTotal" class="text-4xl font-bold text-[#003811] mt-1">0</h3>
+                </div>
+                <div class="bg-green-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#003811]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
+            </div>
+            <div class="card p-6 border-l-4 border-[#1976D2] flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On Travel</p>
+                    <h3 id="statTravel" class="text-4xl font-bold text-[#1976D2] mt-1">0</h3>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#1976D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+            </div>
+            <div class="card p-6 border-l-4 border-[#C62828] flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
+                    <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
+                </div>
+                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+            </div>
+        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-[#1976D2] text-white p-3 rounded-t-lg">
-                    <h4 class="font-bold text-sm text-center tracking-wider">ON TRAVEL</h4>
-                </div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
-                    <div class="w-full">NAME - DESTINATION</div>
-                </div>
-                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
-                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
-                </div>
-            </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-[#1976D2] text-white p-3 rounded-t-lg">
+                    <h4 class="font-bold text-sm text-center tracking-wider">ON TRAVEL</h4>
+                </div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
+                    <div class="w-full">NAME - DESTINATION</div>
+                </div>
+                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
+                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
+                </div>
+            </div>
 
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-[#C62828] text-white p-3 rounded-t-lg">
-                    <h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4>
-                </div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
-                    <div class="w-full">PSO NUMBER, DETAILS OF PSO</div>
-                </div>
-                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
-                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
-                </div>
-            </div>
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-[#C62828] text-white p-3 rounded-t-lg">
+                    <h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4>
+                </div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
+                    <div class="w-full">PSO NUMBER, DETAILS OF PSO</div>
+                </div>
+                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
+                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
+                </div>
+            </div>
 
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-[#006400] text-white p-3 rounded-t-lg">
-                    <h4 class="font-bold text-sm text-center tracking-wider">ON LEAVE</h4>
-                </div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
-                    <div class="w-full">NAME - LEAVE TYPE</div>
-                </div>
-                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
-                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
-                </div>
-            </div>
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-[#006400] text-white p-3 rounded-t-lg">
+                    <h4 class="font-bold text-sm text-center tracking-wider">ON LEAVE</h4>
+                </div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
+                    <div class="w-full">NAME - LEAVE TYPE</div>
+                </div>
+                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
+                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
+                </div>
+            </div>
 
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-gray-700 text-white p-3 rounded-t-lg">
-                    <h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4>
-                </div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
-                    <div class="w-full">NAME - STATUS</div>
-                </div>
-                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
-                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
-                </div>
-            </div>
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-gray-700 text-white p-3 rounded-t-lg">
+                    <h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4>
+                </div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b">
+                    <div class="w-full">NAME - STATUS</div>
+                </div>
+                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1">
+                    <div class="text-center text-gray-400 text-xs mt-10">Loading...</div>
+                </div>
+            </div>
 
-        </div>
+        </div>
 
-        <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-red-700 border-b pb-2 mb-4">Habitual Tardiness & Absenteeism Monitoring (Civil Service Rules)</h3>
-            <p class="text-xs text-gray-500 mb-4">Under Civil Service rules, employees incurring 10 or more late arrivals within a month for two consecutive months, or excessive unauthorized absent days, are subject to disciplinary action.</p>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-red-50 text-red-800">
-                        <tr>
-                            <th class="p-3 font-bold border-b">Employee Name</th>
-                            <th class="p-3 font-bold border-b text-center">Lates (Prev / Curr)</th>
-                            <th class="p-3 font-bold border-b text-center">Total Late/UT (Curr)</th>
-                            <th class="p-3 font-bold border-b text-center">Absent Days (Curr)</th>
-                            <th class="p-3 font-bold border-b text-center">Status/Warning Level</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listHabitual" class="divide-y">
-                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Calculating Civil Service Violations...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <div class="card mt-8 p-6">
+            <h3 class="text-xl font-bold text-red-700 border-b pb-2 mb-4">Habitual Tardiness & Absenteeism Monitoring (Civil Service Rules)</h3>
+            <p class="text-xs text-gray-500 mb-4">Under Civil Service rules, employees incurring 10 or more late arrivals within a month for two consecutive months, or excessive unauthorized absent days, are subject to disciplinary action.</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-red-50 text-red-800">
+                        <tr>
+                            <th class="p-3 font-bold border-b">Employee Name</th>
+                            <th class="p-3 font-bold border-b text-center">Lates (Prev / Curr)</th>
+                            <th class="p-3 font-bold border-b text-center">Total Late/UT (Curr)</th>
+                            <th class="p-3 font-bold border-b text-center">Absent Days (Curr)</th>
+                            <th class="p-3 font-bold border-b text-center">Status/Warning Level</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listHabitual" class="divide-y">
+                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Calculating Civil Service Violations...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-    </main>
+    </main>
 
 <script>
-    // --- SESSION & RBAC AUTH ---
-    const userData = sessionStorage.getItem('currentUser');
-    if (!userData) { window.location.href = 'index.html'; }
-    const currentUser = JSON.parse(userData);
-    
-    document.getElementById('activeUser').innerText = currentUser.full_name;
-    document.getElementById('userRoleBadge').innerText = currentUser.role;
+    // --- SESSION & RBAC AUTH ---
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) { window.location.href = 'index.html'; }
+    const currentUser = JSON.parse(userData);
+    
+    document.getElementById('activeUser').innerText = currentUser.full_name;
 
-    const isChief = currentUser.role.toUpperCase() === 'CHIEF';
-    const targetDivision = currentUser.division;
+    const isChief = currentUser.role.toUpperCase() === 'CHIEF';
+    const targetDivision = currentUser.division;
 
-    // --- SYSTEM START DATE CONSTANT ---
-    const SYSTEM_START_DATE = "2026-05-01"; // Strict cutoff for historical data
+    // --- SYSTEM START DATE CONSTANT ---
+    const SYSTEM_START_DATE = "2026-05-01"; // Strict cutoff for historical data
 
-    function logout() {
-        sessionStorage.removeItem('currentUser');
-        window.location.href = 'index.html';
-    }
+    function logout() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    }
 
-    // Helper: Convert total minutes into an "Xh Ym" formatted string
-    function formatMinutesToHours(totalMinutes) {
-        if (!totalMinutes || totalMinutes <= 0) return "0m";
-        const h = Math.floor(totalMinutes / 60);
-        const m = totalMinutes % 60;
-        if (h > 0 && m > 0) return `${h}h ${m}m`;
-        if (h > 0) return `${h}h`;
-        return `${m}m`;
-    }
+    // Helper: Convert total minutes into an "Xh Ym" formatted string
+    function formatMinutesToHours(totalMinutes) {
+        if (!totalMinutes || totalMinutes <= 0) return "0m";
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        if (h > 0 && m > 0) return `${h}h ${m}m`;
+        if (h > 0) return `${h}h`;
+        return `${m}m`;
+    }
 
-    // --- DASHBOARD CORE LOGIC ---
-    window.onload = async () => {
-        const todayDate = new Date();
-        const todayStr = todayDate.toISOString().split('T')[0];
-        document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        
-        document.getElementById('scopeLabel').innerText = isChief ? `Division: ${targetDivision}` : "Provincial Oversight";
+    // --- DASHBOARD CORE LOGIC ---
+    window.onload = async () => {
+        const todayDate = new Date();
+        const todayStr = todayDate.toISOString().split('T')[0];
+        document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        
+        document.getElementById('scopeLabel').innerText = isChief ? `Division: ${targetDivision}` : "Provincial Oversight";
 
-        // 1. Fetch Employees (Filter by Division if Chief)
-        let empQuery = supabaseClient.from('employees').select('emp_id, full_name, division, flexi_range_start, flexi_range_end, station');
-        if (isChief) empQuery = empQuery.eq('division', targetDivision);
-        const { data: emps } = await empQuery;
-        const empIds = new Set((emps || []).map(e => e.emp_id));
-        document.getElementById('statTotal').innerText = emps?.length || 0;
+        // 1. Fetch Employees (Filter by Division if Chief)
+        let empQuery = supabaseClient.from('employees').select('emp_id, full_name, division, flexi_range_start, flexi_range_end, station');
+        if (isChief) empQuery = empQuery.eq('division', targetDivision);
+        const { data: emps } = await empQuery;
+        const empIds = new Set((emps || []).map(e => e.emp_id));
+        document.getElementById('statTotal').innerText = emps?.length || 0;
 
-        // Fetch Data for Today's panels
-        const [travel, pso, leave, logs, scheduleOverrides] = await Promise.all([
-            supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr),
-            supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr),
-            supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).eq('transaction_t', 'APPROVED'),
-            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59'),
-            supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr)
-        ]);
+        // Fetch Data for Today's panels
+        const [travel, pso, leave, logs, scheduleOverrides] = await Promise.all([
+            supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr),
+            supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr),
+            supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).eq('transaction_t', 'APPROVED'),
+            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59'),
+            supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr)
+        ]);
 
-        // Maps for quick lookup
-        const travelMap = Object.fromEntries((travel.data || []).map(i => [i.emp_id, i.destination]));
-        const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
-        
-        const overrideMap = {};
-        (scheduleOverrides.data || []).forEach(o => {
-            overrideMap[o.emp_id] = { start: o.start_time, end: o.end_time, working_days: o.working_days };
-        });
+        // Maps for quick lookup
+        const travelMap = Object.fromEntries((travel.data || []).map(i => [i.emp_id, i.destination]));
+        const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
+        
+        const overrideMap = {};
+        (scheduleOverrides.data || []).forEach(o => {
+            overrideMap[o.emp_id] = { start: o.start_time, end: o.end_time, working_days: o.working_days };
+        });
 
-        const logMap = {};
-        (logs.data || []).forEach(l => {
-            const time = new Date(l.log_time);
-            if (!logMap[l.emp_id] || time < logMap[l.emp_id]) logMap[l.emp_id] = time;
-        });
+        const logMap = {};
+        (logs.data || []).forEach(l => {
+            const time = new Date(l.log_time);
+            if (!logMap[l.emp_id] || time < logMap[l.emp_id]) logMap[l.emp_id] = time;
+        });
 
-        // Map and Group PSOs specifically for the "arrange per PSO" display
-        const psoGroups = {};
-        const psoSet = new Set();
-        (pso.data || []).forEach(p => {
-            if (empIds.has(p.emp_id)) {
-                psoSet.add(p.emp_id);
-                let psoNo = p.pso_no || "PSO";
-                let details = (p.subject || "").trim();
-                let key = `${psoNo}, ${details}`;
-                
-                if (!psoGroups[key]) psoGroups[key] = [];
-                const empMatch = (emps || []).find(e => e.emp_id === p.emp_id);
-                if (empMatch) psoGroups[key].push(empMatch.full_name);
-            }
-        });
+        // Map and Group PSOs specifically for the "arrange per PSO" display
+        const psoGroups = {};
+        const psoSet = new Set();
+        (pso.data || []).forEach(p => {
+            if (empIds.has(p.emp_id)) {
+                psoSet.add(p.emp_id);
+                let psoNo = p.pso_no || "PSO";
+                let details = (p.subject || "").trim();
+                let key = `${psoNo}, ${details}`;
+                
+                if (!psoGroups[key]) psoGroups[key] = [];
+                const empMatch = (emps || []).find(e => e.emp_id === p.emp_id);
+                if (empMatch) psoGroups[key].push(empMatch.full_name);
+            }
+        });
 
-        // 3. Populate Summary Counts
-        let countTravel = 0, countPSO = psoSet.size;
-        (emps || []).forEach(e => {
-            if (travelMap[e.emp_id]) countTravel++;
-        });
-        document.getElementById('statTravel').innerText = countTravel;
-        document.getElementById('statPSO').innerText = countPSO;
+        // 3. Populate Summary Counts
+        let countTravel = 0, countPSO = psoSet.size;
+        (emps || []).forEach(e => {
+            if (travelMap[e.emp_id]) countTravel++;
+        });
+        document.getElementById('statTravel').innerText = countTravel;
+        document.getElementById('statPSO').innerText = countPSO;
 
-        // 4. Render Detail Lists
-        const listT = document.getElementById('listTravel');
-        const listP = document.getElementById('listPSO');
-        const listL = document.getElementById('listLeave');
-        const listLA = document.getElementById('listLateAbsent');
+        // 4. Render Detail Lists
+        const listT = document.getElementById('listTravel');
+        const listP = document.getElementById('listPSO');
+        const listL = document.getElementById('listLeave');
+        const listLA = document.getElementById('listLateAbsent');
 
-        listT.innerHTML = ''; listP.innerHTML = ''; listL.innerHTML = ''; listLA.innerHTML = '';
+        listT.innerHTML = ''; listP.innerHTML = ''; listL.innerHTML = ''; listLA.innerHTML = '';
 
-        // Render Grouped PSOs
-        Object.keys(psoGroups).forEach(key => {
-            let namesHtml = psoGroups[key].map(n => `<div class="text-gray-800 font-bold ml-2 mt-1 truncate pr-2" title="${n}">• ${n}</div>`).join('');
-            listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded mb-2 text-[11px]">
-                <div class="text-red-800 font-bold border-b border-red-200 pb-1 mb-1 break-words" title="${key}">${key}</div>
-                ${namesHtml}
-            </div>`;
-        });
+        // Render Grouped PSOs
+        Object.keys(psoGroups).forEach(key => {
+            let namesHtml = psoGroups[key].map(n => `<div class="text-gray-800 font-bold ml-2 mt-1 truncate pr-2" title="${n}">• ${n}</div>`).join('');
+            listP.innerHTML += `<div class="p-2 bg-red-50 border-l-4 border-red-500 rounded mb-2 text-[11px]">
+                <div class="text-red-800 font-bold border-b border-red-200 pb-1 mb-1 break-words" title="${key}">${key}</div>
+                ${namesHtml}
+            </div>`;
+        });
 
-        (emps || []).forEach(e => {
-            // On Travel
-            if (travelMap[e.emp_id]) {
-                listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded mb-1 text-[11px] truncate">
-                    <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-blue-700 italic">${travelMap[e.emp_id]}</span>
-                </div>`;
-            }
+        (emps || []).forEach(e => {
+            // On Travel
+            if (travelMap[e.emp_id]) {
+                listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded mb-1 text-[11px] truncate">
+                    <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-blue-700 italic">${travelMap[e.emp_id]}</span>
+                </div>`;
+            }
 
-            // On Leave
-            if (leaveMap[e.emp_id]) {
-                listL.innerHTML += `<div class="p-2 bg-green-50 border-l-4 border-green-600 rounded mb-1 text-[11px] truncate">
-                    <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-green-700 font-bold">${leaveMap[e.emp_id]}</span>
-                </div>`;
-            }
+            // On Leave
+            if (leaveMap[e.emp_id]) {
+                listL.innerHTML += `<div class="p-2 bg-green-50 border-l-4 border-green-600 rounded mb-1 text-[11px] truncate">
+                    <span class="font-bold text-gray-800">${e.full_name}</span> - <span class="text-green-700 font-bold">${leaveMap[e.emp_id]}</span>
+                </div>`;
+            }
 
-            // Late & Absent (STRICT FILTER DARPO-CS1)
-            if (!travelMap[e.emp_id] && !psoSet.has(e.emp_id) && !leaveMap[e.emp_id] && String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
-                
-                let expectedDays = ['1', '2', '3', '4', '5']; // Default M-F
-                let cutoffStr = e.flexi_range_end || '08:00:00';
-                
-                if (overrideMap[e.emp_id]) {
-                    if (overrideMap[e.emp_id].start) cutoffStr = overrideMap[e.emp_id].start;
-                    if (overrideMap[e.emp_id].working_days) expectedDays = overrideMap[e.emp_id].working_days.split(',');
-                }
-                
-                const dayOfWeek = todayDate.getDay().toString();
-                
-                // Only count as late/absent if today is a scheduled working day for this employee
-                if (expectedDays.includes(dayOfWeek)) {
-                    if (logMap[e.emp_id]) {
-                        const cutoffSplit = cutoffStr.split(':');
-                        const cutoffDate = new Date();
-                        cutoffDate.setHours(parseInt(cutoffSplit[0]), parseInt(cutoffSplit[1]), 0, 0);
-                        
-                        const firstLog = logMap[e.emp_id];
-                        
-                        if (firstLog > cutoffDate) {
-                            const diffMins = Math.floor((firstLog - cutoffDate) / 60000);
-                            const lateLabel = formatMinutesToHours(diffMins);
-                            
-                            listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between">
-                                <span class="font-bold text-gray-800 truncate">${e.full_name}</span>
-                                <span class="text-orange-700 font-bold ml-2 shrink-0">LATE (${lateLabel})</span>
-                            </div>`;
-                        }
-                    } else if (new Date().getHours() >= 9) {
-                        listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between">
-                            <span class="font-bold text-gray-800 truncate">${e.full_name}</span>
-                            <span class="text-gray-500 font-bold italic ml-2 shrink-0">ABSENT</span>
-                        </div>`;
-                    }
-                }
-            }
-        });
+            // Late & Absent (STRICT FILTER DARPO-CS1)
+            if (!travelMap[e.emp_id] && !psoSet.has(e.emp_id) && !leaveMap[e.emp_id] && String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
+                
+                let expectedDays = ['1', '2', '3', '4', '5']; // Default M-F
+                let cutoffStr = e.flexi_range_end || '08:00:00';
+                
+                if (overrideMap[e.emp_id]) {
+                    if (overrideMap[e.emp_id].start) cutoffStr = overrideMap[e.emp_id].start;
+                    if (overrideMap[e.emp_id].working_days) expectedDays = overrideMap[e.emp_id].working_days.split(',');
+                }
+                
+                const dayOfWeek = todayDate.getDay().toString();
+                
+                // Only count as late/absent if today is a scheduled working day for this employee
+                if (expectedDays.includes(dayOfWeek)) {
+                    if (logMap[e.emp_id]) {
+                        const cutoffSplit = cutoffStr.split(':');
+                        const cutoffDate = new Date();
+                        cutoffDate.setHours(parseInt(cutoffSplit[0]), parseInt(cutoffSplit[1]), 0, 0);
+                        
+                        const firstLog = logMap[e.emp_id];
+                        
+                        if (firstLog > cutoffDate) {
+                            const diffMins = Math.floor((firstLog - cutoffDate) / 60000);
+                            const lateLabel = formatMinutesToHours(diffMins);
+                            
+                            listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between">
+                                <span class="font-bold text-gray-800 truncate">${e.full_name}</span>
+                                <span class="text-orange-700 font-bold ml-2 shrink-0">LATE (${lateLabel})</span>
+                            </div>`;
+                        }
+                    } else if (new Date().getHours() >= 9) {
+                        listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between">
+                            <span class="font-bold text-gray-800 truncate">${e.full_name}</span>
+                            <span class="text-gray-500 font-bold italic ml-2 shrink-0">ABSENT</span>
+                        </div>`;
+                    }
+                }
+            }
+        });
 
-        const emptyState = '<div class="text-center text-gray-400 text-xs mt-10 italic">No records today</div>';
-        if(!listT.innerHTML) listT.innerHTML = emptyState;
-        if(!listP.innerHTML) listP.innerHTML = emptyState;
-        if(!listL.innerHTML) listL.innerHTML = emptyState;
-        if(!listLA.innerHTML) listLA.innerHTML = (new Date().getHours() < 9) ? '<div class="text-center text-gray-400 text-xs mt-10 italic">Calculating... (Updates post-9AM)</div>' : emptyState;
+        const emptyState = '<div class="text-center text-gray-400 text-xs mt-10 italic">No records today</div>';
+        if(!listT.innerHTML) listT.innerHTML = emptyState;
+        if(!listP.innerHTML) listP.innerHTML = emptyState;
+        if(!listL.innerHTML) listL.innerHTML = emptyState;
+        if(!listLA.innerHTML) listLA.innerHTML = (new Date().getHours() < 9) ? '<div class="text-center text-gray-400 text-xs mt-10 italic">Calculating... (Updates post-9AM)</div>' : emptyState;
 
-        // --- HABITUAL TARDINESS & ABSENTEEISM CALCULATION (Civil Service Rules) ---
-        const currMonth = todayDate.getMonth(); 
-        const currYear = todayDate.getFullYear();
-        const prevMonth = currMonth === 0 ? 11 : currMonth - 1;
-        const prevYear = currMonth === 0 ? currYear - 1 : currYear;
+        // --- HABITUAL TARDINESS & ABSENTEEISM CALCULATION (Civil Service Rules) ---
+        const currMonth = todayDate.getMonth(); 
+        const currYear = todayDate.getFullYear();
+        const prevMonth = currMonth === 0 ? 11 : currMonth - 1;
+        const prevYear = currMonth === 0 ? currYear - 1 : currYear;
 
-        // Ensure we don't query before the system start date (May 2026)
-        const sysStart = new Date(SYSTEM_START_DATE);
-        
-        let reqStartPrevMonth = new Date(prevYear, prevMonth, 1);
-        if (reqStartPrevMonth < sysStart) reqStartPrevMonth = sysStart;
+        // Ensure we don't query before the system start date (May 2026)
+        const sysStart = new Date(SYSTEM_START_DATE);
+        
+        let reqStartPrevMonth = new Date(prevYear, prevMonth, 1);
+        if (reqStartPrevMonth < sysStart) reqStartPrevMonth = sysStart;
 
-        let reqStartCurrMonth = new Date(currYear, currMonth, 1);
-        if (reqStartCurrMonth < sysStart) reqStartCurrMonth = sysStart;
+        let reqStartCurrMonth = new Date(currYear, currMonth, 1);
+        if (reqStartCurrMonth < sysStart) reqStartCurrMonth = sysStart;
 
-        const startPrevMonth = reqStartPrevMonth.toISOString().split('T')[0];
-        const startCurrMonth = reqStartCurrMonth.toISOString().split('T')[0];
-        const endCurrMonth = new Date(currYear, currMonth + 1, 0).toISOString().split('T')[0]; 
+        const startPrevMonth = reqStartPrevMonth.toISOString().split('T')[0];
+        const startCurrMonth = reqStartCurrMonth.toISOString().split('T')[0];
+        const endCurrMonth = new Date(currYear, currMonth + 1, 0).toISOString().split('T')[0]; 
 
-        // Fetch Historical Logs & Absences
-        const [histLogsRes, histTravel, histPso, histLeave, histOverrides] = await Promise.all([
-            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59'),
-            supabaseClient.from('itinerary').select('emp_id, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr),
-            supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth),
-            supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startCurrMonth).lte('date', todayStr),
-            supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth)
-        ]);
+        // Fetch Historical Logs & Absences
+        const [histLogsRes, histTravel, histPso, histLeave, histOverrides] = await Promise.all([
+            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59'),
+            supabaseClient.from('itinerary').select('emp_id, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr),
+            supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth),
+            supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startCurrMonth).lte('date', todayStr),
+            supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth)
+        ]);
 
-        const histLogs = histLogsRes.data || [];
-        const excused = new Set();
-        
-        (histTravel.data || []).forEach(t => excused.add(t.emp_id + '_' + t.travel_date));
-        (histLeave.data || []).forEach(l => excused.add(l.emp_id + '_' + l.date));
-        (histPso.data || []).forEach(p => {
-            let currD = new Date(p.start_date);
-            let endD = new Date(p.end_date);
-            while(currD <= endD) {
-                // Ensure PSO excuses are also bound by system start date
-                if (currD >= sysStart) {
-                    excused.add(p.emp_id + '_' + currD.toISOString().split('T')[0]);
-                }
-                currD.setDate(currD.getDate() + 1);
-            }
-        });
-        
-        const histOverrideMap = {};
-        (histOverrides.data || []).forEach(o => {
-            if (!histOverrideMap[o.emp_id]) histOverrideMap[o.emp_id] = [];
-            let currD = new Date(o.start_date);
-            let endD = new Date(o.end_date);
-            while(currD <= endD) {
-                if (currD >= sysStart) {
-                    histOverrideMap[o.emp_id].push({
-                        date: currD.toISOString().split('T')[0],
-                        start: o.start_time,
-                        end: o.end_time,
-                        working_days: o.working_days
-                    });
-                }
-                currD.setDate(currD.getDate() + 1);
-            }
-        });
+        const histLogs = histLogsRes.data || [];
+        const excused = new Set();
+        
+        (histTravel.data || []).forEach(t => excused.add(t.emp_id + '_' + t.travel_date));
+        (histLeave.data || []).forEach(l => excused.add(l.emp_id + '_' + l.date));
+        (histPso.data || []).forEach(p => {
+            let currD = new Date(p.start_date);
+            let endD = new Date(p.end_date);
+            while(currD <= endD) {
+                // Ensure PSO excuses are also bound by system start date
+                if (currD >= sysStart) {
+                    excused.add(p.emp_id + '_' + currD.toISOString().split('T')[0]);
+                }
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
+        
+        const histOverrideMap = {};
+        (histOverrides.data || []).forEach(o => {
+            if (!histOverrideMap[o.emp_id]) histOverrideMap[o.emp_id] = [];
+            let currD = new Date(o.start_date);
+            let endD = new Date(o.end_date);
+            while(currD <= endD) {
+                if (currD >= sysStart) {
+                    histOverrideMap[o.emp_id].push({
+                        date: currD.toISOString().split('T')[0],
+                        start: o.start_time,
+                        end: o.end_time,
+                        working_days: o.working_days
+                    });
+                }
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
 
-        // Determine all potential days passed in current month
-        const datesToCheck = [];
-        let dCheck = new Date(reqStartCurrMonth); // Use bounded start date
-        while(dCheck <= todayDate) {
-            datesToCheck.push(dCheck.toISOString().split('T')[0]);
-            dCheck.setDate(dCheck.getDate() + 1);
-        }
+        // Determine all potential days passed in current month
+        const datesToCheck = [];
+        let dCheck = new Date(reqStartCurrMonth); // Use bounded start date
+        while(dCheck <= todayDate) {
+            datesToCheck.push(dCheck.toISOString().split('T')[0]);
+            dCheck.setDate(dCheck.getDate() + 1);
+        }
 
-        const habMap = {};
-        (emps || []).forEach(e => {
-            habMap[e.emp_id] = { name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
-        });
+        const habMap = {};
+        (emps || []).forEach(e => {
+            habMap[e.emp_id] = { name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
+        });
 
-        const empLogDates = {};
-        histLogs.forEach(l => {
-            if (!empIds.has(l.emp_id)) return; 
-            const d = l.log_time.split('T')[0];
-            if (!empLogDates[l.emp_id]) empLogDates[l.emp_id] = {};
-            if (!empLogDates[l.emp_id][d]) empLogDates[l.emp_id][d] = [];
-            empLogDates[l.emp_id][d].push(new Date(l.log_time));
-        });
+        const empLogDates = {};
+        histLogs.forEach(l => {
+            if (!empIds.has(l.emp_id)) return; 
+            const d = l.log_time.split('T')[0];
+            if (!empLogDates[l.emp_id]) empLogDates[l.emp_id] = {};
+            if (!empLogDates[l.emp_id][d]) empLogDates[l.emp_id][d] = [];
+            empLogDates[l.emp_id][d].push(new Date(l.log_time));
+        });
 
-        (emps || []).forEach(e => {
-            // STRICT FILTER DARPO-CS1 for Civil Service Violations
-            if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
-            
-            // Calculate Absences (Current Month only, bounded by sysStart)
-            datesToCheck.forEach(dateStr => {
-                let expectedDays = ['1', '2', '3', '4', '5']; // Default M-F
-                if (histOverrideMap[e.emp_id]) {
-                    const override = histOverrideMap[e.emp_id].find(o => o.date === dateStr);
-                    if (override && override.working_days) {
-                        expectedDays = override.working_days.split(',');
-                    }
-                }
-                
-                const dObj = new Date(dateStr);
-                const dayOfWeek = dObj.getDay().toString();
-                
-                // Only count as absent if it is a scheduled working day
-                if (expectedDays.includes(dayOfWeek)) {
-                    const hasLog = empLogDates[e.emp_id] && empLogDates[e.emp_id][dateStr];
-                    const isExcused = excused.has(e.emp_id + '_' + dateStr);
-                    if (!hasLog && !isExcused) {
-                        if (dateStr === todayStr && todayDate.getHours() < 9) return; // Exclude today if morning
-                        habMap[e.emp_id].absentDays++;
-                    }
-                }
-            });
+        (emps || []).forEach(e => {
+            // STRICT FILTER DARPO-CS1 for Civil Service Violations
+            if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
+            
+            // Calculate Absences (Current Month only, bounded by sysStart)
+            datesToCheck.forEach(dateStr => {
+                let expectedDays = ['1', '2', '3', '4', '5']; // Default M-F
+                if (histOverrideMap[e.emp_id]) {
+                    const override = histOverrideMap[e.emp_id].find(o => o.date === dateStr);
+                    if (override && override.working_days) {
+                        expectedDays = override.working_days.split(',');
+                    }
+                }
+                
+                const dObj = new Date(dateStr);
+                const dayOfWeek = dObj.getDay().toString();
+                
+                // Only count as absent if it is a scheduled working day
+                if (expectedDays.includes(dayOfWeek)) {
+                    const hasLog = empLogDates[e.emp_id] && empLogDates[e.emp_id][dateStr];
+                    const isExcused = excused.has(e.emp_id + '_' + dateStr);
+                    if (!hasLog && !isExcused) {
+                        if (dateStr === todayStr && todayDate.getHours() < 9) return; // Exclude today if morning
+                        habMap[e.emp_id].absentDays++;
+                    }
+                }
+            });
 
-            const myLogs = empLogDates[e.emp_id];
-            if(!myLogs) return;
+            const myLogs = empLogDates[e.emp_id];
+            if(!myLogs) return;
 
-            Object.keys(myLogs).forEach(dateStr => {
-                const logsForDay = myLogs[dateStr].sort((a,b) => a-b);
-                const firstLog = logsForDay[0];
-                const lastLog = logsForDay[logsForDay.length - 1];
+            Object.keys(myLogs).forEach(dateStr => {
+                const logsForDay = myLogs[dateStr].sort((a,b) => a-b);
+                const firstLog = logsForDay[0];
+                const lastLog = logsForDay[logsForDay.length - 1];
 
-                let expectedDays = ['1', '2', '3', '4', '5'];
-                let startReqStr = e.flexi_range_start || '08:00:00';
-                let cutoffStr = e.flexi_range_end || '08:00:00';
-                let overrideEndStr = null;
+                let expectedDays = ['1', '2', '3', '4', '5'];
+                let startReqStr = e.flexi_range_start || '08:00:00';
+                let cutoffStr = e.flexi_range_end || '08:00:00';
+                let overrideEndStr = null;
 
-                if (histOverrideMap[e.emp_id]) {
-                    const override = histOverrideMap[e.emp_id].find(o => o.date === dateStr);
-                    if (override) {
-                        if(override.working_days) expectedDays = override.working_days.split(',');
-                        startReqStr = override.start;
-                        cutoffStr = override.start; // Fixed start implies start is the exact cutoff
-                        overrideEndStr = override.end; // Override dictates working hour duration
-                    }
-                }
-                
-                const dObj = new Date(dateStr);
-                const dayOfWeek = dObj.getDay().toString();
-                
-                // Skip late/ut computation if it's not a scheduled working day
-                if (!expectedDays.includes(dayOfWeek)) {
-                    return; 
-                }
+                if (histOverrideMap[e.emp_id]) {
+                    const override = histOverrideMap[e.emp_id].find(o => o.date === dateStr);
+                    if (override) {
+                        if(override.working_days) expectedDays = override.working_days.split(',');
+                        startReqStr = override.start;
+                        cutoffStr = override.start; // Fixed start implies start is the exact cutoff
+                        overrideEndStr = override.end; // Override dictates working hour duration
+                    }
+                }
+                
+                const dObj = new Date(dateStr);
+                const dayOfWeek = dObj.getDay().toString();
+                
+                // Skip late/ut computation if it's not a scheduled working day
+                if (!expectedDays.includes(dayOfWeek)) {
+                    return; 
+                }
 
-                const startDate = new Date(dateStr + 'T' + startReqStr);
-                const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
-                
-                let isLate = false;
-                
-                if (firstLog > cutoffDate) {
-                    isLate = true;
-                    // Only sum minutes for current month
-                    if(firstLog.getMonth() === currMonth) {
-                        habMap[e.emp_id].totalLateMins += Math.floor((firstLog - cutoffDate) / 60000);
-                    }
-                }
+                const startDate = new Date(dateStr + 'T' + startReqStr);
+                const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
+                
+                let isLate = false;
+                
+                if (firstLog > cutoffDate) {
+                    isLate = true;
+                    // Only sum minutes for current month
+                    if(firstLog.getMonth() === currMonth) {
+                        habMap[e.emp_id].totalLateMins += Math.floor((firstLog - cutoffDate) / 60000);
+                    }
+                }
 
-                if (isLate) {
-                    if (firstLog.getMonth() === prevMonth) habMap[e.emp_id].prevCount++;
-                    if (firstLog.getMonth() === currMonth) habMap[e.emp_id].currCount++;
-                }
+                if (isLate) {
+                    if (firstLog.getMonth() === prevMonth) habMap[e.emp_id].prevCount++;
+                    if (firstLog.getMonth() === currMonth) habMap[e.emp_id].currCount++;
+                }
 
-                // UNDERTIME check (Current month only)
-                if(firstLog.getMonth() === currMonth) {
-                    let requiredEnd;
-                    if (overrideEndStr) {
-                        requiredEnd = new Date(dateStr + 'T' + overrideEndStr);
-                    } else {
-                        let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
-                        requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
-                    }
+                // UNDERTIME check (Current month only)
+                if(firstLog.getMonth() === currMonth) {
+                    let requiredEnd;
+                    if (overrideEndStr) {
+                        requiredEnd = new Date(dateStr + 'T' + overrideEndStr);
+                    } else {
+                        let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
+                        requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
+                    }
 
-                    if (lastLog < requiredEnd && firstLog !== lastLog) {
-                        habMap[e.emp_id].totalUtMins += Math.floor((requiredEnd - lastLog) / 60000);
-                    }
-                }
-            });
-        });
+                    if (lastLog < requiredEnd && firstLog !== lastLog) {
+                        habMap[e.emp_id].totalUtMins += Math.floor((requiredEnd - lastLog) / 60000);
+                    }
+                }
+            });
+        });
 
-        // Render Habitual Table
-        const listHabitual = document.getElementById('listHabitual');
-        listHabitual.innerHTML = '';
-        let hasHabitual = false;
+        // Render Habitual Table
+        const listHabitual = document.getElementById('listHabitual');
+        listHabitual.innerHTML = '';
+        let hasHabitual = false;
 
-        Object.values(habMap).forEach(h => {
-            const isHabitualLate = (h.prevCount >= 10 && h.currCount >= 10);
-            const totalMins = h.totalLateMins + h.totalUtMins;
-            const isExcessiveLate = totalMins >= 480;
-            const isAbsenteeism = h.absentDays >= 3;
+        Object.values(habMap).forEach(h => {
+            const isHabitualLate = (h.prevCount >= 10 && h.currCount >= 10);
+            const totalMins = h.totalLateMins + h.totalUtMins;
+            const isExcessiveLate = totalMins >= 480;
+            const isAbsenteeism = h.absentDays >= 3;
 
-            // Display if there's any active warning or tracking accumulation
-            if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
-                hasHabitual = true;
-                
-                let statusBadge = '';
-                if (isHabitualLate && isAbsenteeism) {
-                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE & ABSENT</span>`;
-                } else if (isHabitualLate) {
-                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE (CS WARNING)</span>`;
-                } else if (isAbsenteeism) {
-                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">UNAUTH. ABSENTEEISM</span>`;
-                } else if (isExcessiveLate) {
-                    statusBadge = `<span class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] font-bold">EXCESSIVE LATE (DEDUCT VL)</span>`;
-                } else {
-                    statusBadge = `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-bold border border-yellow-300">MONITORING</span>`;
-                }
+            // Display if there's any active warning or tracking accumulation
+            if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
+                hasHabitual = true;
+                
+                let statusBadge = '';
+                if (isHabitualLate && isAbsenteeism) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE & ABSENT</span>`;
+                } else if (isHabitualLate) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE (CS WARNING)</span>`;
+                } else if (isAbsenteeism) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">UNAUTH. ABSENTEEISM</span>`;
+                } else if (isExcessiveLate) {
+                    statusBadge = `<span class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] font-bold">EXCESSIVE LATE (DEDUCT VL)</span>`;
+                } else {
+                    statusBadge = `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-bold border border-yellow-300">MONITORING</span>`;
+                }
 
-                listHabitual.innerHTML += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="p-3 border-b text-gray-800 font-bold">${h.name}</td>
-                        <td class="p-3 border-b text-center font-mono text-xs"><span class="${h.prevCount >= 10 ? 'text-red-600 font-bold' : ''}">${h.prevCount}</span> / <span class="${h.currCount >= 10 ? 'text-red-600 font-bold' : ''}">${h.currCount}</span></td>
-                        <td class="p-3 border-b text-center font-mono text-orange-700 font-bold text-xs">${formatMinutesToHours(totalMins)}</td>
-                        <td class="p-3 border-b text-center font-mono text-xs ${h.absentDays >= 3 ? 'text-red-600 font-bold' : ''}">${h.absentDays}</td>
-                        <td class="p-3 border-b text-center">${statusBadge}</td>
-                    </tr>
-                `;
-            }
-        });
+                listHabitual.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 border-b text-gray-800 font-bold">${h.name}</td>
+                        <td class="p-3 border-b text-center font-mono text-xs"><span class="${h.prevCount >= 10 ? 'text-red-600 font-bold' : ''}">${h.prevCount}</span> / <span class="${h.currCount >= 10 ? 'text-red-600 font-bold' : ''}">${h.currCount}</span></td>
+                        <td class="p-3 border-b text-center font-mono text-orange-700 font-bold text-xs">${formatMinutesToHours(totalMins)}</td>
+                        <td class="p-3 border-b text-center font-mono text-xs ${h.absentDays >= 3 ? 'text-red-600 font-bold' : ''}">${h.absentDays}</td>
+                        <td class="p-3 border-b text-center">${statusBadge}</td>
+                    </tr>
+                `;
+            }
+        });
 
-        if (!hasHabitual) {
-            listHabitual.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>`;
-        }
-    };
+        if (!hasHabitual) {
+            listHabitual.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>`;
+        }
+    };
 </script>
 </body>
 </html>
