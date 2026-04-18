@@ -81,41 +81,22 @@
                                     <label class="form-label">Purpose</label>
                                     <input type="text" id="gpPurpose" class="form-input" placeholder="Specific purpose...">
                                 </div>
-                                
-                                <div class="border-t border-gray-200 mt-4 pt-4">
-                                    <h4 class="font-bold text-[#003811] text-sm mb-2 uppercase">Gate Pass Processing</h4>
-                                    <div class="grid grid-cols-2 gap-2 mb-2">
-                                        <div>
-                                            <label class="form-label">Time Out</label>
-                                            <input type="time" id="gpTimeOut" class="form-input">
-                                        </div>
-                                        <div>
-                                            <label class="form-label">Time In</label>
-                                            <input type="time" id="gpTimeIn" class="form-input">
-                                        </div>
-                                    </div>
-                                    <div class="mb-4">
-                                        <label class="form-label">Deductible Days (VL)</label>
-                                        <input type="number" step="0.001" id="gpDeduction" class="form-input" placeholder="0.000">
-                                    </div>
-                                </div>
-
-                                <button onclick="generateGatePass()" class="w-full bg-[#003811] hover:bg-[#002200] text-white font-bold py-3 px-4 rounded shadow mt-2">Generate & Print</button>
+                                <button onclick="generateGatePass()" class="w-full bg-[#003811] hover:bg-[#002200] text-white font-bold py-3 px-4 rounded shadow mt-2">Generate & Print Gate Pass</button>
                             </div>
                         </div>
                     </div>
                     <div class="lg:col-span-2">
                         <div class="card h-full flex flex-col">
-                            <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-center">
-                                <h3 class="font-bold text-[#003811]">Recent Gate Passes</h3>
-                                <div class="flex-1 flex gap-2">
-                                    <select id="gpViewFilter" class="form-input text-xs py-1 h-8 w-auto" onchange="loadRecentGatePasses()">
-                                        <option value="DAILY">Daily View</option>
-                                        <option value="WEEKLY">Weekly View</option>
-                                        <option value="MONTHLY" selected>Monthly View</option>
-                                        <option value="ANNUAL">Annual View</option>
+                            <div class="p-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-4 justify-between items-center">
+                                <h3 class="font-bold text-[#003811]">Process Gate Passes</h3>
+                                <div class="flex items-center gap-2">
+                                    <select id="gpViewFilter" class="form-input text-xs py-1 w-32" onchange="loadRecentGatePasses()">
+                                        <option value="DAILY">Daily</option>
+                                        <option value="WEEKLY">Weekly</option>
+                                        <option value="MONTHLY" selected>Monthly</option>
+                                        <option value="ANNUAL">Annual</option>
                                     </select>
-                                    <button onclick="loadRecentGatePasses()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow h-8">Refresh</button>
+                                    <button onclick="loadRecentGatePasses()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
                                 </div>
                             </div>
                             <div class="flex-1 overflow-auto">
@@ -123,11 +104,11 @@
                                     <thead>
                                         <tr>
                                             <th class="table-th">Date</th>
-                                            <th class="table-th">Emp ID</th>
-                                            <th class="table-th">Name</th>
-                                            <th class="table-th">Type</th>
-                                            <th class="table-th">Destination - Purpose</th>
-                                            <th class="table-th text-center">Action</th>
+                                            <th class="table-th">Name / ID</th>
+                                            <th class="table-th">Type / Dest.</th>
+                                            <th class="table-th text-center">Time Logs</th>
+                                            <th class="table-th text-center">Deductible (VL)</th>
+                                            <th class="table-th text-center">Action / Status</th>
                                         </tr>
                                     </thead>
                                     <tbody id="gp-recent-list">
@@ -218,7 +199,7 @@
     let empDataMap = {};
     let gpSearchList = [];
     let allEmpSearchList = [];
-    let selectedCtoEmployees = []; // Array of { emp_id, name }
+    let selectedCtoEmployees = [];
 
     // --- INIT ---
     async function loadData() {
@@ -274,6 +255,11 @@
         }
     });
 
+    document.addEventListener('click', function(e) {
+        if (e.target !== gpInput && e.target !== gpResults) gpResults.classList.add('hidden');
+        if (e.target !== ctoInput && e.target !== ctoResults) ctoResults.classList.add('hidden');
+    });
+
     async function getQRBase64(text) {
         return new Promise((resolve) => {
             const container = document.getElementById('qrContainer');
@@ -284,7 +270,7 @@
     }
 
     function formatTime12h(timeStr) {
-        if (!timeStr || timeStr === 'None' || timeStr === 'nan' || timeStr === '-') return "";
+        if (!timeStr || timeStr === 'None' || timeStr === 'nan' || timeStr === '-') return "N/A";
         try {
             const [h, m] = timeStr.split(":");
             let hour = parseInt(h, 10);
@@ -299,48 +285,33 @@
         const pType = document.getElementById('gpType').value;
         const dest = document.getElementById('gpDest').value;
         const purp = document.getElementById('gpPurpose').value;
-        
-        // Processing Fields
-        const tOut = document.getElementById('gpTimeOut').value;
-        const tIn = document.getElementById('gpTimeIn').value;
-        const deductStr = document.getElementById('gpDeduction').value;
 
         if(!empId || !dest || !purp) {
-            alert("Please select an employee, destination, and purpose.");
+            alert("Please select an employee and fill all fields.");
             return;
         }
 
         const dateStr = new Date().toISOString().split('T')[0];
         const fullPurpose = `${dest} - ${purp}`;
-        
-        let status = 'ISSUED';
-        let dedNum = parseFloat(deductStr) || 0;
-        
-        if (tOut || tIn || dedNum > 0) {
-            status = 'PROCESSED';
-        }
 
         try {
-            // Insert
             const { data, error } = await supabaseClient.from('gate_pass_logs').insert([{
                 emp_id: empId,
                 date: dateStr,
                 pass_type: pType,
                 purpose: fullPurpose,
-                time_out: tOut || null,
-                time_in: tIn || null,
-                deduction_credit: dedNum,
-                status: status
+                status: 'ISSUED',
+                deduction_credit: 0
             }]).select();
 
             if(error) throw error;
             const newRecord = data[0];
 
-            // Print PDF Layout based on uploaded image
+            // Print PDF
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4'); 
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const empName = empDataMap[empId].full_name.toUpperCase();
             
-            // Replicate structure twice for Personal/Security Copy
             const renderSlip = (yOffset, copyType) => {
                 doc.setFontSize(10); doc.setFont("helvetica", "bold");
                 doc.text("DEPARTMENT OF AGRARIAN REFORM", 105, yOffset + 15, {align: 'center'});
@@ -353,9 +324,8 @@
 
                 doc.setFontSize(9); doc.setFont("helvetica", "normal");
                 doc.text("Date:", 140, yOffset + 40); doc.text(new Date(dateStr).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}), 155, yOffset + 40); doc.line(152, yOffset + 41, 190, yOffset + 41);
-                doc.text("No.:", 140, yOffset + 47); doc.text(`GP-${newRecord.id}`, 155, yOffset + 47); doc.line(152, yOffset + 48, 190, yOffset + 48);
+                doc.text("No.:", 140, yOffset + 47); doc.text(`GP-${new Date().getFullYear()}-${String(newRecord.id).padStart(4, '0')}`, 155, yOffset + 47); doc.line(152, yOffset + 48, 190, yOffset + 48);
 
-                // Type Checkboxes
                 doc.rect(20, yOffset + 38, 4, 4); doc.text("Personal", 26, yOffset + 41);
                 if(pType === 'PERSONAL') doc.text("X", 20.5, yOffset + 41);
                 
@@ -369,10 +339,9 @@
                 doc.text("Destination:", 20, yOffset + 82); doc.text(dest, 45, yOffset + 82); doc.line(40, yOffset + 83, 190, yOffset + 83);
                 doc.text("Purpose:", 20, yOffset + 89); doc.text(purp, 45, yOffset + 89); doc.line(40, yOffset + 90, 190, yOffset + 90);
                 
-                doc.text("Time:  From:", 20, yOffset + 98); doc.text(formatTime12h(tOut), 45, yOffset + 98); doc.line(40, yOffset + 99, 90, yOffset + 99);
-                doc.text("To:", 100, yOffset + 98); doc.text(formatTime12h(tIn), 110, yOffset + 98); doc.line(108, yOffset + 99, 160, yOffset + 99);
+                doc.text("Time:  From:", 20, yOffset + 98); doc.line(40, yOffset + 99, 90, yOffset + 99);
+                doc.text("To:", 100, yOffset + 98); doc.line(108, yOffset + 99, 160, yOffset + 99);
 
-                const empName = empDataMap[empId].full_name.toUpperCase();
                 doc.setFont("helvetica", "bold"); doc.text(empName, 105, yOffset + 115, {align: 'center'});
                 doc.line(60, yOffset + 116, 150, yOffset + 116);
                 doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.text("Printed Name & Signature of Employee", 105, yOffset + 119, {align: 'center'});
@@ -381,7 +350,6 @@
                 doc.line(40, yOffset + 140, 100, yOffset + 140);
                 doc.setFont("helvetica", "normal"); doc.text("Division Chief", 70, yOffset + 144, {align: 'center'});
 
-                // Certificate Box
                 doc.rect(40, yOffset + 150, 130, 30);
                 doc.text("CERTIFICATE OF APPEARANCE", 105, yOffset + 155, {align: 'center'});
                 doc.line(60, yOffset + 170, 150, yOffset + 170); doc.text("(Certifying Officer)", 105, yOffset + 174, {align: 'center'});
@@ -393,7 +361,6 @@
             renderSlip(0, "PERSONAL COPY");
             renderSlip(148.5, "SECURITY OFFICER COPY");
 
-            // Generate single QR at top left of each slip
             const qrDataStr = `GP-${newRecord.id}-${empId}`;
             const qrBase64 = await getQRBase64(qrDataStr);
             if(qrBase64) {
@@ -402,16 +369,12 @@
             }
 
             doc.save(`GatePass_${empId}_${dateStr}.pdf`);
-            alert("Gate Pass generated/processed and PDF downloaded.");
+            alert("Gate Pass generated and PDF downloaded.");
             
-            // Clear fields
             document.getElementById('gpSearch').value = '';
             gpEmpId.value = '';
             document.getElementById('gpDest').value = '';
             document.getElementById('gpPurpose').value = '';
-            document.getElementById('gpTimeOut').value = '';
-            document.getElementById('gpTimeIn').value = '';
-            document.getElementById('gpDeduction').value = '';
             
             loadRecentGatePasses();
 
@@ -442,7 +405,8 @@
                 const lwStr = lastWeek.toISOString().split('T')[0];
                 query = query.gte('date', lwStr).lte('date', todayStr);
             } else if(filter === 'MONTHLY') {
-                query = query.gte('date', `${y}-${m}-01`).lte('date', `${y}-${m}-31`);
+                const lastDay = new Date(y, today.getMonth() + 1, 0).getDate();
+                query = query.gte('date', `${y}-${m}-01`).lte('date', `${y}-${m}-${lastDay}`);
             } else if(filter === 'ANNUAL') {
                 query = query.gte('date', `${y}-01-01`).lte('date', `${y}-12-31`);
             }
@@ -455,31 +419,72 @@
                 return;
             }
 
+            // Standard conversion mapping logic for decimal days
+            const getDedDay = (hr, mn) => {
+                let d = 0;
+                if(hr === 1) d+=0.125; else if(hr===2) d+=0.250; else if(hr===3) d+=0.375; else if(hr===4) d+=0.500; else if(hr===5) d+=0.625; else if(hr===6) d+=0.750; else if(hr===7) d+=0.875; else if(hr===8) d+=1.000;
+                
+                if(mn >= 1 && mn <= 10) d += mn === 1 ? 0.002 : mn === 2 ? 0.004 : mn === 3 ? 0.006 : mn === 4 ? 0.008 : mn === 5 ? 0.010 : mn === 6 ? 0.012 : mn === 7 ? 0.015 : mn === 8 ? 0.017 : mn === 9 ? 0.019 : 0.021;
+                else if (mn > 10) {
+                   // simple extrapolation for the rest if needed, or stick to provided chart logic. 
+                   // Providing basic mapping up to 60 for robustness.
+                   d += mn * 0.00208; // Roughly 0.125 / 60 
+                }
+                return d;
+            };
+
             let html = '';
             data.forEach(gp => {
                 const name = empDataMap[gp.emp_id] ? empDataMap[gp.emp_id].full_name.toUpperCase() : gp.emp_id;
+                
                 let sCls = 'bg-gray-100 text-gray-800';
                 if(gp.status === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800';
                 if(gp.status === 'POSTED') sCls = 'bg-green-100 text-green-800';
                 
+                // Calculate time if available, otherwise just show inputs for processing
+                let tOutStr = formatTime12h(gp.time_out);
+                let tInStr = formatTime12h(gp.time_in);
+                
+                let timeCell = '';
+                let dedCell = '';
                 let actionBtn = '';
+
                 if(gp.status === 'ISSUED') {
-                    actionBtn = `<button onclick="processExistingGP('${gp.id}')" class="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700">Process</button>`;
-                } else if(gp.status === 'PROCESSED') {
-                     actionBtn = `<span class="text-xs text-gray-500 italic">Go to Leave Page to Post</span>`;
-                } else if(gp.status === 'POSTED') {
-                    actionBtn = `<span class="text-xs text-green-600 font-bold">Done</span>`;
+                    // Not processed yet. Show UI to input times and calculate.
+                    timeCell = `
+                        <div class="flex flex-col gap-1 items-center">
+                            <input type="time" id="tOut_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_out||''}">
+                            <input type="time" id="tIn_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_in||''}">
+                            <button onclick="calcGP('${gp.id}')" class="text-[10px] bg-gray-200 px-2 py-0.5 rounded mt-1">Calc</button>
+                        </div>
+                    `;
+                    dedCell = `<input type="number" step="0.001" id="ded_${gp.id}" class="border rounded px-1 text-xs w-16 text-center bg-white" value="0.000">`;
+                    actionBtn = `<button onclick="processGP('${gp.id}')" class="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 shadow">Process</button>`;
+                } else {
+                    timeCell = `<div class="text-xs text-center">${tOutStr}<br>to<br>${tInStr}</div>`;
+                    dedCell = `<div class="font-bold text-red-600 text-center">${parseFloat(gp.deduction_credit).toFixed(3)}</div>`;
+                    if(gp.status === 'PROCESSED') {
+                        actionBtn = `<div class="text-xs text-gray-500 italic mt-1">Ready for Posting</div>`;
+                    } else {
+                        actionBtn = `<div class="text-xs text-green-600 font-bold mt-1">Posted</div>`;
+                    }
                 }
 
                 html += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="table-td">${gp.date}</td>
-                        <td class="table-td text-xs font-mono">${gp.emp_id}</td>
-                        <td class="table-td font-bold">${name}</td>
-                        <td class="table-td">${gp.pass_type}</td>
-                        <td class="table-td text-xs">${gp.purpose || '-'}</td>
-                        <td class="table-td text-center flex flex-col gap-1 items-center">
-                            <span class="badge ${sCls}">${gp.status}</span>
+                    <tr class="hover:bg-gray-50 border-b">
+                        <td class="table-td whitespace-nowrap">${gp.date}</td>
+                        <td class="table-td">
+                            <span class="font-bold">${name}</span><br>
+                            <span class="text-xs font-mono text-gray-500">${gp.emp_id}</span>
+                        </td>
+                        <td class="table-td text-xs">
+                            <span class="font-bold">${gp.pass_type}</span><br>
+                            <span class="text-gray-600 truncate max-w-[150px] block" title="${gp.purpose}">${gp.purpose || '-'}</span>
+                        </td>
+                        <td class="table-td p-1">${timeCell}</td>
+                        <td class="table-td p-1">${dedCell}</td>
+                        <td class="table-td text-center">
+                            <span class="badge ${sCls} block w-max mx-auto">${gp.status}</span>
                             ${actionBtn}
                         </td>
                     </tr>
@@ -491,27 +496,58 @@
         }
     }
 
-    async function processExistingGP(id) {
-        const tOut = prompt("Enter Time Out (HH:MM) - 24hr format:");
-        if(tOut === null) return;
-        const tIn = prompt("Enter Time In (HH:MM) - 24hr format:");
-        if(tIn === null) return;
-        const dedStr = prompt("Enter Deductible Days (VL) e.g. 0.125:");
-        if(dedStr === null) return;
+    window.calcGP = function(id) {
+        const tO = document.getElementById(`tOut_${id}`).value;
+        const tI = document.getElementById(`tIn_${id}`).value;
+        if(!tO || !tI) { alert("Please input both Out and In times."); return; }
+        
+        const dO = new Date(`1970-01-01T${tO}:00`);
+        const dI = new Date(`1970-01-01T${tI}:00`);
+        let diffMins = (dI - dO) / 60000;
+        
+        if (diffMins < 0) { alert("Time In cannot be earlier than Time Out."); return; }
+        
+        let hrs = Math.floor(diffMins / 60);
+        let mns = diffMins % 60;
+        
+        // Exact conversion mapping logic 
+        let d = 0;
+        if(hrs === 1) d+=0.125; else if(hrs===2) d+=0.250; else if(hrs===3) d+=0.375; else if(hrs===4) d+=0.500; else if(hrs===5) d+=0.625; else if(hrs===6) d+=0.750; else if(hrs===7) d+=0.875; else if(hrs>=8) d+=1.000;
+        
+        if(mns >= 1 && mns <= 10) {
+            const minMap = {1:0.002, 2:0.004, 3:0.006, 4:0.008, 5:0.010, 6:0.012, 7:0.015, 8:0.017, 9:0.019, 10:0.021};
+            d += minMap[mns];
+        } else if (mns > 10) {
+            d += mns * 0.002083; // Approx calculation for > 10 mins based on standard table
+        }
+        
+        document.getElementById(`ded_${id}`).value = d.toFixed(3);
+    }
+
+    window.processGP = async function(id) {
+        const tO = document.getElementById(`tOut_${id}`).value;
+        const tI = document.getElementById(`tIn_${id}`).value;
+        const ded = document.getElementById(`ded_${id}`).value;
+        
+        if(!tO || !tI || ded === "") { alert("Please calculate or input times and deduction."); return; }
+
+        if(!confirm(`Process this Gate Pass with a deduction of ${ded} days?`)) return;
 
         try {
             await supabaseClient.from('gate_pass_logs').update({
-                time_out: tOut || null,
-                time_in: tIn || null,
-                deduction_credit: parseFloat(dedStr) || 0,
+                time_out: tO,
+                time_in: tI,
+                deduction_credit: parseFloat(ded),
                 status: 'PROCESSED'
             }).eq('id', id);
-            alert("Gate Pass Processed. It is now ready for posting in the Leave Processing Page.");
+            
+            alert("Gate Pass processed and marked for posting.");
             loadRecentGatePasses();
         } catch(e) {
             alert("Error: " + e.message);
         }
     }
+
 
     // --- CTO LOGIC ---
     const ctoInput = document.getElementById('ctoEmpSearch');
@@ -539,11 +575,6 @@
         } else {
             ctoResults.classList.add('hidden');
         }
-    });
-
-    document.addEventListener('click', function(e) {
-        if (e.target !== gpInput && e.target !== gpResults) gpResults.classList.add('hidden');
-        if (e.target !== ctoInput && e.target !== ctoResults) ctoResults.classList.add('hidden');
     });
 
     function checkWeekend() {
@@ -638,7 +669,7 @@
             
             if(isWeekend) {
                 creditableHours = (lastLog - firstLog) / (1000 * 60 * 60);
-                if(creditableHours > 5) creditableHours -= 1; 
+                if(creditableHours > 5) creditableHours -= 1; // Basic 1 hr lunch deduction deduction logic if prolonged
             } else {
                 const { data: sched } = await supabaseClient.from('schedule_override')
                     .select('*').eq('emp_id', emp_id).eq('date', dateStr).limit(1);
@@ -664,7 +695,6 @@
             } else {
                 numEl.value = creditableHours.toFixed(2);
             }
-            // Trigger change
             updateBaseHours(emp_id, numEl.value);
             
         } catch(e) {
@@ -689,10 +719,9 @@
             return;
         }
 
-        // Validate base hours
         for(let emp of selectedCtoEmployees) {
             if(emp.baseHours < 2) {
-                alert(`Employee ${emp.name} has ${emp.baseHours} base hours. CTO requires 2 hours or more. Please correct or remove the employee.`);
+                alert(`Employee ${emp.name} has ${emp.baseHours} base hours. CTO requires 2 hours or more.`);
                 return;
             }
         }
@@ -714,9 +743,8 @@
             const { error } = await supabaseClient.from('cto_records').insert(records);
             if(error) throw error;
 
-            alert("CTO Records successfully saved. They will appear in the CTO Posting tab on the Leave Processing page for final crediting.");
+            alert("CTO Records successfully saved. They will appear in the Leave Processing -> CTO Posting tab for final crediting.");
             
-            // Clear
             selectedCtoEmployees = [];
             renderCtoEmployees();
             document.getElementById('ctoPso').value = '';
