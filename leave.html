@@ -486,7 +486,16 @@
             else if(tType.includes('SL') || tType.includes('SICK')) updates.sl_balance = (parseFloat(empData.sl_balance || 0) - final_debit).toFixed(3);
             else if(tType.includes('SPL')) updates.spl_balance = (parseFloat(empData.spl_balance || 0) - final_debit).toFixed(3);
             else if(tType.includes('WL') || tType.includes('WELLNESS')) updates.wl_balance = (parseFloat(empData.wl_balance || 0) - final_debit).toFixed(3);
-            else if(tType.includes('CTO')) updates.cto_balance = (parseFloat(empData.cto_balance || 0) - final_debit).toFixed(3);
+            else if(tType.includes('CTO')) {
+                let current_cto = parseFloat(empData.cto_balance || 0);
+                if (current_cto >= final_debit) {
+                    updates.cto_balance = (current_cto - final_debit).toFixed(3);
+                } else {
+                    let remaining = final_debit - current_cto;
+                    updates.cto_balance = (0).toFixed(3);
+                    updates.vl_balance = (parseFloat(empData.vl_balance || 0) - remaining).toFixed(3);
+                }
+            }
 
             if(Object.keys(updates).length > 0) {
                 await supabaseClient.from('employees').update(updates).eq('emp_id', emp_id);
@@ -538,11 +547,11 @@
             const emps = Object.values(empDataMap);
             if (emps.length === 0) throw new Error("No REGULAR employees found.");
 
-            // Force Leave: Any VL (APPROVED or DISAPPROVED) per year. Max 5.
+            // Force Leave: Any VL (APPLICATION, APPROVED, or DISAPPROVED) per year. Max 5.
             const currentYear = new Date().getFullYear();
             const { data: vlData } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, debit')
-                .in('transaction_type', ['APPROVED', 'DISAPPROVED'])
+                .in('transaction_type', ['APPLICATION', 'APPROVED', 'DISAPPROVED'])
                 .ilike('type', '%VL%')
                 .gte('start_date', `${currentYear}-01-01`)
                 .lte('start_date', `${currentYear}-12-31`);
