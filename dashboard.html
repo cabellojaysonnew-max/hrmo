@@ -164,7 +164,6 @@
         return h > 0 ? `${h}h ${m}m` : `${m}m`;
     }
 
-    // --- Helper to fetch background image for PDFs ---
     let cachedBgMemo = null;
     async function getBgMemo() {
         if (cachedBgMemo) return cachedBgMemo;
@@ -190,7 +189,6 @@
         document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         document.getElementById('scopeLabel').innerText = isLimited ? `Division: ${targetDivision}` : "Provincial Oversight";
 
-        // Fetch Employees
         let empQuery = supabaseClient.from('employees').select('*');
         if (isLimited) {
             empQuery = empQuery.eq('division', targetDivision);
@@ -408,7 +406,6 @@
             const isExcessiveLate = totalMins >= 480;
             const isAbsenteeism = h.absentDays >= 3;
 
-            // Only show those with infractions
             if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
                 hasHabitual = true;
                 let statusBadge = '';
@@ -439,34 +436,30 @@
         
         if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
 
-        // --- NEW: Flag Ceremony Monitoring ---
-        // Fetch ALL flag attendance logs
+        // --- NEW: Flag Ceremony Monitoring (ALL DATA, NO MAY 1 LIMIT) ---
         const { data: allFlagLogs } = await supabaseClient
             .from('flag_attendance')
             .select('emp_id, date, time_in, status');
             
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
-        // Find valid flag ceremony days (days where AT LEAST ONE person has a record)
         let validMondays = new Set();
         const flagStartDates = {};
 
         (allFlagLogs || []).forEach(log => {
-            const d = new Date(log.date);
-            if (d.getDay() === 1) { // Must be a Monday
-                validMondays.add(log.date);
-            }
+            validMondays.add(log.date);
             
-            // Track first log date per employee from flag_attendance
+            // First time this specific employee ever showed up in the flag system
+            const d = new Date(log.date);
             d.setHours(0,0,0,0);
             if (!flagStartDates[log.emp_id] || d < flagStartDates[log.emp_id]) {
                 flagStartDates[log.emp_id] = d;
             }
         });
         
-        let mondays = Array.from(validMondays).sort().reverse(); // Most recent first
+        let mondays = Array.from(validMondays).sort((a,b) => new Date(b) - new Date(a)); // Newest first
 
-        // Fetch excused (No start date filter)
+        // Note: For full historical check, we also fetch all travel/leave/pso records without the May 1 limit
         const [allFlagTravelRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
             supabaseClient.from('itinerary').select('emp_id, travel_date'),
             supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED'),
@@ -489,7 +482,7 @@
             if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
             
             const startDate = flagStartDates[e.emp_id];
-            if (!startDate) return; // No logs in flag_attendance = new employee / no absent yet
+            if (!startDate) return; // Completely new / no record at all ever
 
             let missedDates = [];
             let presentCount = 0;
@@ -499,12 +492,13 @@
                 const mDate = new Date(m);
                 mDate.setHours(0,0,0,0);
                 
+                // Only count mondays from their very first log onwards
                 if (mDate >= startDate) {
                     expectedMondays++;
                     const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
                     const isExcused = flagExcused.has(e.emp_id + '_' + m); 
                     
-                    const isPresent = log && log.status !== 'ABSENT' && log.time_in !== 'ABSENT' && log.time_in !== null;
+                    const isPresent = log && String(log.status).toUpperCase() !== 'ABSENT' && String(log.time_in).toUpperCase() !== 'ABSENT' && log.time_in !== null;
 
                     if (isPresent) {
                         presentCount++;
@@ -514,7 +508,6 @@
                 }
             });
 
-            // Only those with absenteeism (missed dates) appear
             if (missedDates.length > 0) {
                 listF.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
@@ -530,14 +523,12 @@
         if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
     };
 
-    // --- MEMO PRINTING FUNCTIONS ---
     async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins) {
         if (!confirm(`Generate memo for ${empName}?`)) return;
 
         const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); // Legal size
+        const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); 
         
-        // Add Background Image First
         const bgBase64 = await getBgMemo();
         if (bgBase64) {
             pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
@@ -623,7 +614,6 @@
             }
         }
 
-        // --- ALIGNMENT FIX FOR TARDINESS MEMO ---
         pdf.setMargins(30, 45, 30); 
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(12);
@@ -717,7 +707,6 @@
         const { jsPDF } = window.jspdf; 
         const pdf = new jsPDF('p', 'mm', [215.9, 330.2]);
 
-        // Add Background Image First
         const bgBase64 = await getBgMemo();
         if (bgBase64) {
             pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
@@ -727,7 +716,6 @@
         const currYear = new Date().getFullYear();
         const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 
-        // --- ALIGNMENT FIX FOR FLAG MEMO ---
         pdf.setMargins(30, 45, 30); 
         pdf.setFont("helvetica", "bold"); 
         pdf.setFontSize(12);
