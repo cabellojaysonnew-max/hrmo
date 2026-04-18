@@ -442,7 +442,8 @@
                 return;
             }
 
-            const filteredData = data.filter(gp => ['PROCESSED', 'POSTED', 'ISSUED'].includes(gp.status));
+            // Filter ONLY ISSUED, PROCESSED, POSTED
+            const filteredData = data.filter(gp => ['ISSUED', 'PROCESSED', 'POSTED'].includes(gp.status));
 
             if(filteredData.length === 0) {
                  list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No gate passes found for this view.</td></tr>`;
@@ -462,30 +463,19 @@
                 let actionBtn = '';
 
                 if(gp.status === 'ISSUED') {
-                    // Civil Service Matrix calculation logic for auto-display
-                    let calcDeduct = 0;
-                    if(gp.time_out && gp.time_in) {
-                        const dO = new Date(`1970-01-01T${gp.time_out}`);
-                        const dI = new Date(`1970-01-01T${gp.time_in}`);
-                        let diffMins = (dI - dO) / 60000;
-                        
-                        if (gp.pass_type === 'OFFICIAL') {
-                            diffMins -= 180; // deduct 3 hours
-                        }
-
-                        if(diffMins > 0) {
-                            calcDeduct = diffMins / 480; 
-                        }
-                    }
+                    // Pre-populate with values if they were recorded by scanner
+                    let outVal = gp.time_out ? String(gp.time_out).substring(0,5) : '';
+                    let inVal = gp.time_in ? String(gp.time_in).substring(0,5) : '';
                     
                     timeCell = `
                         <div class="flex flex-col gap-1 items-center">
-                            <input type="time" id="tOut_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_out ? String(gp.time_out).substring(0,5) : ''}">
-                            <input type="time" id="tIn_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${gp.time_in ? String(gp.time_in).substring(0,5) : ''}">
+                            <input type="time" id="tOut_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${outVal}">
+                            <input type="time" id="tIn_${gp.id}" class="border rounded px-1 text-xs w-24 bg-white" value="${inVal}">
                             <button onclick="calcGP('${gp.id}', '${gp.pass_type}')" class="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-0.5 rounded mt-1 shadow">Calc Deduction</button>
                         </div>
                     `;
-                    dedCell = `<div id="ded_${gp.id}" class="font-bold text-red-600 text-center">${calcDeduct.toFixed(3)}</div>`;
+                    // Static text element for deduction calculation
+                    dedCell = `<div id="ded_${gp.id}" class="font-bold text-red-600 text-center">${parseFloat(gp.deduction_credit || 0).toFixed(3)}</div>`;
                     actionBtn = `
                         <button onclick="processGP('${gp.id}')" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mt-1 mb-1">Process</button>
                         <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline">Delete</button>
@@ -497,10 +487,7 @@
                     dedCell = `<div class="font-bold text-red-600 text-center">${parseFloat(gp.deduction_credit).toFixed(3)}</div>`;
                     
                     if(gp.status === 'PROCESSED') {
-                        actionBtn = `
-                            <div class="text-xs text-gray-500 italic mt-1 mb-1">Ready for Posting</div>
-                            <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline">Delete</button>
-                        `;
+                        actionBtn = `<div class="text-xs text-gray-500 italic mt-1">Ready for Posting</div>`;
                     } else {
                         actionBtn = `<div class="text-xs text-green-600 font-bold mt-1">Posted</div>`;
                     }
@@ -781,7 +768,7 @@
             const records = selectedCtoEmployees.map(emp => ({
                 emp_id: emp.id,
                 date: cDate,
-                transaction_type: 'EARNED',
+                transaction_type: 'PROCESSED',
                 base_type: desc,
                 base_hours: emp.baseHours,
                 multiplier: mult,
