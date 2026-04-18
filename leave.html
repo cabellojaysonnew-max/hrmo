@@ -147,14 +147,14 @@
                             <label class="form-label">Select Month</label>
                             <input type="month" id="gpMonth" class="form-input">
                         </div>
-                        <button onclick="loadGatePasses()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-4 rounded shadow">Fetch Gate Passes</button>
+                        <button onclick="loadGatePasses()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-4 rounded shadow">Fetch Gate Passes / CTO</button>
                         <div class="flex-1 text-right">
                             <button onclick="postAllGatePasses()" id="btnPostAllGp" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-6 rounded shadow hidden">Post All Pending to Ledger</button>
                         </div>
                     </div>
                     
                     <div class="p-4 bg-yellow-50 border-b border-gray-200">
-                        <h4 class="font-bold text-yellow-800">Pending For Deduction (Unposted)</h4>
+                        <h4 class="font-bold text-yellow-800">Pending For Deduction / Crediting (Unposted)</h4>
                     </div>
                     <div class="overflow-x-auto max-h-64 border-b border-gray-200">
                         <table class="w-full text-left border-collapse">
@@ -163,13 +163,13 @@
                                     <th class="table-th bg-yellow-100">Date</th>
                                     <th class="table-th bg-yellow-100">Emp ID</th>
                                     <th class="table-th bg-yellow-100">Name</th>
-                                    <th class="table-th bg-yellow-100">Purpose</th>
-                                    <th class="table-th bg-yellow-100">Deduction (VL)</th>
+                                    <th class="table-th bg-yellow-100">Type / Purpose</th>
+                                    <th class="table-th bg-yellow-100">Deduct(VL) / Credit(CTO)</th>
                                     <th class="table-th bg-yellow-100 text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="gp-pending-list">
-                                <tr><td colspan="6" class="table-td text-center text-gray-500">Select a month to fetch gate passes.</td></tr>
+                                <tr><td colspan="6" class="table-td text-center text-gray-500">Select a month to fetch gate passes and CTO records.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -184,12 +184,12 @@
                                     <th class="table-th bg-green-100">Date</th>
                                     <th class="table-th bg-green-100">Emp ID</th>
                                     <th class="table-th bg-green-100">Name</th>
-                                    <th class="table-th bg-green-100">Purpose</th>
-                                    <th class="table-th bg-green-100">Deducted (VL)</th>
+                                    <th class="table-th bg-green-100">Type / Purpose</th>
+                                    <th class="table-th bg-green-100">Amount</th>
                                 </tr>
                             </thead>
                             <tbody id="gp-posted-list">
-                                <tr><td colspan="5" class="table-td text-center text-gray-500">No posted gate passes shown.</td></tr>
+                                <tr><td colspan="5" class="table-td text-center text-gray-500">No posted records shown.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -198,15 +198,15 @@
 
             <div id="ledgerTab" class="tab-content">
                 <div class="card mb-6">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end flex-wrap">
-                        <div class="relative">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end flex-wrap">
+                        <div class="flex-1 min-w-[200px] relative">
                             <label class="form-label">Search Employee</label>
                             <input type="text" id="ledgEmpSearch" class="form-input" placeholder="Type to search employee..." autocomplete="off">
                             <div id="empSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
                             <input type="hidden" id="ledgEmpId">
                         </div>
                         <div>
-                            <button onclick="loadSimpleLedger()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow w-full">View Complete Ledger</button>
+                            <button onclick="loadSimpleLedger()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow w-full">View Statement</button>
                         </div>
                     </div>
                     
@@ -276,8 +276,8 @@
     document.getElementById('genYear').value = d.getFullYear();
 
     let empDataMap = {};
-    let currentGatePasses = [];
-    let currentForceLeaveStatus = {}; // Tracks { emp_id: VL_taken }
+    let currentGatePasses = []; // also holding cto
+    let currentForceLeaveStatus = {}; 
     let empSearchList = [];
 
     // Ensure we process REGULAR employees only
@@ -714,37 +714,53 @@
             const startDate = `${monthVal}-01`;
             const endDate = `${monthVal}-${lastDay}`;
 
-            const { data, error } = await supabaseClient.from('gate_pass_logs')
+            // Fetch Gate Passes
+            const { data: gpData, error: gpErr } = await supabaseClient.from('gate_pass_logs')
                 .select('*')
                 .gte('date', startDate)
                 .lte('date', endDate)
                 .gt('deduction_credit', 0)
                 .in('status', ['APPROVED', 'PROCESSED', 'POSTED'])
                 .order('date', { ascending: false });
+            if(gpErr) throw gpErr;
 
-            if (error) throw error;
+            // Fetch CTOs (checking cto_records, not leave_ledger, to post them)
+            // CTO doesn't have a status usually, check if it exists in ledger as POSTED
+            const { data: ctoData, error: ctoErr } = await supabaseClient.from('cto_records')
+                .select('*')
+                .gte('date', startDate)
+                .lte('date', endDate)
+                .order('date', { ascending: false });
+            if(ctoErr) throw ctoErr;
+
+            // Fetch ledger to see which CTOs are already posted
+            const { data: ledgerCTO } = await supabaseClient.from('leave_ledger')
+                .select('transaction_id')
+                .eq('type', 'CTO EARNED');
+            const postedCtoIds = ledgerCTO ? ledgerCTO.map(l => l.transaction_id) : [];
 
             let pendingHtml = '';
             let postedHtml = '';
             let hasPending = false;
-            currentGatePasses = [];
+            currentGatePasses = []; // Unified queue for GP and CTO
 
-            (data || []).forEach(gp => {
+            // Process GP
+            (gpData || []).forEach(gp => {
                 const emp = empDataMap[gp.emp_id];
                 const name = emp && emp.full_name ? emp.full_name : gp.emp_id;
                 
                 if (gp.status !== 'POSTED') {
                     hasPending = true;
-                    currentGatePasses.push(gp);
+                    currentGatePasses.push({ type: 'GP', ...gp });
                     pendingHtml += `
                         <tr class="hover:bg-yellow-50">
                             <td class="table-td">${gp.date}</td>
                             <td class="table-td">${gp.emp_id}</td>
                             <td class="table-td font-bold">${name.toUpperCase()}</td>
-                            <td class="table-td">${gp.purpose || '-'}</td>
+                            <td class="table-td">Gate Pass: ${gp.purpose || '-'}</td>
                             <td class="table-td font-bold text-red-600">${parseFloat(gp.deduction_credit).toFixed(3)}</td>
                             <td class="table-td text-center">
-                                <button onclick="postSingleGatePass('${gp.id}', '${gp.emp_id}', ${gp.deduction_credit}, '${gp.date}', '${gp.purpose ? gp.purpose.replace(/'/g, "\\'") : ''}')" class="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 shadow">Post Deduction</button>
+                                <button onclick="postSingleRecord('GP', '${gp.id}', '${gp.emp_id}', ${gp.deduction_credit}, '${gp.date}', '${gp.purpose ? gp.purpose.replace(/'/g, "\\'") : ''}')" class="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 shadow">Post GP</button>
                             </td>
                         </tr>
                     `;
@@ -754,15 +770,50 @@
                             <td class="table-td">${gp.date}</td>
                             <td class="table-td">${gp.emp_id}</td>
                             <td class="table-td font-bold">${name.toUpperCase()}</td>
-                            <td class="table-td">${gp.purpose || '-'}</td>
-                            <td class="table-td font-bold text-green-700">${parseFloat(gp.deduction_credit).toFixed(3)}</td>
+                            <td class="table-td">Gate Pass: ${gp.purpose || '-'}</td>
+                            <td class="table-td font-bold text-red-700">-${parseFloat(gp.deduction_credit).toFixed(3)}</td>
                         </tr>
                     `;
                 }
             });
 
-            pList.innerHTML = pendingHtml || `<tr><td colspan="6" class="table-td text-center text-gray-500">No pending gate passes for deduction.</td></tr>`;
-            dList.innerHTML = postedHtml || `<tr><td colspan="5" class="table-td text-center text-gray-500">No posted gate passes for this month.</td></tr>`;
+            // Process CTO
+            (ctoData || []).forEach(cto => {
+                const emp = empDataMap[cto.emp_id];
+                const name = emp && emp.full_name ? emp.full_name : cto.emp_id;
+                // calculate credit: hours / 8
+                const creditVal = cto.calculated_hours ? parseFloat(cto.calculated_hours) / 8 : 0;
+                
+                if (!postedCtoIds.includes(String(cto.id))) {
+                    hasPending = true;
+                    currentGatePasses.push({ type: 'CTO', creditVal, ...cto });
+                    pendingHtml += `
+                        <tr class="hover:bg-yellow-50">
+                            <td class="table-td">${cto.date}</td>
+                            <td class="table-td">${cto.emp_id}</td>
+                            <td class="table-td font-bold">${name.toUpperCase()}</td>
+                            <td class="table-td">CTO: ${cto.base_type || '-'}</td>
+                            <td class="table-td font-bold text-green-600">+${creditVal.toFixed(3)}</td>
+                            <td class="table-td text-center">
+                                <button onclick="postSingleRecord('CTO', '${cto.id}', '${cto.emp_id}', ${creditVal}, '${cto.date}', '${cto.base_type ? cto.base_type.replace(/'/g, "\\'") : ''}')" class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700 shadow">Post CTO</button>
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    postedHtml += `
+                        <tr class="bg-gray-50">
+                            <td class="table-td">${cto.date}</td>
+                            <td class="table-td">${cto.emp_id}</td>
+                            <td class="table-td font-bold">${name.toUpperCase()}</td>
+                            <td class="table-td">CTO: ${cto.base_type || '-'}</td>
+                            <td class="table-td font-bold text-green-700">+${creditVal.toFixed(3)}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            pList.innerHTML = pendingHtml || `<tr><td colspan="6" class="table-td text-center text-gray-500">No pending records.</td></tr>`;
+            dList.innerHTML = postedHtml || `<tr><td colspan="5" class="table-td text-center text-gray-500">No posted records for this month.</td></tr>`;
             
             const btnAll = document.getElementById('btnPostAllGp');
             if(hasPending) btnAll.classList.remove('hidden');
@@ -774,67 +825,90 @@
         }
     }
 
-    async function postSingleGatePass(gp_id, emp_id, deduction, date, purpose) {
-        if(!confirm(`Deduct ${deduction} VL credits from ${empDataMap[emp_id]?.full_name || emp_id}?`)) return;
+    async function postSingleRecord(recType, id, emp_id, val, date, desc) {
+        if(!confirm(`Are you sure you want to post this ${recType}?`)) return;
         try {
-            await applyGatePassDeduction([{ id: gp_id, emp_id, deduction_credit: deduction, date, purpose }]);
-            alert("Gate pass posted successfully.");
+            if(recType === 'GP') {
+                await applyRecords([{ type: 'GP', id: id, emp_id: emp_id, deduction_credit: val, date: date, purpose: desc }]);
+            } else {
+                await applyRecords([{ type: 'CTO', id: id, emp_id: emp_id, creditVal: val, date: date, base_type: desc }]);
+            }
+            alert(`${recType} posted successfully.`);
             loadGatePasses();
         } catch(e) { alert("Error: " + e.message); }
     }
 
     async function postAllGatePasses() {
         if(currentGatePasses.length === 0) return;
-        if(!confirm(`Are you sure you want to deduct VL balances and post ${currentGatePasses.length} gate passes to the ledger?`)) return;
+        if(!confirm(`Are you sure you want to post ${currentGatePasses.length} pending records to the ledger?`)) return;
 
         const btn = document.getElementById('btnPostAllGp');
         btn.innerText = "Posting..."; btn.disabled = true;
 
         try {
-            await applyGatePassDeduction(currentGatePasses);
-            alert("All gate passes successfully posted and deducted from VL balances.");
+            await applyRecords(currentGatePasses);
+            alert("All records successfully posted to ledger.");
             loadGatePasses(); 
         } catch(e) {
-            alert("Error posting gate passes: " + e.message);
+            alert("Error posting records: " + e.message);
         } finally {
             btn.innerText = "Post All Pending to Ledger"; btn.disabled = false;
         }
     }
 
-    async function applyGatePassDeduction(gpArray) {
+    async function applyRecords(arr) {
         await loadEmployeeMaps(); 
-        let empDeductions = {};
+        let empUpdates = {}; // { emp_id: { vl: val, cto: val } }
         let ledgers = [];
         let gpIdsToUpdate = [];
 
-        gpArray.forEach(gp => {
-            if(!empDeductions[gp.emp_id]) empDeductions[gp.emp_id] = 0;
-            empDeductions[gp.emp_id] += parseFloat(gp.deduction_credit);
-            gpIdsToUpdate.push(gp.id);
-
-            ledgers.push({
-                emp_id: gp.emp_id,
-                type: 'VL (GATE PASS)',
-                debit: gp.deduction_credit,
-                transaction_type: 'GATE_PASS_DEDUCTION',
-                remarks: `Gate Pass Deduction - ${gp.purpose || ''}`,
-                start_date: gp.date
-            });
+        arr.forEach(rec => {
+            if(!empUpdates[rec.emp_id]) empUpdates[rec.emp_id] = { vl: 0, cto: 0 };
+            
+            if(rec.type === 'GP') {
+                empUpdates[rec.emp_id].vl -= parseFloat(rec.deduction_credit);
+                gpIdsToUpdate.push(rec.id);
+                ledgers.push({
+                    emp_id: rec.emp_id,
+                    type: 'VL (GATE PASS)',
+                    debit: rec.deduction_credit,
+                    transaction_type: 'GATE_PASS_DEDUCTION',
+                    remarks: `Gate Pass Deduction - ${rec.purpose || ''}`,
+                    start_date: rec.date
+                });
+            } else if(rec.type === 'CTO') {
+                empUpdates[rec.emp_id].cto += parseFloat(rec.creditVal);
+                ledgers.push({
+                    transaction_id: String(rec.id), // use to check if posted
+                    emp_id: rec.emp_id,
+                    type: 'CTO EARNED',
+                    credit: rec.creditVal,
+                    transaction_type: 'CREDIT',
+                    remarks: `Earned CTO from ${rec.base_type || ''}`,
+                    start_date: rec.date
+                });
+            }
         });
 
         const updates = [];
-        for (const [eId, amount] of Object.entries(empDeductions)) {
+        for (const [eId, vals] of Object.entries(empUpdates)) {
             const emp = empDataMap[eId];
             if (emp) {
-                const newBal = (parseFloat(emp.vl_balance || 0) - amount).toFixed(3);
-                updates.push( supabaseClient.from('employees').update({ vl_balance: newBal }).eq('emp_id', eId) );
+                let dbUpdate = {};
+                if(vals.vl !== 0) dbUpdate.vl_balance = (parseFloat(emp.vl_balance || 0) + vals.vl).toFixed(3);
+                if(vals.cto !== 0) dbUpdate.cto_balance = (parseFloat(emp.cto_balance || 0) + vals.cto).toFixed(3);
+                if(Object.keys(dbUpdate).length > 0) {
+                    updates.push( supabaseClient.from('employees').update(dbUpdate).eq('emp_id', eId) );
+                }
             }
         }
+        
         await Promise.all(updates);
-        await supabaseClient.from('leave_ledger').insert(ledgers);
-
-        const gpUpdates = gpIdsToUpdate.map(id => supabaseClient.from('gate_pass_logs').update({ status: 'POSTED' }).eq('id', id));
-        await Promise.all(gpUpdates);
+        if(ledgers.length > 0) await supabaseClient.from('leave_ledger').insert(ledgers);
+        if(gpIdsToUpdate.length > 0) {
+            const gpUpdates = gpIdsToUpdate.map(id => supabaseClient.from('gate_pass_logs').update({ status: 'POSTED' }).eq('id', id));
+            await Promise.all(gpUpdates);
+        }
         
         await loadEmployeeMaps(); 
     }
@@ -874,26 +948,9 @@
 
             if (error) throw error;
 
-            // Fetch CTO records to show as credits
-            let extraCTO = [];
-            const { data: ctoData } = await supabaseClient.from('cto_records').select('*').eq('emp_id', empId);
-            if(ctoData) {
-                ctoData.forEach(c => {
-                    extraCTO.push({
-                        created_at: c.date,
-                        start_date: c.date,
-                        type: 'CTO EARNED',
-                        transaction_type: 'CREDIT',
-                        credit: c.calculated_hours ? (parseFloat(c.calculated_hours) / 8) : 0,
-                        debit: 0,
-                        remarks: `Earned CTO from ${c.base_type || ''} (Mult: ${c.multiplier || 1})`
-                    });
-                });
-            }
-
-            let allTransactions = (ledgerData || []).concat(extraCTO);
+            let allTransactions = ledgerData || [];
             
-            // Sort combined data by date ascending (oldest first) for display
+            // Sort combined data by date ascending (oldest first)
             allTransactions.sort((a,b) => new Date(a.created_at || a.start_date) - new Date(b.created_at || b.start_date));
 
             if (allTransactions.length === 0) {
@@ -935,10 +992,8 @@
                 `;
             });
             
-            // Reverse html so newest is at the top (easier to read a long log)
-            // Or leave it chronological depending on preference. Let's keep it chronological for now as requested by typical ledgers, but we can reverse it if needed.
-            // list.innerHTML = html.split('</tr>').reverse().join('</tr>'); // If we wanted reverse
-            list.innerHTML = html;
+            // Reverse html so newest is at the top
+            list.innerHTML = html.split('</tr>').reverse().join('</tr>'); 
 
         } catch (e) {
             list.innerHTML = `<tr><td colspan="4" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
