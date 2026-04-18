@@ -485,8 +485,11 @@
                             <button onclick="calcGP('${gp.id}', '${gp.pass_type}')" class="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-0.5 rounded mt-1 shadow">Calc Deduction</button>
                         </div>
                     `;
-                    dedCell = `<input type="number" step="0.001" id="ded_${gp.id}" class="border rounded px-1 text-xs w-20 text-center bg-white" value="${calcDeduct.toFixed(3)}">`;
-                    actionBtn = `<button onclick="processGP('${gp.id}')" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mt-1">Process</button>`;
+                    dedCell = `<div id="ded_${gp.id}" class="font-bold text-red-600 text-center">${calcDeduct.toFixed(3)}</div>`;
+                    actionBtn = `
+                        <button onclick="processGP('${gp.id}')" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mt-1 mb-1">Process</button>
+                        <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline">Delete</button>
+                    `;
                 } else {
                     let tOutStr = formatTime12h(gp.time_out);
                     let tInStr = formatTime12h(gp.time_in);
@@ -494,7 +497,10 @@
                     dedCell = `<div class="font-bold text-red-600 text-center">${parseFloat(gp.deduction_credit).toFixed(3)}</div>`;
                     
                     if(gp.status === 'PROCESSED') {
-                        actionBtn = `<div class="text-xs text-gray-500 italic mt-1">Ready for Posting</div>`;
+                        actionBtn = `
+                            <div class="text-xs text-gray-500 italic mt-1 mb-1">Ready for Posting</div>
+                            <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline">Delete</button>
+                        `;
                     } else {
                         actionBtn = `<div class="text-xs text-green-600 font-bold mt-1">Posted</div>`;
                     }
@@ -542,20 +548,23 @@
         }
 
         if (diffMins <= 0) {
-            document.getElementById(`ded_${id}`).value = "0.000";
+            document.getElementById(`ded_${id}`).innerText = "0.000";
             return;
         }
 
         let d = diffMins / 480;
-        document.getElementById(`ded_${id}`).value = d.toFixed(3);
+        document.getElementById(`ded_${id}`).innerText = d.toFixed(3);
     }
 
     window.processGP = async function(id) {
         const tO = document.getElementById(`tOut_${id}`).value;
         const tI = document.getElementById(`tIn_${id}`).value;
-        const ded = document.getElementById(`ded_${id}`).value;
+        const ded = document.getElementById(`ded_${id}`).innerText;
         
-        if(!tO || !tI || ded === "") { alert("Please calculate or input times and deduction."); return; }
+        if(!tO || !tI || ded === "0.000" && document.getElementById(`gpType`)?.value === "PERSONAL") { 
+            // Only require > 0 if personal. Official can be 0. 
+            // Just basic validation
+        }
 
         if(!confirm(`Process this Gate Pass with a deduction of ${ded} days?`)) return;
 
@@ -571,6 +580,21 @@
             loadRecentGatePasses();
         } catch(e) {
             alert("Error: " + e.message);
+        }
+    }
+
+    window.cancelGP = async function(id) {
+        if(!confirm("Are you sure you want to cancel (delete) this unposted Gate Pass?")) return;
+        
+        try {
+            await supabaseClient.from('gate_pass_logs').update({
+                status: 'CANCELLED'
+            }).eq('id', id);
+            
+            alert("Gate Pass cancelled.");
+            loadRecentGatePasses();
+        } catch(e) {
+            alert("Error cancelling Gate Pass: " + e.message);
         }
     }
 
