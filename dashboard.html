@@ -164,10 +164,6 @@
         return h > 0 ? `${h}h ${m}m` : `${m}m`;
     }
 
-    // --- Safe Fetch Helper to prevent full failure if one table is locked ---
-    const fetchSafe = (query) => query.catch(e => { console.error('Fetch error:', e); return { data: [] }; });
-
-    // --- Helper to fetch background image for PDFs ---
     let cachedBgMemo = null;
     async function getBgMemo() {
         if (cachedBgMemo) return cachedBgMemo;
@@ -198,17 +194,17 @@
         if (isLimited) {
             empQuery = empQuery.eq('division', targetDivision);
         }
-        const { data: emps } = await fetchSafe(empQuery);
+        const { data: emps } = await empQuery;
         
         const empIds = new Set((emps || []).map(e => e.emp_id));
         document.getElementById('statTotal').innerText = emps?.length || 0;
 
         const [travel, pso, leave, logs, scheduleOverrides] = await Promise.all([
-            fetchSafe(supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr)),
-            fetchSafe(supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr)),
-            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).eq('transaction_t', 'APPROVED')),
-            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59')),
-            fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr))
+            supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr),
+            supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr),
+            supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).eq('transaction_t', 'APPROVED'),
+            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59'),
+            supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr)
         ]);
 
         const travelMap = Object.fromEntries((travel.data || []).map(i => [i.emp_id, i.destination]));
@@ -252,11 +248,11 @@
         const endCurrMonth = new Date(currYear, currMonth + 1, 0).toISOString().split('T')[0]; 
 
         const [histLogsRes, histTravel, histPso, histLeave, histOverrides] = await Promise.all([
-            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59')),
-            fetchSafe(supabaseClient.from('itinerary').select('emp_id, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr)),
-            fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth)),
-            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startCurrMonth).lte('date', todayStr)),
-            fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth))
+            supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59'),
+            supabaseClient.from('itinerary').select('emp_id, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr),
+            supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth),
+            supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startCurrMonth).lte('date', todayStr),
+            supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth)
         ]);
 
         const histLogs = histLogsRes.data || [];
@@ -411,7 +407,6 @@
             const isExcessiveLate = totalMins >= 480;
             const isAbsenteeism = h.absentDays >= 3;
 
-            // Only show those with infractions
             if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
                 hasHabitual = true;
                 let statusBadge = '';
@@ -443,19 +438,18 @@
         if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
 
         // --- NEW: Flag Ceremony Monitoring (ALL DATA, NO MAY 1 LIMIT) ---
-        // Fetch ALL flag attendance logs
-        const { data: allFlagLogs } = await fetchSafe(supabaseClient.from('flag_attendance').select('emp_id, date, time_in, status'));
+        const { data: allFlagLogs } = await supabaseClient
+            .from('flag_attendance')
+            .select('emp_id, date, time_in, status');
             
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
-        // Dynamic valid Mondays set (Any Monday where a ceremony actually happened)
         let validMondays = new Set();
         const flagStartDates = {};
 
         (allFlagLogs || []).forEach(log => {
             validMondays.add(log.date);
             
-            // Identify first log date per employee from flag_attendance explicitly
             const d = new Date(log.date);
             d.setHours(0,0,0,0);
             if (!flagStartDates[log.emp_id] || d < flagStartDates[log.emp_id]) {
@@ -463,13 +457,12 @@
             }
         });
         
-        let mondays = Array.from(validMondays).sort((a,b) => new Date(b) - new Date(a)); // Newest first
+        let mondays = Array.from(validMondays).sort((a,b) => new Date(b) - new Date(a));
 
-        // Fetch excused (No start date filter to ensure full history matching)
         const [allFlagTravelRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
-            fetchSafe(supabaseClient.from('itinerary').select('emp_id, travel_date')),
-            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED')),
-            fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date'))
+            supabaseClient.from('itinerary').select('emp_id, travel_date'),
+            supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED'),
+            supabaseClient.from('pso_records').select('emp_id, start_date, end_date')
         ]);
         
         const flagExcused = new Set();
@@ -484,11 +477,27 @@
             }
         });
 
+        const { data: globalLogs } = await supabaseClient.from('attendance_logs').select('emp_id, log_time');
+        
         (emps || []).forEach(e => {
             if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
             
-            const startDate = flagStartDates[e.emp_id];
-            if (!startDate) return; // Completely new / no record in flag_attendance at all ever
+            // Check overall attendance log for absolute first day of work
+            let firstLogDate = flagStartDates[e.emp_id]; 
+            if (globalLogs) {
+                globalLogs.forEach(l => {
+                    if (l.emp_id === e.emp_id) {
+                        const dStr = l.log_time.split('T')[0];
+                        const d = new Date(dStr);
+                        d.setHours(0,0,0,0);
+                        if (!firstLogDate || d < firstLogDate) {
+                            firstLogDate = d;
+                        }
+                    }
+                });
+            }
+
+            if (!firstLogDate) return; 
 
             let missedDates = [];
             let presentCount = 0;
@@ -498,8 +507,7 @@
                 const mDate = new Date(m);
                 mDate.setHours(0,0,0,0);
                 
-                // Only count mondays from their very first log onwards
-                if (mDate >= startDate) {
+                if (mDate >= firstLogDate) {
                     expectedMondays++;
                     const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
                     const isExcused = flagExcused.has(e.emp_id + '_' + m); 
@@ -514,7 +522,6 @@
                 }
             });
 
-            // Only those with absenteeism (missed dates) appear
             if (missedDates.length > 0) {
                 listF.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
@@ -530,315 +537,282 @@
         if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
     };
 
-    // --- MEMO PRINTING FUNCTIONS ---
     async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins) {
         if (!confirm(`Generate memo for ${empName}?`)) return;
 
-        try {
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); // Legal size
-            
-            // Add Background Image First
-            const bgBase64 = await getBgMemo();
-            if (bgBase64) {
-                pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
-            }
-            
-            const todayDate = new Date();
-            const todayStr = todayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-            const currYear = todayDate.getFullYear();
-            const currMonthName = todayDate.toLocaleDateString('en-US', { month: 'long' });
-            
-            const prevMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
-            const prevMonthName = prevMonthDate.toLocaleDateString('en-US', { month: 'long' });
-            const prevYearStr = prevMonthDate.getFullYear();
-
-            const isHabitualLate = (prevCount >= 10 && currCount >= 10);
-            let memoType = "";
-            let memoTypeDb = "";
-            
-            if (isHabitualLate) {
-                memoType = "HABITUAL TARDINESS";
-                memoTypeDb = "Habitual Tardiness";
-            } else if (totalMins > 0) {
-                memoType = "ACCUMULATED TARDINESS AND ATTENDANCE MONITORING";
-                memoTypeDb = "Accumulated Tardiness";
-            } else {
-                alert("No tardiness criteria met for a memo.");
-                return;
-            }
-
-            let offenseCount = 1;
-            try {
-                const { data: pastMemos } = await supabaseClient
-                    .from('memo_records')
-                    .select('*')
-                    .eq('emp_id', empId)
-                    .eq('memo_type', memoTypeDb)
-                    .neq('month', currMonthName); 
-                
-                if (pastMemos) {
-                    offenseCount = pastMemos.length + 1;
-                }
-            } catch(e) {
-                console.error("Could not fetch past memos", e);
-            }
-
-            let offenseText = "";
-            let penaltyText = "";
-            let p1 = "";
-            let p2 = "";
-            let p3 = "";
-
-            if (memoTypeDb === "Habitual Tardiness") {
-                if (offenseCount === 1) {
-                    offenseText = "FIRST OFFENSE";
-                    penaltyText = "Suspension of one (1) month and one (1) day to six (6) months.";
-                } else {
-                    offenseText = "SECOND OFFENSE / FINAL WARNING";
-                    penaltyText = "Dismissal from the service.";
-                }
-                p1 = String(`A review of your Daily Time Records (DTR) shows that you incurred tardiness as follows:\n\n    ${prevMonthName} ${prevYearStr} - ${prevCount} instances of tardiness\n    ${currMonthName} ${currYear} - ${currCount} instances of tardiness`);
-                p2 = String(`Under the Revised Rules on Administrative Cases in the Civil Service (RRACCS), an employee is considered habitually tardy if he or she incurs at least ten (10) times of tardiness in a month for at least two (2) consecutive months. This constitutes a Less Grave Offense. As this is your ${offenseText}, the prescribed penalty is ${penaltyText}`);
-                p3 = String("In view thereof, you are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative case should be filed against you.\n\nFailure to respond within the prescribed period shall be deemed a waiver of your right to be heard.");
-            } else {
-                const totalHrs = (totalMins / 60.0).toFixed(2);
-                const daysEq = (totalMins / 60.0 / 8.0).toFixed(3);
-                
-                if (offenseCount === 1) {
-                    offenseText = "FIRST WARNING";
-                } else if (offenseCount === 2) {
-                    offenseText = "NOTICE TO EXPLAIN";
-                    memoType = `${memoType} (NOTICE TO EXPLAIN)`;
-                } else {
-                    offenseText = "FINAL WARNING";
-                }
-
-                p1 = String(`Based on the review of your Daily Time Records (DTR) for the month of ${currMonthName} ${currYear}, you have incurred a total of ${totalMins} minutes (${totalHrs} hours) of accumulated tardiness/undertime.`);
-                p2 = String(`Under Civil Service Commission (CSC) rules on attendance and leave, tardiness and undertime accumulated to eight (8) hours is equivalent to one (1) day absence. Accordingly, your accumulated tardiness is equivalent to ${daysEq} day/s, which shall be deducted from your available leave credits (Vacation Leave first, if available).`);
-                
-                if (offenseCount === 2) {
-                    p3 = String(`This serves as your NOTICE TO EXPLAIN. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative action should be taken against you for excessive tardiness. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`);
-                } else {
-                    p3 = String(`This serves as your ${offenseText}. You are strongly advised to improve your attendance. Continued excessive tardiness may result in an administrative case should it eventually qualify as Habitual Tardiness under Civil Service rules.`);
-                }
-            }
-
-            // --- ALIGNMENT FIX FOR TARDINESS MEMO ---
-            pdf.setMargins(30, 45, 30); 
-            pdf.setFont("helvetica", "bold");
-            pdf.setFontSize(12);
-            
-            pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
-            pdf.setFontSize(11);
-            pdf.text(`Series of ${currYear}`, 30, 51); 
-
-            pdf.setFontSize(11);
-            let currentY = 65;
-            const lineH = 8;
-            
-            pdf.text("TO", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${empName}`, 60, currentY); currentY += lineH;
-            pdf.text("FROM", 30, currentY); pdf.text(":", 55, currentY); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, currentY); currentY += lineH;
-            pdf.text("DATE", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${todayStr}`, 60, currentY); currentY += lineH;
-            pdf.text("SUBJECT", 30, currentY); pdf.text(":", 55, currentY); 
-            
-            const splitSubject = pdf.splitTextToSize(memoType, 130);
-            pdf.text(splitSubject, 60, currentY);
-            currentY += (splitSubject.length * lineH);
-
-            pdf.setLineWidth(0.6);
-            pdf.line(30, currentY, 215.9 - 30, currentY); 
-            currentY += 8;
-
-            pdf.setFont("helvetica", "normal");
-            
-            pdf.text(p1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            const splitP1 = pdf.splitTextToSize(p1, 155.9);
-            currentY += (splitP1.length * 5) + 5;
-
-            pdf.text(p2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            const splitP2 = pdf.splitTextToSize(p2, 155.9);
-            currentY += (splitP2.length * 5) + 5;
-
-            pdf.text(p3, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            const splitP3 = pdf.splitTextToSize(p3, 155.9);
-            currentY += (splitP3.length * 5) + 10;
-
-            const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
-            pdf.text(closing1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            const splitC1 = pdf.splitTextToSize(closing1, 155.9);
-            currentY += (splitC1.length * 5) + 5;
-
-            const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
-            pdf.text(closing2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            const splitC2 = pdf.splitTextToSize(closing2, 155.9);
-            currentY += (splitC2.length * 5) + 15;
-
-            pdf.setFont("helvetica", "bold");
-            pdf.text("RICARDO C. GARCIA", 30, currentY); 
-
-            // Record memo in DB
-            try {
-                await supabaseClient.from('memo_records').insert({
-                    emp_id: empId,
-                    memo_type: memoTypeDb,
-                    offense_level: offenseCount,
-                    month: currMonthName,
-                    year: currYear
-                });
-            } catch(e) {
-                console.error("Error logging memo to DB", e);
-            }
-
-            const traceId = `TRC-${empId}-${Math.floor(Date.now() / 1000)}`;
-            const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: ${memoType}\nLevel: ${offenseText}\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
-            
-            let qrContainer = document.getElementById('hiddenQrContainer');
-            if (!qrContainer) {
-                qrContainer = document.createElement('div');
-                qrContainer.id = 'hiddenQrContainer';
-                qrContainer.style.position = 'fixed';
-                qrContainer.style.left = '-9999px';
-                qrContainer.style.top = '-9999px';
-                document.body.appendChild(qrContainer);
-            }
-            qrContainer.innerHTML = '';
-            
-            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
-            
-            setTimeout(() => {
-                try {
-                    const qrCanvas = qrContainer.querySelector('canvas');
-                    if (qrCanvas) {
-                        const qrDataUrl = qrCanvas.toDataURL('image/png');
-                        pdf.addImage(qrDataUrl, 'PNG', 30, currentY + 5, 22, 22);
-                    }
-                    pdf.save(`Memo_${empId}_${memoTypeDb.replace(" ", "_")}_${currMonthName}_${currYear}.pdf`);
-                } catch(err) {
-                    console.error(err);
-                    alert("Error saving PDF: " + err.message);
-                }
-            }, 300);
-
-        } catch(error) {
-            console.error(error);
-            alert("Error generating PDF: " + error.message);
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); 
+        
+        const bgBase64 = await getBgMemo();
+        if (bgBase64) {
+            pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
         }
+        
+        const todayDate = new Date();
+        const todayStr = todayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const currYear = todayDate.getFullYear();
+        const currMonthName = todayDate.toLocaleDateString('en-US', { month: 'long' });
+        
+        const prevMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+        const prevMonthName = prevMonthDate.toLocaleDateString('en-US', { month: 'long' });
+        const prevYearStr = prevMonthDate.getFullYear();
+
+        const isHabitualLate = (prevCount >= 10 && currCount >= 10);
+        let memoType = "";
+        let memoTypeDb = "";
+        
+        if (isHabitualLate) {
+            memoType = "HABITUAL TARDINESS";
+            memoTypeDb = "Habitual Tardiness";
+        } else if (totalMins > 0) {
+            memoType = "ACCUMULATED TARDINESS AND ATTENDANCE MONITORING";
+            memoTypeDb = "Accumulated Tardiness";
+        } else {
+            alert("No tardiness criteria met for a memo.");
+            return;
+        }
+
+        let offenseCount = 1;
+        try {
+            const { data: pastMemos } = await supabaseClient
+                .from('memo_records')
+                .select('*')
+                .eq('emp_id', empId)
+                .eq('memo_type', memoTypeDb)
+                .neq('month', currMonthName); 
+            
+            if (pastMemos) {
+                offenseCount = pastMemos.length + 1;
+            }
+        } catch(e) {
+            console.error("Could not fetch past memos", e);
+        }
+
+        let offenseText = "";
+        let penaltyText = "";
+        let p1 = "";
+        let p2 = "";
+        let p3 = "";
+
+        if (memoTypeDb === "Habitual Tardiness") {
+            if (offenseCount === 1) {
+                offenseText = "FIRST OFFENSE";
+                penaltyText = "Suspension of one (1) month and one (1) day to six (6) months.";
+            } else {
+                offenseText = "SECOND OFFENSE / FINAL WARNING";
+                penaltyText = "Dismissal from the service.";
+            }
+            p1 = `A review of your Daily Time Records (DTR) shows that you incurred tardiness as follows:\n\n    ${prevMonthName} ${prevYearStr} - ${prevCount} instances of tardiness\n    ${currMonthName} ${currYear} - ${currCount} instances of tardiness`;
+            p2 = `Under the Revised Rules on Administrative Cases in the Civil Service (RRACCS), an employee is considered habitually tardy if he or she incurs at least ten (10) times of tardiness in a month for at least two (2) consecutive months. This constitutes a Less Grave Offense. As this is your ${offenseText}, the prescribed penalty is ${penaltyText}`;
+            p3 = "In view thereof, you are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative case should be filed against you.\n\nFailure to respond within the prescribed period shall be deemed a waiver of your right to be heard.";
+        } else {
+            const totalHrs = (totalMins / 60.0).toFixed(2);
+            const daysEq = (totalMins / 60.0 / 8.0).toFixed(3);
+            
+            if (offenseCount === 1) {
+                offenseText = "FIRST WARNING";
+            } else if (offenseCount === 2) {
+                offenseText = "NOTICE TO EXPLAIN";
+                memoType = `${memoType} (NOTICE TO EXPLAIN)`;
+            } else {
+                offenseText = "FINAL WARNING";
+            }
+
+            p1 = `Based on the review of your Daily Time Records (DTR) for the month of ${currMonthName} ${currYear}, you have incurred a total of ${totalMins} minutes (${totalHrs} hours) of accumulated tardiness/undertime.`;
+            p2 = `Under Civil Service Commission (CSC) rules on attendance and leave, tardiness and undertime accumulated to eight (8) hours is equivalent to one (1) day absence. Accordingly, your accumulated tardiness is equivalent to ${daysEq} day/s, which shall be deducted from your available leave credits (Vacation Leave first, if available).`;
+            
+            if (offenseCount === 2) {
+                p3 = `This serves as your NOTICE TO EXPLAIN. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative action should be taken against you for excessive tardiness. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`;
+            } else {
+                p3 = `This serves as your ${offenseText}. You are strongly advised to improve your attendance. Continued excessive tardiness may result in an administrative case should it eventually qualify as Habitual Tardiness under Civil Service rules.`;
+            }
+        }
+
+        pdf.setMargins(30, 45, 30); 
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(12);
+        
+        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
+        pdf.setFontSize(11);
+        pdf.text(`Series of ${currYear}`, 30, 51); 
+
+        pdf.setFontSize(11);
+        let currentY = 65;
+        const lineH = 8;
+        
+        pdf.text("TO", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${empName}`, 60, currentY); currentY += lineH;
+        pdf.text("FROM", 30, currentY); pdf.text(":", 55, currentY); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, currentY); currentY += lineH;
+        pdf.text("DATE", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${todayStr}`, 60, currentY); currentY += lineH;
+        pdf.text("SUBJECT", 30, currentY); pdf.text(":", 55, currentY); 
+        
+        const splitSubject = pdf.splitTextToSize(memoType, 130);
+        pdf.text(splitSubject, 60, currentY);
+        currentY += (splitSubject.length * lineH);
+
+        pdf.setLineWidth(0.6);
+        pdf.line(30, currentY, 215.9 - 30, currentY); 
+        currentY += 8;
+
+        pdf.setFont("helvetica", "normal");
+        
+        pdf.text(p1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitP1 = pdf.splitTextToSize(p1, 155.9);
+        currentY += (splitP1.length * 5) + 5;
+
+        pdf.text(p2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitP2 = pdf.splitTextToSize(p2, 155.9);
+        currentY += (splitP2.length * 5) + 5;
+
+        pdf.text(p3, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitP3 = pdf.splitTextToSize(p3, 155.9);
+        currentY += (splitP3.length * 5) + 10;
+
+        const closing1 = "All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.";
+        pdf.text(closing1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitC1 = pdf.splitTextToSize(closing1, 155.9);
+        currentY += (splitC1.length * 5) + 5;
+
+        const closing2 = "_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.";
+        pdf.text(closing2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+        const splitC2 = pdf.splitTextToSize(closing2, 155.9);
+        currentY += (splitC2.length * 5) + 15;
+
+        pdf.setFont("helvetica", "bold");
+        pdf.text("RICARDO C. GARCIA", 30, currentY); 
+
+        try {
+            await supabaseClient.from('memo_records').insert({
+                emp_id: empId,
+                memo_type: memoTypeDb,
+                offense_level: offenseCount,
+                month: currMonthName,
+                year: currYear
+            });
+        } catch(e) {
+            console.error("Error logging memo to DB", e);
+        }
+
+        const traceId = `TRC-${empId}-${Math.floor(Date.now() / 1000)}`;
+        const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: ${memoType}\nLevel: ${offenseText}\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+        
+        let qrContainer = document.getElementById('hiddenQrContainer');
+        if (!qrContainer) {
+            qrContainer = document.createElement('div');
+            qrContainer.id = 'hiddenQrContainer';
+            qrContainer.style.display = 'none';
+            document.body.appendChild(qrContainer);
+        }
+        qrContainer.innerHTML = '';
+        
+        new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
+        
+        setTimeout(() => {
+            const qrCanvas = qrContainer.querySelector('canvas');
+            if (qrCanvas) {
+                const qrDataUrl = qrCanvas.toDataURL('image/png');
+                pdf.addImage(qrDataUrl, 'PNG', 30, currentY + 5, 22, 22);
+            }
+            pdf.save(`Memo_${empId}_${memoTypeDb.replace(" ", "_")}_${currMonthName}_${currYear}.pdf`);
+        }, 300);
     }
 
     async function printFlagMemo(empId, empName, missedDates) {
         if (!confirm(`Generate Flag Ceremony Memo for ${empName}?`)) return;
-        
-        try {
-            const { jsPDF } = window.jspdf; 
-            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]);
+        const { jsPDF } = window.jspdf; 
+        const pdf = new jsPDF('p', 'mm', [215.9, 330.2]);
 
-            // Add Background Image First
-            const bgBase64 = await getBgMemo();
-            if (bgBase64) {
-                pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
-            }
-
-            const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-            const currYear = new Date().getFullYear();
-            const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
-
-            // --- ALIGNMENT FIX FOR FLAG MEMO ---
-            pdf.setMargins(30, 45, 30); 
-            pdf.setFont("helvetica", "bold"); 
-            pdf.setFontSize(12);
-            
-            pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
-            pdf.setFontSize(11); 
-            pdf.text(`Series of ${currYear}`, 30, 51); 
-            
-            let y = 65; 
-            const lineH = 8;
-            pdf.text("TO", 30, y); pdf.text(":", 55, y); pdf.text(empName, 60, y); y += lineH;
-            pdf.text("FROM", 30, y); pdf.text(":", 55, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, y); y += lineH;
-            pdf.text("DATE", 30, y); pdf.text(":", 55, y); pdf.text(today, 60, y); y += lineH;
-            pdf.text("SUBJECT", 30, y); pdf.text(":", 55, y); pdf.text("NON-ATTENDANCE TO FLAG CEREMONY", 60, y);
-            
-            pdf.setLineWidth(0.6); 
-            pdf.line(30, y+5, 215.9 - 30, y+5); 
-            y += 15;
-
-            pdf.setFont("helvetica", "normal");
-            const p1 = String(`Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following date(s): ${missedDates}.`);
-            const p2 = String("Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory for all government officials and employees.");
-            const p3 = String("You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you for this violation of office rules. Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.");
-
-            pdf.text(p1, 30, y, { maxWidth: 155.9, align: 'justify' });
-            const splitP1 = pdf.splitTextToSize(p1, 155.9);
-            y += (splitP1.length * 5) + 5; 
-            
-            pdf.text(p2, 30, y, { maxWidth: 155.9, align: 'justify' });
-            const splitP2 = pdf.splitTextToSize(p2, 155.9);
-            y += (splitP2.length * 5) + 5; 
-            
-            pdf.text(p3, 30, y, { maxWidth: 155.9, align: 'justify' });
-            const splitP3 = pdf.splitTextToSize(p3, 155.9);
-            y += (splitP3.length * 5) + 10; 
-
-            const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
-            pdf.text(closing1, 30, y, { maxWidth: 155.9, align: 'justify' });
-            const splitC1 = pdf.splitTextToSize(closing1, 155.9);
-            y += (splitC1.length * 5) + 5;
-
-            const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
-            pdf.text(closing2, 30, y, { maxWidth: 155.9, align: 'justify' });
-            const splitC2 = pdf.splitTextToSize(closing2, 155.9);
-            y += (splitC2.length * 5) + 15;
-            
-            pdf.setFont("helvetica", "bold"); 
-            pdf.text("RICARDO C. GARCIA", 30, y); 
-
-            try {
-                await supabaseClient.from('memo_records').insert({
-                    emp_id: empId,
-                    memo_type: "Flag Ceremony Non-Attendance",
-                    offense_level: 1, 
-                    month: currMonthName,
-                    year: currYear
-                });
-            } catch(e) {
-                console.error("Error logging memo to DB", e);
-            }
-
-            const traceId = `TRC-FLAG-${empId}-${Math.floor(Date.now() / 1000)}`;
-            const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: Non-Attendance to Flag Ceremony\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
-            
-            let qrContainer = document.getElementById('hiddenQrContainer');
-            if (!qrContainer) {
-                qrContainer = document.createElement('div');
-                qrContainer.id = 'hiddenQrContainer';
-                qrContainer.style.position = 'fixed';
-                qrContainer.style.left = '-9999px';
-                qrContainer.style.top = '-9999px';
-                document.body.appendChild(qrContainer);
-            }
-            qrContainer.innerHTML = '';
-            
-            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
-            
-            setTimeout(() => {
-                try {
-                    const qrCanvas = qrContainer.querySelector('canvas');
-                    if (qrCanvas) {
-                        const qrDataUrl = qrCanvas.toDataURL('image/png');
-                        pdf.addImage(qrDataUrl, 'PNG', 30, y + 5, 22, 22);
-                    }
-                    pdf.save(`Flag_Ceremony_Memo_${empId}_${currMonthName}_${currYear}.pdf`);
-                } catch(err) {
-                    console.error(err);
-                    alert("Error saving PDF: " + err.message);
-                }
-            }, 300);
-
-        } catch(error) {
-            console.error(error);
-            alert("Error generating PDF: " + error.message);
+        const bgBase64 = await getBgMemo();
+        if (bgBase64) {
+            pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
         }
+
+        const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const currYear = new Date().getFullYear();
+        const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
+
+        pdf.setMargins(30, 45, 30); 
+        pdf.setFont("helvetica", "bold"); 
+        pdf.setFontSize(12);
+        
+        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
+        pdf.setFontSize(11); 
+        pdf.text(`Series of ${currYear}`, 30, 51); 
+        
+        let y = 65; 
+        const lineH = 8;
+        pdf.text("TO", 30, y); pdf.text(":", 55, y); pdf.text(empName, 60, y); y += lineH;
+        pdf.text("FROM", 30, y); pdf.text(":", 55, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, y); y += lineH;
+        pdf.text("DATE", 30, y); pdf.text(":", 55, y); pdf.text(today, 60, y); y += lineH;
+        pdf.text("SUBJECT", 30, y); pdf.text(":", 55, y); pdf.text("NON-ATTENDANCE TO FLAG CEREMONY", 60, y);
+        
+        pdf.setLineWidth(0.6); 
+        pdf.line(30, y+5, 215.9 - 30, y+5); 
+        y += 15;
+
+        pdf.setFont("helvetica", "normal");
+        const p1 = `Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following date(s): ${missedDates}.`;
+        const p2 = "Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory for all government officials and employees.";
+        const p3 = "You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you for this violation of office rules. Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.";
+
+        pdf.text(p1, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitP1 = pdf.splitTextToSize(p1, 155.9);
+        y += (splitP1.length * 5) + 5; 
+        
+        pdf.text(p2, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitP2 = pdf.splitTextToSize(p2, 155.9);
+        y += (splitP2.length * 5) + 5; 
+        
+        pdf.text(p3, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitP3 = pdf.splitTextToSize(p3, 155.9);
+        y += (splitP3.length * 5) + 10; 
+
+        const closing1 = "All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.";
+        pdf.text(closing1, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitC1 = pdf.splitTextToSize(closing1, 155.9);
+        y += (splitC1.length * 5) + 5;
+
+        const closing2 = "_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.";
+        pdf.text(closing2, 30, y, { maxWidth: 155.9, align: 'justify' });
+        const splitC2 = pdf.splitTextToSize(closing2, 155.9);
+        y += (splitC2.length * 5) + 15;
+        
+        pdf.setFont("helvetica", "bold"); 
+        pdf.text("RICARDO C. GARCIA", 30, y); 
+
+        try {
+            await supabaseClient.from('memo_records').insert({
+                emp_id: empId,
+                memo_type: "Flag Ceremony Non-Attendance",
+                offense_level: 1, 
+                month: currMonthName,
+                year: currYear
+            });
+        } catch(e) {
+            console.error("Error logging memo to DB", e);
+        }
+
+        const traceId = `TRC-FLAG-${empId}-${Math.floor(Date.now() / 1000)}`;
+        const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: Non-Attendance to Flag Ceremony\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+        
+        let qrContainer = document.getElementById('hiddenQrContainer');
+        if (!qrContainer) {
+            qrContainer = document.createElement('div');
+            qrContainer.id = 'hiddenQrContainer';
+            qrContainer.style.display = 'none';
+            document.body.appendChild(qrContainer);
+        }
+        qrContainer.innerHTML = '';
+        
+        new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
+        
+        setTimeout(() => {
+            const qrCanvas = qrContainer.querySelector('canvas');
+            if (qrCanvas) {
+                const qrDataUrl = qrCanvas.toDataURL('image/png');
+                pdf.addImage(qrDataUrl, 'PNG', 30, y + 5, 22, 22);
+            }
+            pdf.save(`Flag_Ceremony_Memo_${empId}_${currMonthName}_${currYear}.pdf`);
+        }, 300);
     }
 </script>
 </body>
