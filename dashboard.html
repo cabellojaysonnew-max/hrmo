@@ -74,7 +74,7 @@
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
                     <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
                 </div>
-                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
             </div>
         </div>
 
@@ -124,7 +124,7 @@
         </div>
 
         <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1 Mondays Only)</h3>
+            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1)</h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
                     <thead class="bg-blue-50 text-blue-800">
@@ -447,20 +447,13 @@
             
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
-        // Find all Mondays from SYSTEM_START_DATE to today
-        let mondays = []; 
-        let startD = new Date(SYSTEM_START_DATE);
-        startD.setHours(0,0,0,0);
-        let endD = new Date(todayDate);
-        endD.setHours(0,0,0,0);
+        // Find valid flag ceremony days (days where AT LEAST ONE person has a record)
+        let validMondays = new Set();
+        (allFlagLogs || []).forEach(log => {
+            validMondays.add(log.date);
+        });
         
-        while (startD <= endD) {
-            if (startD.getDay() === 1) { // 1 is Monday
-                mondays.push(startD.toISOString().split('T')[0]);
-            }
-            startD.setDate(startD.getDate() + 1);
-        }
-        mondays.reverse(); // Most recent first
+        let mondays = Array.from(validMondays).sort().reverse(); // Most recent first
 
         (emps || []).forEach(e => {
             if (e.station !== 'DARPO-CS1') return;
@@ -705,7 +698,7 @@
         pdf.setLineWidth(0.6); pdf.line(25.4, y+5, 190, y+5); y += 15;
 
         pdf.setFont("helvetica", "normal");
-        const p1 = `Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following Monday(s): ${missedDates}.`;
+        const p1 = `Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following date(s): ${missedDates}.`;
         const p2 = "Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory for all government officials and employees.";
         const p3 = "You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you for this violation of office rules. Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.";
 
