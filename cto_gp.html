@@ -308,7 +308,6 @@
             const newRecord = data[0];
 
             // Print PDF Layout (1/2 8.5x13 landscape split vertically into two 6.5x8.5 portrait slips)
-            // Using mm: 13 inches = 330.2mm (Width), 8.5 inches = 215.9mm (Height)
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('l', 'mm', [215.9, 330.2]);
             const empName = empDataMap[empId].full_name.toUpperCase();
@@ -420,27 +419,32 @@
                 return;
             }
 
-            // Standard conversion mapping logic for decimal days
             const getDedDay = (hr, mn) => {
                 let d = 0;
-                if(hr === 1) d+=0.125; else if(hr===2) d+=0.250; else if(hr===3) d+=0.375; else if(hr===4) d+=0.500; else if(hr===5) d+=0.625; else if(hr===6) d+=0.750; else if(hr===7) d+=0.875; else if(hr===8) d+=1.000;
+                if(hr === 1) d+=0.125; else if(hr===2) d+=0.250; else if(hr===3) d+=0.375; else if(hr===4) d+=0.500; else if(hr===5) d+=0.625; else if(hr===6) d+=0.750; else if(hr===7) d+=0.875; else if(hr>=8) d+=1.000;
                 
                 if(mn >= 1 && mn <= 10) d += mn === 1 ? 0.002 : mn === 2 ? 0.004 : mn === 3 ? 0.006 : mn === 4 ? 0.008 : mn === 5 ? 0.010 : mn === 6 ? 0.012 : mn === 7 ? 0.015 : mn === 8 ? 0.017 : mn === 9 ? 0.019 : 0.021;
                 else if (mn > 10) {
-                   d += mn * 0.00208; // Roughly 0.125 / 60 
+                   d += mn * 0.00208; 
                 }
                 return d;
             };
 
+            const filteredData = data.filter(gp => ['APPROVED', 'PROCESSED', 'POSTED'].includes(gp.status) || gp.status === 'ISSUED');
+
+            if(filteredData.length === 0) {
+                 list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No gate passes found for this view.</td></tr>`;
+                 return;
+            }
+
             let html = '';
-            data.forEach(gp => {
+            filteredData.forEach(gp => {
                 const name = empDataMap[gp.emp_id] ? empDataMap[gp.emp_id].full_name.toUpperCase() : gp.emp_id;
                 
                 let sCls = 'bg-gray-100 text-gray-800';
                 if(gp.status === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800';
                 if(gp.status === 'POSTED') sCls = 'bg-green-100 text-green-800';
                 
-                // Use automated time out/in from table
                 let tOutStr = formatTime12h(gp.time_out);
                 let tInStr = formatTime12h(gp.time_in);
                 
@@ -449,7 +453,6 @@
                 let actionBtn = '';
 
                 if(gp.status === 'ISSUED') {
-                    // Calculate and show what the deduction will be based on logs
                     let calcDeduct = 0;
                     if(gp.time_out && gp.time_in) {
                         const dO = new Date(`1970-01-01T${gp.time_out}`);
@@ -526,7 +529,6 @@
             alert("Error: " + e.message);
         }
     }
-
 
     // --- CTO LOGIC ---
     const ctoInput = document.getElementById('ctoEmpSearch');
@@ -674,7 +676,6 @@
             } else {
                 numEl.value = creditableHours.toFixed(2);
             }
-            // Trigger change
             updateBaseHours(emp_id, numEl.value);
             
         } catch(e) {
@@ -699,7 +700,6 @@
             return;
         }
 
-        // Validate base hours
         for(let emp of selectedCtoEmployees) {
             if(emp.baseHours < 2) {
                 alert(`Employee ${emp.name} has ${emp.baseHours} base hours. CTO requires 2 hours or more. Please correct or remove the employee.`);
@@ -726,7 +726,6 @@
 
             alert("CTO Records successfully saved. They will appear in the Leave Processing -> CTO Posting tab for final crediting.");
             
-            // Clear
             selectedCtoEmployees = [];
             renderCtoEmployees();
             document.getElementById('ctoPso').value = '';
