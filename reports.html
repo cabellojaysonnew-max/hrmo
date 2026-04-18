@@ -369,10 +369,17 @@
             const emps = empsData || [];
             if(!emps.length) throw new Error("No employees found in database.");
 
-            const nameMap = {}, divMap = {}, posMap = {}, stationMap = {};
+            const nameMap = {}, divMap = {}, posMap = {}, stationMap = {}, balMap = {};
             emps.forEach(e => {
                 const id = cleanId(e.emp_id);
                 nameMap[id] = e.full_name; divMap[id] = e.division; posMap[id] = e.position; stationMap[id] = e.station;
+                balMap[id] = {
+                    vl: parseFloat(e.vl_balance || 0),
+                    sl: parseFloat(e.sl_balance || 0),
+                    spl: parseFloat(e.spl_balance || 0),
+                    wl: parseFloat(e.wl_balance || 0),
+                    cto: parseFloat(e.cto_balance || 0)
+                };
             });
 
             // 1. TRAVEL ORDER BATCH PRINTING 
@@ -945,7 +952,7 @@
                     });
 
                 } else if (type === "Leave Summary") {
-                    const { data: llData } = await supabaseClient.from('leave_ledger').select('*').in('transaction_t', ['APPROVED', 'PROCESSED']).gte('date', startIso.split('T')[0]).lte('date', endIso.split('T')[0]);
+                    const { data: llData } = await supabaseClient.from('leave_ledger').select('*').in('transaction_type', ['APPROVED', 'PROCESSED']).gte('created_at', startIso).lte('created_at', endIso);
                     const ll = llData || [];
                     
                     let empGroups = {};
@@ -955,13 +962,35 @@
                         empGroups[div].push(t);
                     });
 
-                    const headers = ["LEAVE APPLICATION", "EMP NUMBER", "NAME", "LEAVE TYPE", "INCLUSIVE DATES", "TOTAL DAYS"];
-                    const widths = [40, 30, 60, 30, 85, 45];
+                    const headers = ["EMP NUMBER", "NAME", "LEAVE TYPE", "DATE OF FILING", "BALANCE (AS OF TODAY)", "NO. OF DAYS", "REMAINING BALANCE"];
+                    const widths = [30, 60, 40, 35, 45, 35, 45];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
                         currY = drawTableGroup(doc, div, empGroups[div], headers, widths, r => {
-                            return [r.transaction_id || '-', r.emp_id, (nameMap[cleanId(r.emp_id)] || '').toUpperCase(), (r.type || '').toUpperCase(), r.date, Math.abs(parseFloat(r.debit||0)).toFixed(2)];
+                            let lType = (r.type || '').toUpperCase();
+                            let bal = 0;
+                            let empBal = balMap[cleanId(r.emp_id)];
+                            if (empBal) {
+                                if (lType.includes('VL') || lType.includes('VACATION')) bal = empBal.vl;
+                                else if (lType.includes('SL') || lType.includes('SICK')) bal = empBal.sl;
+                                else if (lType.includes('SPL') || lType.includes('SPECIAL')) bal = empBal.spl;
+                                else if (lType.includes('WL') || lType.includes('WOMEN') || lType.includes('MANDATORY')) bal = empBal.wl;
+                                else if (lType.includes('CTO') || lType.includes('COMPENSATORY')) bal = empBal.cto;
+                            }
+                            
+                            let days = Math.abs(parseFloat(r.debit || 0));
+                            let dateFiling = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US') : (r.start_date || r.date || '-');
+                            
+                            return [
+                                r.emp_id, 
+                                (nameMap[cleanId(r.emp_id)] || '').toUpperCase(), 
+                                lType, 
+                                dateFiling, 
+                                bal.toFixed(3), 
+                                days.toFixed(3), 
+                                (bal - days).toFixed(3)
+                            ];
                         }, isAppend, levelNum, currY);
                     });
 
