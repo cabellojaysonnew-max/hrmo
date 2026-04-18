@@ -122,9 +122,10 @@
             </div>
 
             <div id="ctoTab" class="tab-content">
+                
                 <div class="card mb-6">
                     <div class="p-4 border-b border-gray-200 bg-gray-50">
-                        <h3 class="font-bold text-[#003811]">CTO Details</h3>
+                        <h3 class="font-bold text-[#003811]">CTO Details (Encoding)</h3>
                     </div>
                     <div class="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
@@ -148,7 +149,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card mb-6">
                     <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end flex-wrap">
                         <div class="flex-1 min-w-[200px] relative">
                             <label class="form-label">Search & Add Employee</label>
@@ -166,12 +167,35 @@
                                 <tr>
                                     <th class="table-th">Emp ID</th>
                                     <th class="table-th">Name</th>
-                                    <th class="table-th" style="width: 150px;">Base Hours</th>
-                                    <th class="table-th text-center" style="width: 250px;">Logs Actions</th>
+                                    <th class="table-th text-center" style="width: 150px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="cto-emp-list">
-                                <tr><td colspan="4" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>
+                                <tr><td colspan="3" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 justify-between items-center">
+                        <h3 class="font-bold text-[#003811]">Process Encoded CTO</h3>
+                        <button onclick="loadCtoProcessing()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="table-th">Emp ID / Name</th>
+                                    <th class="table-th">CTO Reference</th>
+                                    <th class="table-th text-center">Creditable Hours</th>
+                                    <th class="table-th text-center">Credited Hour</th>
+                                    <th class="table-th text-center">Remarks</th>
+                                    <th class="table-th text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cto-process-list">
+                                <tr><td colspan="6" class="table-td text-center text-gray-500">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -217,6 +241,7 @@
             });
         }
         loadRecentGatePasses();
+        loadCtoProcessing();
     }
 
     function switchTab(tabId) {
@@ -488,7 +513,7 @@
                     dedCell = `<div id="ded_${gp.id}" class="font-bold text-red-600 text-center">${calcDeduct.toFixed(3)}</div>`;
                     actionBtn = `
                         <button onclick="processGP('${gp.id}')" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mt-1 mb-1">Process</button>
-                        <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline">Delete</button>
+                        <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline block mx-auto">Delete</button>
                     `;
                 } else {
                     let tOutStr = formatTime12h(gp.time_out);
@@ -499,7 +524,7 @@
                     if(gp.status === 'PROCESSED') {
                         actionBtn = `
                             <div class="text-xs text-gray-500 italic mt-1 mb-1">Ready for Posting</div>
-                            <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline">Delete</button>
+                            <button onclick="cancelGP('${gp.id}')" class="text-red-600 text-xs hover:underline block mx-auto">Delete</button>
                         `;
                     } else {
                         actionBtn = `<div class="text-xs text-green-600 font-bold mt-1">Posted</div>`;
@@ -584,17 +609,15 @@
     }
 
     window.cancelGP = async function(id) {
-        if(!confirm("Are you sure you want to cancel (delete) this unposted Gate Pass?")) return;
+        if(!confirm("Are you sure you want to permanently delete this unposted Gate Pass?")) return;
         
         try {
-            await supabaseClient.from('gate_pass_logs').update({
-                status: 'CANCELLED'
-            }).eq('id', id);
+            await supabaseClient.from('gate_pass_logs').delete().eq('id', id);
             
-            alert("Gate Pass cancelled.");
+            alert("Gate Pass permanently deleted.");
             loadRecentGatePasses();
         } catch(e) {
-            alert("Error cancelling Gate Pass: " + e.message);
+            alert("Error deleting Gate Pass: " + e.message);
         }
     }
 
@@ -650,7 +673,7 @@
 
     function addCtoEmployee(id, name) {
         if(selectedCtoEmployees.find(e => e.id === id)) return; // already added
-        selectedCtoEmployees.push({ id, name, baseHours: 0 });
+        selectedCtoEmployees.push({ id, name });
         renderCtoEmployees();
     }
 
@@ -659,30 +682,21 @@
         renderCtoEmployees();
     }
 
-    function updateBaseHours(id, val) {
-        const emp = selectedCtoEmployees.find(e => e.id === id);
-        if(emp) emp.baseHours = parseFloat(val) || 0;
-    }
-
     function renderCtoEmployees() {
         const list = document.getElementById('cto-emp-list');
         if(selectedCtoEmployees.length === 0) {
-            list.innerHTML = `<tr><td colspan="4" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>`;
+            list.innerHTML = `<tr><td colspan="3" class="table-td text-center text-gray-500">Search and select employees to add to this CTO.</td></tr>`;
             return;
         }
 
         let html = '';
         selectedCtoEmployees.forEach(emp => {
             html += `
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-gray-50 border-b">
                     <td class="table-td text-xs font-mono">${emp.id}</td>
                     <td class="table-td font-bold">${emp.name}</td>
-                    <td class="table-td">
-                        <input type="number" step="0.1" class="form-input text-center" value="${emp.baseHours}" onchange="updateBaseHours('${emp.id}', this.value)" id="ctoHr_${emp.id}">
-                    </td>
                     <td class="table-td text-center">
-                        <button onclick="fetchLogsForCTO('${emp.id}', 'ctoHr_${emp.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded shadow mr-2">Check Logs</button>
-                        <button onclick="removeCtoEmployee('${emp.id}')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded shadow">Remove</button>
+                        <button onclick="removeCtoEmployee('${emp.id}')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded shadow">Remove</button>
                     </td>
                 </tr>
             `;
@@ -690,9 +704,144 @@
         list.innerHTML = html;
     }
 
-    async function fetchLogsForCTO(emp_id, inputId) {
-        const dateStr = document.getElementById('ctoDate').value;
-        if(!dateStr) { alert("Please set the Date of Activity first."); return; }
+    async function saveCtoBatch() {
+        const pso = document.getElementById('ctoPso').value.trim();
+        const desc = document.getElementById('ctoDesc').value.trim();
+        const cDate = document.getElementById('ctoDate').value;
+        const isWeekend = document.getElementById('ctoIsWeekend').checked;
+        const mult = isWeekend ? 1.5 : 1.0;
+
+        if(!pso || !desc || !cDate) {
+            alert("Please fill out PSO Number, Description, and Date.");
+            return;
+        }
+
+        if(selectedCtoEmployees.length === 0) {
+            alert("Please add at least one employee.");
+            return;
+        }
+
+        if(!confirm(`Encoding CTO for ${selectedCtoEmployees.length} employees. Proceed?`)) return;
+
+        try {
+            const records = selectedCtoEmployees.map(emp => ({
+                emp_id: emp.id,
+                date: cDate,
+                transaction_type: 'EARNED',
+                base_type: desc,
+                base_hours: 0,
+                multiplier: mult,
+                calculated_hours: 0,
+                PSO_Number: pso,
+                status: 'ENCODED'
+            }));
+
+            const { error } = await supabaseClient.from('cto_records').insert(records);
+            if(error) throw error;
+
+            alert("CTO Records encoded successfully. Please process them in the table below.");
+            
+            selectedCtoEmployees = [];
+            renderCtoEmployees();
+            document.getElementById('ctoPso').value = '';
+            document.getElementById('ctoDesc').value = '';
+            
+            loadCtoProcessing();
+
+        } catch(e) {
+            alert("Error saving CTO: " + e.message);
+        }
+    }
+
+    async function loadCtoProcessing() {
+        const list = document.getElementById('cto-process-list');
+        list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">Loading...</td></tr>`;
+        
+        try {
+            const { data, error } = await supabaseClient.from('cto_records')
+                .select('*')
+                .order('date', { ascending: false })
+                .order('id', { ascending: false });
+                
+            if(error) throw error;
+            
+            if(!data || data.length === 0) {
+                list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No records found.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            data.forEach(r => {
+                const name = empDataMap[r.emp_id] ? empDataMap[r.emp_id].full_name.toUpperCase() : r.emp_id;
+                const ref = r.PSO_Number || '-';
+                const isWeekend = r.multiplier > 1.0;
+                
+                let sCls = 'bg-gray-100 text-gray-800';
+                if(r.status === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800';
+                if(r.status === 'POSTED') sCls = 'bg-green-100 text-green-800';
+                
+                let creditableCell = '';
+                let actionCell = '';
+                
+                if(r.status === 'ENCODED') {
+                    creditableCell = `
+                        <div class="flex items-center gap-2 justify-center">
+                            <input type="number" step="0.1" id="baseHr_${r.id}" class="border rounded px-2 py-1 w-20 text-center text-sm bg-white" value="${r.base_hours || 0}" oninput="calcCtoCredited('${r.id}', ${r.multiplier})">
+                            <button onclick="fetchLogsForCTOProcess('${r.id}', '${r.emp_id}', '${r.date}', ${isWeekend})" class="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 rounded shadow">Check DTR</button>
+                        </div>
+                    `;
+                    actionCell = `
+                        <button onclick="processCTO('${r.id}')" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mb-1">Process</button>
+                        <button onclick="deleteCTO('${r.id}')" class="text-red-600 text-xs hover:underline block mx-auto mt-1">Delete</button>
+                    `;
+                } else {
+                    creditableCell = `<div class="text-center font-bold">${r.base_hours || 0}</div>`;
+                    if(r.status === 'PROCESSED') {
+                        actionCell = `
+                            <div class="text-xs text-gray-500 italic mt-1 mb-1">Ready for Posting</div>
+                            <button onclick="deleteCTO('${r.id}')" class="text-red-600 text-xs hover:underline block mx-auto">Delete</button>
+                        `;
+                    } else {
+                        actionCell = `<div class="text-xs text-green-600 font-bold mt-1">Posted</div>`;
+                    }
+                }
+
+                html += `
+                    <tr class="hover:bg-gray-50 border-b">
+                        <td class="table-td">
+                            <span class="font-bold">${name}</span><br>
+                            <span class="text-xs font-mono text-gray-500">${r.emp_id}</span>
+                        </td>
+                        <td class="table-td text-xs">
+                            <span class="font-bold">${ref}</span><br>
+                            <span class="text-gray-500">${r.date}</span>
+                        </td>
+                        <td class="table-td">${creditableCell}</td>
+                        <td class="table-td text-center font-bold text-[#003811]" id="credHr_${r.id}">${r.calculated_hours || 0}</td>
+                        <td class="table-td text-center flex justify-center"><span class="badge ${sCls}">${r.status}</span></td>
+                        <td class="table-td text-center">${actionCell}</td>
+                    </tr>
+                `;
+            });
+            list.innerHTML = html;
+        } catch(e) {
+            list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+        }
+    }
+
+    window.calcCtoCredited = function(id, multiplier) {
+        const baseHrEl = document.getElementById(`baseHr_${id}`);
+        if(!baseHrEl) return;
+        let baseHr = parseFloat(baseHrEl.value) || 0;
+        let credHr = 0;
+        if (baseHr >= 2) {
+            credHr = baseHr * multiplier;
+        }
+        document.getElementById(`credHr_${id}`).innerText = credHr.toFixed(2);
+    }
+
+    window.fetchLogsForCTOProcess = async function(recordId, emp_id, dateStr, isWeekend) {
+        if(!dateStr) { alert("Date is missing for this record."); return; }
         
         try {
             const startOfDay = new Date(`${dateStr}T00:00:00+08:00`).toISOString();
@@ -714,7 +863,6 @@
             const firstLog = new Date(logs[0].log_time);
             const lastLog = new Date(logs[logs.length-1].log_time);
             let creditableHours = 0;
-            const isWeekend = document.getElementById('ctoIsWeekend').checked;
             
             if(isWeekend) {
                 creditableHours = (lastLog - firstLog) / (1000 * 60 * 60);
@@ -737,71 +885,57 @@
                 }
             }
             
-            const numEl = document.getElementById(inputId);
+            const numEl = document.getElementById(`baseHr_${recordId}`);
             if(creditableHours < 2) {
                 alert(`Calculated excess time is ${creditableHours.toFixed(2)} hours. (Must be 2 hours or more to be creditable). Outputting raw value for HR review.`);
                 numEl.value = creditableHours > 0 ? creditableHours.toFixed(2) : 0;
             } else {
                 numEl.value = creditableHours.toFixed(2);
             }
-            updateBaseHours(emp_id, numEl.value);
+            
+            // Trigger the auto-calculation
+            calcCtoCredited(recordId, isWeekend ? 1.5 : 1.0);
             
         } catch(e) {
             alert("Error fetching logs: " + e.message);
         }
     }
 
-    async function saveCtoBatch() {
-        const pso = document.getElementById('ctoPso').value.trim();
-        const desc = document.getElementById('ctoDesc').value.trim();
-        const cDate = document.getElementById('ctoDate').value;
-        const isWeekend = document.getElementById('ctoIsWeekend').checked;
-        const mult = isWeekend ? 1.5 : 1.0;
+    window.processCTO = async function(id) {
+        const baseHrEl = document.getElementById(`baseHr_${id}`);
+        const credHrEl = document.getElementById(`credHr_${id}`);
+        let baseHr = parseFloat(baseHrEl.value) || 0;
+        let credHr = parseFloat(credHrEl.innerText) || 0;
 
-        if(!pso || !desc || !cDate) {
-            alert("Please fill out PSO Number, Description, and Date.");
+        if (baseHr > 0 && baseHr < 2) {
+            alert("Creditable hours must be 2 or more to be processed for CTO.");
             return;
         }
 
-        if(selectedCtoEmployees.length === 0) {
-            alert("Please add at least one employee.");
-            return;
-        }
-
-        for(let emp of selectedCtoEmployees) {
-            if(emp.baseHours < 2) {
-                alert(`Employee ${emp.name} has ${emp.baseHours} base hours. CTO requires 2 hours or more. Please correct or remove the employee.`);
-                return;
-            }
-        }
-
-        if(!confirm(`Saving CTO for ${selectedCtoEmployees.length} employees. Multiplier is ${mult}x. Proceed?`)) return;
+        if(!confirm(`Process this CTO with ${credHr.toFixed(2)} credited hours?`)) return;
 
         try {
-            const records = selectedCtoEmployees.map(emp => ({
-                emp_id: emp.id,
-                date: cDate,
-                transaction_type: 'EARNED',
-                base_type: desc,
-                base_hours: emp.baseHours,
-                multiplier: mult,
-                calculated_hours: emp.baseHours * mult,
-                PSO_Number: pso,
+            await supabaseClient.from('cto_records').update({
+                base_hours: baseHr,
+                calculated_hours: credHr,
                 status: 'PROCESSED'
-            }));
-
-            const { error } = await supabaseClient.from('cto_records').insert(records);
-            if(error) throw error;
-
-            alert("CTO Records successfully saved. They will appear in the Leave Processing -> CTO Posting tab for final crediting.");
+            }).eq('id', id);
             
-            selectedCtoEmployees = [];
-            renderCtoEmployees();
-            document.getElementById('ctoPso').value = '';
-            document.getElementById('ctoDesc').value = '';
-
+            alert('CTO Processed successfully. It will now be ready for posting in the Leave Processing page.');
+            loadCtoProcessing();
         } catch(e) {
-            alert("Error saving CTO: " + e.message);
+            alert("Error: " + e.message);
+        }
+    }
+
+    window.deleteCTO = async function(id) {
+        if(!confirm("Are you sure you want to permanently delete this CTO record?")) return;
+        try {
+            await supabaseClient.from('cto_records').delete().eq('id', id);
+            alert('Record permanently deleted.');
+            loadCtoProcessing();
+        } catch(e) {
+            alert("Error: " + e.message);
         }
     }
 
