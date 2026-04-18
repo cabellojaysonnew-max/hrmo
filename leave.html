@@ -198,12 +198,14 @@
 
             <div id="ledgerTab" class="tab-content">
                 <div class="card mb-6">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                        <div class="md:col-span-2">
-                            <label class="form-label">Select Employee</label>
-                            <select id="ledgEmp" class="form-input"></select>
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end flex-wrap">
+                        <div class="flex-1 min-w-[200px] relative">
+                            <label class="form-label">Search Employee</label>
+                            <input type="text" id="ledgEmpSearch" class="form-input" placeholder="Type to search employee..." autocomplete="off">
+                            <div id="empSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
+                            <input type="hidden" id="ledgEmpId">
                         </div>
-                        <div>
+                        <div class="w-48">
                             <label class="form-label">Leave Type</label>
                             <select id="ledgType" class="form-input">
                                 <option value="VL">Vacation Leave (VL)</option>
@@ -213,12 +215,12 @@
                                 <option value="CTO">Compensatory Time-Off (CTO)</option>
                             </select>
                         </div>
-                        <div>
+                        <div class="w-48">
                             <label class="form-label">Select Month/Year</label>
                             <input type="month" id="ledgMonth" class="form-input">
                         </div>
-                        <div class="md:col-span-4 mt-2">
-                            <button onclick="loadLedgerStatement()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow w-full">View Statement</button>
+                        <div>
+                            <button onclick="loadLedgerStatement()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow">View Statement</button>
                         </div>
                     </div>
                     
@@ -284,6 +286,7 @@
     let empDataMap = {};
     let currentGatePasses = [];
     let currentForceLeaveStatus = {}; // Tracks { emp_id: VL_taken }
+    let empSearchList = [];
 
     // Ensure we process REGULAR employees only
     async function loadEmployeeMaps() {
@@ -293,16 +296,52 @@
             .order('full_name');
             
         if(data) {
-            const ledgEmpSelect = document.getElementById('ledgEmp');
-            ledgEmpSelect.innerHTML = '<option value="">-- Select Employee --</option>';
+            empSearchList = [];
             data.forEach(e => {
                 empDataMap[e.emp_id] = e;
                 if(e.full_name) {
-                    ledgEmpSelect.innerHTML += `<option value="${e.emp_id}">${e.full_name.toUpperCase()} (${e.emp_id})</option>`;
+                    empSearchList.push({ id: e.emp_id, name: e.full_name.toUpperCase() });
                 }
             });
         }
     }
+
+    // Custom Search Setup for Ledger
+    const searchInput = document.getElementById('ledgEmpSearch');
+    const searchResults = document.getElementById('empSearchResults');
+    const hiddenEmpId = document.getElementById('ledgEmpId');
+
+    searchInput.addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        searchResults.innerHTML = '';
+        if (!val) { searchResults.classList.add('hidden'); return; }
+        
+        const filtered = empSearchList.filter(e => e.name.toLowerCase().includes(val) || e.id.toLowerCase().includes(val));
+        
+        if (filtered.length > 0) {
+            filtered.forEach(e => {
+                const div = document.createElement('div');
+                div.className = 'p-2 hover:bg-gray-100 cursor-pointer text-sm';
+                div.innerText = `${e.name} (${e.id})`;
+                div.onclick = () => {
+                    searchInput.value = e.name;
+                    hiddenEmpId.value = e.id;
+                    searchResults.classList.add('hidden');
+                };
+                searchResults.appendChild(div);
+            });
+            searchResults.classList.remove('hidden');
+        } else {
+            searchResults.classList.add('hidden');
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target !== searchInput && e.target !== searchResults) {
+            searchResults.classList.add('hidden');
+        }
+    });
+
 
     function switchTab(tabId) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -437,11 +476,10 @@
         currentForceLeaveStatus = {};
         
         try {
-            // Emps already filtered to REGULAR in loadEmployeeMaps
             const emps = Object.values(empDataMap);
             if (emps.length === 0) throw new Error("No REGULAR employees found.");
 
-            // Force Leave: Any VL (APPROVED or DISAPPROVED) per year. Max 5 requirement.
+            // Force Leave: Any VL (APPROVED or DISAPPROVED) per year. Max 5.
             const currentYear = new Date().getFullYear();
             const { data: vlData } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, debit')
@@ -677,7 +715,6 @@
         dList.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching...</td></tr>`;
         
         try {
-            // FIX: Proper End Date calculation to avoid "date out of range"
             const parts = monthVal.split('-');
             const yy = parseInt(parts[0], 10);
             const mm = parseInt(parts[1], 10);
@@ -812,7 +849,7 @@
 
     // --- TAB 5: DETAILED LEDGER MONITORING ---
     async function loadLedgerStatement() {
-        const empId = document.getElementById('ledgEmp').value;
+        const empId = document.getElementById('ledgEmpId').value;
         const monthVal = document.getElementById('ledgMonth').value;
         const ledgType = document.getElementById('ledgType').value;
         const list = document.getElementById('ledger-list');
@@ -842,7 +879,7 @@
             let balField = ledgType.toLowerCase() + '_balance';
             let currentBal = parseFloat(emp[balField] || 0);
 
-            // Fetch ALL historical ledger for this employee related to the chosen type
+            // Fetch ALL historical ledger for this employee
             const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
                 .eq('emp_id', empId)
@@ -851,8 +888,28 @@
 
             if (error) throw error;
 
+            // Optional: Also fetch CTO records if CTO is selected to show credits from cto_records table
+            let extraCTO = [];
+            if (ledgType === 'CTO') {
+                 const { data: ctoData } = await supabaseClient.from('cto_records').select('*').eq('emp_id', empId);
+                 if(ctoData) {
+                     ctoData.forEach(c => {
+                         // Push as a mock ledger entry
+                         extraCTO.push({
+                             created_at: c.date,
+                             start_date: c.date,
+                             type: 'CTO EARNED',
+                             transaction_type: 'CREDIT',
+                             credit: c.calculated_hours ? (parseFloat(c.calculated_hours) / 8) : 0, // Assuming 8hr day equivalent
+                             debit: 0,
+                             remarks: `Earned CTO from ${c.base_type || ''} (Mult: ${c.multiplier || 1})`
+                         });
+                     });
+                 }
+            }
+
             // Filter specific Leave Type transactions
-            let relevantData = (allData || []).filter(t => {
+            let relevantData = (allData || []).concat(extraCTO).filter(t => {
                 const tType = (t.type || '').toUpperCase();
                 if (ledgType === 'VL') return tType.includes('VL') || tType.includes('VACATION') || tType.includes('GATE PASS') || tType.includes('FORCE LEAVE');
                 if (ledgType === 'SL') return tType.includes('SL') || tType.includes('SICK');
@@ -861,8 +918,10 @@
                 if (ledgType === 'CTO') return tType.includes('CTO') || tType.includes('COMPENSATORY');
                 return false;
             });
+            
+            // Sort combined data by date
+            relevantData.sort((a,b) => new Date(a.created_at || a.start_date) - new Date(b.created_at || b.start_date));
 
-            // Split into 'this month' and 'future' to reverse-calculate balances
             const dtEnd = new Date(`${endDate}T23:59:59`);
             const dtStart = new Date(`${startDate}T00:00:00`);
             
@@ -882,7 +941,6 @@
             let endOfMonthBal = currentBal;
             futureData.forEach(f => {
                 if (f.transaction_type !== 'DISAPPROVED') {
-                    // Reverse operation: if it was credit, subtract. if debit, add.
                     endOfMonthBal -= parseFloat(f.credit || 0);
                     endOfMonthBal += parseFloat(f.debit || 0);
                 }
@@ -934,15 +992,18 @@
                 const displayType = t.type ? t.type.toUpperCase() : '-';
                 const dateStr = new Date(t.created_at || t.start_date).toLocaleDateString('en-US');
                 
+                let credColor = cred > 0 ? 'text-green-600' : 'text-gray-400';
+                let debColor = deb > 0 ? 'text-red-600' : 'text-gray-400';
+
                 html += `
-                    <tr class="${isDisapproved ? 'bg-red-50 opacity-70' : ''}">
+                    <tr class="${isDisapproved ? 'bg-red-50 opacity-70' : 'hover:bg-gray-50'}">
                         <td class="table-td">${dateStr}</td>
                         <td class="table-td">
                             <span class="font-bold">${t.transaction_type.replace(/_/g, ' ')}</span><br>
                             <span class="text-xs text-gray-500">${displayType} | ${t.remarks || ''}</span>
                         </td>
-                        <td class="table-td text-green-700 font-bold">${cred > 0 ? cred.toFixed(3) : '-'}</td>
-                        <td class="table-td text-red-700 font-bold">${deb > 0 ? deb.toFixed(3) : '-'}</td>
+                        <td class="table-td font-bold ${credColor}">${cred > 0 ? '+'+cred.toFixed(3) : '-'}</td>
+                        <td class="table-td font-bold ${debColor}">${deb > 0 ? '-'+deb.toFixed(3) : '-'}</td>
                         <td class="table-td font-bold">${isDisapproved ? '-' : runningBal.toFixed(3)}</td>
                     </tr>
                 `;
