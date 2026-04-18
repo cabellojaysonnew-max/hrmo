@@ -189,6 +189,7 @@
         document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         document.getElementById('scopeLabel').innerText = isLimited ? `Division: ${targetDivision}` : "Provincial Oversight";
 
+        // Fetch Employees
         let empQuery = supabaseClient.from('employees').select('*');
         if (isLimited) {
             empQuery = empQuery.eq('division', targetDivision);
@@ -449,7 +450,6 @@
         (allFlagLogs || []).forEach(log => {
             validMondays.add(log.date);
             
-            // First time this specific employee ever showed up in the flag system
             const d = new Date(log.date);
             d.setHours(0,0,0,0);
             if (!flagStartDates[log.emp_id] || d < flagStartDates[log.emp_id]) {
@@ -457,9 +457,8 @@
             }
         });
         
-        let mondays = Array.from(validMondays).sort((a,b) => new Date(b) - new Date(a)); // Newest first
+        let mondays = Array.from(validMondays).sort((a,b) => new Date(b) - new Date(a));
 
-        // Note: For full historical check, we also fetch all travel/leave/pso records without the May 1 limit
         const [allFlagTravelRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
             supabaseClient.from('itinerary').select('emp_id, travel_date'),
             supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED'),
@@ -478,11 +477,27 @@
             }
         });
 
+        const { data: globalLogs } = await supabaseClient.from('attendance_logs').select('emp_id, log_time');
+        
         (emps || []).forEach(e => {
             if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
             
-            const startDate = flagStartDates[e.emp_id];
-            if (!startDate) return; // Completely new / no record at all ever
+            // Check overall attendance log for absolute first day of work
+            let firstLogDate = flagStartDates[e.emp_id]; 
+            if (globalLogs) {
+                globalLogs.forEach(l => {
+                    if (l.emp_id === e.emp_id) {
+                        const dStr = l.log_time.split('T')[0];
+                        const d = new Date(dStr);
+                        d.setHours(0,0,0,0);
+                        if (!firstLogDate || d < firstLogDate) {
+                            firstLogDate = d;
+                        }
+                    }
+                });
+            }
+
+            if (!firstLogDate) return; 
 
             let missedDates = [];
             let presentCount = 0;
@@ -492,8 +507,7 @@
                 const mDate = new Date(m);
                 mDate.setHours(0,0,0,0);
                 
-                // Only count mondays from their very first log onwards
-                if (mDate >= startDate) {
+                if (mDate >= firstLogDate) {
                     expectedMondays++;
                     const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
                     const isExcused = flagExcused.has(e.emp_id + '_' + m); 
