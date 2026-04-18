@@ -124,7 +124,7 @@
         </div>
 
         <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1)</h3>
+            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1 Mondays Only)</h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
                     <thead class="bg-blue-50 text-blue-800">
@@ -440,14 +440,14 @@
         if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
 
         // --- NEW: Flag Ceremony Monitoring ---
+        // Fetch ALL flag attendance logs
         const { data: allFlagLogs } = await supabaseClient
             .from('flag_attendance')
-            .select('emp_id, date, time_in, status')
-            .gte('date', SYSTEM_START_DATE);
+            .select('emp_id, date, time_in, status');
             
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
-        // Find valid flag ceremony days (days where AT LEAST ONE person has a record)
+        // Dynamic valid Mondays set
         let validMondays = new Set();
         (allFlagLogs || []).forEach(log => {
             validMondays.add(log.date);
@@ -463,8 +463,9 @@
 
             mondays.forEach(m => {
                 const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
-                const isExcused = excused.has(e.emp_id + '_' + m); // Use existing excused Set (Travel/Leave/PSO)
+                const isExcused = excused.has(e.emp_id + '_' + m); 
                 
+                // Present ONLY IF log exists, AND status isn't explicitly ABSENT, AND time_in isn't explicitly ABSENT
                 const isPresent = log && log.status !== 'ABSENT' && log.time_in !== 'ABSENT' && log.time_in !== null;
 
                 if (isPresent) {
