@@ -130,13 +130,14 @@
                     <thead class="bg-blue-50 text-blue-800">
                         <tr>
                             <th class="p-3 font-bold border-b">Employee Name</th>
-                            <th class="p-3 font-bold border-b text-center">Total Missed Mondays</th>
-                            <th class="p-3 font-bold border-b text-center">Last Missed Date</th>
+                            <th class="p-3 font-bold border-b text-center">Attendance (Present / Total)</th>
+                            <th class="p-3 font-bold border-b text-center">Missed Dates</th>
+                            <th class="p-3 font-bold border-b text-center">Status</th>
                             <th class="p-3 font-bold border-b text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody id="listFlagAttendance" class="divide-y">
-                        <tr><td colspan="4" class="p-4 text-center text-gray-400 text-xs italic">Scanning Monday Logs...</td></tr>
+                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Scanning Flag Ceremony Logs...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -439,7 +440,6 @@
         if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
 
         // --- NEW: Flag Ceremony Monitoring ---
-        // Fetch all flag ceremony records from SYSTEM_START_DATE
         const { data: allFlagLogs } = await supabaseClient
             .from('flag_attendance')
             .select('emp_id, date, time_in, status')
@@ -447,36 +447,46 @@
             
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
-        // Find valid flag ceremony days (Mondays where AT LEAST ONE person has a record)
-        let validMondays = new Set();
-        (allFlagLogs || []).forEach(log => {
-            const d = new Date(log.date);
-            if (d.getDay() === 1) { // It's a Monday
-                validMondays.add(log.date);
-            }
-        });
+        // Find all Mondays from SYSTEM_START_DATE to today
+        let mondays = []; 
+        let startD = new Date(SYSTEM_START_DATE);
+        startD.setHours(0,0,0,0);
+        let endD = new Date(todayDate);
+        endD.setHours(0,0,0,0);
         
-        let mondays = Array.from(validMondays).sort().reverse(); // Most recent first
+        while (startD <= endD) {
+            if (startD.getDay() === 1) { // 1 is Monday
+                mondays.push(startD.toISOString().split('T')[0]);
+            }
+            startD.setDate(startD.getDate() + 1);
+        }
+        mondays.reverse(); // Most recent first
 
         (emps || []).forEach(e => {
             if (e.station !== 'DARPO-CS1') return;
             
             let missedDates = [];
+            let presentCount = 0;
+
             mondays.forEach(m => {
                 const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
                 const isExcused = excused.has(e.emp_id + '_' + m); // Use existing excused Set (Travel/Leave/PSO)
                 
-                // If there's no log at all, or the log explicitly says ABSENT, and they are not excused
-                if ((!log || log.status === 'ABSENT' || log.time_in === 'ABSENT') && !isExcused) {
+                const isPresent = log && log.status !== 'ABSENT' && log.time_in !== 'ABSENT' && log.time_in !== null;
+
+                if (isPresent) {
+                    presentCount++;
+                } else if (!isExcused) {
                     missedDates.push(m);
                 }
             });
 
+            // Only those with absenteeism (missed dates) appear
             if (missedDates.length > 0) {
                 listF.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
-                    <td class="text-center font-bold text-red-600">${missedDates.length}</td>
-                    <td class="text-center text-xs text-gray-500">${missedDates[0]}</td>
+                    <td class="text-center font-bold text-gray-700">${presentCount} / ${mondays.length}</td>
+                    <td class="text-center text-xs text-gray-500">${missedDates.join(", ")}</td>
                     <td class="text-center"><span class="px-2 py-0.5 rounded-full text-[10px] ${missedDates.length >= 3 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'} font-bold">${missedDates.length >= 3 ? 'FOR EXPLANATION' : 'WARNING'}</span></td>
                     <td class="text-center">
                         <button onclick="printFlagMemo('${e.emp_id}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>
