@@ -74,7 +74,7 @@
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
                     <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
                 </div>
-                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
             </div>
         </div>
 
@@ -447,30 +447,26 @@
             
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
-        // Dynamic valid Mondays set
+        // Find valid flag ceremony days (days where AT LEAST ONE person has a record)
         let validMondays = new Set();
+        const flagStartDates = {};
+
         (allFlagLogs || []).forEach(log => {
-            validMondays.add(log.date);
+            const d = new Date(log.date);
+            if (d.getDay() === 1) { // Must be a Monday
+                validMondays.add(log.date);
+            }
+            
+            // Track first log date per employee from flag_attendance
+            d.setHours(0,0,0,0);
+            if (!flagStartDates[log.emp_id] || d < flagStartDates[log.emp_id]) {
+                flagStartDates[log.emp_id] = d;
+            }
         });
         
         let mondays = Array.from(validMondays).sort().reverse(); // Most recent first
 
-        // Get absolute first log for each employee to determine their start date
-        const { data: allAttendanceLogs } = await supabaseClient
-            .from('attendance_logs')
-            .select('emp_id, log_time');
-            
-        const empStartDates = {};
-        (allAttendanceLogs || []).forEach(l => {
-            const dStr = l.log_time.split('T')[0];
-            const d = new Date(dStr);
-            d.setHours(0,0,0,0);
-            if (!empStartDates[l.emp_id] || d < empStartDates[l.emp_id]) {
-                empStartDates[l.emp_id] = d;
-            }
-        });
-
-        // Fetch ALL historical excuses for accurate Flag Ceremony tracking
+        // Fetch excused (No start date filter)
         const [allFlagTravelRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
             supabaseClient.from('itinerary').select('emp_id, travel_date'),
             supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED'),
@@ -490,10 +486,10 @@
         });
 
         (emps || []).forEach(e => {
-            if (e.station !== 'DARPO-CS1') return;
+            if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
             
-            const startDate = empStartDates[e.emp_id];
-            if (!startDate) return; // Unregistered / No logs at all yet
+            const startDate = flagStartDates[e.emp_id];
+            if (!startDate) return; // No logs in flag_attendance = new employee / no absent yet
 
             let missedDates = [];
             let presentCount = 0;
