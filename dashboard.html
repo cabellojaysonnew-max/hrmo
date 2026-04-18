@@ -440,10 +440,10 @@
         if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
 
         // --- NEW: Flag Ceremony Monitoring ---
-        // Fetch ALL flag attendance logs
         const { data: allFlagLogs } = await supabaseClient
             .from('flag_attendance')
-            .select('emp_id, date, time_in, status');
+            .select('emp_id, date, time_in, status')
+            .gte('date', SYSTEM_START_DATE);
             
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
@@ -455,23 +455,48 @@
         
         let mondays = Array.from(validMondays).sort().reverse(); // Most recent first
 
+        // Get absolute first log for each employee to determine their start date
+        const { data: allAttendanceLogs } = await supabaseClient
+            .from('attendance_logs')
+            .select('emp_id, log_time')
+            .gte('log_time', SYSTEM_START_DATE);
+            
+        const empStartDates = {};
+        (allAttendanceLogs || []).forEach(l => {
+            const dStr = l.log_time.split('T')[0];
+            const d = new Date(dStr);
+            d.setHours(0,0,0,0);
+            if (!empStartDates[l.emp_id] || d < empStartDates[l.emp_id]) {
+                empStartDates[l.emp_id] = d;
+            }
+        });
+
         (emps || []).forEach(e => {
             if (e.station !== 'DARPO-CS1') return;
             
+            const startDate = empStartDates[e.emp_id];
+            if (!startDate) return; // Unregistered / No logs at all yet
+
             let missedDates = [];
             let presentCount = 0;
+            let expectedMondays = 0;
 
             mondays.forEach(m => {
-                const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
-                const isExcused = excused.has(e.emp_id + '_' + m); 
+                const mDate = new Date(m);
+                mDate.setHours(0,0,0,0);
                 
-                // Present ONLY IF log exists, AND status isn't explicitly ABSENT, AND time_in isn't explicitly ABSENT
-                const isPresent = log && log.status !== 'ABSENT' && log.time_in !== 'ABSENT' && log.time_in !== null;
+                if (mDate >= startDate) {
+                    expectedMondays++;
+                    const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
+                    const isExcused = excused.has(e.emp_id + '_' + m); 
+                    
+                    const isPresent = log && log.status !== 'ABSENT' && log.time_in !== 'ABSENT' && log.time_in !== null;
 
-                if (isPresent) {
-                    presentCount++;
-                } else if (!isExcused) {
-                    missedDates.push(m);
+                    if (isPresent) {
+                        presentCount++;
+                    } else if (!isExcused) {
+                        missedDates.push(m);
+                    }
                 }
             });
 
@@ -479,7 +504,7 @@
             if (missedDates.length > 0) {
                 listF.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
-                    <td class="text-center font-bold text-gray-700">${presentCount} / ${mondays.length}</td>
+                    <td class="text-center font-bold text-gray-700">${presentCount} / ${expectedMondays}</td>
                     <td class="text-center text-xs text-gray-500">${missedDates.join(", ")}</td>
                     <td class="text-center"><span class="px-2 py-0.5 rounded-full text-[10px] ${missedDates.length >= 3 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'} font-bold">${missedDates.length >= 3 ? 'FOR EXPLANATION' : 'WARNING'}</span></td>
                     <td class="text-center">
@@ -585,13 +610,13 @@
         }
 
         // --- ALIGNMENT FIX FOR TARDINESS MEMO ---
-        pdf.setMargins(30, 45, 30); // Set explicit left margin to 30mm for proper alignment
+        pdf.setMargins(30, 45, 30); 
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(12);
         
-        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); // Left aligned
+        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
         pdf.setFontSize(11);
-        pdf.text(`Series of ${currYear}`, 30, 51); // Left aligned
+        pdf.text(`Series of ${currYear}`, 30, 51); 
 
         pdf.setFontSize(11);
         let currentY = 65;
@@ -607,12 +632,11 @@
         currentY += (splitSubject.length * lineH);
 
         pdf.setLineWidth(0.6);
-        pdf.line(30, currentY, 215.9 - 30, currentY); // Line drawn matching the margins
+        pdf.line(30, currentY, 215.9 - 30, currentY); 
         currentY += 8;
 
         pdf.setFont("helvetica", "normal");
         
-        // Use text alignment 'justify' natively supported by jsPDF (needs wrapping parameter)
         pdf.text(p1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
         const splitP1 = pdf.splitTextToSize(p1, 155.9);
         currentY += (splitP1.length * 5) + 5;
@@ -636,7 +660,7 @@
         currentY += (splitC2.length * 5) + 15;
 
         pdf.setFont("helvetica", "bold");
-        pdf.text("RICARDO C. GARCIA", 30, currentY); // Left aligned
+        pdf.text("RICARDO C. GARCIA", 30, currentY); 
 
         try {
             await supabaseClient.from('memo_records').insert({
@@ -690,13 +714,13 @@
         const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 
         // --- ALIGNMENT FIX FOR FLAG MEMO ---
-        pdf.setMargins(30, 45, 30); // Set explicit left margin to 30mm
+        pdf.setMargins(30, 45, 30); 
         pdf.setFont("helvetica", "bold"); 
         pdf.setFontSize(12);
         
-        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); // Left aligned
+        pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
         pdf.setFontSize(11); 
-        pdf.text(`Series of ${currYear}`, 30, 51); // Left aligned
+        pdf.text(`Series of ${currYear}`, 30, 51); 
         
         let y = 65; 
         const lineH = 8;
@@ -706,7 +730,7 @@
         pdf.text("SUBJECT", 30, y); pdf.text(":", 55, y); pdf.text("NON-ATTENDANCE TO FLAG CEREMONY", 60, y);
         
         pdf.setLineWidth(0.6); 
-        pdf.line(30, y+5, 215.9 - 30, y+5); // Line drawn matching the margins
+        pdf.line(30, y+5, 215.9 - 30, y+5); 
         y += 15;
 
         pdf.setFont("helvetica", "normal");
@@ -714,7 +738,6 @@
         const p2 = "Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory for all government officials and employees.";
         const p3 = "You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you for this violation of office rules. Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.";
 
-        // Use text alignment 'justify' natively supported by jsPDF
         pdf.text(p1, 30, y, { maxWidth: 155.9, align: 'justify' });
         const splitP1 = pdf.splitTextToSize(p1, 155.9);
         y += (splitP1.length * 5) + 5; 
@@ -738,7 +761,7 @@
         y += (splitC2.length * 5) + 15;
         
         pdf.setFont("helvetica", "bold"); 
-        pdf.text("RICARDO C. GARCIA", 30, y); // Left aligned
+        pdf.text("RICARDO C. GARCIA", 30, y); 
 
         try {
             await supabaseClient.from('memo_records').insert({
