@@ -74,7 +74,7 @@
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
                     <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
                 </div>
-                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
             </div>
         </div>
 
@@ -440,10 +440,10 @@
         if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
 
         // --- NEW: Flag Ceremony Monitoring ---
+        // Fetch ALL flag attendance logs
         const { data: allFlagLogs } = await supabaseClient
             .from('flag_attendance')
-            .select('emp_id, date, time_in, status')
-            .gte('date', SYSTEM_START_DATE);
+            .select('emp_id, date, time_in, status');
             
         const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
         
@@ -458,8 +458,7 @@
         // Get absolute first log for each employee to determine their start date
         const { data: allAttendanceLogs } = await supabaseClient
             .from('attendance_logs')
-            .select('emp_id, log_time')
-            .gte('log_time', SYSTEM_START_DATE);
+            .select('emp_id, log_time');
             
         const empStartDates = {};
         (allAttendanceLogs || []).forEach(l => {
@@ -468,6 +467,25 @@
             d.setHours(0,0,0,0);
             if (!empStartDates[l.emp_id] || d < empStartDates[l.emp_id]) {
                 empStartDates[l.emp_id] = d;
+            }
+        });
+
+        // Fetch ALL historical excuses for accurate Flag Ceremony tracking
+        const [allFlagTravelRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
+            supabaseClient.from('itinerary').select('emp_id, travel_date'),
+            supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED'),
+            supabaseClient.from('pso_records').select('emp_id, start_date, end_date')
+        ]);
+        
+        const flagExcused = new Set();
+        (allFlagTravelRes.data || []).forEach(t => flagExcused.add(t.emp_id + '_' + t.travel_date));
+        (allFlagLeaveRes.data || []).forEach(l => flagExcused.add(l.emp_id + '_' + l.date));
+        (allFlagPsoRes.data || []).forEach(p => {
+            let currD = new Date(p.start_date);
+            let endD = new Date(p.end_date);
+            while(currD <= endD) {
+                flagExcused.add(p.emp_id + '_' + currD.toISOString().split('T')[0]);
+                currD.setDate(currD.getDate() + 1);
             }
         });
 
@@ -488,7 +506,7 @@
                 if (mDate >= startDate) {
                     expectedMondays++;
                     const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
-                    const isExcused = excused.has(e.emp_id + '_' + m); 
+                    const isExcused = flagExcused.has(e.emp_id + '_' + m); 
                     
                     const isPresent = log && log.status !== 'ABSENT' && log.time_in !== 'ABSENT' && log.time_in !== null;
 
