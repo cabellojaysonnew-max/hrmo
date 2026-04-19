@@ -259,13 +259,13 @@
                 
                 <div class="mb-4">
                     <label class="form-label">Search Employee</label>
-                    <input type="text" id="mEmployeeSearch" list="employeeList" class="form-input" placeholder="Type name or ID to search...">
+                    <input type="text" id="mEmployeeSearch" list="employeeList" class="form-input" placeholder="Type name or ID to search..." onchange="checkMissingLogs()">
                     <datalist id="employeeList"></datalist>
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label">Log Date</label>
-                    <input type="date" id="mDate" class="form-input">
+                    <input type="date" id="mDate" class="form-input" onchange="checkMissingLogs()">
                 </div>
                 
                 <div class="grid grid-cols-2 gap-4 mb-4">
@@ -317,7 +317,7 @@
     if (!userData) window.location.href = 'index.html';
     const currentUser = JSON.parse(userData);
     
-    if (!currentUser.role.toUpperCase().includes('HR') && !currentUser.role.toUpperCase().includes('ADMIN')) {
+    if (!currentUser.role.toUpperCase().includes('HRMO')) {
         alert("Unauthorized Access. HR personnel only.");
         window.location.href = 'dashboard.html';
     }
@@ -436,7 +436,7 @@
             const endDtStr = `${y}-${String(m).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
 
             const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, holRes] = await Promise.all([
-                fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
+                fetchSafe(supabaseClient.from('attendance_logs').select('id, emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
                 fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED')),
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
@@ -450,7 +450,7 @@
                 const dateStr = l.log_time.split('T')[0];
                 const key = `${l.emp_id}_${dateStr}`;
                 if(!logMap[key]) logMap[key] = [];
-                logMap[key].push(new Date(l.log_time));
+                logMap[key].push({ time: new Date(l.log_time), id: l.id });
             });
 
             const validTOs = new Set((toRes.data || []).map(t => t.to_no));
@@ -495,6 +495,7 @@
                     let status = "PRESENT";
                     let cssClass = "";
                     let amIn = "-", amOut = "-", pmIn = "-", pmOut = "-", ud = "0:00";
+                    let amInId = null, amOutId = null, pmInId = null, pmOutId = null;
 
                     const key = `${e.emp_id}_${dateStr}`;
                     const isTO = toSet.has(key);
@@ -508,7 +509,7 @@
                     else if (isPSO) { status = "ON PSO"; cssClass = "status-onpso"; overrideLogs = true; }
                     else if (isTO) { status = "ON TO"; cssClass = "status-onto"; overrideLogs = true; }
                     
-                    const dayLogs = (logMap[key] || []).sort((a,b) => a-b);
+                    const dayLogs = (logMap[key] || []).sort((a,b) => a.time - b.time);
                     
                     if (isHoliday && dayLogs.length === 0 && !overrideLogs) {
                         status = "HOLIDAY"; cssClass = "status-onpso"; overrideLogs = true;
@@ -518,13 +519,14 @@
                         if (dayLogs.length === 0) { 
                             status = "ABSENT"; cssClass = "status-absent"; 
                         } else {
-                            dayLogs.forEach(time => {
+                            dayLogs.forEach(log => {
+                                const time = log.time;
                                 const hr = time.getHours();
                                 const fmt = formatTime12(time);
-                                if(hr < 12 && amIn === "-") amIn = fmt;
-                                else if(hr <= 12 && time.getMinutes() <= 30 && amOut === "-") amOut = fmt;
-                                else if(hr <= 14 && pmIn === "-") pmIn = fmt;
-                                else pmOut = fmt;
+                                if(hr < 12 && amIn === "-") { amIn = fmt; amInId = log.id; }
+                                else if(hr <= 12 && time.getMinutes() <= 30 && amOut === "-") { amOut = fmt; amOutId = log.id; }
+                                else if(hr <= 14 && pmIn === "-") { pmIn = fmt; pmInId = log.id; }
+                                else { pmOut = fmt; pmOutId = log.id; }
                             });
                             
                             if (amIn === "-" || pmOut === "-") {
@@ -547,10 +549,10 @@
                             <td class="p-2 text-[#003811] font-mono">${e.emp_id}</td>
                             <td class="p-2 font-bold text-gray-800 truncate max-w-[150px]" title="${e.full_name}">${e.full_name}</td>
                             <td class="p-2 text-center text-gray-600">${dateStr}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${amIn}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${amOut}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${pmIn}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${pmOut}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${amInId}')">${amIn}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${amOutId}')">${amOut}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${pmInId}')">${pmIn}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${pmOutId}')">${pmOut}</td>
                             <td class="p-2 text-center font-mono text-red-600">${ud}</td>
                             <td class="p-2 text-center ${cssClass}">${status}</td>
                         </tr>
@@ -567,10 +569,10 @@
         }
     }
 
-    function inlineEdit(td, emp_id, dateStr) {
+    function inlineEdit(td, emp_id, dateStr, logId) {
         if (td.querySelector('input')) return; 
         const oldVal = td.innerText;
-        td.innerHTML = `<input type="text" value="${oldVal === '-' ? '' : oldVal}" class="w-20 text-center font-mono border border-gray-400 px-1 py-0.5" placeholder="HH:MM AM" onblur="cancelEdit(this, '${oldVal}')" onkeydown="saveEdit(event, this, '${emp_id}', '${dateStr}', '${oldVal}')">`;
+        td.innerHTML = `<input type="text" value="${oldVal === '-' ? '' : oldVal}" class="w-20 text-center font-mono border border-gray-400 px-1 py-0.5" placeholder="HH:MM AM" onblur="cancelEdit(this, '${oldVal}')" onkeydown="saveEdit(event, this, '${emp_id}', '${dateStr}', '${oldVal}', '${logId}')">`;
         const input = td.querySelector('input');
         input.focus();
         input.select();
@@ -580,7 +582,7 @@
         input.parentElement.innerText = oldVal;
     }
 
-    async function saveEdit(event, input, emp_id, dateStr, oldVal) {
+    async function saveEdit(event, input, emp_id, dateStr, oldVal, logId) {
         if (event.key !== 'Enter') return;
         const val = input.value.trim();
         const td = input.parentElement;
@@ -615,13 +617,58 @@
                 manual_log_date: new Date().toISOString()
             };
 
-            const { error } = await supabaseClient.from('attendance_logs').insert(payload);
-            if (error) throw error;
+            if (logId && logId !== 'null') {
+                const { error } = await supabaseClient.from('attendance_logs').update(payload).eq('id', logId);
+                if (error) throw error;
+            } else {
+                const { error } = await supabaseClient.from('attendance_logs').insert(payload);
+                if (error) throw error;
+            }
 
             generateMonthlyView(); 
         } catch (e) {
             alert(`Save failed: ${e.message}`);
             td.innerText = oldVal;
+        }
+    }
+
+    async function checkMissingLogs() {
+        const dStr = document.getElementById('mDate').value;
+        const empSearchVal = document.getElementById('mEmployeeSearch').value;
+        const empIdToUse = empSearchVal.includes(' - ') ? empSearchVal.split(' - ')[0] : empSearchVal;
+
+        document.getElementById('mAmIn').disabled = false;
+        document.getElementById('mAmOut').disabled = false;
+        document.getElementById('mPmIn').disabled = false;
+        document.getElementById('mPmOut').disabled = false;
+        document.getElementById('mAmIn').value = '';
+        document.getElementById('mAmOut').value = '';
+        document.getElementById('mPmIn').value = '';
+        document.getElementById('mPmOut').value = '';
+
+        if(!dStr || !empIdToUse) return;
+
+        const { data } = await supabaseClient.from('attendance_logs')
+            .select('log_time')
+            .eq('emp_id', empIdToUse)
+            .gte('log_time', dStr + "T00:00:00")
+            .lte('log_time', dStr + "T23:59:59");
+
+        if(data && data.length > 0) {
+            let hasAmIn = false, hasAmOut = false, hasPmIn = false, hasPmOut = false;
+            data.forEach(l => {
+                const time = new Date(l.log_time);
+                const hr = time.getHours();
+                if(hr < 12 && !hasAmIn) hasAmIn = true;
+                else if(hr <= 12 && time.getMinutes() <= 30 && !hasAmOut) hasAmOut = true;
+                else if(hr <= 14 && !hasPmIn) hasPmIn = true;
+                else hasPmOut = true;
+            });
+
+            if(hasAmIn) { document.getElementById('mAmIn').disabled = true; document.getElementById('mAmIn').title = 'Log already exists'; }
+            if(hasAmOut) { document.getElementById('mAmOut').disabled = true; document.getElementById('mAmOut').title = 'Log already exists'; }
+            if(hasPmIn) { document.getElementById('mPmIn').disabled = true; document.getElementById('mPmIn').title = 'Log already exists'; }
+            if(hasPmOut) { document.getElementById('mPmOut').disabled = true; document.getElementById('mPmOut').title = 'Log already exists'; }
         }
     }
 
@@ -708,10 +755,10 @@
 
         if(!dStr || !empIdToUse) return alert("Date and Employee are required.");
 
-        const amIn = document.getElementById('mAmIn').value;
-        const amOut = document.getElementById('mAmOut').value;
-        const pmIn = document.getElementById('mPmIn').value;
-        const pmOut = document.getElementById('mPmOut').value;
+        const amIn = document.getElementById('mAmIn').disabled ? null : document.getElementById('mAmIn').value;
+        const amOut = document.getElementById('mAmOut').disabled ? null : document.getElementById('mAmOut').value;
+        const pmIn = document.getElementById('mPmIn').disabled ? null : document.getElementById('mPmIn').value;
+        const pmOut = document.getElementById('mPmOut').disabled ? null : document.getElementById('mPmOut').value;
 
         const logsToInsert = [];
         const currentIso = new Date().toISOString();
@@ -741,7 +788,7 @@
         const p4 = createPayload(pmOut);
         if(p4) logsToInsert.push(p4);
 
-        if (logsToInsert.length === 0) return alert("Please provide at least one time entry.");
+        if (logsToInsert.length === 0) return alert("Please provide at least one new time entry.");
 
         const btn = document.getElementById('btnSubmitManual');
         btn.innerText = "INSERTING..."; btn.disabled = true;
@@ -771,8 +818,10 @@
     }
 
     function openLockModal() { 
-        const role = currentUser.role.toUpperCase();
-        if (role !== 'HRMO' && role !== 'ADMIN') {
+        const roleParts = currentUser.role.toUpperCase().split(',').map(r => r.trim());
+        const hasHrmo = roleParts.some(r => r.includes('HRMO') && r !== 'HRMO STAFF');
+        
+        if (!hasHrmo && !roleParts.includes('ADMIN')) {
             return alert("Access Denied: Only the head HRMO account is authorized to lock the monthly ledger. HR Staff accounts are not permitted.");
         }
         document.getElementById('modalLock').classList.remove('hidden'); 
