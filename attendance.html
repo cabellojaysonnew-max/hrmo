@@ -51,7 +51,10 @@
             <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
             <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
             <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">ATTENDANCE</a>
+            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
+            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">USERS</a>
         </div>
         <div class="p-4 bg-black/20 hidden md:block">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
@@ -96,7 +99,7 @@
                     
                     <div class="flex-1"></div>
                     <button onclick="printMissingLogs()" class="bg-[#C62828] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-red-800 shadow-sm mr-2">PRINT MISSING LOGS</button>
-                    <button onclick="openManualEntryModal()" class="bg-[#D4AF37] text-[#003811] px-4 py-1.5 rounded text-sm font-bold hover:bg-yellow-500 shadow-sm">+ BATCH MANUAL ENTRY</button>
+                    <button onclick="openManualEntryModal()" class="bg-[#D4AF37] text-[#003811] px-4 py-1.5 rounded text-sm font-bold hover:bg-yellow-500 shadow-sm">+ MANUAL ENTRY</button>
                 </div>
                 
                 <div class="flex-1 overflow-auto scroll-list">
@@ -217,12 +220,24 @@
                 <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4 text-xs text-yellow-800">
                     Logs entered manually will be securely tagged with your HR credentials (<strong><span id="lblHrName"></span></strong>) and the current date.
                 </div>
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div><label class="form-label">Log Date</label><input type="date" id="mDate" class="form-input"></div>
-                    <div><label class="form-label">Log Time</label><input type="time" id="mTime" class="form-input"></div>
+                
+                <div class="mb-4">
+                    <label class="form-label">Search Employee</label>
+                    <input type="text" id="mEmployeeSearch" list="employeeList" class="form-input" placeholder="Type name or ID to search...">
+                    <datalist id="employeeList"></datalist>
                 </div>
-                <label class="form-label">Select Employees</label>
-                <select id="mEmployees" multiple class="form-input h-32 font-mono text-xs"></select>
+
+                <div class="mb-4">
+                    <label class="form-label">Log Date</label>
+                    <input type="date" id="mDate" class="form-input">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div><label class="form-label">AM IN</label><input type="time" id="mAmIn" class="form-input"></div>
+                    <div><label class="form-label">AM OUT</label><input type="time" id="mAmOut" class="form-input"></div>
+                    <div><label class="form-label">PM IN</label><input type="time" id="mPmIn" class="form-input"></div>
+                    <div><label class="form-label">PM OUT</label><input type="time" id="mPmOut" class="form-input"></div>
+                </div>
             </div>
             <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
                 <button onclick="closeModal('modalManual')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded font-bold text-sm hover:bg-gray-400">CANCEL</button>
@@ -325,13 +340,13 @@
             const { data } = await supabaseClient.from('employees').select('*').order('full_name');
             allEmployees = data || [];
             
-            let f48Html = '', mHtml = '';
+            let f48Html = '', searchHtml = '';
             allEmployees.forEach(e => {
                 f48Html += `<option value="${e.emp_id}">${e.emp_id} - ${e.full_name}</option>`;
-                mHtml += `<option value="${e.emp_id}">${e.emp_id.padEnd(12, ' ')} | ${e.full_name}</option>`;
+                searchHtml += `<option value="${e.emp_id} - ${e.full_name}"></option>`;
             });
             document.getElementById('f48Employee').innerHTML = f48Html;
-            document.getElementById('mEmployees').innerHTML = mHtml;
+            document.getElementById('employeeList').innerHTML = searchHtml;
         } catch (e) {
             console.error("Fetch employees failed.", e);
         }
@@ -623,33 +638,64 @@
 
     async function submitManualLogs() {
         const dStr = document.getElementById('mDate').value;
-        let tStr = document.getElementById('mTime').value;
-        const select = document.getElementById('mEmployees');
-        const selectedOptions = Array.from(select.selectedOptions);
-
-        if(!dStr || !tStr || selectedOptions.length === 0) return alert("Date, Time, and at least one Employee are required.");
-        if (tStr.length === 5) tStr += ":00"; 
+        const empSearchVal = document.getElementById('mEmployeeSearch').value;
         
-        const timestamp = `${dStr}T${tStr}`;
+        // Extract the emp_id from the datalist format ("EMP-123 - John Doe")
+        const empIdToUse = empSearchVal.includes(' - ') ? empSearchVal.split(' - ')[0] : empSearchVal;
+
+        if(!dStr || !empIdToUse) return alert("Date and Employee are required.");
+
+        const amIn = document.getElementById('mAmIn').value;
+        const amOut = document.getElementById('mAmOut').value;
+        const pmIn = document.getElementById('mPmIn').value;
+        const pmOut = document.getElementById('mPmOut').value;
+
+        const logsToInsert = [];
         const currentIso = new Date().toISOString();
+
+        const createPayload = (timeStr) => {
+            if (!timeStr) return null;
+            let t = timeStr;
+            if (t.length === 5) t += ":00"; 
+            return {
+                emp_id: empIdToUse,
+                log_time: `${dStr}T${t}`,
+                device_id: 'HR_MANUAL',
+                manual_log_name: currentUser.username,
+                manual_log_date: currentIso
+            };
+        };
+
+        const p1 = createPayload(amIn);
+        if(p1) logsToInsert.push(p1);
+        
+        const p2 = createPayload(amOut);
+        if(p2) logsToInsert.push(p2);
+        
+        const p3 = createPayload(pmIn);
+        if(p3) logsToInsert.push(p3);
+        
+        const p4 = createPayload(pmOut);
+        if(p4) logsToInsert.push(p4);
+
+        if (logsToInsert.length === 0) return alert("Please provide at least one time entry.");
 
         const btn = document.getElementById('btnSubmitManual');
         btn.innerText = "INSERTING..."; btn.disabled = true;
 
         try {
-            const payload = selectedOptions.map(opt => ({
-                emp_id: opt.value,
-                log_time: timestamp,
-                device_id: 'HR_MANUAL',
-                manual_log_name: currentUser.username,
-                manual_log_date: currentIso
-            }));
-
-            const { error } = await supabaseClient.from('attendance_logs').insert(payload);
+            const { error } = await supabaseClient.from('attendance_logs').insert(logsToInsert);
             if (error) throw error;
 
-            alert(`Successfully inserted logs for ${selectedOptions.length} employee(s).`);
+            alert(`Successfully inserted ${logsToInsert.length} log(s) for the employee.`);
             closeModal('modalManual');
+            
+            // Clear inputs
+            document.getElementById('mEmployeeSearch').value = '';
+            document.getElementById('mAmIn').value = '';
+            document.getElementById('mAmOut').value = '';
+            document.getElementById('mPmIn').value = '';
+            document.getElementById('mPmOut').value = '';
             
             const viewM = document.getElementById('viewMonth').value;
             const insertM = parseInt(dStr.split('-')[1]).toString();
