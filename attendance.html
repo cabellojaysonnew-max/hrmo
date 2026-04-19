@@ -640,7 +640,6 @@
         const dStr = document.getElementById('mDate').value;
         const empSearchVal = document.getElementById('mEmployeeSearch').value;
         
-        // Extract the emp_id from the datalist format ("EMP-123 - John Doe")
         const empIdToUse = empSearchVal.includes(' - ') ? empSearchVal.split(' - ')[0] : empSearchVal;
 
         if(!dStr || !empIdToUse) return alert("Date and Employee are required.");
@@ -690,7 +689,6 @@
             alert(`Successfully inserted ${logsToInsert.length} log(s) for the employee.`);
             closeModal('modalManual');
             
-            // Clear inputs
             document.getElementById('mEmployeeSearch').value = '';
             document.getElementById('mAmIn').value = '';
             document.getElementById('mAmOut').value = '';
@@ -708,16 +706,29 @@
         }
     }
 
-    function openLockModal() { document.getElementById('modalLock').classList.remove('hidden'); }
+    function openLockModal() { 
+        // Verification: hrmo staff cannot lock
+        if (currentUser.role.toUpperCase().includes('STAFF')) {
+            return alert("Restricted: HRMO Staff members do not have permission to lock the month.");
+        }
+        document.getElementById('modalLock').classList.remove('hidden'); 
+    }
+    
     async function submitLock() {
+        // Verification: hrmo staff cannot lock
+        if (currentUser.role.toUpperCase().includes('STAFF')) {
+            return alert("Restricted: HRMO Staff members do not have permission to lock the month.");
+        }
+
         const pass = document.getElementById('lockPass').value;
         if (!pass) return alert("HR Password required to authorize.");
         
         try {
-            const { data: u, error } = await supabaseClient.from('users').select('password').eq('username', currentUser.username).single();
-            if (error || !u) throw new Error("Authentication failed.");
+            // "superpassword = hrmo account only" logic: check against the hrmo master account
+            const { data: u, error } = await supabaseClient.from('users').select('password').eq('username', 'hrmo').single();
+            if (error || !u) throw new Error("Verification failed. Master HRMO account record missing.");
             
-            if (u.password !== pass) throw new Error("Invalid Password.");
+            if (u.password !== pass) throw new Error("Invalid Authorization Password. Only the Master HRMO password can lock months.");
 
             alert("Month successfully locked. Further modifications are restricted.");
             closeModal('modalLock');
@@ -728,13 +739,8 @@
         }
     }
 
-    // ==========================================
-    // FORM 48 GENERATION LOGIC
-    // ==========================================
     function toggleF48Mode() {
         const mode = document.querySelector('input[name="f48Mode"]:checked').value;
-        
-        // Remove 'hidden' class to transition in, add to transition out
         if (mode === 'individual') {
             document.getElementById('divBatch').classList.add('opacity-0', 'pointer-events-none');
             setTimeout(() => document.getElementById('divIndividual').classList.remove('opacity-0', 'pointer-events-none'), 150);
@@ -793,14 +799,11 @@
                     let eDiv = String(e.division || '').toUpperCase().trim();
                     let eType = String(e.type || '').toUpperCase().trim();
                     
-                    if (isMarpo) eDiv = 'MARPOS'; // Special grouping for MARPOs
+                    if (isMarpo) eDiv = 'MARPOS'; 
                     if (eDiv === 'PARPO') eDiv = 'OFFICE OF THE PARPO';
-                    if (eDiv === 'PARPO I') eDiv = 'OFFICE OF THE PARPO'; // Treat PARPO I exactly the same
+                    if (eDiv === 'PARPO I') eDiv = 'OFFICE OF THE PARPO'; 
 
-                    // Apply Type Filter
                     if (empTypeFilter !== 'ALL' && eType !== empTypeFilter) return false;
-
-                    // Apply Division Filter
                     if (div === 'ALL') return true;
                     return eDiv === div;
                 });
@@ -808,7 +811,6 @@
 
             if (targetEmps.length === 0) throw new Error("No employees found for the selected criteria.");
 
-            // Initialize PDF
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
             const mName = monthNames[month];
@@ -819,7 +821,6 @@
 
             const empIds = targetEmps.map(e => e.emp_id);
             
-            // Fetch Chiefs for Division lookup
             status.innerText = "Fetching signatories...";
             const { data: chiefUsers } = await supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF');
             const chiefMap = {};
@@ -878,13 +879,12 @@
                 const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${validationId}`;
                 const dtr_qr = await urlToBase64(qrUrl);
 
-                // --- DIVISION CHIEF LOGIC ---
                 let chiefName = "_________________________";
                 let chiefPos = "DIVISION CHIEF";
                 let empDiv = (emp.division || "").toUpperCase().trim();
                 const isMarpo = String(emp.position || '').toUpperCase().includes('MARPO');
                 
-                if (isMarpo) empDiv = "LTSP"; // Treat MARPOs as LTSP for signatory mapping
+                if (isMarpo) empDiv = "LTSP"; 
 
                 if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO" || empDiv === "PARPO I") {
                     chiefName = "RICARDO C. GARCIA";
@@ -941,7 +941,6 @@
                         if (d <= endDt.getDate()) {
                             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                             const dayLogs = (logsByDate[dateStr] || []).sort((a,b) => a-b);
-                            
                             const dateObj = new Date(year, month, d);
                             const dayOfWeek = dateObj.getDay().toString();
                             
@@ -964,7 +963,6 @@
                             const key = `${emp.emp_id}_${dateStr}`;
                             let isOverrideLog = false;
 
-                            // Strict Hierarchy: Leave > PSO > TO
                             if (leaveMap[key]) {
                                 special = leaveMap[key].toUpperCase();
                                 isOverrideLog = true;
