@@ -600,10 +600,10 @@
             const currentYear = new Date().getFullYear();
             
             // Force leave explicitly includes APPROVED, DISAPPROVED, and APPLICATION of any VL type
+            // NO TRANSACTION_TYPE FILTER so we grab everything for the year
             const { data: vlData } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, debit')
-                .in('transaction_type', ['APPLICATION', 'APPROVED', 'DISAPPROVED'])
-                .or(`type.ilike.%VL%,type.ilike.%VACATION%,type.ilike.%FORCE%`)
+                .ilike('type', '%VL%')
                 .gte('start_date', `${currentYear}-01-01`)
                 .lte('start_date', `${currentYear}-12-31`);
 
@@ -1262,6 +1262,12 @@
             await loadEmployeeMaps();
             const emp = empDataMap[empId];
             if(!emp) throw new Error("Employee data missing.");
+
+            let currentBal = 0;
+            if (ledgType !== 'ALL') {
+                let balField = ledgType.toLowerCase() + '_balance';
+                currentBal = parseFloat(emp[balField] || 0);
+            }
 
             const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
