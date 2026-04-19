@@ -1000,7 +1000,7 @@
                     let eDiv = String(e.division || '').toUpperCase().trim();
                     let eType = String(e.type || '').toUpperCase().trim();
                     
-                    if (String(e.role || '').toUpperCase() === 'MARPO') eDiv = 'MARPOS'; 
+                    if (String(e.position || '').toUpperCase() === 'MARPO') eDiv = 'MARPOS'; 
                     if (eDiv === 'PARPO') eDiv = 'OFFICE OF THE PARPO';
                     if (eDiv === 'PARPO I') eDiv = 'OFFICE OF THE PARPO'; 
 
@@ -1085,7 +1085,7 @@
                 let chiefPos = "DIVISION CHIEF";
                 let empDiv = (emp.division || "").toUpperCase().trim();
                 
-                if (String(emp.role || '').toUpperCase() === 'MARPO') empDiv = "LTSP";
+                if (String(emp.position || '').toUpperCase() === 'MARPO') empDiv = "LTSP";
 
                 if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO" || empDiv === "PARPO I") {
                     chiefName = "RICARDO C. GARCIA";
