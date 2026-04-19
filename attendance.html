@@ -317,6 +317,7 @@
     if (!userData) window.location.href = 'index.html';
     const currentUser = JSON.parse(userData);
     
+    // Page access restricted to HRMO and HRMO Staff
     if (!currentUser.role.toUpperCase().includes('HR') && !currentUser.role.toUpperCase().includes('ADMIN')) {
         alert("Unauthorized Access. HR personnel only.");
         window.location.href = 'dashboard.html';
@@ -442,7 +443,7 @@
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
                 fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)),
-                fetchSafe(supabaseClient.from('holidays').select('date, name').gte('date', startDtStr).lte('date', endDtStr))
+                fetchSafe(supabaseClient.from('holidays').select('date, description').gte('date', startDtStr).lte('date', endDtStr))
             ]);
 
             const logMap = {};
@@ -467,7 +468,7 @@
             const ovrList = ovrRes.data || [];
             
             const holMap = {};
-            (holRes.data || []).forEach(h => { holMap[h.date] = h.name; });
+            (holRes.data || []).forEach(h => { holMap[h.date] = h.description; });
 
             let html = '';
             
@@ -893,7 +894,7 @@
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date, destination').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date, pso_no').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type').eq('transaction_t', 'APPROVED').in('emp_id', empIds).gte('date', startDtStr).lte('date', endDtStr)),
-                fetchSafe(supabaseClient.from('holidays').select('date, name').gte('date', startDtStr).lte('date', endDtStr))
+                fetchSafe(supabaseClient.from('holidays').select('date, description').gte('date', startDtStr).lte('date', endDtStr))
             ]);
 
             const validTOs = new Set((toRes.data || []).map(t => t.to_no));
@@ -910,7 +911,7 @@
             (leaveRes.data || []).forEach(l => { leaveMap[`${l.emp_id}_${l.date}`] = l.type; });
 
             const holMap = {};
-            (holRes.data || []).forEach(h => { holMap[h.date] = h.name; });
+            (holRes.data || []).forEach(h => { holMap[h.date] = h.description; });
 
             for (let i = 0; i < targetEmps.length; i++) {
                 const emp = targetEmps[i];
@@ -1109,6 +1110,13 @@
     // ==========================================
     // DEDUCTION SUMMARY LOGIC
     // ==========================================
+    function formatMinutesToHours(totalMinutes) {
+        if (!totalMinutes || totalMinutes <= 0) return "0m";
+        const h = Math.floor(totalMinutes / 60); 
+        const m = totalMinutes % 60;
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
     async function printDeductionSummary() {
         const btn = document.getElementById('btnGenerateDeduction');
         const status = document.getElementById('deductStatus');
@@ -1131,7 +1139,7 @@
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
                 fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)),
-                fetchSafe(supabaseClient.from('gate_pass_logs').select('emp_id, date, minutes, status').gte('date', startDtStr).lte('date', endDtStr)),
+                fetchSafe(supabaseClient.from('gate_pass_logs').select('emp_id, date, minutes, status').gte('date', startDtStr).lte('date', endDtStr).eq('status', 'APPROVED')),
                 fetchSafe(supabaseClient.from('holidays').select('date').gte('date', startDtStr).lte('date', endDtStr))
             ]);
 
