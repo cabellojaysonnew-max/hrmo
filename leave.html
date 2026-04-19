@@ -140,14 +140,10 @@
                     </div>
                     
                     <div class="card p-6 col-span-1 md:col-span-2 border-t-4 border-orange-500">
-                        <h3 class="font-bold text-orange-700 mb-4">Rolling CTO Forfeiture (1-Year Expiration)</h3>
-                        <p class="text-sm text-gray-600 mb-6">Compensatory Time-Off (CTO) credits automatically expire exactly 1 year after they were earned (issuance date). This system checks and applies expiration dynamically based on usage (FIFO), ensuring accurate balances. You can force a scan below.</p>
+                        <h3 class="font-bold text-orange-700 mb-4">Strict CTO Forfeiture (1-Year Expiration)</h3>
+                        <p class="text-sm text-gray-600 mb-6">Compensatory Time-Off (CTO) credits automatically expire exactly 1 year after they were earned based on their specific issuance date (e.g., April 1, 2025 expires on April 2, 2026). This system dynamically applies FIFO usage. Force a scan below.</p>
                         <div class="flex gap-2 items-end">
-                            <div class="flex-1">
-                                <label class="form-label">Select Expiration Target Year</label>
-                                <input type="number" id="expireCtoYear" class="form-input" value="2025">
-                            </div>
-                            <button onclick="processCtoExpiration(true)" id="btnCtoExpire" class="bg-orange-600 text-white font-bold py-2 px-6 rounded hover:bg-orange-700 shadow">Force Scan Expired CTOs</button>
+                            <button onclick="processCtoExpiration(true)" id="btnCtoExpire" class="bg-orange-600 text-white font-bold py-2 px-6 rounded hover:bg-orange-700 shadow">Scan & Forfeit Expired CTOs</button>
                         </div>
                     </div>
                 </div>
@@ -826,19 +822,12 @@
     }
 
     async function processCtoExpiration(isManual = false) {
-        const yearVal = document.getElementById('expireCtoYear').value;
-        if (!yearVal && isManual) return alert("Please enter the expiration target year.");
-
-        if (isManual && !confirm(`WARNING: This will permanently forfeit any remaining CTO balances that were earned BEFORE December 31, ${yearVal}. Proceed?`)) return;
-
         const btn = document.getElementById('btnCtoExpire');
         if(btn) { btn.disabled = true; btn.innerText = "Scanning..."; }
 
         try {
             await loadEmployeeMaps();
             
-            const targetYear = isManual ? yearVal : new Date().getFullYear() - 1;
-
             // 1. Get all CTO EARNED (Issuances)
             const { data: earnedCtos } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, credit, start_date, id')
@@ -864,9 +853,8 @@
             const ledgers = [];
             let expiredCount = 0;
 
-            const todayObj = new Date();
-            todayObj.setFullYear(todayObj.getFullYear() - 1);
-            const cutoffDate = todayObj.toISOString().split('T')[0]; // Exactly 1 year ago
+            const today = new Date();
+            today.setHours(0,0,0,0);
 
             const empGroups = {};
             (earnedCtos || []).forEach(c => {
@@ -879,16 +867,20 @@
                 let totalExpiredForEmp = 0;
 
                 empGroups[empId].forEach(issuance => {
-                    if (issuance.start_date <= cutoffDate) {
-                        // This issuance is 1+ years old
+                    const earnedDate = new Date(issuance.start_date);
+                    // Add exactly 1 year to the specific issuance date
+                    earnedDate.setFullYear(earnedDate.getFullYear() + 1);
+                    
+                    // If today is strictly past the 1-year mark of this specific CTO
+                    if (today > earnedDate) {
                         const credit = parseFloat(issuance.credit || 0);
                         if (totalUsed >= credit) {
-                            // Fully consumed by usage
+                            // Fully consumed by historical usage
                             totalUsed -= credit;
                         } else {
                             // Partially or not consumed at all -> Expires
                             const expiredAmount = credit - totalUsed;
-                            totalUsed = 0; // Used is depleted
+                            totalUsed = 0; 
                             totalExpiredForEmp += expiredAmount;
                         }
                     }
@@ -897,7 +889,6 @@
                 if (totalExpiredForEmp > 0) {
                     const emp = empDataMap[empId];
                     if (emp && parseFloat(emp.cto_balance || 0) > 0) {
-                        // Can't forfeit more than they currently have (failsafe)
                         const actualForfeit = Math.min(totalExpiredForEmp, parseFloat(emp.cto_balance));
                         
                         if (actualForfeit > 0) {
@@ -1278,26 +1269,16 @@
                 return cat === ledgType;
             });
             
-            // Sort NEWEST TO OLDEST
-            relevantData.sort((a,b) => new Date(b.created_at || b.start_date) - new Date(a.created_at || a.start_date));
+            // Sort OLDEST TO NEWEST for forwards calculation based on initial balances
+            relevantData.sort((a,b) => new Date(a.created_at || a.start_date) - new Date(b.created_at || b.start_date));
 
             const dtEnd = new Date(`${endDate}T23:59:59`);
             const dtStart = new Date(`${startDate}T00:00:00`);
-            
-            let futureData = [];
-            let rangeData = [];
 
-            relevantData.forEach(t => {
-                const tDate = new Date(t.created_at || t.start_date);
-                if(tDate > dtEnd) {
-                    futureData.push(t);
-                } else if(tDate >= dtStart && tDate <= dtEnd) {
-                    rangeData.push(t);
-                }
-            });
-
-            // Tracking object initialized with exact CURRENT balances from `employees` table
-            let runningBalances = {
+            // Initialize tracker for all balances from Employees table
+            // In this specific implementation, employees table represents INITIAL/BASE values 
+            // from which the ledger dynamically computes the running balances forwards.
+            let balances = {
                 VL: parseFloat(emp.vl_balance || 0),
                 SL: parseFloat(emp.sl_balance || 0),
                 SPL: parseFloat(emp.spl_balance || 0),
@@ -1305,71 +1286,76 @@
                 CTO: parseFloat(emp.cto_balance || 0)
             };
 
-            // Reversing future data to establish the absolute correct balance at the end of the selected period
-            futureData.forEach(f => {
-                if (f.transaction_type !== 'DISAPPROVED') {
-                    const cat = getLeaveCategory(f.type);
-                    if (cat) {
-                        runningBalances[cat] -= parseFloat(f.credit || 0);
-                        runningBalances[cat] += parseFloat(f.debit || 0);
-                    }
+            // Compute forwards for all historical transactions to get the accurate running balance for each
+            relevantData.forEach(t => {
+                const isDisapproved = t.transaction_type === 'DISAPPROVED';
+                const cat = getLeaveCategory(t.type);
+                if (cat && !isDisapproved) {
+                    balances[cat] += parseFloat(t.credit || 0);
+                    balances[cat] -= parseFloat(t.debit || 0);
                 }
+                // Store the computed balance right onto the transaction object
+                t.computedBal = (cat && !isDisapproved) ? balances[cat].toFixed(3) : '-';
             });
 
-            // Set UI summary components
+            // Set UI headers based on INITIAL values from Employees Table
             if (ledgType === 'ALL') {
-                document.getElementById('lblAllVl').innerText = runningBalances.VL.toFixed(3);
-                document.getElementById('lblAllSl').innerText = runningBalances.SL.toFixed(3);
-                document.getElementById('lblAllSpl').innerText = runningBalances.SPL.toFixed(3);
-                document.getElementById('lblAllWl').innerText = runningBalances.WL.toFixed(3);
-                document.getElementById('lblAllCto').innerText = runningBalances.CTO.toFixed(3);
+                document.getElementById('lblAllVl').innerText = parseFloat(emp.vl_balance || 0).toFixed(3);
+                document.getElementById('lblAllSl').innerText = parseFloat(emp.sl_balance || 0).toFixed(3);
+                document.getElementById('lblAllSpl').innerText = parseFloat(emp.spl_balance || 0).toFixed(3);
+                document.getElementById('lblAllWl').innerText = parseFloat(emp.wl_balance || 0).toFixed(3);
+                document.getElementById('lblAllCto').innerText = parseFloat(emp.cto_balance || 0).toFixed(3);
                 allBalDiv.classList.remove('hidden');
+                sumDiv.classList.add('hidden');
             } else {
-                const endBal = runningBalances[ledgType];
-                let begBal = endBal;
-                let totalC = 0, totalD = 0;
+                let balField = ledgType.toLowerCase() + '_balance';
+                let initialBal = parseFloat(emp[balField] || 0);
                 
+                document.getElementById('lblBegBal').innerText = initialBal.toFixed(3);
+                
+                let rangeData = relevantData.filter(t => {
+                    const tDate = new Date(t.created_at || t.start_date);
+                    return tDate >= dtStart && tDate <= dtEnd;
+                });
+                
+                let totalC = 0, totalD = 0;
                 rangeData.forEach(t => {
                     if (t.transaction_type !== 'DISAPPROVED') {
-                        const c = parseFloat(t.credit || 0);
-                        const d = parseFloat(t.debit || 0);
-                        totalC += c; totalD += d;
-                        begBal -= c; begBal += d; // moving backwards
+                        totalC += parseFloat(t.credit || 0);
+                        totalD += parseFloat(t.debit || 0);
                     }
                 });
-
-                document.getElementById('lblBegBal').innerText = begBal.toFixed(3);
+                
                 const net = totalC - totalD;
                 const netEl = document.getElementById('lblMovement');
                 netEl.innerText = (net > 0 ? '+' : '') + net.toFixed(3);
                 netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
-                document.getElementById('lblEndBal').innerText = endBal.toFixed(3);
+                
+                document.getElementById('lblEndBal').innerText = (initialBal + net).toFixed(3);
                 sumDiv.classList.remove('hidden');
+                allBalDiv.classList.add('hidden');
             }
+
+            // Filter for the chosen date range
+            let rangeData = relevantData.filter(t => {
+                const tDate = new Date(t.created_at || t.start_date);
+                return tDate >= dtStart && tDate <= dtEnd;
+            });
 
             if (rangeData.length === 0) {
                 list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this range.</td></tr>`;
                 return;
             }
 
+            // Reverse the array to display NEWEST to OLDEST on the UI
+            rangeData.sort((a,b) => new Date(b.created_at || b.start_date) - new Date(a.created_at || a.start_date));
+
             let html = '';
             
-            // Loop from Newest to Oldest to render rows
             rangeData.forEach(t => {
                 const isDisapproved = t.transaction_type === 'DISAPPROVED';
                 const cred = parseFloat(t.credit || 0);
                 const deb = parseFloat(t.debit || 0);
-                const cat = getLeaveCategory(t.type);
-
-                let rowBalDisplay = '-';
-
-                if (cat && !isDisapproved) {
-                    rowBalDisplay = runningBalances[cat].toFixed(3);
-                    // Reverse this transaction to prepare the running balance for the NEXT (older) row down
-                    runningBalances[cat] -= cred;
-                    runningBalances[cat] += deb;
-                }
-
                 const displayType = t.type ? t.type.toUpperCase() : '-';
                 const dateStr = new Date(t.created_at || t.start_date).toLocaleDateString('en-US');
                 
@@ -1385,7 +1371,7 @@
                         </td>
                         <td class="table-td font-bold ${credColor}">${cred > 0 ? '+'+cred.toFixed(3) : '-'}</td>
                         <td class="table-td font-bold ${debColor}">${deb > 0 ? '-'+deb.toFixed(3) : '-'}</td>
-                        <td class="table-td font-bold">${rowBalDisplay}</td>
+                        <td class="table-td font-bold">${t.computedBal}</td>
                     </tr>
                 `;
                 
@@ -1394,7 +1380,7 @@
                     particulars: `${t.transaction_type.replace(/_/g, ' ')}: ${displayType}`,
                     credit: cred > 0 ? `+${cred.toFixed(3)}` : '-',
                     debit: deb > 0 ? `-${deb.toFixed(3)}` : '-',
-                    runningBal: rowBalDisplay
+                    runningBal: t.computedBal
                 });
             });
             list.innerHTML = html;
