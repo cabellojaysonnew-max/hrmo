@@ -404,8 +404,20 @@
             allEmployees = data || [];
             
             let searchHtml = '';
+            
+            const userRole = currentUser.role.toUpperCase();
+            
             allEmployees.forEach(e => {
-                searchHtml += `<option value="${e.emp_id} - ${e.full_name}"></option>`;
+                const eStation = String(e.station || '').toUpperCase();
+                const eType = String(e.type || '').toUpperCase();
+                
+                if (eStation === 'DARPO-CS1') {
+                    if (userRole === 'HRMO-SPLIT' && eType === 'SPLIT') {
+                        searchHtml += `<option value="${e.emp_id} - ${e.full_name}"></option>`;
+                    } else if (userRole !== 'HRMO-SPLIT' && (eType === 'SPLIT' || eType === 'REGULAR')) {
+                        searchHtml += `<option value="${e.emp_id} - ${e.full_name}"></option>`;
+                    }
+                }
             });
             document.getElementById('f48EmployeeList').innerHTML = searchHtml;
             document.getElementById('employeeList').innerHTML = searchHtml;
@@ -476,104 +488,106 @@
                 const dObj = new Date(y, m - 1, d);
                 const dayOfWeek = dObj.getDay().toString();
 
+                const userRole = currentUser.role.toUpperCase();
+
                 allEmployees.forEach(e => {
-                    const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
-                    const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(e.type || '').toUpperCase() === 'SPLIT';
-                    const isRegular = String(e.type || '').toUpperCase() === 'REGULAR';
+                    const eStation = String(e.station || '').toUpperCase();
+                    const eType = String(e.type || '').toUpperCase();
+
+                    if (eStation !== 'DARPO-CS1') return;
+                    if (userRole === 'HRMO-SPLIT' && eType !== 'SPLIT') return;
+                    if (userRole !== 'HRMO-SPLIT' && eType !== 'SPLIT' && eType !== 'REGULAR') return;
+
+                    let expectedDays = ['1', '2', '3', '4', '5'];
+                    const override = ovrList.find(o => e.emp_id === o.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
+                    if (override && override.working_days) {
+                        expectedDays = override.working_days.split(',');
+                    }
+
+                    if (!expectedDays.includes(dayOfWeek)) return;
+
+                    let status = "PRESENT";
+                    let cssClass = "";
+                    let amIn = "-", amOut = "-", pmIn = "-", pmOut = "-", ud = "0:00";
+                    let amInId = null, amOutId = null, pmInId = null, pmOutId = null;
+
+                    const key = `${e.emp_id}_${dateStr}`;
+                    const isTO = toSet.has(key);
+                    const isLeave = leaveSet.has(key);
+                    const isPSO = psoList.some(p => p.emp_id === e.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
+                    const isHoliday = !!holMap[dateStr];
                     
-                    if (isDarpo && (isSplit || isRegular)) {
-                        let expectedDays = ['1', '2', '3', '4', '5'];
-                        const override = ovrList.find(o => e.emp_id === o.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
-                        if (override && override.working_days) {
-                            expectedDays = override.working_days.split(',');
-                        }
+                    let overrideLogs = false;
 
-                        if (!expectedDays.includes(dayOfWeek)) return;
+                    if (isLeave) { status = "ON LEAVE"; cssClass = "status-onleave"; overrideLogs = true; }
+                    else if (isPSO) { status = "ON PSO"; cssClass = "status-onpso"; overrideLogs = true; }
+                    else if (isTO) { status = "ON TO"; cssClass = "status-onto"; overrideLogs = true; }
+                    
+                    const dayLogs = (logMap[key] || []).sort((a,b) => a.time - b.time);
+                    
+                    if (isHoliday && dayLogs.length === 0 && !overrideLogs) {
+                        status = "HOLIDAY"; cssClass = "status-onpso"; overrideLogs = true;
+                    }
 
-                        let status = "PRESENT";
-                        let cssClass = "";
-                        let amIn = "-", amOut = "-", pmIn = "-", pmOut = "-", ud = "0:00";
-                        let amInId = null, amOutId = null, pmInId = null, pmOutId = null;
+                    if (!overrideLogs) {
+                        if (dayLogs.length === 0) { 
+                            status = "ABSENT"; cssClass = "status-absent"; 
+                        } else {
+                            if (dayLogs.length > 0) { amIn = formatTime12(dayLogs[0].time); amInId = dayLogs[0].id; }
+                            if (dayLogs.length > 1) { amOut = formatTime12(dayLogs[1].time); amOutId = dayLogs[1].id; }
+                            if (dayLogs.length > 2) { pmIn = formatTime12(dayLogs[2].time); pmInId = dayLogs[2].id; }
+                            if (dayLogs.length > 3) { pmOut = formatTime12(dayLogs[3].time); pmOutId = dayLogs[3].id; }
 
-                        const key = `${e.emp_id}_${dateStr}`;
-                        const isTO = toSet.has(key);
-                        const isLeave = leaveSet.has(key);
-                        const isPSO = psoList.some(p => p.emp_id === e.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
-                        const isHoliday = !!holMap[dateStr];
-                        
-                        let overrideLogs = false;
+                            let reqIn = e.flexi_range_start || '08:00:00';
+                            let reqOut = e.flexi_range_end || '17:00:00';
+                            if (override) {
+                                if (override.start_time) reqIn = override.start_time;
+                                if (override.end_time) reqOut = override.end_time;
+                            }
 
-                        if (isLeave) { status = "ON LEAVE"; cssClass = "status-onleave"; overrideLogs = true; }
-                        else if (isPSO) { status = "ON PSO"; cssClass = "status-onpso"; overrideLogs = true; }
-                        else if (isTO) { status = "ON TO"; cssClass = "status-onto"; overrideLogs = true; }
-                        
-                        const dayLogs = (logMap[key] || []).sort((a,b) => a.time - b.time);
-                        
-                        if (isHoliday && dayLogs.length === 0 && !overrideLogs) {
-                            status = "HOLIDAY"; cssClass = "status-onpso"; overrideLogs = true;
-                        }
+                            const firstLog = dayLogs[0].time;
+                            const lastLog = dayLogs[dayLogs.length - 1].time;
+                            const reqStart = new Date(`${dateStr}T${reqIn}`);
+                            const reqEnd = new Date(`${dateStr}T${reqOut}`);
 
-                        if (!overrideLogs) {
-                            if (dayLogs.length === 0) { 
-                                status = "ABSENT"; cssClass = "status-absent"; 
-                            } else {
-                                if (dayLogs.length > 0) { amIn = formatTime12(dayLogs[0].time); amInId = dayLogs[0].id; }
-                                if (dayLogs.length > 1) { amOut = formatTime12(dayLogs[1].time); amOutId = dayLogs[1].id; }
-                                if (dayLogs.length > 2) { pmIn = formatTime12(dayLogs[2].time); pmInId = dayLogs[2].id; }
-                                if (dayLogs.length > 3) { pmOut = formatTime12(dayLogs[3].time); pmOutId = dayLogs[3].id; }
+                            let utMins = 0;
+                            if (firstLog > reqStart) utMins += Math.floor((firstLog - reqStart) / 60000);
+                            if (dayLogs.length > 1 && lastLog < reqEnd) utMins += Math.floor((reqEnd - lastLog) / 60000);
 
-                                let reqIn = e.flexi_range_start || '08:00:00';
-                                let reqOut = e.flexi_range_end || '17:00:00';
-                                if (override) {
-                                    if (override.start_time) reqIn = override.start_time;
-                                    if (override.end_time) reqOut = override.end_time;
-                                }
+                            if (utMins > 0) {
+                                let h = Math.floor(utMins / 60);
+                                let m = utMins % 60;
+                                ud = `${h}:${m.toString().padStart(2, '0')}`;
+                            }
 
-                                const firstLog = dayLogs[0].time;
-                                const lastLog = dayLogs[dayLogs.length - 1].time;
-                                const reqStart = new Date(`${dateStr}T${reqIn}`);
-                                const reqEnd = new Date(`${dateStr}T${reqOut}`);
-
-                                let utMins = 0;
-                                if (firstLog > reqStart) utMins += Math.floor((firstLog - reqStart) / 60000);
-                                if (dayLogs.length > 1 && lastLog < reqEnd) utMins += Math.floor((reqEnd - lastLog) / 60000);
-
-                                if (utMins > 0) {
-                                    let h = Math.floor(utMins / 60);
-                                    let m = utMins % 60;
-                                    ud = `${h}:${m.toString().padStart(2, '0')}`;
-                                }
-
-                                if (amIn === "-" || pmOut === "-") {
-                                    status = "INCOMPLETE"; cssClass = "status-incomplete";
-                                }
+                            if (amIn === "-" || pmOut === "-") {
+                                status = "INCOMPLETE"; cssClass = "status-incomplete";
                             }
                         }
-
-                        currentViewData.push({ 
-                            emp_id: e.emp_id, 
-                            full_name: e.full_name, 
-                            division: e.division, 
-                            type: e.type,
-                            date: dateStr, 
-                            amIn, amOut, pmIn, pmOut, status 
-                        });
-
-                        html += `
-                            <tr class="hover:bg-gray-50 border-b">
-                                <td class="p-2 text-[#003811] font-mono">${e.emp_id}</td>
-                                <td class="p-2 font-bold text-gray-800 truncate max-w-[150px]" title="${e.full_name}">${e.full_name}</td>
-                                <td class="p-2 text-center text-gray-600">${dateStr}</td>
-                                <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${amInId}')">${amIn}</td>
-                                <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${amOutId}')">${amOut}</td>
-                                <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${pmInId}')">${pmIn}</td>
-                                <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${pmOutId}')">${pmOut}</td>
-                                <td class="p-2 text-center font-mono text-red-600">${ud}</td>
-                                <td class="p-2 text-center ${cssClass}">${status}</td>
-                            </tr>
-                        `;
                     }
+
+                    currentViewData.push({ 
+                        emp_id: e.emp_id, 
+                        full_name: e.full_name, 
+                        division: e.division, 
+                        type: e.type,
+                        date: dateStr, 
+                        amIn, amOut, pmIn, pmOut, status 
+                    });
+
+                    html += `
+                        <tr class="hover:bg-gray-50 border-b">
+                            <td class="p-2 text-[#003811] font-mono">${e.emp_id}</td>
+                            <td class="p-2 font-bold text-gray-800 truncate max-w-[150px]" title="${e.full_name}">${e.full_name}</td>
+                            <td class="p-2 text-center text-gray-600">${dateStr}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${amInId}')">${amIn}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${amOutId}')">${amOut}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${pmInId}')">${pmIn}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${pmOutId}')">${pmOut}</td>
+                            <td class="p-2 text-center font-mono text-red-600">${ud}</td>
+                            <td class="p-2 text-center ${cssClass}">${status}</td>
+                        </tr>
+                    `;
                 });
             }
 
@@ -608,16 +622,24 @@
 
         let parsedTime;
         try {
+            let h = 0, m = 0;
             const match = val.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
-            if (!match) throw new Error();
-            let [_, h, m, ampm] = match;
-            h = parseInt(h);
             
-            if (ampm) {
-                if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
-                if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+            if (match) {
+                h = parseInt(match[1]);
+                m = match[2];
+                if (match[3]) {
+                    if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+                    if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+                } else {
+                    if (h < 12 && td.cellIndex >= 5) h += 12; 
+                }
+            } else if (val.includes(':')) {
+                const parts = val.split(':');
+                h = parseInt(parts[0]);
+                m = parts[1];
             } else {
-                if (h < 12 && td.cellIndex >= 5) h += 12; 
+                throw new Error();
             }
             
             parsedTime = `${String(h).padStart(2, '0')}:${m}:00`;
@@ -772,7 +794,7 @@
         const logsToInsert = [];
         const currentIso = new Date().toISOString();
 
-        const createPayload = (timeStr) => {
+        const createPayload = (timeStr, isPMBox) => {
             if (!timeStr) return null;
             let val = timeStr;
             let h = 0, m = 0;
@@ -785,6 +807,8 @@
                     if (match[3]) {
                         if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
                         if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+                    } else {
+                        if (h < 12 && isPMBox) h += 12; 
                     }
                 } else if (val.includes(':')) {
                     const parts = val.split(':');
@@ -806,16 +830,16 @@
             }
         };
 
-        const p1 = createPayload(amIn);
+        const p1 = createPayload(amIn, false);
         if(p1) logsToInsert.push(p1);
         
-        const p2 = createPayload(amOut);
+        const p2 = createPayload(amOut, false);
         if(p2) logsToInsert.push(p2);
         
-        const p3 = createPayload(pmIn);
+        const p3 = createPayload(pmIn, true);
         if(p3) logsToInsert.push(p3);
         
-        const p4 = createPayload(pmOut);
+        const p4 = createPayload(pmOut, true);
         if(p4) logsToInsert.push(p4);
 
         if (logsToInsert.length === 0) return alert("Please provide at least one new time entry.");
@@ -912,10 +936,15 @@
                 const eVal = eSearchVal.includes(' - ') ? eSearchVal.split(' - ')[0].trim() : eSearchVal.trim();
                 const found = allEmployees.find(e => e.emp_id === eVal);
                 if (found) {
-                    const isMarpo = String(found.position || '').toUpperCase().includes('MARPO');
-                    const isDarpo = String(found.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(found.division || '').toUpperCase().includes('SPLIT');
-                    if (isDarpo || isMarpo || isSplit) targetEmps = [found];
+                    const isDarpo = String(found.station || '').toUpperCase() === 'DARPO-CS1';
+                    const isSplit = String(found.type || '').toUpperCase() === 'SPLIT';
+                    const isRegular = String(found.type || '').toUpperCase() === 'REGULAR';
+                    
+                    if (isDarpo && (isSplit || isRegular)) {
+                        targetEmps = [found];
+                    } else {
+                         throw new Error("Only DARPO-CS1 Regular and Split employees can be generated.");
+                    }
                 } else {
                     throw new Error("Please select a valid employee from the search list.");
                 }
@@ -924,11 +953,8 @@
                 const empTypeFilter = document.querySelector('input[name="f48Type"]:checked').value;
 
                 targetEmps = allEmployees.filter(e => {
-                    const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
-                    const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
-                    
-                    if (!isDarpo && !isMarpo && !isSplit) return false;
+                    const isDarpo = String(e.station || '').toUpperCase() === 'DARPO-CS1';
+                    if (!isDarpo) return false;
 
                     let eDiv = String(e.division || '').toUpperCase().trim();
                     let eType = String(e.type || '').toUpperCase().trim();
@@ -938,6 +964,7 @@
                     if (eDiv === 'PARPO I') eDiv = 'OFFICE OF THE PARPO'; 
 
                     if (empTypeFilter !== 'ALL' && eType !== empTypeFilter) return false;
+                    if (eType !== 'SPLIT' && eType !== 'REGULAR') return false;
 
                     if (div === 'ALL') return true;
                     return eDiv === div;
@@ -1016,9 +1043,8 @@
                 let chiefName = "_________________________";
                 let chiefPos = "DIVISION CHIEF";
                 let empDiv = (emp.division || "").toUpperCase().trim();
-                const isMarpo = String(emp.position || '').toUpperCase().includes('MARPO');
                 
-                if (isMarpo) empDiv = "LTSP";
+                if (String(emp.role || '').toUpperCase() === 'MARPO') empDiv = "LTSP";
 
                 if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO" || empDiv === "PARPO I") {
                     chiefName = "RICARDO C. GARCIA";
