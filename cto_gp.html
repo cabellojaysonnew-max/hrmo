@@ -323,7 +323,7 @@
         const fullPurpose = `${dest} - ${purp}`;
 
         try {
-            // Capture Division Chief
+            // Capture Division Chief from users table
             const empDiv = empDataMap[empId].division;
             const { data: chiefData } = await supabaseClient.from('users').select('full_name').eq('role', 'CHIEF').eq('division', empDiv).limit(1);
             const chiefName = chiefData && chiefData.length > 0 ? chiefData[0].full_name.toUpperCase() : '';
@@ -869,7 +869,7 @@
             
             if(isWeekend) {
                 creditableHours = (lastLog - firstLog) / (1000 * 60 * 60);
-                if(creditableHours > 5) creditableHours -= 1; // Basic 1 hr lunch deduction deduction logic if prolonged
+                if(creditableHours > 5) creditableHours -= 1; // Basic 1 hr lunch deduction logic if prolonged
             } else {
                 const { data: sched } = await supabaseClient.from('schedule_override')
                     .select('*').eq('emp_id', emp_id).eq('date', dateStr).limit(1);
@@ -881,8 +881,13 @@
                     const empInfo = empDataMap[emp_id];
                     if(empInfo && empInfo.flexi_range_end) endTimeStr = empInfo.flexi_range_end.substring(0,5);
                 }
+
+                // If schedule ends early (e.g., half day at 12:00), account for 1hr lunch break from 12-1
+                let schedEnd = new Date(`${dateStr}T${endTimeStr}:00+08:00`);
+                if (endTimeStr === "12:00" && lastLog > new Date(`${dateStr}T13:00:00+08:00`)) {
+                    schedEnd = new Date(`${dateStr}T13:00:00+08:00`); 
+                }
                 
-                const schedEnd = new Date(`${dateStr}T${endTimeStr}:00+08:00`);
                 if(lastLog > schedEnd) {
                     creditableHours = (lastLog - schedEnd) / (1000 * 60 * 60);
                 }
