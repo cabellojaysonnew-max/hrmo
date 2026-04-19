@@ -859,7 +859,7 @@
                 
             if(error) throw error;
             if(!logs || logs.length < 2) {
-                alert("Incomplete or no attendance logs found for this date.");
+                alert("Incomplete or no attendance logs found for this date. You may enter the hours manually.");
                 return;
             }
             
@@ -867,21 +867,24 @@
             const lastLog = new Date(logs[logs.length-1].log_time);
             let creditableHours = 0;
             
-            if(isWeekend) {
+            const { data: sched } = await supabaseClient.from('schedule_override')
+                .select('*').eq('emp_id', emp_id).eq('date', dateStr).limit(1);
+                
+            let endTimeStr = "17:00"; 
+            let isHalfDay = false;
+            
+            if(sched && sched.length > 0 && sched[0].end_time) {
+                endTimeStr = sched[0].end_time.substring(0,5);
+                if(endTimeStr === "12:00") isHalfDay = true;
+            } else {
+                const empInfo = empDataMap[emp_id];
+                if(empInfo && empInfo.flexi_range_end) endTimeStr = empInfo.flexi_range_end.substring(0,5);
+            }
+
+            if(isWeekend && !isHalfDay) {
                 creditableHours = (lastLog - firstLog) / (1000 * 60 * 60);
                 if(creditableHours > 5) creditableHours -= 1; // Basic 1 hr lunch deduction logic if prolonged
             } else {
-                const { data: sched } = await supabaseClient.from('schedule_override')
-                    .select('*').eq('emp_id', emp_id).eq('date', dateStr).limit(1);
-                    
-                let endTimeStr = "17:00"; 
-                if(sched && sched.length > 0 && sched[0].end_time) {
-                    endTimeStr = sched[0].end_time.substring(0,5);
-                } else {
-                    const empInfo = empDataMap[emp_id];
-                    if(empInfo && empInfo.flexi_range_end) endTimeStr = empInfo.flexi_range_end.substring(0,5);
-                }
-
                 // If schedule ends early (e.g., half day at 12:00), account for 1hr lunch break from 12-1
                 let schedEnd = new Date(`${dateStr}T${endTimeStr}:00+08:00`);
                 if (endTimeStr === "12:00" && lastLog > new Date(`${dateStr}T13:00:00+08:00`)) {
@@ -894,9 +897,11 @@
             }
             
             const numEl = document.getElementById(`baseHr_${recordId}`);
-            if(creditableHours < 2) {
-                alert(`Calculated excess time is ${creditableHours.toFixed(2)} hours. (Must be 2 hours or more to be creditable). Outputting raw value for HR review.`);
-                numEl.value = creditableHours > 0 ? creditableHours.toFixed(2) : 0;
+            if(creditableHours > 0 && creditableHours < 2) {
+                alert(`Calculated excess time is ${creditableHours.toFixed(2)} hours. (Must be 2 hours or more to be creditable). Outputting raw value for HR review. You may also enter the hours manually.`);
+                numEl.value = creditableHours.toFixed(2);
+            } else if (creditableHours <= 0) {
+                numEl.value = "0";
             } else {
                 numEl.value = creditableHours.toFixed(2);
             }
