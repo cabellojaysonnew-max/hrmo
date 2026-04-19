@@ -317,7 +317,6 @@
     if (!userData) window.location.href = 'index.html';
     const currentUser = JSON.parse(userData);
     
-    // Page access restricted to HRMO and HRMO Staff
     if (!currentUser.role.toUpperCase().includes('HR') && !currentUser.role.toUpperCase().includes('ADMIN')) {
         alert("Unauthorized Access. HR personnel only.");
         window.location.href = 'dashboard.html';
@@ -901,8 +900,7 @@
             const toMap = {};
             (itinRes.data || []).forEach(i => {
                 if(validTOs.has(i.to_no)) {
-                    const t = toRes.data.find(x => x.to_no === i.to_no);
-                    if(t) toMap[`${t.emp_id}_${i.travel_date}`] = i.destination;
+                    toMap[`${i.to_no}_${i.travel_date}`] = i.to_no; // Store the TO Number instead of destination
                 }
             });
 
@@ -1021,12 +1019,15 @@
                                 if(pso) {
                                     special = `PSO ${pso.pso_no || ''}`.toUpperCase();
                                     isOverrideLog = true;
-                                } else if (toMap[key]) {
-                                    special = `TO - ${toMap[key]}`.toUpperCase();
-                                    isOverrideLog = true;
-                                } else if (holMap[dateStr]) {
-                                    special = holMap[dateStr].toUpperCase();
-                                    isOverrideLog = (dayLogs.length === 0);
+                                } else {
+                                    const toRecord = (toRes.data || []).find(t => t.emp_id === emp.emp_id);
+                                    if (toRecord && toMap[`${toRecord.to_no}_${dateStr}`]) {
+                                        special = `TO - ${toMap[`${toRecord.to_no}_${dateStr}`]}`.toUpperCase();
+                                        isOverrideLog = true;
+                                    } else if (holMap[dateStr]) {
+                                        special = holMap[dateStr].toUpperCase();
+                                        isOverrideLog = (dayLogs.length === 0);
+                                    }
                                 }
                             }
 
@@ -1041,7 +1042,7 @@
                                     const hr = time.getHours();
                                     const fmt = formatTime12(time);
                                     if(hr < 12 && !amIn) amIn = fmt;
-                                    else if(hr <= 12 && time.getMinutes() <= 30 && !amOut) amOut = fmt;
+                                    else if(hr <= 12 && time.getMinutes() <= 30 && amOut) amOut = fmt;
                                     else if(hr <= 14 && !pmIn) pmIn = fmt;
                                     else pmOut = fmt;
                                 });
