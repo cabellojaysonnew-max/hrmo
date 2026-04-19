@@ -599,18 +599,20 @@
 
             const currentYear = new Date().getFullYear();
             
-            // Force leave explicitly includes APPROVED, DISAPPROVED, and APPLICATION of any VL type
-            // NO TRANSACTION_TYPE FILTER so we grab everything for the year
             const { data: vlData } = await supabaseClient.from('leave_ledger')
-                .select('emp_id, debit')
-                .ilike('type', '%VL%')
+                .select('emp_id, debit, type, transaction_type')
                 .gte('start_date', `${currentYear}-01-01`)
                 .lte('start_date', `${currentYear}-12-31`);
 
             if(vlData) {
                 vlData.forEach(fl => {
-                    if(!currentForceLeaveStatus[fl.emp_id]) currentForceLeaveStatus[fl.emp_id] = 0;
-                    currentForceLeaveStatus[fl.emp_id] += Math.abs(parseFloat(fl.debit || 0));
+                    const tType = (fl.type || '').toUpperCase();
+                    if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE')) {
+                        if (['APPLICATION', 'APPROVED', 'DISAPPROVED'].includes(fl.transaction_type)) {
+                            if(!currentForceLeaveStatus[fl.emp_id]) currentForceLeaveStatus[fl.emp_id] = 0;
+                            currentForceLeaveStatus[fl.emp_id] += Math.abs(parseFloat(fl.debit || 0));
+                        }
+                    }
                 });
             }
 
@@ -1263,12 +1265,6 @@
             const emp = empDataMap[empId];
             if(!emp) throw new Error("Employee data missing.");
 
-            let currentBal = 0;
-            if (ledgType !== 'ALL') {
-                let balField = ledgType.toLowerCase() + '_balance';
-                currentBal = parseFloat(emp[balField] || 0);
-            }
-
             const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
                 .eq('emp_id', empId)
@@ -1300,8 +1296,8 @@
                 }
             });
 
-            // Initialize tracker for all balances from Employees table
-            let balances = {
+            // Tracking object initialized with exact CURRENT balances from `employees` table
+            let runningBalances = {
                 VL: parseFloat(emp.vl_balance || 0),
                 SL: parseFloat(emp.sl_balance || 0),
                 SPL: parseFloat(emp.spl_balance || 0),
@@ -1309,30 +1305,36 @@
                 CTO: parseFloat(emp.cto_balance || 0)
             };
 
-            // Reverse future data to find balance at exact end of selected period
+            // Reversing future data to establish the absolute correct balance at the end of the selected period
             futureData.forEach(f => {
                 if (f.transaction_type !== 'DISAPPROVED') {
                     const cat = getLeaveCategory(f.type);
                     if (cat) {
-                        balances[cat] -= parseFloat(f.credit || 0);
-                        balances[cat] += parseFloat(f.debit || 0);
+                        runningBalances[cat] -= parseFloat(f.credit || 0);
+                        runningBalances[cat] += parseFloat(f.debit || 0);
                     }
                 }
             });
 
-            // Set UI headers based on type
-            if (ledgType !== 'ALL') {
-                const endBal = balances[ledgType];
-                
-                // Calculate backwards just to get the beginning balance for summary
+            // Set UI summary components
+            if (ledgType === 'ALL') {
+                document.getElementById('lblAllVl').innerText = runningBalances.VL.toFixed(3);
+                document.getElementById('lblAllSl').innerText = runningBalances.SL.toFixed(3);
+                document.getElementById('lblAllSpl').innerText = runningBalances.SPL.toFixed(3);
+                document.getElementById('lblAllWl').innerText = runningBalances.WL.toFixed(3);
+                document.getElementById('lblAllCto').innerText = runningBalances.CTO.toFixed(3);
+                allBalDiv.classList.remove('hidden');
+            } else {
+                const endBal = runningBalances[ledgType];
                 let begBal = endBal;
                 let totalC = 0, totalD = 0;
+                
                 rangeData.forEach(t => {
                     if (t.transaction_type !== 'DISAPPROVED') {
                         const c = parseFloat(t.credit || 0);
                         const d = parseFloat(t.debit || 0);
                         totalC += c; totalD += d;
-                        begBal -= c; begBal += d;
+                        begBal -= c; begBal += d; // moving backwards
                     }
                 });
 
@@ -1343,13 +1345,6 @@
                 netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
                 document.getElementById('lblEndBal').innerText = endBal.toFixed(3);
                 sumDiv.classList.remove('hidden');
-            } else {
-                document.getElementById('lblAllVl').innerText = balances.VL.toFixed(3);
-                document.getElementById('lblAllSl').innerText = balances.SL.toFixed(3);
-                document.getElementById('lblAllSpl').innerText = balances.SPL.toFixed(3);
-                document.getElementById('lblAllWl').innerText = balances.WL.toFixed(3);
-                document.getElementById('lblAllCto').innerText = balances.CTO.toFixed(3);
-                allBalDiv.classList.remove('hidden');
             }
 
             if (rangeData.length === 0) {
@@ -1359,7 +1354,7 @@
 
             let html = '';
             
-            // Loop from newest to oldest
+            // Loop from Newest to Oldest to render rows
             rangeData.forEach(t => {
                 const isDisapproved = t.transaction_type === 'DISAPPROVED';
                 const cred = parseFloat(t.credit || 0);
@@ -1369,10 +1364,10 @@
                 let rowBalDisplay = '-';
 
                 if (cat && !isDisapproved) {
-                    rowBalDisplay = balances[cat].toFixed(3);
-                    // Reverse the transaction for the NEXT older row
-                    balances[cat] -= cred;
-                    balances[cat] += deb;
+                    rowBalDisplay = runningBalances[cat].toFixed(3);
+                    // Reverse this transaction to prepare the running balance for the NEXT (older) row down
+                    runningBalances[cat] -= cred;
+                    runningBalances[cat] += deb;
                 }
 
                 const displayType = t.type ? t.type.toUpperCase() : '-';
