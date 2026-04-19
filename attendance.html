@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="supabase-config.js"></script>
     <style>
         :root {
@@ -163,8 +164,9 @@
                             <div class="h-[85px] bg-gray-50 p-3 rounded border relative overflow-hidden">
                                 
                                 <div id="divIndividual" class="absolute inset-0 p-3 w-full transition-opacity duration-200">
-                                    <label class="form-label text-[10px]">Select Employee</label>
-                                    <select id="f48Employee" class="form-input py-1.5"></select>
+                                    <label class="form-label text-[10px]">Search Employee</label>
+                                    <input type="text" id="f48Employee" list="f48EmployeeList" class="form-input py-1.5" placeholder="Type name or ID...">
+                                    <datalist id="f48EmployeeList"></datalist>
                                 </div>
 
                                 <div id="divBatch" class="absolute inset-0 p-3 w-full opacity-0 pointer-events-none transition-opacity duration-200">
@@ -281,8 +283,9 @@
     if (!userData) window.location.href = 'index.html';
     const currentUser = JSON.parse(userData);
     
+    // Page access restricted to HRMO and HRMO Staff
     if (!currentUser.role.toUpperCase().includes('HR') && !currentUser.role.toUpperCase().includes('ADMIN')) {
-        alert("Unauthorized Access. HRMO personnel only.");
+        alert("Unauthorized Access. HR personnel only.");
         window.location.href = 'dashboard.html';
     }
 
@@ -340,12 +343,11 @@
             const { data } = await supabaseClient.from('employees').select('*').order('full_name');
             allEmployees = data || [];
             
-            let f48Html = '', searchHtml = '';
+            let searchHtml = '';
             allEmployees.forEach(e => {
-                f48Html += `<option value="${e.emp_id}">${e.emp_id} - ${e.full_name}</option>`;
                 searchHtml += `<option value="${e.emp_id} - ${e.full_name}"></option>`;
             });
-            document.getElementById('f48Employee').innerHTML = f48Html;
+            document.getElementById('f48EmployeeList').innerHTML = searchHtml;
             document.getElementById('employeeList').innerHTML = searchHtml;
         } catch (e) {
             console.error("Fetch employees failed.", e);
@@ -640,6 +642,7 @@
         const dStr = document.getElementById('mDate').value;
         const empSearchVal = document.getElementById('mEmployeeSearch').value;
         
+        // Extract the emp_id from the datalist format ("EMP-123 - John Doe")
         const empIdToUse = empSearchVal.includes(' - ') ? empSearchVal.split(' - ')[0] : empSearchVal;
 
         if(!dStr || !empIdToUse) return alert("Date and Employee are required.");
@@ -689,6 +692,7 @@
             alert(`Successfully inserted ${logsToInsert.length} log(s) for the employee.`);
             closeModal('modalManual');
             
+            // Clear inputs
             document.getElementById('mEmployeeSearch').value = '';
             document.getElementById('mAmIn').value = '';
             document.getElementById('mAmOut').value = '';
@@ -707,28 +711,23 @@
     }
 
     function openLockModal() { 
-        // Verification: hrmo staff cannot lock
-        if (currentUser.role.toUpperCase().includes('STAFF')) {
-            return alert("Restricted: HRMO Staff members do not have permission to lock the month.");
+        const role = currentUser.role.toUpperCase();
+        // Restrict lock functionality strictly to HRMO head account or ADMIN
+        if (role !== 'HRMO' && role !== 'ADMIN') {
+            return alert("Access Denied: Only the head HRMO account is authorized to lock the monthly ledger. HR Staff accounts are not permitted.");
         }
         document.getElementById('modalLock').classList.remove('hidden'); 
     }
     
     async function submitLock() {
-        // Verification: hrmo staff cannot lock
-        if (currentUser.role.toUpperCase().includes('STAFF')) {
-            return alert("Restricted: HRMO Staff members do not have permission to lock the month.");
-        }
-
         const pass = document.getElementById('lockPass').value;
         if (!pass) return alert("HR Password required to authorize.");
         
         try {
-            // "superpassword = hrmo account only" logic: check against the hrmo master account
-            const { data: u, error } = await supabaseClient.from('users').select('password').eq('username', 'hrmo').single();
-            if (error || !u) throw new Error("Verification failed. Master HRMO account record missing.");
+            const { data: u, error } = await supabaseClient.from('users').select('password').eq('username', currentUser.username).single();
+            if (error || !u) throw new Error("Authentication failed.");
             
-            if (u.password !== pass) throw new Error("Invalid Authorization Password. Only the Master HRMO password can lock months.");
+            if (u.password !== pass) throw new Error("Invalid Password.");
 
             alert("Month successfully locked. Further modifications are restricted.");
             closeModal('modalLock');
@@ -739,8 +738,13 @@
         }
     }
 
+    // ==========================================
+    // FORM 48 GENERATION LOGIC
+    // ==========================================
     function toggleF48Mode() {
         const mode = document.querySelector('input[name="f48Mode"]:checked').value;
+        
+        // Remove 'hidden' class to transition in, add to transition out
         if (mode === 'individual') {
             document.getElementById('divBatch').classList.add('opacity-0', 'pointer-events-none');
             setTimeout(() => document.getElementById('divIndividual').classList.remove('opacity-0', 'pointer-events-none'), 150);
@@ -777,13 +781,16 @@
         try {
             let targetEmps = [];
             if (mode === 'individual') {
-                const eVal = document.getElementById('f48Employee').value;
+                const eSearchVal = document.getElementById('f48Employee').value;
+                const eVal = eSearchVal.includes(' - ') ? eSearchVal.split(' - ')[0].trim() : eSearchVal.trim();
                 const found = allEmployees.find(e => e.emp_id === eVal);
                 if (found) {
                     const isMarpo = String(found.position || '').toUpperCase().includes('MARPO');
                     const isDarpo = String(found.station || '').toUpperCase().includes('DARPO-CS1');
                     const isSplit = String(found.division || '').toUpperCase().includes('SPLIT');
                     if (isDarpo || isMarpo || isSplit) targetEmps = [found];
+                } else {
+                    throw new Error("Please select a valid employee from the search list.");
                 }
             } else {
                 const div = document.getElementById('f48Division').value;
@@ -799,11 +806,14 @@
                     let eDiv = String(e.division || '').toUpperCase().trim();
                     let eType = String(e.type || '').toUpperCase().trim();
                     
-                    if (isMarpo) eDiv = 'MARPOS'; 
+                    if (isMarpo) eDiv = 'MARPOS'; // Special grouping for MARPOs
                     if (eDiv === 'PARPO') eDiv = 'OFFICE OF THE PARPO';
-                    if (eDiv === 'PARPO I') eDiv = 'OFFICE OF THE PARPO'; 
+                    if (eDiv === 'PARPO I') eDiv = 'OFFICE OF THE PARPO'; // Treat PARPO I exactly the same
 
+                    // Apply Type Filter
                     if (empTypeFilter !== 'ALL' && eType !== empTypeFilter) return false;
+
+                    // Apply Division Filter
                     if (div === 'ALL') return true;
                     return eDiv === div;
                 });
@@ -811,6 +821,7 @@
 
             if (targetEmps.length === 0) throw new Error("No employees found for the selected criteria.");
 
+            // Initialize PDF
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
             const mName = monthNames[month];
@@ -821,6 +832,7 @@
 
             const empIds = targetEmps.map(e => e.emp_id);
             
+            // Fetch Chiefs for Division lookup
             status.innerText = "Fetching signatories...";
             const { data: chiefUsers } = await supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF');
             const chiefMap = {};
@@ -879,12 +891,13 @@
                 const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${validationId}`;
                 const dtr_qr = await urlToBase64(qrUrl);
 
+                // --- DIVISION CHIEF LOGIC ---
                 let chiefName = "_________________________";
                 let chiefPos = "DIVISION CHIEF";
                 let empDiv = (emp.division || "").toUpperCase().trim();
                 const isMarpo = String(emp.position || '').toUpperCase().includes('MARPO');
                 
-                if (isMarpo) empDiv = "LTSP"; 
+                if (isMarpo) empDiv = "LTSP"; // Treat MARPOs as LTSP for signatory mapping
 
                 if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO" || empDiv === "PARPO I") {
                     chiefName = "RICARDO C. GARCIA";
@@ -941,6 +954,7 @@
                         if (d <= endDt.getDate()) {
                             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                             const dayLogs = (logsByDate[dateStr] || []).sort((a,b) => a-b);
+                            
                             const dateObj = new Date(year, month, d);
                             const dayOfWeek = dateObj.getDay().toString();
                             
@@ -963,6 +977,7 @@
                             const key = `${emp.emp_id}_${dateStr}`;
                             let isOverrideLog = false;
 
+                            // Strict Hierarchy: Leave > PSO > TO
                             if (leaveMap[key]) {
                                 special = leaveMap[key].toUpperCase();
                                 isOverrideLog = true;
