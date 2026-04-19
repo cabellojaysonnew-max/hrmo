@@ -138,6 +138,18 @@
                             <button onclick="generateYearlyCredits()" class="bg-[#D4AF37] text-black font-bold py-2 px-4 rounded hover:brightness-110 shadow">Grant Yearly Credits</button>
                         </div>
                     </div>
+                    
+                    <div class="card p-6 col-span-1 md:col-span-2 border-t-4 border-orange-500">
+                        <h3 class="font-bold text-orange-700 mb-4">Rolling CTO Forfeiture (1-Year Expiration)</h3>
+                        <p class="text-sm text-gray-600 mb-6">Compensatory Time-Off (CTO) credits automatically expire exactly 1 year after they were earned (issuance date). This system checks and applies expiration dynamically based on usage (FIFO), ensuring accurate balances. You can force a scan below.</p>
+                        <div class="flex gap-2 items-end">
+                            <div class="flex-1">
+                                <label class="form-label">Select Expiration Target Year</label>
+                                <input type="number" id="expireCtoYear" class="form-input" value="2025">
+                            </div>
+                            <button onclick="processCtoExpiration(true)" id="btnCtoExpire" class="bg-orange-600 text-white font-bold py-2 px-6 rounded hover:bg-orange-700 shadow">Force Scan Expired CTOs</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -300,6 +312,29 @@
                             <div class="bg-[#f0fdf4] p-4 rounded border border-green-200">
                                 <span class="block text-xs font-bold text-green-700 uppercase">Ending Balance</span>
                                 <span id="lblEndBal" class="text-xl font-bold text-green-800">-</span>
+                            </div>
+                        </div>
+
+                        <div id="allBalancesSummary" class="mb-4 grid grid-cols-5 gap-2 text-center hidden">
+                            <div class="bg-gray-100 p-3 rounded border">
+                                <span class="block text-[10px] font-bold text-gray-500 uppercase">VL</span>
+                                <span id="lblAllVl" class="text-lg font-bold text-[#003811]">-</span>
+                            </div>
+                            <div class="bg-gray-100 p-3 rounded border">
+                                <span class="block text-[10px] font-bold text-gray-500 uppercase">SL</span>
+                                <span id="lblAllSl" class="text-lg font-bold text-[#003811]">-</span>
+                            </div>
+                            <div class="bg-gray-100 p-3 rounded border">
+                                <span class="block text-[10px] font-bold text-gray-500 uppercase">SPL</span>
+                                <span id="lblAllSpl" class="text-lg font-bold text-[#003811]">-</span>
+                            </div>
+                            <div class="bg-gray-100 p-3 rounded border">
+                                <span class="block text-[10px] font-bold text-gray-500 uppercase">WL</span>
+                                <span id="lblAllWl" class="text-lg font-bold text-[#003811]">-</span>
+                            </div>
+                            <div class="bg-gray-100 p-3 rounded border">
+                                <span class="block text-[10px] font-bold text-gray-500 uppercase">CTO</span>
+                                <span id="lblAllCto" class="text-lg font-bold text-[#003811]">-</span>
                             </div>
                         </div>
 
@@ -559,6 +594,9 @@
             const emps = Object.values(empDataMap);
             if (emps.length === 0) throw new Error("No REGULAR employees found.");
 
+            // Run auto CTO expiration silently in the background
+            processCtoExpiration(false).catch(e => console.error(e));
+
             const currentYear = new Date().getFullYear();
             const { data: vlData } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, debit')
@@ -780,6 +818,111 @@
             alert("Error: " + e.message);
         }
     }
+
+    async function processCtoExpiration(isManual = false) {
+        const yearVal = document.getElementById('expireCtoYear').value;
+        if (!yearVal && isManual) return alert("Please enter the expiration target year.");
+
+        if (isManual && !confirm(`WARNING: This will permanently forfeit any remaining CTO balances that were earned BEFORE December 31, ${yearVal}. Proceed?`)) return;
+
+        const btn = document.getElementById('btnCtoExpire');
+        if(btn) { btn.disabled = true; btn.innerText = "Scanning..."; }
+
+        try {
+            await loadEmployeeMaps();
+            
+            const targetYear = isManual ? yearVal : new Date().getFullYear() - 1;
+
+            const { data: earnedCtos } = await supabaseClient.from('leave_ledger')
+                .select('emp_id, credit, start_date, id')
+                .eq('transaction_type', 'CREDIT')
+                .eq('type', 'CTO EARNED')
+                .order('start_date', { ascending: true }); 
+
+            const { data: usedCtos } = await supabaseClient.from('leave_ledger')
+                .select('emp_id, debit')
+                .in('transaction_type', ['APPROVED', 'FORFEITURE'])
+                .ilike('type', '%CTO%');
+
+            const usedMap = {};
+            if (usedCtos) {
+                usedCtos.forEach(c => {
+                    if(!usedMap[c.emp_id]) usedMap[c.emp_id] = 0;
+                    usedMap[c.emp_id] += parseFloat(c.debit || 0);
+                });
+            }
+
+            const updates = [];
+            const ledgers = [];
+            let expiredCount = 0;
+
+            const todayObj = new Date();
+            todayObj.setFullYear(todayObj.getFullYear() - 1);
+            const cutoffDate = todayObj.toISOString().split('T')[0]; 
+
+            const empGroups = {};
+            (earnedCtos || []).forEach(c => {
+                if(!empGroups[c.emp_id]) empGroups[c.emp_id] = [];
+                empGroups[c.emp_id].push(c);
+            });
+
+            for (const empId in empGroups) {
+                let totalUsed = usedMap[empId] || 0;
+                let totalExpiredForEmp = 0;
+
+                empGroups[empId].forEach(issuance => {
+                    if (issuance.start_date <= cutoffDate) {
+                        const credit = parseFloat(issuance.credit || 0);
+                        if (totalUsed >= credit) {
+                            totalUsed -= credit;
+                        } else {
+                            const expiredAmount = credit - totalUsed;
+                            totalUsed = 0; 
+                            totalExpiredForEmp += expiredAmount;
+                        }
+                    }
+                });
+
+                if (totalExpiredForEmp > 0) {
+                    const emp = empDataMap[empId];
+                    if (emp && parseFloat(emp.cto_balance || 0) > 0) {
+                        const actualForfeit = Math.min(totalExpiredForEmp, parseFloat(emp.cto_balance));
+                        
+                        if (actualForfeit > 0) {
+                            const newBal = (parseFloat(emp.cto_balance) - actualForfeit).toFixed(3);
+                            updates.push( supabaseClient.from('employees').update({ cto_balance: newBal }).eq('emp_id', empId) );
+                            
+                            ledgers.push({
+                                emp_id: empId,
+                                type: 'CTO EXPIRATION',
+                                debit: actualForfeit,
+                                transaction_type: 'FORFEITURE',
+                                remarks: `Automatic Forfeiture of CTO unused 1 year after issuance.`,
+                                start_date: new Date().toISOString().split('T')[0]
+                            });
+                            expiredCount++;
+                        }
+                    }
+                }
+            }
+
+            if (updates.length > 0) {
+                await Promise.all(updates);
+                await supabaseClient.from('leave_ledger').insert(ledgers);
+                await loadEmployeeMaps();
+                if(isManual && btn) alert(`Successfully processed auto-expiration. Deducted expired CTO for ${expiredCount} employee(s).`);
+            } else {
+                if(isManual && btn) alert(`System scanned successfully. No expired CTO balances found.`);
+            }
+
+        } catch (e) {
+            console.error(e);
+            if(isManual && btn) alert("Error processing CTO expiration: " + e.message);
+        } finally {
+            if(btn) { btn.disabled = false; btn.innerText = "Force Scan Expired CTOs"; }
+        }
+    }
+
 
     // --- TAB 4: GATE PASS PROCESSING ---
     async function loadGatePasses() {
@@ -1076,6 +1219,7 @@
         const ledgType = document.getElementById('ledgType').value;
         const list = document.getElementById('ledger-list');
         const sumDiv = document.getElementById('ledgerSummary');
+        const allBalDiv = document.getElementById('allBalancesSummary');
         const btnPrint = document.getElementById('btnPrintLedger');
 
         if (!empId || !startDate || !endDate) {
@@ -1090,6 +1234,7 @@
 
         list.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching ledger data...</td></tr>`;
         sumDiv.classList.add('hidden');
+        allBalDiv.classList.add('hidden');
         btnPrint.classList.add('hidden');
         currentLedgerDataToPrint = []; 
 
@@ -1173,6 +1318,13 @@
                 netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
                 document.getElementById('lblEndBal').innerText = endOfMonthBal.toFixed(3);
                 sumDiv.classList.remove('hidden');
+            } else {
+                document.getElementById('lblAllVl').innerText = parseFloat(emp.vl_balance || 0).toFixed(3);
+                document.getElementById('lblAllSl').innerText = parseFloat(emp.sl_balance || 0).toFixed(3);
+                document.getElementById('lblAllSpl').innerText = parseFloat(emp.spl_balance || 0).toFixed(3);
+                document.getElementById('lblAllWl').innerText = parseFloat(emp.wl_balance || 0).toFixed(3);
+                document.getElementById('lblAllCto').innerText = parseFloat(emp.cto_balance || 0).toFixed(3);
+                allBalDiv.classList.remove('hidden');
             }
 
             if (monthData.length === 0) {
@@ -1199,6 +1351,57 @@
                 let credColor = cred > 0 ? 'text-green-600' : 'text-gray-400';
                 let debColor = deb > 0 ? 'text-red-600' : 'text-gray-400';
 
+                let rowBalDisplay = isDisapproved || ledgType === 'ALL' ? '-' : runningBal.toFixed(3);
+
+                // Specific case for ALL LEAVE TYPES: Re-calculate the balance based on the specific type for that row
+                if (ledgType === 'ALL' && !isDisapproved) {
+                     let specificType = '';
+                     if (displayType.includes('VL') || displayType.includes('VACATION') || displayType.includes('GATE PASS') || displayType.includes('FORCE LEAVE')) specificType = 'vl_balance';
+                     else if (displayType.includes('SL') || displayType.includes('SICK')) specificType = 'sl_balance';
+                     else if (displayType.includes('SPL') || displayType.includes('SPECIAL')) specificType = 'spl_balance';
+                     else if (displayType.includes('WL') || displayType.includes('WELLNESS') || displayType.includes('MANDATORY')) specificType = 'wl_balance';
+                     else if (displayType.includes('CTO') || displayType.includes('COMPENSATORY') || displayType.includes('EXPIRATION')) specificType = 'cto_balance';
+                     
+                     if (specificType) {
+                         // Find the balance for this specific type by reversing future transactions of THIS TYPE ONLY
+                         let specificBal = parseFloat(emp[specificType] || 0);
+                         futureData.forEach(f => {
+                             const fType = (f.type || '').toUpperCase();
+                             let isMatch = false;
+                             if (specificType === 'vl_balance' && (fType.includes('VL') || fType.includes('VACATION') || fType.includes('GATE PASS') || fType.includes('FORCE LEAVE'))) isMatch = true;
+                             else if (specificType === 'sl_balance' && (fType.includes('SL') || fType.includes('SICK'))) isMatch = true;
+                             else if (specificType === 'spl_balance' && (fType.includes('SPL') || fType.includes('SPECIAL'))) isMatch = true;
+                             else if (specificType === 'wl_balance' && (fType.includes('WL') || fType.includes('WELLNESS') || fType.includes('MANDATORY'))) isMatch = true;
+                             else if (specificType === 'cto_balance' && (fType.includes('CTO') || fType.includes('COMPENSATORY') || fType.includes('EXPIRATION'))) isMatch = true;
+
+                             if (isMatch && f.transaction_type !== 'DISAPPROVED') {
+                                 specificBal -= parseFloat(f.credit || 0);
+                                 specificBal += parseFloat(f.debit || 0);
+                             }
+                         });
+                         
+                         // Find where this transaction is in the monthData to reverse up to this point
+                         let currentSpecificBal = specificBal;
+                         const tIndex = monthData.indexOf(t);
+                         for (let i = monthData.length - 1; i > tIndex; i--) {
+                             const pastT = monthData[i];
+                             const pastTType = (pastT.type || '').toUpperCase();
+                             let isMatch = false;
+                             if (specificType === 'vl_balance' && (pastTType.includes('VL') || pastTType.includes('VACATION') || pastTType.includes('GATE PASS') || pastTType.includes('FORCE LEAVE'))) isMatch = true;
+                             else if (specificType === 'sl_balance' && (pastTType.includes('SL') || pastTType.includes('SICK'))) isMatch = true;
+                             else if (specificType === 'spl_balance' && (pastTType.includes('SPL') || pastTType.includes('SPECIAL'))) isMatch = true;
+                             else if (specificType === 'wl_balance' && (pastTType.includes('WL') || pastTType.includes('WELLNESS') || pastTType.includes('MANDATORY'))) isMatch = true;
+                             else if (specificType === 'cto_balance' && (pastTType.includes('CTO') || pastTType.includes('COMPENSATORY') || pastTType.includes('EXPIRATION'))) isMatch = true;
+
+                             if (isMatch && pastT.transaction_type !== 'DISAPPROVED') {
+                                 currentSpecificBal -= parseFloat(pastT.credit || 0);
+                                 currentSpecificBal += parseFloat(pastT.debit || 0);
+                             }
+                         }
+                         rowBalDisplay = currentSpecificBal.toFixed(3);
+                     }
+                }
+
                 html += `
                     <tr class="${isDisapproved ? 'bg-red-50 opacity-70' : 'hover:bg-gray-50'}">
                         <td class="table-td">${dateStr}</td>
@@ -1208,7 +1411,7 @@
                         </td>
                         <td class="table-td font-bold ${credColor}">${cred > 0 ? '+'+cred.toFixed(3) : '-'}</td>
                         <td class="table-td font-bold ${debColor}">${deb > 0 ? '-'+deb.toFixed(3) : '-'}</td>
-                        <td class="table-td font-bold">${isDisapproved || ledgType === 'ALL' ? '-' : runningBal.toFixed(3)}</td>
+                        <td class="table-td font-bold">${rowBalDisplay}</td>
                     </tr>
                 `;
                 
@@ -1218,11 +1421,11 @@
                     particulars: `${t.transaction_type.replace(/_/g, ' ')}: ${displayType}`,
                     credit: cred > 0 ? `+${cred.toFixed(3)}` : '-',
                     debit: deb > 0 ? `-${deb.toFixed(3)}` : '-',
-                    runningBal: isDisapproved || ledgType === 'ALL' ? '-' : runningBal.toFixed(3)
+                    runningBal: rowBalDisplay
                 });
             });
             list.innerHTML = html;
-            btnPrint.classList.remove('hidden'); // Show print button
+            btnPrint.classList.remove('hidden'); 
 
         } catch (e) {
             list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
@@ -1236,10 +1439,12 @@
         const doc = new jsPDF('p', 'mm', 'a4');
         
         const empId = document.getElementById('ledgEmpId').value;
-        const empName = empDataMap[empId] ? empDataMap[empId].full_name.toUpperCase() : empId;
+        const emp = empDataMap[empId];
+        const empName = emp ? emp.full_name.toUpperCase() : empId;
         const startDate = document.getElementById('ledgStartDate').value;
         const endDate = document.getElementById('ledgEndDate').value;
         const ledgType = document.getElementById('ledgType').options[document.getElementById('ledgType').selectedIndex].text;
+        const isAllTypes = document.getElementById('ledgType').value === 'ALL';
 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(14);
@@ -1252,6 +1457,19 @@
         doc.text(`Period: ${startDate} to ${endDate}`, 14, 40);
 
         let y = 50;
+
+        if (isAllTypes && emp) {
+            doc.setFont("helvetica", "bold");
+            doc.text("CURRENT BALANCES:", 14, y);
+            y += 6;
+            doc.setFont("helvetica", "normal");
+            doc.text(`VL: ${parseFloat(emp.vl_balance || 0).toFixed(3)}`, 14, y);
+            doc.text(`SL: ${parseFloat(emp.sl_balance || 0).toFixed(3)}`, 40, y);
+            doc.text(`SPL: ${parseFloat(emp.spl_balance || 0).toFixed(3)}`, 66, y);
+            doc.text(`WL: ${parseFloat(emp.wl_balance || 0).toFixed(3)}`, 92, y);
+            doc.text(`CTO: ${parseFloat(emp.cto_balance || 0).toFixed(3)}`, 118, y);
+            y += 10;
+        }
         
         // Table Header
         doc.setFont("helvetica", "bold");
