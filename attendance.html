@@ -317,7 +317,6 @@
     if (!userData) window.location.href = 'index.html';
     const currentUser = JSON.parse(userData);
     
-    // Page access restricted to HRMO and HRMO Staff
     if (!currentUser.role.toUpperCase().includes('HR') && !currentUser.role.toUpperCase().includes('ADMIN')) {
         alert("Unauthorized Access. HR personnel only.");
         window.location.href = 'dashboard.html';
@@ -390,7 +389,14 @@
         await fetchEmployees();
     };
 
-    const fetchSafe = (query) => query.catch(e => { console.error('Fetch error:', e); return { data: [] }; });
+    const fetchSafe = async (query) => {
+        try {
+            return await query;
+        } catch(e) {
+            console.error('Fetch error:', e);
+            return { data: [] };
+        }
+    };
 
     async function fetchEmployees() {
         try {
@@ -413,9 +419,6 @@
         return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).replace(' AM', '').replace(' PM','');
     }
 
-    // ==========================================
-    // MONTHLY LOG VIEW LOGIC (WITH INLINE EDITING)
-    // ==========================================
     async function generateMonthlyView() {
         const btn = document.getElementById('btnGenerateView');
         const tbody = document.getElementById('logsTableBody');
@@ -432,13 +435,14 @@
             const endDt = new Date(y, m, 0);
             const endDtStr = `${y}-${String(m).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
 
-            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes] = await Promise.all([
+            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, holRes] = await Promise.all([
                 fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
                 fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED')),
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
-                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr))
+                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)),
+                fetchSafe(supabaseClient.from('holidays').select('date, name').gte('date', startDtStr).lte('date', endDtStr))
             ]);
 
             const logMap = {};
@@ -461,6 +465,9 @@
             const psoList = psoRes.data || [];
             const leaveSet = new Set((leaveRes.data || []).map(l => `${l.emp_id}_${l.date}`));
             const ovrList = ovrRes.data || [];
+            
+            const holMap = {};
+            (holRes.data || []).forEach(h => { holMap[h.date] = h.name; });
 
             let html = '';
             
@@ -493,6 +500,7 @@
                     const isTO = toSet.has(key);
                     const isLeave = leaveSet.has(key);
                     const isPSO = psoList.some(p => p.emp_id === e.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
+                    const isHoliday = !!holMap[dateStr];
                     
                     let overrideLogs = false;
 
@@ -500,8 +508,13 @@
                     else if (isPSO) { status = "ON PSO"; cssClass = "status-onpso"; overrideLogs = true; }
                     else if (isTO) { status = "ON TO"; cssClass = "status-onto"; overrideLogs = true; }
                     
+                    const dayLogs = (logMap[key] || []).sort((a,b) => a-b);
+                    
+                    if (isHoliday && dayLogs.length === 0 && !overrideLogs) {
+                        status = "HOLIDAY"; cssClass = "status-onpso"; overrideLogs = true;
+                    }
+
                     if (!overrideLogs) {
-                        const dayLogs = (logMap[key] || []).sort((a,b) => a-b);
                         if (dayLogs.length === 0) { 
                             status = "ABSENT"; cssClass = "status-absent"; 
                         } else {
@@ -554,7 +567,6 @@
         }
     }
 
-    // --- INLINE EDITING LOGIC ---
     function inlineEdit(td, emp_id, dateStr) {
         if (td.querySelector('input')) return; 
         const oldVal = td.innerText;
@@ -613,7 +625,6 @@
         }
     }
 
-    // --- PRINT MISSING LOGS ---
     function printMissingLogs() {
         const missing = currentViewData.filter(d => d.status === 'ABSENT' || d.status === 'INCOMPLETE');
         if (missing.length === 0) return alert("No missing logs to print for this period.");
@@ -686,9 +697,6 @@
         doc.save(`Missing_Logs_${m}_${y}.pdf`);
     }
 
-    // ==========================================
-    // MANUAL BATCH ENTRY & LOCK LOGIC
-    // ==========================================
     function openManualEntryModal() { document.getElementById('modalManual').classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
@@ -696,7 +704,6 @@
         const dStr = document.getElementById('mDate').value;
         const empSearchVal = document.getElementById('mEmployeeSearch').value;
         
-        // Extract the emp_id from the datalist format ("EMP-123 - John Doe")
         const empIdToUse = empSearchVal.includes(' - ') ? empSearchVal.split(' - ')[0] : empSearchVal;
 
         if(!dStr || !empIdToUse) return alert("Date and Employee are required.");
@@ -746,7 +753,6 @@
             alert(`Successfully inserted ${logsToInsert.length} log(s) for the employee.`);
             closeModal('modalManual');
             
-            // Clear inputs
             document.getElementById('mEmployeeSearch').value = '';
             document.getElementById('mAmIn').value = '';
             document.getElementById('mAmOut').value = '';
@@ -791,9 +797,6 @@
         }
     }
 
-    // ==========================================
-    // FORM 48 GENERATION LOGIC
-    // ==========================================
     function toggleF48Mode() {
         const mode = document.querySelector('input[name="f48Mode"]:checked').value;
         
@@ -804,19 +807,6 @@
             document.getElementById('divIndividual').classList.add('opacity-0', 'pointer-events-none');
             setTimeout(() => document.getElementById('divBatch').classList.remove('opacity-0', 'pointer-events-none'), 150);
         }
-    }
-
-    async function urlToBase64(url) {
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
-        } catch(e) { return null; }
     }
 
     window.generateForm48Trigger = async function() {
@@ -882,7 +872,7 @@
             const empIds = targetEmps.map(e => e.emp_id);
             
             status.innerText = "Fetching signatories...";
-            const { data: chiefUsers } = await supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF');
+            const { data: chiefUsers } = await fetchSafe(supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF'));
             const chiefMap = {};
             (chiefUsers || []).forEach(u => {
                 if(u.division) {
@@ -892,17 +882,18 @@
             });
 
             status.innerText = "Fetching attendance logs...";
-            const { data: allLogs } = await supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', empIds).gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59");
+            const { data: allLogs } = await fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', empIds).gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59"));
             
             status.innerText = "Fetching schedule overrides...";
-            const { data: allOverrides } = await supabaseClient.from('schedule_overrides').select('*').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr);
+            const { data: allOverrides } = await fetchSafe(supabaseClient.from('schedule_overrides').select('*').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr));
 
-            status.innerText = "Fetching TO, PSO, and Leaves...";
-            const [toRes, itinRes, psoRes, leaveRes] = await Promise.all([
-                supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED'),
-                supabaseClient.from('itinerary').select('to_no, travel_date, destination').gte('travel_date', startDtStr).lte('travel_date', endDtStr),
-                supabaseClient.from('pso_records').select('emp_id, start_date, end_date, pso_no').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr),
-                supabaseClient.from('leave_ledger').select('emp_id, date, type').eq('transaction_t', 'APPROVED').in('emp_id', empIds).gte('date', startDtStr).lte('date', endDtStr)
+            status.innerText = "Fetching TO, PSO, Leaves and Holidays...";
+            const [toRes, itinRes, psoRes, leaveRes, holRes] = await Promise.all([
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED')),
+                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date, destination').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
+                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date, pso_no').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr)),
+                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type').eq('transaction_t', 'APPROVED').in('emp_id', empIds).gte('date', startDtStr).lte('date', endDtStr)),
+                fetchSafe(supabaseClient.from('holidays').select('date, name').gte('date', startDtStr).lte('date', endDtStr))
             ]);
 
             const validTOs = new Set((toRes.data || []).map(t => t.to_no));
@@ -917,6 +908,9 @@
             const psoList = psoRes.data || [];
             const leaveMap = {};
             (leaveRes.data || []).forEach(l => { leaveMap[`${l.emp_id}_${l.date}`] = l.type; });
+
+            const holMap = {};
+            (holRes.data || []).forEach(h => { holMap[h.date] = h.name; });
 
             for (let i = 0; i < targetEmps.length; i++) {
                 const emp = targetEmps[i];
@@ -935,10 +929,6 @@
 
                 const schedOverrides = (allOverrides || []).filter(o => o.emp_id === emp.emp_id);
 
-                let validationId = crypto.randomUUID();
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${validationId}`;
-                const dtr_qr = await urlToBase64(qrUrl);
-
                 let chiefName = "_________________________";
                 let chiefPos = "DIVISION CHIEF";
                 let empDiv = (emp.division || "").toUpperCase().trim();
@@ -956,8 +946,6 @@
                 }
 
                 const drawForm = (startX, startY) => {
-                    if (dtr_qr) { try { doc.addImage(dtr_qr, 'PNG', startX + 73, startY, 12, 12); } catch(e){} }
-                    
                     doc.setFont("helvetica", "italic"); doc.setFontSize(6);
                     doc.text("CIVIL SERVICE FORM 48", startX, startY + 3);
                     doc.setFont("helvetica", "bold"); doc.setFontSize(9);
@@ -1035,6 +1023,9 @@
                                 } else if (toMap[key]) {
                                     special = `TO - ${toMap[key]}`.toUpperCase();
                                     isOverrideLog = true;
+                                } else if (holMap[dateStr]) {
+                                    special = holMap[dateStr].toUpperCase();
+                                    isOverrideLog = (dayLogs.length === 0);
                                 }
                             }
 
@@ -1133,14 +1124,15 @@
             const endDt = new Date(y, m + 1, 0);
             const endDtStr = `${y}-${String(m+1).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
 
-            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, gpRes] = await Promise.all([
+            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, gpRes, holRes] = await Promise.all([
                 fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
                 fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED')),
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
                 fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)),
-                fetchSafe(supabaseClient.from('gate_pass_logs').select('emp_id, date, minutes, status').gte('date', startDtStr).lte('date', endDtStr))
+                fetchSafe(supabaseClient.from('gate_pass_logs').select('emp_id, date, minutes, status').gte('date', startDtStr).lte('date', endDtStr)),
+                fetchSafe(supabaseClient.from('holidays').select('date').gte('date', startDtStr).lte('date', endDtStr))
             ]);
 
             const validTOs = new Set((toRes.data || []).map(t => t.to_no));
@@ -1162,6 +1154,8 @@
                     currD.setDate(currD.getDate() + 1);
                 }
             });
+
+            const holidays = new Set((holRes.data || []).map(h => h.date));
 
             const logsByEmp = {};
             (logsRes.data || []).forEach(l => {
@@ -1190,7 +1184,7 @@
                 for (let d = 1; d <= endDt.getDate(); d++) {
                     const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                     
-                    if (excusedSet.has(`${emp.emp_id}_${dateStr}`)) continue;
+                    if (excusedSet.has(`${emp.emp_id}_${dateStr}`) || holidays.has(dateStr)) continue;
 
                     const dayOfWeek = new Date(y, m, d).getDay().toString();
                     let expectedDays = ['1', '2', '3', '4', '5'];
