@@ -1137,6 +1137,9 @@
                         doc.rect(startX, ty, cw_day, row_h);
                         doc.text(String(d), startX + 4, ty + 3, { align: "center" });
 
+                        let isOverrideLog = false;
+                        let special = "";
+
                         if (d <= endDt.getDate()) {
                             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                             const dayLogs = (logsByDate[dateStr] || []).sort((a,b) => a-b);
@@ -1151,7 +1154,6 @@
                             }
                             
                             let isWeekend = !expectedDays.includes(dayOfWeek);
-                            let special = "";
                             
                             if (isWeekend) {
                                 if (dayOfWeek === '0') special = "SUNDAY";
@@ -1161,7 +1163,6 @@
                             }
                             
                             const key = `${emp.emp_id}_${dateStr}`;
-                            let isOverrideLog = false;
 
                             if (leaveMap[key]) {
                                 special = leaveMap[key].toUpperCase();
