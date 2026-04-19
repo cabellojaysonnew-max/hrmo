@@ -233,13 +233,19 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 bg-gray-50 border rounded mt-4">
                         <div>
                             <label class="form-label">Sched Setup</label>
-                            <select id="s_schedule_type" class="form-input"><option value="Flexi">Flexi</option><option value="Fixed">Fixed</option></select>
+                            <select id="s_schedule_type" class="form-input" onchange="toggleHalfDay()">
+                                <option value="Flexi">Flexi</option>
+                                <option value="Fixed">Fixed</option>
+                                <option value="Half-Day (AM)">Half-Day (AM Only)</option>
+                                <option value="Half-Day (PM)">Half-Day (PM Only)</option>
+                                <option value="Suspension">Suspension (No Work)</option>
+                            </select>
                         </div>
                         <div><label class="form-label">Time 1 (In/Earliest)</label><input type="time" id="s_start_time" class="form-input"></div>
                         <div><label class="form-label">Time 2 (Out/Latest)</label><input type="time" id="s_end_time" class="form-input"></div>
                     </div>
 
-                    <div class="p-4 bg-gray-50 border rounded mt-4">
+                    <div class="p-4 bg-gray-50 border rounded mt-4" id="divWorkDays">
                         <label class="form-label mb-2">Active Working Days (OP MO 114 Compressed Week)</label>
                         <div class="flex flex-wrap gap-4">
                             <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="1" checked class="w-4 h-4 accent-[#003811]"> Mon</label>
@@ -488,10 +494,34 @@
         }
     }
 
-
     // ==========================================
     // WORK SCHEDULE CONFIGURATOR LOGIC
     // ==========================================
+    function toggleHalfDay() {
+        const type = document.getElementById('s_schedule_type').value;
+        const timeIn = document.getElementById('s_start_time');
+        const timeOut = document.getElementById('s_end_time');
+        const dayChecks = document.querySelectorAll('input[name="s_work_days"]');
+        
+        // Reset state
+        timeIn.disabled = false;
+        timeOut.disabled = false;
+        dayChecks.forEach(cb => cb.disabled = false);
+
+        if (type === 'Suspension') {
+            timeIn.value = ''; timeOut.value = '';
+            timeIn.disabled = true; timeOut.disabled = true;
+            // Uncheck and disable all days to force full absence recognition
+            dayChecks.forEach(cb => { cb.checked = false; cb.disabled = true; });
+        } else if (type === 'Half-Day (AM)') {
+            timeIn.value = '08:00'; timeOut.value = '12:00';
+            dayChecks.forEach(cb => cb.disabled = false);
+        } else if (type === 'Half-Day (PM)') {
+            timeIn.value = '13:00'; timeOut.value = '17:00';
+            dayChecks.forEach(cb => cb.disabled = false);
+        }
+    }
+
     async function checkActiveSetup() {
         const target = document.getElementById('s_target').value;
         const lbl = document.getElementById('sched_current_setup');
@@ -533,11 +563,13 @@
         // NEW: Gather Working Days
         const selectedDays = Array.from(document.querySelectorAll('input[name="s_work_days"]:checked')).map(cb => cb.value).join(',');
 
-        if (!sDate || !eDate || !sTime || !eTime) {
-            return alert("All fields (Dates and Times) are required.");
+        if (!sDate || !eDate) {
+            return alert("Start and End Dates are required.");
         }
-        if (!selectedDays) {
-            return alert("Please select at least one working day.");
+        
+        if (sType !== 'Suspension') {
+            if (!sTime || !eTime) return alert("Time 1 and Time 2 are required unless it is a full Suspension.");
+            if (!selectedDays) return alert("Please select at least one working day.");
         }
 
         if (new Date(eDate) < new Date(sDate)) {
@@ -555,9 +587,9 @@
         btn.innerText = "UPDATING..."; btn.disabled = true;
         lbl.innerText = "";
 
-        // Format to Postgres Time
-        if(sTime.length === 5) sTime += ":00";
-        if(eTime.length === 5) eTime += ":00";
+        // Format to Postgres Time, handle nulls for Suspension
+        if(sTime && sTime.length === 5) sTime += ":00";
+        if(eTime && eTime.length === 5) eTime += ":00";
 
         try {
             const targetIds = target === "ALL" ? allEmployees.map(e => e.emp_id) : [target];
@@ -566,9 +598,9 @@
                 schedule_type: sType,
                 start_date: sDate,
                 end_date: eDate,
-                start_time: sTime,
-                end_time: eTime,
-                working_days: selectedDays
+                start_time: sTime || null,
+                end_time: eTime || null,
+                working_days: sType === 'Suspension' ? null : selectedDays // Clear working days entirely if suspension
             }));
 
             const { error } = await supabaseClient.from('schedule_overrides').insert(payload);
