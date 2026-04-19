@@ -868,7 +868,12 @@
             let creditableHours = 0;
             
             const { data: sched } = await supabaseClient.from('schedule_override')
-                .select('*').eq('emp_id', emp_id).eq('date', dateStr).limit(1);
+                .select('*')
+                .eq('emp_id', emp_id)
+                .lte('start_date', dateStr)
+                .gte('end_date', dateStr)
+                .order('created_at', { ascending: false })
+                .limit(1);
                 
             let endTimeStr = "17:00"; 
             let isHalfDay = false;
