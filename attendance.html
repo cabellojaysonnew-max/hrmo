@@ -441,7 +441,7 @@
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
-                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)),
+                fetchSafe(supabaseClient.from('schedule_overrides').select('*').lte('start_date', endDtStr).gte('end_date', startDtStr).order('created_at', { ascending: false })),
                 fetchSafe(supabaseClient.from('holidays').select('date, description').gte('date', startDtStr).lte('date', endDtStr))
             ]);
 
@@ -485,7 +485,7 @@
                     if (!isDarpo && !isMarpo && !isSplit && !isRegular) return;
 
                     let expectedDays = ['1', '2', '3', '4', '5'];
-                    const override = ovrList.find(o => o.emp_id === e.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
+                    const override = ovrList.find(o => e.emp_id === o.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
                     if (override && override.working_days) {
                         expectedDays = override.working_days.split(',');
                     }
@@ -519,16 +519,33 @@
                         if (dayLogs.length === 0) { 
                             status = "ABSENT"; cssClass = "status-absent"; 
                         } else {
-                            dayLogs.forEach(log => {
-                                const time = log.time;
-                                const hr = time.getHours();
-                                const fmt = formatTime12(time);
-                                if(hr < 12 && amIn === "-") { amIn = fmt; amInId = log.id; }
-                                else if(hr <= 12 && time.getMinutes() <= 30 && amOut === "-") { amOut = fmt; amOutId = log.id; }
-                                else if(hr <= 14 && pmIn === "-") { pmIn = fmt; pmInId = log.id; }
-                                else { pmOut = fmt; pmOutId = log.id; }
-                            });
-                            
+                            if (dayLogs.length > 0) { amIn = formatTime12(dayLogs[0].time); amInId = dayLogs[0].id; }
+                            if (dayLogs.length > 1) { amOut = formatTime12(dayLogs[1].time); amOutId = dayLogs[1].id; }
+                            if (dayLogs.length > 2) { pmIn = formatTime12(dayLogs[2].time); pmInId = dayLogs[2].id; }
+                            if (dayLogs.length > 3) { pmOut = formatTime12(dayLogs[3].time); pmOutId = dayLogs[3].id; }
+
+                            let reqIn = e.flexi_range_start || '08:00:00';
+                            let reqOut = e.flexi_range_end || '17:00:00';
+                            if (override) {
+                                if (override.start_time) reqIn = override.start_time;
+                                if (override.end_time) reqOut = override.end_time;
+                            }
+
+                            const firstLog = dayLogs[0].time;
+                            const lastLog = dayLogs[dayLogs.length - 1].time;
+                            const reqStart = new Date(`${dateStr}T${reqIn}`);
+                            const reqEnd = new Date(`${dateStr}T${reqOut}`);
+
+                            let utMins = 0;
+                            if (firstLog > reqStart) utMins += Math.floor((firstLog - reqStart) / 60000);
+                            if (dayLogs.length > 1 && lastLog < reqEnd) utMins += Math.floor((reqEnd - lastLog) / 60000);
+
+                            if (utMins > 0) {
+                                let h = Math.floor(utMins / 60);
+                                let m = utMins % 60;
+                                ud = `${h}:${m.toString().padStart(2, '0')}`;
+                            }
+
                             if (amIn === "-" || pmOut === "-") {
                                 status = "INCOMPLETE"; cssClass = "status-incomplete";
                             }
@@ -934,7 +951,7 @@
             const { data: allLogs } = await fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', empIds).gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59"));
             
             status.innerText = "Fetching schedule overrides...";
-            const { data: allOverrides } = await fetchSafe(supabaseClient.from('schedule_overrides').select('*').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr));
+            const { data: allOverrides } = await fetchSafe(supabaseClient.from('schedule_overrides').select('*').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr).order('created_at', { ascending: false }));
 
             status.innerText = "Fetching TO, PSO, Leaves and Holidays...";
             const [toRes, itinRes, psoRes, leaveRes, holRes] = await Promise.all([
@@ -1087,23 +1104,48 @@
                                 doc.setFont("helvetica", "normal"); doc.setFontSize(7);
                             } else {
                                 let amIn="", amOut="", pmIn="", pmOut="";
-                                dayLogs.forEach(time => {
-                                    const hr = time.getHours();
-                                    const fmt = formatTime12(time);
-                                    if(hr < 12 && !amIn) amIn = fmt;
-                                    else if(hr <= 12 && time.getMinutes() <= 30 && amOut) amOut = fmt;
-                                    else if(hr <= 14 && !pmIn) pmIn = fmt;
-                                    else pmOut = fmt;
-                                });
+                                if (dayLogs.length > 0) amIn = formatTime12(dayLogs[0]);
+                                if (dayLogs.length > 1) amOut = formatTime12(dayLogs[1]);
+                                if (dayLogs.length > 2) pmIn = formatTime12(dayLogs[2]);
+                                if (dayLogs.length > 3) pmOut = formatTime12(dayLogs[3]);
+
+                                let utH = "", utM = "";
+                                if (dayLogs.length > 0) {
+                                    let reqIn = emp.flexi_range_start || '08:00:00';
+                                    let reqOut = emp.flexi_range_end || '17:00:00';
+                                    let activeOvr = schedOverrides.find(o => dateStr >= o.start_date && dateStr <= o.end_date);
+                                    if (activeOvr) {
+                                        if (activeOvr.start_time) reqIn = activeOvr.start_time;
+                                        if (activeOvr.end_time) reqOut = activeOvr.end_time;
+                                    }
+
+                                    const firstLog = dayLogs[0];
+                                    const lastLog = dayLogs[dayLogs.length - 1];
+                                    const reqStart = new Date(`${dateStr}T${reqIn}`);
+                                    const reqEnd = new Date(`${dateStr}T${reqOut}`);
+
+                                    let utMins = 0;
+                                    if (firstLog > reqStart) utMins += Math.floor((firstLog - reqStart) / 60000);
+                                    if (dayLogs.length > 1 && lastLog < reqEnd) utMins += Math.floor((reqEnd - lastLog) / 60000);
+
+                                    if (utMins > 0) {
+                                        let h = Math.floor(utMins / 60);
+                                        let m = utMins % 60;
+                                        if (h > 0) utH = h.toString();
+                                        utM = m.toString();
+                                    }
+                                }
 
                                 doc.rect(startX + cw_day, ty, cw_time, row_h); doc.text(amIn, startX + cw_day + 7, ty + 3, { align: "center" });
                                 doc.rect(startX + cw_day + cw_time, ty, cw_time, row_h); doc.text(amOut, startX + cw_day + cw_time + 7, ty + 3, { align: "center" });
                                 doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, row_h); doc.text(pmIn, startX + cw_day + (cw_time * 2) + 7, ty + 3, { align: "center" });
                                 doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, row_h); doc.text(pmOut, startX + cw_day + (cw_time * 3) + 7, ty + 3, { align: "center" });
+                                
+                                doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h); 
+                                if (utH) doc.text(utH, startX + cw_day + (cw_time * 4) + 5.5, ty + 3, { align: "center" });
+                                doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h); 
+                                if (utM) doc.text(utM, startX + cw_day + (cw_time * 4) + cw_u + 5.5, ty + 3, { align: "center" });
                             }
-                            
-                            doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h); 
-                            doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h); 
 
                         } else {
                             doc.rect(startX + cw_day, ty, cw_time, row_h);
@@ -1113,6 +1155,12 @@
                             doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h);
                             doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h);
                         }
+                        
+                        if (d <= endDt.getDate() && (isOverrideLog || (special && (logsByDate[`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`] || []).length === 0))) {
+                            doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h);
+                            doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h);
+                        }
+
                         ty += row_h;
                     }
                     
@@ -1188,7 +1236,7 @@
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
-                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)),
+                fetchSafe(supabaseClient.from('schedule_overrides').select('*').lte('start_date', endDtStr).gte('end_date', startDtStr).order('created_at', { ascending: false })),
                 fetchSafe(supabaseClient.from('gate_pass_logs').select('emp_id, date, minutes, status').gte('date', startDtStr).lte('date', endDtStr).eq('status', 'APPROVED')),
                 fetchSafe(supabaseClient.from('holidays').select('date').gte('date', startDtStr).lte('date', endDtStr))
             ]);
@@ -1246,16 +1294,14 @@
 
                     const dayOfWeek = new Date(y, m, d).getDay().toString();
                     let expectedDays = ['1', '2', '3', '4', '5'];
-                    let startReqStr = emp.flexi_range_start || '08:00:00';
-                    let cutoffStr = emp.flexi_range_end || '08:00:00';
-                    let overrideEndStr = null;
+                    let reqIn = emp.flexi_range_start || '08:00:00';
+                    let reqOut = emp.flexi_range_end || '17:00:00';
 
                     const override = schedOverrides.find(o => dateStr >= o.start_date && dateStr <= o.end_date);
                     if (override) {
                         if (override.working_days) expectedDays = override.working_days.split(',');
-                        startReqStr = override.start_time || startReqStr;
-                        cutoffStr = override.start_time || cutoffStr;
-                        overrideEndStr = override.end_time;
+                        if (override.start_time) reqIn = override.start_time;
+                        if (override.end_time) reqOut = override.end_time;
                     }
 
                     if (!expectedDays.includes(dayOfWeek)) continue;
@@ -1266,23 +1312,14 @@
                     const firstLog = dayLogs[0];
                     const lastLog = dayLogs[dayLogs.length - 1];
 
-                    const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
-                    const startDate = new Date(dateStr + 'T' + startReqStr);
+                    const reqStart = new Date(`${dateStr}T${reqIn}`);
+                    const reqEnd = new Date(`${dateStr}T${reqOut}`);
 
-                    if (firstLog > cutoffDate) {
-                        tardiness += Math.floor((firstLog - cutoffDate) / 60000);
+                    if (firstLog > reqStart) {
+                        tardiness += Math.floor((firstLog - reqStart) / 60000);
                     }
-
-                    let requiredEnd;
-                    if (overrideEndStr) {
-                        requiredEnd = new Date(dateStr + 'T' + overrideEndStr);
-                    } else {
-                        let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
-                        requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
-                    }
-
-                    if (lastLog < requiredEnd && firstLog !== lastLog) {
-                        undertime += Math.floor((requiredEnd - lastLog) / 60000);
+                    if (dayLogs.length > 1 && lastLog < reqEnd) {
+                        undertime += Math.floor((reqEnd - lastLog) / 60000);
                     }
                 }
 
