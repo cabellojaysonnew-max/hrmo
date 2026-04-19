@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance & Form 48 - DAR HRMO</title>
+    <title>Dashboard - DAR HRMO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -16,29 +16,11 @@
         }
         body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
         .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
-        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
-        .form-input:focus { outline: none; border-color: var(--color-primary); ring: 1px solid var(--color-primary); }
-        .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.25rem; text-transform: uppercase; }
         
-        .scroll-list::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scroll-list::-webkit-scrollbar { width: 4px; }
         .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
         .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
         .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-
-        .tab-btn { transition: all 0.2s; }
-        .tab-active { background-color: #FFFFFF; border-top: 4px solid var(--color-secondary); color: var(--color-primary); font-weight: bold; }
-        .tab-inactive { background-color: #F3F4F6; color: #6B7280; font-weight: 600; border-top: 4px solid transparent; }
-        .tab-inactive:hover { background-color: #E5E7EB; }
-        .modal-bg { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); }
-
-        .status-onto { color: #1976D2; font-weight: bold; }
-        .status-onpso { color: #C62828; font-weight: bold; }
-        .status-onleave { color: #8E24AA; font-weight: bold; }
-        .status-absent { color: #D32F2F; font-weight: bold; font-style: italic; }
-        .status-incomplete { color: #E64A19; font-weight: bold; }
-        
-        .editable-cell { cursor: pointer; transition: background-color 0.2s; }
-        .editable-cell:hover { background-color: #FEF3C7; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
@@ -49,9 +31,9 @@
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
-            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
             <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
-            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">ATTENDANCE</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
             <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
             <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
@@ -62,333 +44,125 @@
             <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
         </div>
     </nav>
-
-    <main class="flex-1 flex flex-col overflow-hidden bg-gray-100 relative">
-        <div class="px-8 pt-8 pb-4 flex justify-between items-end">
+    
+    <main class="flex-1 overflow-y-auto p-8 relative">
+        <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
             <div>
-                <h2 class="text-3xl font-bold text-[#003811]">Monthly Attendance & Form 48</h2>
-                <p class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide">Log Management & Civil Service Generation</p>
+                <h2 class="text-3xl font-bold text-[#003811]">Operations Dashboard</h2>
+                <p id="scopeLabel" class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide"></p>
             </div>
-            <button onclick="openLockModal()" class="bg-red-700 text-white px-4 py-2 rounded text-xs font-bold shadow hover:bg-red-800 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                LOCK MONTH
-            </button>
+            <p id="dashDate" class="text-[#D4AF37] font-bold text-lg bg-white px-4 py-2 rounded shadow-sm border border-gray-200"></p>
         </div>
-
-        <div class="flex px-8 border-b border-gray-300">
-            <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn tab-active px-6 py-3 rounded-t-lg">Monthly Log View</button>
-            <button onclick="switchTab('f48')" id="tab-f48" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Form 48 Generator</button>
-            <button onclick="switchTab('deduction')" id="tab-deduction" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Deduction</button>
-        </div>
-
-        <div id="module-logs" class="flex-1 flex flex-col p-8 overflow-hidden">
-            <div class="card bg-white flex flex-col h-full overflow-hidden">
-                <div class="p-4 border-b bg-gray-50 flex flex-wrap gap-4 items-end">
-                    <div>
-                        <label class="form-label">Month</label>
-                        <select id="viewMonth" class="form-input py-1.5 w-32">
-                            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
-                            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
-                            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
-                            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label">Year</label>
-                        <select id="viewYear" class="form-input py-1.5 w-24"></select>
-                    </div>
-                    <button onclick="generateMonthlyView()" id="btnGenerateView" class="bg-[#003811] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-[#006400]">GENERATE VIEW</button>
-                    
-                    <div class="flex-1"></div>
-                    <button onclick="printMissingLogs()" class="bg-[#C62828] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-red-800 shadow-sm mr-2">PRINT MISSING LOGS</button>
-                    <button onclick="openManualEntryModal()" class="bg-[#D4AF37] text-[#003811] px-4 py-1.5 rounded text-sm font-bold hover:bg-yellow-500 shadow-sm">+ MANUAL ENTRY</button>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="card p-6 border-l-4 border-[#003811] flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Staff</p>
+                    <h3 id="statTotal" class="text-4xl font-bold text-[#003811] mt-1">0</h3>
                 </div>
-                
-                <div class="flex-1 overflow-auto scroll-list">
-                    <table class="w-full text-xs text-left whitespace-nowrap" id="tblLogs">
-                        <thead class="bg-[#003811] text-white sticky top-0 z-10">
-                            <tr>
-                                <th class="p-3 font-bold border-b">EMP ID</th>
-                                <th class="p-3 font-bold border-b">NAME</th>
-                                <th class="p-3 font-bold border-b text-center">DATE</th>
-                                <th class="p-3 font-bold border-b text-center">AM IN</th>
-                                <th class="p-3 font-bold border-b text-center">AM OUT</th>
-                                <th class="p-3 font-bold border-b text-center">PM IN</th>
-                                <th class="p-3 font-bold border-b text-center">PM OUT</th>
-                                <th class="p-3 font-bold border-b text-center">UNDERTIME</th>
-                                <th class="p-3 font-bold border-b text-center">STATUS</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logsTableBody" class="divide-y">
-                            <tr><td colspan="9" class="p-8 text-center text-gray-400 italic">Select Month & Year, then click Generate View...</td></tr>
-                        </tbody>
-                    </table>
+                <div class="bg-green-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#003811]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
+            </div>
+            <div class="card p-6 border-l-4 border-[#1976D2] flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On Travel</p>
+                    <h3 id="statTravel" class="text-4xl font-bold text-[#1976D2] mt-1">0</h3>
                 </div>
+                <div class="bg-blue-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#1976D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+            </div>
+            <div class="card p-6 border-l-4 border-[#C62828] flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
+                    <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
+                </div>
+                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
             </div>
         </div>
 
-        <div id="module-f48" class="hidden flex-1 p-8 overflow-y-auto">
-            <div class="card p-8 max-w-4xl mx-auto border-t-4 border-[#003811]">
-                <h3 class="text-2xl font-bold text-[#003811] mb-2">Civil Service Form 48 Generation</h3>
-                <p class="text-sm text-gray-500 mb-6 italic pb-4 border-b">Generate official DTR forms capturing Travel Orders, PSOs, Leaves, and Schedule Overrides.</p>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="space-y-6">
-                        <div>
-                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">1. Select Period</h4>
-                            <div class="flex gap-4">
-                                <div class="w-1/2">
-                                    <label class="form-label">Month</label>
-                                    <select id="f48Month" class="form-input"></select>
-                                </div>
-                                <div class="w-1/2">
-                                    <label class="form-label">Year</label>
-                                    <select id="f48Year" class="form-input"></select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">2. Select Target Scope</h4>
-                            
-                            <div class="flex gap-4 mb-4">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="f48Mode" value="individual" checked onchange="toggleF48Mode()" class="accent-[#003811]">
-                                    <span class="text-sm font-bold text-gray-700">Individual Employee</span>
-                                </label>
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="f48Mode" value="batch" onchange="toggleF48Mode()" class="accent-[#003811]">
-                                    <span class="text-sm font-bold text-gray-700">Batch Generate</span>
-                                </label>
-                            </div>
-                            
-                            <div class="h-[85px] bg-gray-50 p-3 rounded border relative overflow-hidden">
-                                
-                                <div id="divIndividual" class="absolute inset-0 p-3 w-full transition-opacity duration-200">
-                                    <label class="form-label text-[10px]">Search Employee</label>
-                                    <input type="text" id="f48Employee" list="f48EmployeeList" class="form-input py-1.5" placeholder="Type name or ID...">
-                                    <datalist id="f48EmployeeList"></datalist>
-                                </div>
-
-                                <div id="divBatch" class="absolute inset-0 p-3 w-full opacity-0 pointer-events-none transition-opacity duration-200">
-                                    <div class="flex justify-between items-center mb-1">
-                                        <label class="form-label text-[10px] mb-0">Division / Office</label>
-                                        <div class="flex gap-3">
-                                            <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-gray-700">
-                                                <input type="radio" name="f48Type" value="ALL" checked class="accent-[#003811]"> ALL
-                                            </label>
-                                            <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-gray-700">
-                                                <input type="radio" name="f48Type" value="REGULAR" class="accent-[#003811]"> REGULAR
-                                            </label>
-                                            <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-gray-700">
-                                                <input type="radio" name="f48Type" value="SPLIT" class="accent-[#003811]"> SPLIT
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <select id="f48Division" class="form-input py-1.5 text-xs">
-                                        <option value="ALL">ALL (DARPO-CS1)</option>
-                                        <option value="OFFICE OF THE PARPO">OFFICE OF THE PARPO</option>
-                                        <option value="MARPOs">MARPOs</option>
-                                        <option value="PARAD">PARAD</option>
-                                        <option value="LTSP">LTSP</option>
-                                        <option value="AJDP">AJDP</option>
-                                        <option value="PBDD">PBDD</option>
-                                        <option value="STOD">STOD</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col justify-center items-center bg-gray-50 rounded-lg border border-dashed border-gray-300 p-6">
-                        <svg class="w-16 h-16 text-[#003811] mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <button onclick="generateForm48Trigger()" id="btnGenerateF48" class="w-full bg-[#003811] text-white py-4 rounded-lg font-bold text-lg shadow-lg hover:bg-[#006400] transition-colors">
-                            GENERATE FORM 48
-                        </button>
-                        <p id="f48Status" class="mt-4 text-sm font-bold text-[#D4AF37] text-center"></p>
-                    </div>
-                </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-[#1976D2] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON TRAVEL</h4></div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - DESTINATION</div></div>
+                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+            </div>
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-[#C62828] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4></div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">PSO NUMBER, DETAILS OF PSO</div></div>
+                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+            </div>
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-[#006400] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON LEAVE</h4></div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - LEAVE TYPE</div></div>
+                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+            </div>
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-gray-700 text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4></div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - STATUS</div></div>
+                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
             </div>
         </div>
 
-        <div id="module-deduction" class="hidden flex-1 p-8 overflow-y-auto">
-            <div class="card p-8 max-w-4xl mx-auto border-t-4 border-[#C62828]">
-                <h3 class="text-2xl font-bold text-[#003811] mb-2">Monthly Deduction Summary</h3>
-                <p class="text-sm text-gray-500 mb-6 italic pb-4 border-b">Generate printable summary of Tardiness, Undertime, and Gate Pass per division.</p>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="space-y-6">
-                        <div>
-                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">Select Period</h4>
-                            <div class="flex gap-4">
-                                <div class="w-1/2">
-                                    <label class="form-label">Month</label>
-                                    <select id="deductMonth" class="form-input"></select>
-                                </div>
-                                <div class="w-1/2">
-                                    <label class="form-label">Year</label>
-                                    <select id="deductYear" class="form-input"></select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col justify-center items-center bg-gray-50 rounded-lg border border-dashed border-gray-300 p-6">
-                        <svg class="w-16 h-16 text-[#C62828] mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <button onclick="printDeductionSummary()" id="btnGenerateDeduction" class="w-full bg-[#C62828] text-white py-4 rounded-lg font-bold text-lg shadow-lg hover:bg-red-800 transition-colors">
-                            PRINT DEDUCTION SUMMARY
-                        </button>
-                        <p id="deductStatus" class="mt-4 text-sm font-bold text-red-700 text-center"></p>
-                    </div>
-                </div>
+        <div class="card mt-8 p-6">
+            <h3 class="text-xl font-bold text-red-700 border-b pb-2 mb-4">Habitual Tardiness & Absenteeism Monitoring (Civil Service Rules)</h3>
+            <p class="text-xs text-gray-500 mb-4">Under Civil Service rules, employees incurring 10 or more late arrivals within a month for two consecutive months, or excessive unauthorized absent days, are subject to disciplinary action. <strong>(Target: DARPO-CS1 Personnel Only)</strong></p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-red-50 text-red-800">
+                        <tr>
+                            <th class="p-3 font-bold border-b">Employee Name</th>
+                            <th class="p-3 font-bold border-b text-center">Lates (Prev / Curr)</th>
+                            <th class="p-3 font-bold border-b text-center">Total Late/UT (Curr)</th>
+                            <th class="p-3 font-bold border-b text-center">Absent Days (Curr)</th>
+                            <th class="p-3 font-bold border-b text-center">Status/Warning Level</th>
+                            <th class="p-3 font-bold border-b text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listHabitual" class="divide-y">
+                        <tr><td colspan="6" class="p-4 text-center text-gray-400 text-xs italic">Calculating...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
+        <div class="card mt-8 p-6">
+            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1 Mondays Only)</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-blue-50 text-blue-800">
+                        <tr>
+                            <th class="p-3 font-bold border-b">Employee Name</th>
+                            <th class="p-3 font-bold border-b text-center">Attendance (Present / Total)</th>
+                            <th class="p-3 font-bold border-b text-center">Missed Dates</th>
+                            <th class="p-3 font-bold border-b text-center">Status</th>
+                            <th class="p-3 font-bold border-b text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listFlagAttendance" class="divide-y">
+                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Scanning Flag Ceremony Logs...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </main>
-
-    <div id="modalManual" class="fixed inset-0 modal-bg hidden z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-2xl w-[500px]">
-            <div class="px-6 py-4 bg-[#003811] text-white rounded-t-lg flex justify-between items-center">
-                <h3 class="font-bold text-lg">Resolve Absences / Manual Entry</h3>
-                <button onclick="closeModal('modalManual')" class="text-white hover:text-gray-300 font-bold text-xl">&times;</button>
-            </div>
-            <div class="p-6">
-                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4 text-xs text-yellow-800">
-                    Logs entered manually will be securely tagged with your HR credentials (<strong><span id="lblHrName"></span></strong>) and the current date.
-                </div>
-                
-                <div class="mb-4">
-                    <label class="form-label">Search Employee</label>
-                    <input type="text" id="mEmployeeSearch" list="employeeList" class="form-input" placeholder="Type name or ID to search...">
-                    <datalist id="employeeList"></datalist>
-                </div>
-
-                <div class="mb-4">
-                    <label class="form-label">Log Date</label>
-                    <input type="date" id="mDate" class="form-input">
-                </div>
-                
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div><label class="form-label">AM IN</label><input type="time" id="mAmIn" class="form-input"></div>
-                    <div><label class="form-label">AM OUT</label><input type="time" id="mAmOut" class="form-input"></div>
-                    <div><label class="form-label">PM IN</label><input type="time" id="mPmIn" class="form-input"></div>
-                    <div><label class="form-label">PM OUT</label><input type="time" id="mPmOut" class="form-input"></div>
-                </div>
-            </div>
-            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
-                <button onclick="closeModal('modalManual')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded font-bold text-sm hover:bg-gray-400">CANCEL</button>
-                <button onclick="submitManualLogs()" id="btnSubmitManual" class="px-4 py-2 bg-[#D4AF37] text-[#003811] rounded font-bold text-sm shadow hover:bg-yellow-500">INSERT LOGS</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modalLock" class="fixed inset-0 modal-bg hidden z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-2xl w-[400px]">
-            <div class="px-6 py-4 bg-red-700 text-white rounded-t-lg flex justify-between items-center">
-                <h3 class="font-bold text-lg">Lock Attendance Month</h3>
-                <button onclick="closeModal('modalLock')" class="text-white hover:text-gray-300 font-bold text-xl">&times;</button>
-            </div>
-            <div class="p-6 space-y-4">
-                <p class="text-sm text-gray-600">Locking a month records your signature and finalizes the ledger. <strong>This requires Super Admin confirmation.</strong></p>
-                <div class="flex gap-4">
-                    <div class="w-1/2">
-                        <label class="form-label">Month</label>
-                        <select id="lockMonth" class="form-input"></select>
-                    </div>
-                    <div class="w-1/2">
-                        <label class="form-label">Year</label>
-                        <select id="lockYear" class="form-input"></select>
-                    </div>
-                </div>
-                <div class="bg-gray-50 p-4 border rounded mt-2">
-                    <label class="form-label text-red-700">HR Super Password</label>
-                    <input type="password" id="lockPass" class="form-input" placeholder="Enter HR Password...">
-                </div>
-            </div>
-            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
-                <button onclick="closeModal('modalLock')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded font-bold text-sm hover:bg-gray-400">CANCEL</button>
-                <button onclick="submitLock()" id="btnSubmitLock" class="px-4 py-2 bg-red-700 text-white rounded font-bold text-sm shadow hover:bg-red-800">AUTHORIZE & LOCK</button>
-            </div>
-        </div>
-    </div>
 
 <script>
     const userData = sessionStorage.getItem('currentUser');
-    if (!userData) window.location.href = 'index.html';
+    if (!userData) { window.location.href = 'index.html'; }
     const currentUser = JSON.parse(userData);
-    
-    // Page access restricted to HRMO and HRMO Staff
-    if (!currentUser.role.toUpperCase().includes('HR') && !currentUser.role.toUpperCase().includes('ADMIN')) {
-        alert("Unauthorized Access. HR personnel only.");
-        window.location.href = 'dashboard.html';
-    }
-
     document.getElementById('activeUser').innerText = currentUser.full_name;
     document.getElementById('userRoleBadge').innerText = currentUser.role;
-    document.getElementById('lblHrName').innerText = currentUser.username;
 
-    function logout() {
-        sessionStorage.removeItem('currentUser');
-        window.location.href = 'index.html';
+    const userRole = currentUser.role.toUpperCase();
+    const isLimited = userRole === 'CHIEF' || userRole === 'UNIT HEAD';
+    const targetDivision = currentUser.division;
+    const SYSTEM_START_DATE = "2026-05-01";
+
+    function logout() { sessionStorage.removeItem('currentUser'); window.location.href = 'index.html'; }
+
+    function formatMinutesToHours(totalMinutes) {
+        if (!totalMinutes || totalMinutes <= 0) return "0m";
+        const h = Math.floor(totalMinutes / 60); const m = totalMinutes % 60;
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
     }
-
-    function switchTab(tab) {
-        document.getElementById('module-logs').classList.add('hidden');
-        document.getElementById('module-f48').classList.add('hidden');
-        document.getElementById('module-deduction').classList.add('hidden');
-        
-        document.getElementById('tab-logs').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg';
-        document.getElementById('tab-f48').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
-        document.getElementById('tab-deduction').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
-
-        if (tab === 'logs') {
-            document.getElementById('module-logs').classList.remove('hidden');
-            document.getElementById('module-logs').classList.add('flex');
-            document.getElementById('tab-logs').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg';
-        } else if (tab === 'f48') {
-            document.getElementById('module-f48').classList.remove('hidden');
-            document.getElementById('module-f48').classList.add('flex');
-            document.getElementById('tab-f48').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
-        } else if (tab === 'deduction') {
-            document.getElementById('module-deduction').classList.remove('hidden');
-            document.getElementById('module-deduction').classList.add('flex');
-            document.getElementById('tab-deduction').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
-        }
-    }
-
-    let allEmployees = [];
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    let currentViewData = []; 
-
-    window.onload = async () => {
-        const today = new Date();
-        document.getElementById('mDate').value = today.toISOString().split('T')[0];
-
-        const currYear = today.getFullYear();
-        const yHtml = `<option value="${currYear}">${currYear}</option><option value="${currYear-1}">${currYear-1}</option>`;
-        
-        document.getElementById('viewYear').innerHTML = yHtml;
-        document.getElementById('f48Year').innerHTML = yHtml;
-        document.getElementById('lockYear').innerHTML = yHtml;
-        document.getElementById('deductYear').innerHTML = yHtml;
-
-        const mHtml = `
-            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
-            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
-            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
-            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
-        `;
-        document.getElementById('f48Month').innerHTML = mHtml;
-        document.getElementById('lockMonth').innerHTML = mHtml;
-        document.getElementById('deductMonth').innerHTML = mHtml;
-
-        document.getElementById('viewMonth').value = today.getMonth() + 1;
-        document.getElementById('f48Month').value = today.getMonth() + 1;
-        document.getElementById('lockMonth').value = today.getMonth() + 1;
-        document.getElementById('deductMonth').value = today.getMonth() + 1;
-
-        await fetchEmployees();
-    };
 
     const fetchSafe = async (query) => {
         try {
@@ -399,830 +173,241 @@
         }
     };
 
-    async function fetchEmployees() {
+    let cachedBgMemo = null;
+    async function getBgMemo() {
+        if (cachedBgMemo) return cachedBgMemo;
         try {
-            const { data } = await supabaseClient.from('employees').select('*').order('full_name');
-            allEmployees = data || [];
-            
-            let searchHtml = '';
-            allEmployees.forEach(e => {
-                searchHtml += `<option value="${e.emp_id} - ${e.full_name}"></option>`;
-            });
-            document.getElementById('f48EmployeeList').innerHTML = searchHtml;
-            document.getElementById('employeeList').innerHTML = searchHtml;
-        } catch (e) {
-            console.error("Fetch employees failed.", e);
+            const { data } = await supabaseClient.storage.from('e-sign').download('bg_memo.jpg');
+            if (data) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        cachedBgMemo = reader.result;
+                        resolve(cachedBgMemo);
+                    };
+                    reader.readAsDataURL(data);
+                });
+            }
+        } catch(e) { console.error("Error downloading bg_memo.jpg", e); }
+        return null;
+    }
+
+    window.onload = async () => {
+        const todayDate = new Date();
+        const todayStr = todayDate.toISOString().split('T')[0];
+        document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        document.getElementById('scopeLabel').innerText = isLimited ? `Division: ${targetDivision}` : "Provincial Oversight";
+
+        // Fetch Employees
+        let empQuery = supabaseClient.from('employees').select('*');
+        if (isLimited) {
+            empQuery = empQuery.eq('division', targetDivision);
         }
-    }
-
-    function formatTime12(dateObj) {
-        if (!dateObj) return "";
-        return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).replace(' AM', '').replace(' PM','');
-    }
-
-    async function generateMonthlyView() {
-        const btn = document.getElementById('btnGenerateView');
-        const tbody = document.getElementById('logsTableBody');
+        const { data: emps } = await fetchSafe(empQuery);
         
-        const m = parseInt(document.getElementById('viewMonth').value);
-        const y = parseInt(document.getElementById('viewYear').value);
-        
-        btn.disabled = true; btn.innerText = "LOADING...";
-        tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-[#D4AF37] font-bold">Aggregating Monthly Data...</td></tr>';
-        currentViewData = [];
+        const empIds = new Set((emps || []).map(e => e.emp_id));
+        document.getElementById('statTotal').innerText = emps?.length || 0;
 
-        try {
-            const startDtStr = `${y}-${String(m).padStart(2,'0')}-01`;
-            const endDt = new Date(y, m, 0);
-            const endDtStr = `${y}-${String(m).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
+        const [travel, pso, leave, logs, scheduleOverrides] = await Promise.all([
+            fetchSafe(supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr)),
+            fetchSafe(supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr)),
+            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).eq('transaction_t', 'APPROVED')),
+            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59')),
+            fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr))
+        ]);
 
-            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, holRes] = await Promise.all([
-                fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
-                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED')),
-                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
-                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
-                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
-                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)),
-                fetchSafe(supabaseClient.from('holidays').select('date, description').gte('date', startDtStr).lte('date', endDtStr))
-            ]);
+        const travelMap = Object.fromEntries((travel.data || []).map(i => [i.emp_id, i.destination]));
+        const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
+        const overrideMap = {}; (scheduleOverrides.data || []).forEach(o => overrideMap[o.emp_id] = o);
+        const logMap = {}; (logs.data || []).forEach(l => { if (!logMap[l.emp_id] || new Date(l.log_time) < logMap[l.emp_id]) logMap[l.emp_id] = new Date(l.log_time); });
 
-            const logMap = {};
-            (logsRes.data || []).forEach(l => {
-                const dateStr = l.log_time.split('T')[0];
-                const key = `${l.emp_id}_${dateStr}`;
-                if(!logMap[key]) logMap[key] = [];
-                logMap[key].push(new Date(l.log_time));
-            });
+        const psoSet = new Set((pso.data || []).filter(p => empIds.has(p.emp_id)).map(p => p.emp_id));
+        document.getElementById('statTravel').innerText = (emps || []).filter(e => travelMap[e.emp_id]).length;
+        document.getElementById('statPSO').innerText = psoSet.size;
 
-            const validTOs = new Set((toRes.data || []).map(t => t.to_no));
-            const toSet = new Set();
-            (itinRes.data || []).forEach(i => {
-                if(validTOs.has(i.to_no)) {
-                    const t = toRes.data.find(x => x.to_no === i.to_no);
-                    if(t) toSet.add(`${t.emp_id}_${i.travel_date}`);
+        const listT = document.getElementById('listTravel'); const listP = document.getElementById('listPSO'); 
+        const listL = document.getElementById('listLeave'); const listLA = document.getElementById('listLateAbsent');
+        listT.innerHTML = ''; listP.innerHTML = ''; listL.innerHTML = ''; listLA.innerHTML = '';
+
+        (emps || []).forEach(e => {
+            if (travelMap[e.emp_id]) listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded mb-1 text-[11px] truncate"><span class="font-bold">${e.full_name}</span> - ${travelMap[e.emp_id]}</div>`;
+            if (leaveMap[e.emp_id]) listL.innerHTML += `<div class="p-2 bg-green-50 border-l-4 border-green-600 rounded mb-1 text-[11px] truncate"><span class="font-bold">${e.full_name}</span> - ${leaveMap[e.emp_id]}</div>`;
+            
+            if (String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
+                if (!travelMap[e.emp_id] && !psoSet.has(e.emp_id) && !leaveMap[e.emp_id]) {
+                    if (logMap[e.emp_id]) listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-orange-700">LATE</span></div>`;
+                    else if (todayDate.getHours() >= 9) {
+                        
+                        let expectedDays = ['1', '2', '3', '4', '5'];
+                        if (overrideMap[e.emp_id] && overrideMap[e.emp_id].working_days) {
+                            expectedDays = overrideMap[e.emp_id].working_days.split(',');
+                        }
+                        const dayOfWeek = todayDate.getDay().toString();
+                        
+                        if (expectedDays.includes(dayOfWeek)) {
+                            listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-gray-500 italic">ABSENT</span></div>`;
+                        }
+                    }
                 }
-            });
+            }
+        });
 
-            const psoList = psoRes.data || [];
-            const leaveSet = new Set((leaveRes.data || []).map(l => `${l.emp_id}_${l.date}`));
-            const ovrList = ovrRes.data || [];
+        // --- Tardiness & Habitual Monitoring (DARPO-CS1 ONLY) ---
+        const currMonth = todayDate.getMonth(); 
+        const currYear = todayDate.getFullYear();
+        const prevMonth = currMonth === 0 ? 11 : currMonth - 1;
+        const prevYear = currMonth === 0 ? currYear - 1 : currYear;
+
+        const sysStart = new Date(SYSTEM_START_DATE);
+        
+        let reqStartPrevMonth = new Date(prevYear, prevMonth, 1);
+        if (reqStartPrevMonth < sysStart) reqStartPrevMonth = sysStart;
+
+        let reqStartCurrMonth = new Date(currYear, currMonth, 1);
+        if (reqStartCurrMonth < sysStart) reqStartCurrMonth = sysStart;
+
+        const startPrevMonth = reqStartPrevMonth.toISOString().split('T')[0];
+        const startCurrMonth = reqStartCurrMonth.toISOString().split('T')[0];
+        const endCurrMonth = new Date(currYear, currMonth + 1, 0).toISOString().split('T')[0]; 
+
+        const [histLogsRes, histTravel, histPso, histLeave, histOverrides] = await Promise.all([
+            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59')),
+            fetchSafe(supabaseClient.from('itinerary').select('emp_id, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr)),
+            fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth)),
+            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startCurrMonth).lte('date', todayStr)),
+            fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth))
+        ]);
+
+        const histLogs = histLogsRes.data || [];
+        const excused = new Set();
+        
+        (histTravel.data || []).forEach(t => excused.add(t.emp_id + '_' + t.travel_date));
+        (histLeave.data || []).forEach(l => excused.add(l.emp_id + '_' + l.date));
+        (histPso.data || []).forEach(p => {
+            let currD = new Date(p.start_date);
+            let endD = new Date(p.end_date);
+            while(currD <= endD) {
+                if (currD >= sysStart) {
+                    excused.add(p.emp_id + '_' + currD.toISOString().split('T')[0]);
+                }
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
+        
+        const histOverrideMap = {};
+        (histOverrides.data || []).forEach(o => {
+            if (!histOverrideMap[o.emp_id]) histOverrideMap[o.emp_id] = [];
+            let currD = new Date(o.start_date);
+            let endD = new Date(o.end_date);
+            while(currD <= endD) {
+                if (currD >= sysStart) {
+                    histOverrideMap[o.emp_id].push({
+                        date: currD.toISOString().split('T')[0],
+                        start: o.start_time,
+                        end: o.end_time,
+                        working_days: o.working_days
+                    });
+                }
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
+
+        const datesToCheck = [];
+        let dCheck = new Date(reqStartCurrMonth); 
+        while(dCheck <= todayDate) {
+            datesToCheck.push(dCheck.toISOString().split('T')[0]);
+            dCheck.setDate(dCheck.getDate() + 1);
+        }
+
+        const habMap = {};
+        (emps || []).forEach(e => {
+            if (String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
+                habMap[e.emp_id] = { id: e.emp_id, name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
+            }
+        });
+
+        const empLogDates = {};
+        histLogs.forEach(l => {
+            if (!habMap[l.emp_id]) return; 
+            const d = l.log_time.split('T')[0];
+            if (!empLogDates[l.emp_id]) empLogDates[l.emp_id] = {};
+            if (!empLogDates[l.emp_id][d]) empLogDates[l.emp_id][d] = [];
+            empLogDates[l.emp_id][d].push(new Date(l.log_time));
+        });
+
+        Object.keys(habMap).forEach(emp_id => {
+            const e = emps.find(x => x.emp_id === emp_id);
             
-            const holMap = {};
-            (holRes.data || []).forEach(h => { holMap[h.date] = h.description; });
-
-            let html = '';
-            
-            for(let d = 1; d <= endDt.getDate(); d++) {
-                const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                const dObj = new Date(y, m - 1, d);
-                const dayOfWeek = dObj.getDay().toString();
-
-                allEmployees.forEach(e => {
-                    const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
-                    const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
-                    const isRegular = String(e.type || '').toUpperCase().includes('REGULAR');
-                    
-                    if (!isDarpo && !isMarpo && !isSplit && !isRegular) return;
-
-                    let expectedDays = ['1', '2', '3', '4', '5'];
-                    const override = ovrList.find(o => o.emp_id === e.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
+            datesToCheck.forEach(dateStr => {
+                let expectedDays = ['1', '2', '3', '4', '5'];
+                if (histOverrideMap[emp_id]) {
+                    const override = histOverrideMap[emp_id].find(o => o.date === dateStr);
                     if (override && override.working_days) {
                         expectedDays = override.working_days.split(',');
                     }
-
-                    if (!expectedDays.includes(dayOfWeek)) return;
-
-                    let status = "PRESENT";
-                    let cssClass = "";
-                    let amIn = "-", amOut = "-", pmIn = "-", pmOut = "-", ud = "0:00";
-
-                    const key = `${e.emp_id}_${dateStr}`;
-                    const isTO = toSet.has(key);
-                    const isLeave = leaveSet.has(key);
-                    const isPSO = psoList.some(p => p.emp_id === e.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
-                    const isHoliday = !!holMap[dateStr];
-                    
-                    let overrideLogs = false;
-
-                    if (isLeave) { status = "ON LEAVE"; cssClass = "status-onleave"; overrideLogs = true; }
-                    else if (isPSO) { status = "ON PSO"; cssClass = "status-onpso"; overrideLogs = true; }
-                    else if (isTO) { status = "ON TO"; cssClass = "status-onto"; overrideLogs = true; }
-                    
-                    const dayLogs = (logMap[key] || []).sort((a,b) => a-b);
-                    
-                    if (isHoliday && dayLogs.length === 0 && !overrideLogs) {
-                        status = "HOLIDAY"; cssClass = "status-onpso"; overrideLogs = true;
-                    }
-
-                    if (!overrideLogs) {
-                        if (dayLogs.length === 0) { 
-                            status = "ABSENT"; cssClass = "status-absent"; 
-                        } else {
-                            dayLogs.forEach(time => {
-                                const hr = time.getHours();
-                                const fmt = formatTime12(time);
-                                if(hr < 12 && amIn === "-") amIn = fmt;
-                                else if(hr <= 12 && time.getMinutes() <= 30 && amOut === "-") amOut = fmt;
-                                else if(hr <= 14 && pmIn === "-") pmIn = fmt;
-                                else pmOut = fmt;
-                            });
-                            
-                            if (amIn === "-" || pmOut === "-") {
-                                status = "INCOMPLETE"; cssClass = "status-incomplete";
-                            }
-                        }
-                    }
-
-                    currentViewData.push({ 
-                        emp_id: e.emp_id, 
-                        full_name: e.full_name, 
-                        division: e.division, 
-                        type: e.type,
-                        date: dateStr, 
-                        amIn, amOut, pmIn, pmOut, status 
-                    });
-
-                    html += `
-                        <tr class="hover:bg-gray-50 border-b">
-                            <td class="p-2 text-[#003811] font-mono">${e.emp_id}</td>
-                            <td class="p-2 font-bold text-gray-800 truncate max-w-[150px]" title="${e.full_name}">${e.full_name}</td>
-                            <td class="p-2 text-center text-gray-600">${dateStr}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${amIn}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${amOut}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${pmIn}</td>
-                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}')">${pmOut}</td>
-                            <td class="p-2 text-center font-mono text-red-600">${ud}</td>
-                            <td class="p-2 text-center ${cssClass}">${status}</td>
-                        </tr>
-                    `;
-                });
-            }
-
-            tbody.innerHTML = html || '<tr><td colspan="9" class="p-8 text-center text-gray-400 italic">No attendance expected for this period.</td></tr>';
-
-        } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-red-600 font-bold">Error: ${e.message}</td></tr>`;
-        } finally {
-            btn.disabled = false; btn.innerText = "GENERATE VIEW";
-        }
-    }
-
-    function inlineEdit(td, emp_id, dateStr) {
-        if (td.querySelector('input')) return; 
-        const oldVal = td.innerText;
-        td.innerHTML = `<input type="text" value="${oldVal === '-' ? '' : oldVal}" class="w-20 text-center font-mono border border-gray-400 px-1 py-0.5" placeholder="HH:MM AM" onblur="cancelEdit(this, '${oldVal}')" onkeydown="saveEdit(event, this, '${emp_id}', '${dateStr}', '${oldVal}')">`;
-        const input = td.querySelector('input');
-        input.focus();
-        input.select();
-    }
-
-    function cancelEdit(input, oldVal) {
-        input.parentElement.innerText = oldVal;
-    }
-
-    async function saveEdit(event, input, emp_id, dateStr, oldVal) {
-        if (event.key !== 'Enter') return;
-        const val = input.value.trim();
-        const td = input.parentElement;
-
-        if (!val) { td.innerText = oldVal; return; }
-
-        let parsedTime;
-        try {
-            const match = val.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-            if (!match) throw new Error();
-            let [_, h, m, ampm] = match;
-            h = parseInt(h);
-            if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
-            if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
-            
-            parsedTime = `${String(h).padStart(2, '0')}:${m}:00`;
-        } catch {
-            alert("Invalid time format. Please use HH:MM AM/PM (e.g. 08:00 AM)");
-            td.innerText = oldVal;
-            return;
-        }
-
-        td.innerText = "Saving...";
-        
-        try {
-            const timestamp = `${dateStr}T${parsedTime}`;
-            const payload = {
-                emp_id: emp_id,
-                log_time: timestamp,
-                device_id: 'HR_MANUAL_EDIT',
-                manual_log_name: currentUser.username,
-                manual_log_date: new Date().toISOString()
-            };
-
-            const { error } = await supabaseClient.from('attendance_logs').insert(payload);
-            if (error) throw error;
-
-            generateMonthlyView(); 
-        } catch (e) {
-            alert(`Save failed: ${e.message}`);
-            td.innerText = oldVal;
-        }
-    }
-
-    function printMissingLogs() {
-        const missing = currentViewData.filter(d => d.status === 'ABSENT' || d.status === 'INCOMPLETE');
-        if (missing.length === 0) return alert("No missing logs to print for this period.");
-
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const m = document.getElementById('viewMonth').options[document.getElementById('viewMonth').selectedIndex].text;
-        const y = document.getElementById('viewYear').value;
-
-        const byDiv = {};
-        missing.forEach(r => {
-            let div = String(r.division || 'UNASSIGNED').toUpperCase();
-            let type = String(r.type || '').toUpperCase();
-            
-            if (div.includes('SPLIT') || type === 'SPLIT') div = 'SPLIT';
-            else if (!div) div = 'UNASSIGNED';
-            
-            if(!byDiv[div]) byDiv[div] = [];
-            byDiv[div].push(r);
-        });
-
-        let isFirst = true;
-        for (const div in byDiv) {
-            if (!isFirst) doc.addPage();
-            isFirst = false;
-
-            doc.setFont("helvetica", "bold"); doc.setFontSize(12);
-            doc.text(`MISSING / INCOMPLETE LOGS REPORT - ${div}`, 105, 15, { align: "center" });
-            doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-            doc.text(`Period: ${m} ${y}`, 105, 22, { align: "center" });
-
-            let yPos = 35;
-            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-            doc.rect(10, yPos, 20, 6); doc.text("ID", 20, yPos + 4, { align: "center" });
-            doc.rect(30, yPos, 50, 6); doc.text("NAME", 55, yPos + 4, { align: "center" });
-            doc.rect(80, yPos, 25, 6); doc.text("DATE", 92.5, yPos + 4, { align: "center" });
-            doc.rect(105, yPos, 20, 6); doc.text("AM IN", 115, yPos + 4, { align: "center" });
-            doc.rect(125, yPos, 20, 6); doc.text("AM OUT", 135, yPos + 4, { align: "center" });
-            doc.rect(145, yPos, 20, 6); doc.text("PM IN", 155, yPos + 4, { align: "center" });
-            doc.rect(165, yPos, 20, 6); doc.text("PM OUT", 175, yPos + 4, { align: "center" });
-            doc.rect(185, yPos, 15, 6); doc.text("STAT", 192.5, yPos + 4, { align: "center" });
-
-            yPos += 6;
-            doc.setFont("helvetica", "normal"); doc.setFontSize(8);
-            
-            byDiv[div].forEach(r => {
-                doc.rect(10, yPos, 20, 6); doc.text(r.emp_id, 20, yPos + 4, { align: "center" });
-                doc.rect(30, yPos, 50, 6); doc.text(r.full_name.substring(0,25), 32, yPos + 4);
-                doc.rect(80, yPos, 25, 6); doc.text(r.date, 92.5, yPos + 4, { align: "center" });
-                doc.rect(105, yPos, 20, 6); doc.text(r.amIn, 115, yPos + 4, { align: "center" });
-                doc.rect(125, yPos, 20, 6); doc.text(r.amOut, 135, yPos + 4, { align: "center" });
-                doc.rect(145, yPos, 20, 6); doc.text(r.pmIn, 155, yPos + 4, { align: "center" });
-                doc.rect(165, yPos, 20, 6); doc.text(r.pmOut, 175, yPos + 4, { align: "center" });
-                doc.rect(185, yPos, 15, 6); doc.text(r.status === 'ABSENT' ? 'ABS' : 'INC', 192.5, yPos + 4, { align: "center" });
+                }
                 
-                yPos += 6;
-                if (yPos > 270) {
-                    doc.addPage();
-                    yPos = 20;
-                }
-            });
-
-            yPos += 15;
-            doc.text("Certified Correct:", 15, yPos);
-            yPos += 15;
-            doc.text("_______________________", 15, yPos);
-            doc.text("HR Officer Signature", 15, yPos + 5);
-        }
-
-        doc.save(`Missing_Logs_${m}_${y}.pdf`);
-    }
-
-    function openManualEntryModal() { document.getElementById('modalManual').classList.remove('hidden'); }
-    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-    async function submitManualLogs() {
-        const dStr = document.getElementById('mDate').value;
-        const empSearchVal = document.getElementById('mEmployeeSearch').value;
-        
-        const empIdToUse = empSearchVal.includes(' - ') ? empSearchVal.split(' - ')[0] : empSearchVal;
-
-        if(!dStr || !empIdToUse) return alert("Date and Employee are required.");
-
-        const amIn = document.getElementById('mAmIn').value;
-        const amOut = document.getElementById('mAmOut').value;
-        const pmIn = document.getElementById('mPmIn').value;
-        const pmOut = document.getElementById('mPmOut').value;
-
-        const logsToInsert = [];
-        const currentIso = new Date().toISOString();
-
-        const createPayload = (timeStr) => {
-            if (!timeStr) return null;
-            let t = timeStr;
-            if (t.length === 5) t += ":00"; 
-            return {
-                emp_id: empIdToUse,
-                log_time: `${dStr}T${t}`,
-                device_id: 'HR_MANUAL',
-                manual_log_name: currentUser.username,
-                manual_log_date: currentIso
-            };
-        };
-
-        const p1 = createPayload(amIn);
-        if(p1) logsToInsert.push(p1);
-        
-        const p2 = createPayload(amOut);
-        if(p2) logsToInsert.push(p2);
-        
-        const p3 = createPayload(pmIn);
-        if(p3) logsToInsert.push(p3);
-        
-        const p4 = createPayload(pmOut);
-        if(p4) logsToInsert.push(p4);
-
-        if (logsToInsert.length === 0) return alert("Please provide at least one time entry.");
-
-        const btn = document.getElementById('btnSubmitManual');
-        btn.innerText = "INSERTING..."; btn.disabled = true;
-
-        try {
-            const { error } = await supabaseClient.from('attendance_logs').insert(logsToInsert);
-            if (error) throw error;
-
-            alert(`Successfully inserted ${logsToInsert.length} log(s) for the employee.`);
-            closeModal('modalManual');
-            
-            document.getElementById('mEmployeeSearch').value = '';
-            document.getElementById('mAmIn').value = '';
-            document.getElementById('mAmOut').value = '';
-            document.getElementById('mPmIn').value = '';
-            document.getElementById('mPmOut').value = '';
-            
-            const viewM = document.getElementById('viewMonth').value;
-            const insertM = parseInt(dStr.split('-')[1]).toString();
-            if (viewM === insertM) generateMonthlyView();
-
-        } catch (e) {
-            alert(`Insert failed: ${e.message}`);
-        } finally {
-            btn.innerText = "INSERT LOGS"; btn.disabled = false;
-        }
-    }
-
-    function openLockModal() { 
-        const role = currentUser.role.toUpperCase();
-        if (role !== 'HRMO' && role !== 'ADMIN') {
-            return alert("Access Denied: Only the head HRMO account is authorized to lock the monthly ledger. HR Staff accounts are not permitted.");
-        }
-        document.getElementById('modalLock').classList.remove('hidden'); 
-    }
-    
-    async function submitLock() {
-        const pass = document.getElementById('lockPass').value;
-        if (!pass) return alert("HR Password required to authorize.");
-        
-        try {
-            const { data: u, error } = await supabaseClient.from('users').select('password').eq('username', currentUser.username).single();
-            if (error || !u) throw new Error("Authentication failed.");
-            
-            if (u.password !== pass) throw new Error("Invalid Password.");
-
-            alert("Month successfully locked. Further modifications are restricted.");
-            closeModal('modalLock');
-            document.getElementById('lockPass').value = '';
-
-        } catch(e) {
-            alert(e.message);
-        }
-    }
-
-    function toggleF48Mode() {
-        const mode = document.querySelector('input[name="f48Mode"]:checked').value;
-        
-        if (mode === 'individual') {
-            document.getElementById('divBatch').classList.add('opacity-0', 'pointer-events-none');
-            setTimeout(() => document.getElementById('divIndividual').classList.remove('opacity-0', 'pointer-events-none'), 150);
-        } else {
-            document.getElementById('divIndividual').classList.add('opacity-0', 'pointer-events-none');
-            setTimeout(() => document.getElementById('divBatch').classList.remove('opacity-0', 'pointer-events-none'), 150);
-        }
-    }
-
-    window.generateForm48Trigger = async function() {
-        const mode = document.querySelector('input[name="f48Mode"]:checked').value;
-        const month = parseInt(document.getElementById('f48Month').value) - 1;
-        const year = parseInt(document.getElementById('f48Year').value);
-        
-        const btn = document.getElementById('btnGenerateF48');
-        const status = document.getElementById('f48Status');
-        
-        btn.disabled = true; btn.innerText = "GENERATING PDF...";
-        status.innerText = "Processing data. Please wait...";
-
-        try {
-            let targetEmps = [];
-            if (mode === 'individual') {
-                const eSearchVal = document.getElementById('f48Employee').value;
-                const eVal = eSearchVal.includes(' - ') ? eSearchVal.split(' - ')[0].trim() : eSearchVal.trim();
-                const found = allEmployees.find(e => e.emp_id === eVal);
-                if (found) {
-                    const isMarpo = String(found.position || '').toUpperCase().includes('MARPO');
-                    const isDarpo = String(found.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(found.division || '').toUpperCase().includes('SPLIT');
-                    if (isDarpo || isMarpo || isSplit) targetEmps = [found];
-                } else {
-                    throw new Error("Please select a valid employee from the search list.");
-                }
-            } else {
-                const div = document.getElementById('f48Division').value;
-                const empTypeFilter = document.querySelector('input[name="f48Type"]:checked').value;
-
-                targetEmps = allEmployees.filter(e => {
-                    const isMarpo = String(e.position || '').toUpperCase().includes('MARPO');
-                    const isDarpo = String(e.station || '').toUpperCase().includes('DARPO-CS1');
-                    const isSplit = String(e.division || '').toUpperCase().includes('SPLIT');
-                    
-                    if (!isDarpo && !isMarpo && !isSplit) return false;
-
-                    let eDiv = String(e.division || '').toUpperCase().trim();
-                    let eType = String(e.type || '').toUpperCase().trim();
-                    
-                    if (isMarpo) eDiv = 'MARPOS'; 
-                    if (eDiv === 'PARPO') eDiv = 'OFFICE OF THE PARPO';
-                    if (eDiv === 'PARPO I') eDiv = 'OFFICE OF THE PARPO'; 
-
-                    if (empTypeFilter !== 'ALL' && eType !== empTypeFilter) return false;
-
-                    if (div === 'ALL') return true;
-                    return eDiv === div;
-                });
-            }
-
-            if (targetEmps.length === 0) throw new Error("No employees found for the selected criteria.");
-
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            const mName = monthNames[month];
-
-            const startDtStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
-            const endDt = new Date(year, month + 1, 0);
-            const endDtStr = `${year}-${String(month+1).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
-
-            const empIds = targetEmps.map(e => e.emp_id);
-            
-            status.innerText = "Fetching signatories...";
-            const { data: chiefUsers } = await fetchSafe(supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF'));
-            const chiefMap = {};
-            (chiefUsers || []).forEach(u => {
-                if(u.division) {
-                    const divBase = u.division.split(',')[0].trim().toUpperCase();
-                    chiefMap[divBase] = u.full_name.toUpperCase();
-                }
-            });
-
-            status.innerText = "Fetching attendance logs...";
-            const { data: allLogs } = await fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', empIds).gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59"));
-            
-            status.innerText = "Fetching schedule overrides...";
-            const { data: allOverrides } = await fetchSafe(supabaseClient.from('schedule_overrides').select('*').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr));
-
-            status.innerText = "Fetching TO, PSO, Leaves and Holidays...";
-            const [toRes, itinRes, psoRes, leaveRes, holRes] = await Promise.all([
-                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED')),
-                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date, destination').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
-                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date, pso_no').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr)),
-                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type').eq('transaction_t', 'APPROVED').in('emp_id', empIds).gte('date', startDtStr).lte('date', endDtStr)),
-                fetchSafe(supabaseClient.from('holidays').select('date, description').gte('date', startDtStr).lte('date', endDtStr))
-            ]);
-
-            const validTOs = new Set((toRes.data || []).map(t => t.to_no));
-            const toMap = {};
-            (itinRes.data || []).forEach(i => {
-                if(validTOs.has(i.to_no)) {
-                    const t = toRes.data.find(x => x.to_no === i.to_no);
-                    if(t) toMap[`${t.emp_id}_${i.travel_date}`] = i.destination;
-                }
-            });
-
-            const psoList = psoRes.data || [];
-            const leaveMap = {};
-            (leaveRes.data || []).forEach(l => { leaveMap[`${l.emp_id}_${l.date}`] = l.type; });
-
-            const holMap = {};
-            (holRes.data || []).forEach(h => { holMap[h.date] = h.description; });
-
-            for (let i = 0; i < targetEmps.length; i++) {
-                const emp = targetEmps[i];
-                status.innerText = `Processing ${i+1}/${targetEmps.length}: ${emp.full_name}...`;
-
-                if (i > 0) doc.addPage();
-
-                const myLogs = (allLogs || []).filter(l => l.emp_id === emp.emp_id);
-                const logsByDate = {};
-                myLogs.forEach(l => {
-                    const dateObj = new Date(l.log_time.split('+')[0].trim().replace(' ', 'T'));
-                    const isoStr = dateObj.getFullYear() + "-" + String(dateObj.getMonth() + 1).padStart(2, '0') + "-" + String(dateObj.getDate()).padStart(2, '0');
-                    if(!logsByDate[isoStr]) logsByDate[isoStr] = [];
-                    logsByDate[isoStr].push(dateObj);
-                });
-
-                const schedOverrides = (allOverrides || []).filter(o => o.emp_id === emp.emp_id);
-
-                let chiefName = "_________________________";
-                let chiefPos = "DIVISION CHIEF";
-                let empDiv = (emp.division || "").toUpperCase().trim();
-                const isMarpo = String(emp.position || '').toUpperCase().includes('MARPO');
+                const dObj = new Date(dateStr);
+                const dayOfWeek = dObj.getDay().toString();
                 
-                if (isMarpo) empDiv = "LTSP";
-
-                if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO" || empDiv === "PARPO I") {
-                    chiefName = "RICARDO C. GARCIA";
-                    chiefPos = "PARPO II";
-                } else {
-                    const baseDiv = empDiv.split(',')[0].trim();
-                    if (chiefMap[baseDiv]) chiefName = chiefMap[baseDiv];
-                    chiefPos = "DIVISION CHIEF";
-                }
-
-                const drawForm = (startX, startY) => {
-                    doc.setFont("helvetica", "italic"); doc.setFontSize(6);
-                    doc.text("CIVIL SERVICE FORM 48", startX, startY + 3);
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(9);
-                    doc.text("DAILY TIME RECORD", startX + 42.5, startY + 7, { align: "center" });
-
-                    doc.setFontSize(8);
-                    doc.text(emp.full_name, startX + 42.5, startY + 15, { align: "center" });
-                    doc.line(startX, startY + 16, startX + 85, startY + 16);
-                    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
-                    doc.text("Name", startX + 42.5, startY + 19, { align: "center" });
-
-                    doc.text("For the month of", startX, startY + 23);
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-                    doc.text(`${mName} ${year}`, startX + 25, startY + 23);
-                    doc.line(startX + 22, startY + 24, startX + 55, startY + 24);
-
-                    let ty = startY + 30;
-                    let cw_day = 8, cw_time = 14, cw_u = 11;
-                    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
-
-                    doc.rect(startX, ty, cw_day, 8); doc.text("Days", startX + 4, ty + 5, { align: "center" });
-                    doc.rect(startX + cw_day, ty, cw_time * 2, 4); doc.text("A.M.", startX + cw_day + cw_time, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time * 2, 4); doc.text("P.M.", startX + cw_day + (cw_time * 3), ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u * 2, 4); doc.text("UNDERTIME", startX + cw_day + (cw_time * 4) + cw_u, ty + 3, { align: "center" });
-
-                    ty += 4;
-                    doc.rect(startX + cw_day, ty, cw_time, 4); doc.text("Arrival", startX + cw_day + 7, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + cw_time, ty, cw_time, 4); doc.text("Departure", startX + cw_day + cw_time + 7, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, 4); doc.text("Arrival", startX + cw_day + (cw_time * 2) + 7, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, 4); doc.text("Departure", startX + cw_day + (cw_time * 3) + 7, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, 4); doc.text("Hours", startX + cw_day + (cw_time * 4) + 5.5, ty + 3, { align: "center" });
-                    doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, 4); doc.text("Min.", startX + cw_day + (cw_time * 4) + cw_u + 5.5, ty + 3, { align: "center" });
-
-                    ty += 4;
-                    let row_h = 4.2;
-
-                    for (let d = 1; d <= 31; d++) {
-                        doc.rect(startX, ty, cw_day, row_h);
-                        doc.text(String(d), startX + 4, ty + 3, { align: "center" });
-
-                        if (d <= endDt.getDate()) {
-                            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                            const dayLogs = (logsByDate[dateStr] || []).sort((a,b) => a-b);
-                            
-                            const dateObj = new Date(year, month, d);
-                            const dayOfWeek = dateObj.getDay().toString();
-                            
-                            let expectedDays = ['1', '2', '3', '4', '5'];
-                            let activeOverride = schedOverrides.find(s => dateStr >= s.start_date && dateStr <= s.end_date);
-                            if (activeOverride && activeOverride.working_days) {
-                                expectedDays = activeOverride.working_days.split(',');
-                            }
-                            
-                            let isWeekend = !expectedDays.includes(dayOfWeek);
-                            let special = "";
-                            
-                            if (isWeekend) {
-                                if (dayOfWeek === '0') special = "SUNDAY";
-                                else if (dayOfWeek === '6') special = "SATURDAY";
-                                else if (dayOfWeek === '5') special = "(FRIDAY - COMPRESSED WORKWEEK)";
-                                else special = "DAY OFF";
-                            }
-                            
-                            const key = `${emp.emp_id}_${dateStr}`;
-                            let isOverrideLog = false;
-
-                            if (leaveMap[key]) {
-                                special = leaveMap[key].toUpperCase();
-                                isOverrideLog = true;
-                            } else {
-                                const pso = psoList.find(p => p.emp_id === emp.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
-                                if(pso) {
-                                    special = `PSO ${pso.pso_no || ''}`.toUpperCase();
-                                    isOverrideLog = true;
-                                } else if (toMap[key]) {
-                                    special = `TO - ${toMap[key]}`.toUpperCase();
-                                    isOverrideLog = true;
-                                } else if (holMap[dateStr]) {
-                                    special = holMap[dateStr].toUpperCase();
-                                    isOverrideLog = (dayLogs.length === 0);
-                                }
-                            }
-
-                            if (isOverrideLog || (special && dayLogs.length === 0)) {
-                                doc.setFont("helvetica", "bold"); doc.setFontSize(5);
-                                doc.rect(startX + cw_day, ty, cw_time * 4, row_h);
-                                doc.text(special.substring(0, 45), startX + cw_day + (cw_time * 2), ty + 3, { align: "center" });
-                                doc.setFont("helvetica", "normal"); doc.setFontSize(7);
-                            } else {
-                                let amIn="", amOut="", pmIn="", pmOut="";
-                                dayLogs.forEach(time => {
-                                    const hr = time.getHours();
-                                    const fmt = formatTime12(time);
-                                    if(hr < 12 && !amIn) amIn = fmt;
-                                    else if(hr <= 12 && time.getMinutes() <= 30 && amOut) amOut = fmt;
-                                    else if(hr <= 14 && !pmIn) pmIn = fmt;
-                                    else pmOut = fmt;
-                                });
-
-                                doc.rect(startX + cw_day, ty, cw_time, row_h); doc.text(amIn, startX + cw_day + 7, ty + 3, { align: "center" });
-                                doc.rect(startX + cw_day + cw_time, ty, cw_time, row_h); doc.text(amOut, startX + cw_day + cw_time + 7, ty + 3, { align: "center" });
-                                doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, row_h); doc.text(pmIn, startX + cw_day + (cw_time * 2) + 7, ty + 3, { align: "center" });
-                                doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, row_h); doc.text(pmOut, startX + cw_day + (cw_time * 3) + 7, ty + 3, { align: "center" });
-                            }
-                            
-                            doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h); 
-                            doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h); 
-
-                        } else {
-                            doc.rect(startX + cw_day, ty, cw_time, row_h);
-                            doc.rect(startX + cw_day + cw_time, ty, cw_time, row_h);
-                            doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, row_h);
-                            doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, row_h);
-                            doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h);
-                            doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h);
-                        }
-                        ty += row_h;
+                if (expectedDays.includes(dayOfWeek)) {
+                    const hasLog = empLogDates[emp_id] && empLogDates[emp_id][dateStr];
+                    const isExcused = excused.has(emp_id + '_' + dateStr);
+                    if (!hasLog && !isExcused) {
+                        if (dateStr === todayStr && todayDate.getHours() < 9) return; 
+                        habMap[emp_id].absentDays++;
                     }
-                    
-                    doc.text("Total", startX + cw_day + (cw_time * 4) - 2, ty + 3, { align: "right" });
-                    doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, 5); 
-                    doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, 5);
-
-                    ty += 8;
-                    doc.setFont("helvetica", "italic");
-                    const cert = "I certify on my honor that the above is true and correct report of the hours of work performed, record of which was made daily at the time of arrival and departure from office.";
-                    doc.text(cert, startX, ty, { maxWidth: 85, align: "justify" });
-
-                    ty += 12;
-                    doc.line(startX + 10, ty, startX + 75, ty);
-                    doc.setFont("helvetica", "normal");
-                    doc.text("(Employee's Signature)", startX + 42.5, ty + 3, { align: "center" });
-
-                    ty += 8;
-                    doc.text("Verified as to prescribed office hours:", startX, ty);
-                    
-                    ty += 8;
-                    doc.setFont("helvetica", "bold");
-                    doc.text(chiefName, startX + 42.5, ty, { align: "center" });
-                    doc.line(startX + 10, ty + 1, startX + 75, ty + 1);
-                    doc.setFont("helvetica", "normal");
-                    doc.text(chiefPos, startX + 42.5, ty + 4, { align: "center" });
-                };
-
-                drawForm(10, 10);
-                drawForm(110, 10);
-            }
-            
-            const fName = mode === 'individual' ? `Form48_${targetEmps[0].full_name}_${mName}${year}.pdf` : `Form48_BATCH_${mName}${year}.pdf`;
-            doc.save(fName);
-            status.innerText = "PDF Generated Successfully!";
-
-        } catch (e) {
-            status.innerText = `Error: ${e.message}`;
-            alert(e.message);
-        } finally {
-            btn.disabled = false; btn.innerText = "GENERATE FORM 48";
-        }
-    };
-
-    // ==========================================
-    // DEDUCTION SUMMARY LOGIC
-    // ==========================================
-    function formatMinutesToHours(totalMinutes) {
-        if (!totalMinutes || totalMinutes <= 0) return "0m";
-        const h = Math.floor(totalMinutes / 60); 
-        const m = totalMinutes % 60;
-        return h > 0 ? `${h}h ${m}m` : `${m}m`;
-    }
-
-    async function printDeductionSummary() {
-        const btn = document.getElementById('btnGenerateDeduction');
-        const status = document.getElementById('deductStatus');
-        btn.disabled = true; btn.innerText = "GENERATING...";
-        status.innerText = "Fetching data...";
-
-        try {
-            const m = parseInt(document.getElementById('deductMonth').value) - 1;
-            const y = parseInt(document.getElementById('deductYear').value);
-            const mName = monthNames[m];
-
-            const startDtStr = `${y}-${String(m+1).padStart(2,'0')}-01`;
-            const endDt = new Date(y, m + 1, 0);
-            const endDtStr = `${y}-${String(m+1).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
-
-            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, gpRes, holRes] = await Promise.all([
-                fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
-                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED')),
-                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
-                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
-                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
-                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)),
-                fetchSafe(supabaseClient.from('gate_pass_logs').select('emp_id, date, minutes, status').gte('date', startDtStr).lte('date', endDtStr).eq('status', 'APPROVED')),
-                fetchSafe(supabaseClient.from('holidays').select('date').gte('date', startDtStr).lte('date', endDtStr))
-            ]);
-
-            const validTOs = new Set((toRes.data || []).map(t => t.to_no));
-            const excusedSet = new Set();
-            (itinRes.data || []).forEach(i => {
-                if(validTOs.has(i.to_no)) {
-                    const t = toRes.data.find(x => x.to_no === i.to_no);
-                    if(t) excusedSet.add(`${t.emp_id}_${i.travel_date}`);
-                }
-            });
-            (leaveRes.data || []).forEach(l => excusedSet.add(`${l.emp_id}_${l.date}`));
-            
-            const psoList = psoRes.data || [];
-            psoList.forEach(p => {
-                let currD = new Date(p.start_date);
-                let eD = new Date(p.end_date);
-                while(currD <= eD) {
-                    excusedSet.add(`${p.emp_id}_${currD.toISOString().split('T')[0]}`);
-                    currD.setDate(currD.getDate() + 1);
                 }
             });
 
-            const holidays = new Set((holRes.data || []).map(h => h.date));
+            const myLogs = empLogDates[emp_id];
+            if(!myLogs) return;
 
-            const logsByEmp = {};
-            (logsRes.data || []).forEach(l => {
-                if (!logsByEmp[l.emp_id]) logsByEmp[l.emp_id] = {};
-                const d = l.log_time.split('T')[0];
-                if (!logsByEmp[l.emp_id][d]) logsByEmp[l.emp_id][d] = [];
-                logsByEmp[l.emp_id][d].push(new Date(l.log_time));
-            });
+            Object.keys(myLogs).forEach(dateStr => {
+                const logsForDay = myLogs[dateStr].sort((a,b) => a-b);
+                const firstLog = logsForDay[0];
+                const lastLog = logsForDay[logsForDay.length - 1];
 
-            const gpByEmp = {};
-            (gpRes.data || []).forEach(g => {
-                if (!gpByEmp[g.emp_id]) gpByEmp[g.emp_id] = 0;
-                if (g.minutes) gpByEmp[g.emp_id] += parseInt(g.minutes);
-            });
+                let expectedDays = ['1', '2', '3', '4', '5'];
+                let startReqStr = e.flexi_range_start || '08:00:00';
+                let cutoffStr = e.flexi_range_end || '08:00:00';
+                let overrideEndStr = null;
 
-            const deductions = [];
-
-            allEmployees.forEach(emp => {
-                let tardiness = 0;
-                let undertime = 0;
-                let gatepass = gpByEmp[emp.emp_id] || 0;
-
-                const myLogs = logsByEmp[emp.emp_id] || {};
-                const schedOverrides = (ovrRes.data || []).filter(o => o.emp_id === emp.emp_id);
-
-                for (let d = 1; d <= endDt.getDate(); d++) {
-                    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                    
-                    if (excusedSet.has(`${emp.emp_id}_${dateStr}`) || holidays.has(dateStr)) continue;
-
-                    const dayOfWeek = new Date(y, m, d).getDay().toString();
-                    let expectedDays = ['1', '2', '3', '4', '5'];
-                    let startReqStr = emp.flexi_range_start || '08:00:00';
-                    let cutoffStr = emp.flexi_range_end || '08:00:00';
-                    let overrideEndStr = null;
-
-                    const override = schedOverrides.find(o => dateStr >= o.start_date && dateStr <= o.end_date);
+                if (histOverrideMap[emp_id]) {
+                    const override = histOverrideMap[emp_id].find(o => o.date === dateStr);
                     if (override) {
-                        if (override.working_days) expectedDays = override.working_days.split(',');
-                        startReqStr = override.start_time || startReqStr;
-                        cutoffStr = override.start_time || cutoffStr;
-                        overrideEndStr = override.end_time;
+                        if(override.working_days) expectedDays = override.working_days.split(',');
+                        startReqStr = override.start;
+                        cutoffStr = override.start; 
+                        overrideEndStr = override.end; 
                     }
+                }
+                
+                const dObj = new Date(dateStr);
+                const dayOfWeek = dObj.getDay().toString();
+                
+                if (!expectedDays.includes(dayOfWeek)) {
+                    return; 
+                }
 
-                    if (!expectedDays.includes(dayOfWeek)) continue;
-
-                    const dayLogs = (myLogs[dateStr] || []).sort((a,b) => a-b);
-                    if (dayLogs.length === 0) continue; 
-
-                    const firstLog = dayLogs[0];
-                    const lastLog = dayLogs[dayLogs.length - 1];
-
-                    const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
-                    const startDate = new Date(dateStr + 'T' + startReqStr);
-
-                    if (firstLog > cutoffDate) {
-                        tardiness += Math.floor((firstLog - cutoffDate) / 60000);
+                const startDate = new Date(dateStr + 'T' + startReqStr);
+                const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
+                
+                let isLate = false;
+                
+                if (firstLog > cutoffDate) {
+                    isLate = true;
+                    if(firstLog.getMonth() === currMonth) {
+                        habMap[emp_id].totalLateMins += Math.floor((firstLog - cutoffDate) / 60000);
                     }
+                }
 
+                if (isLate) {
+                    if (firstLog.getMonth() === prevMonth) habMap[emp_id].prevCount++;
+                    if (firstLog.getMonth() === currMonth) habMap[emp_id].currCount++;
+                }
+
+                if(firstLog.getMonth() === currMonth) {
                     let requiredEnd;
                     if (overrideEndStr) {
                         requiredEnd = new Date(dateStr + 'T' + overrideEndStr);
@@ -1232,88 +417,450 @@
                     }
 
                     if (lastLog < requiredEnd && firstLog !== lastLog) {
-                        undertime += Math.floor((requiredEnd - lastLog) / 60000);
+                        habMap[emp_id].totalUtMins += Math.floor((requiredEnd - lastLog) / 60000);
                     }
                 }
+            });
+        });
 
-                const total = tardiness + undertime + gatepass;
-                if (total > 0 || gatepass > 0 || tardiness > 0 || undertime > 0) {
-                    deductions.push({
-                        emp_id: emp.emp_id,
-                        name: emp.full_name,
-                        division: String(emp.division || 'UNASSIGNED').toUpperCase().trim(),
-                        tardiness,
-                        undertime,
-                        gatepass,
-                        total
-                    });
+        const listH = document.getElementById('listHabitual'); listH.innerHTML = '';
+        let hasHabitual = false;
+        
+        Object.values(habMap).forEach(h => {
+            const isHabitualLate = (h.prevCount >= 10 && h.currCount >= 10);
+            const totalMins = h.totalLateMins + h.totalUtMins;
+            const isExcessiveLate = totalMins >= 480;
+            const isAbsenteeism = h.absentDays >= 3;
+
+            if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
+                hasHabitual = true;
+                let statusBadge = '';
+                if (isHabitualLate && isAbsenteeism) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE & ABSENT</span>`;
+                } else if (isHabitualLate) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE (CS WARNING)</span>`;
+                } else if (isAbsenteeism) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">UNAUTH. ABSENTEEISM</span>`;
+                } else if (isExcessiveLate) {
+                    statusBadge = `<span class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] font-bold">EXCESSIVE LATE (DEDUCT VL)</span>`;
+                } else {
+                    statusBadge = `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-bold border border-yellow-300">MONITORING</span>`;
                 }
-            });
 
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
+                listH.innerHTML += `<tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold">${h.name}</td>
+                    <td class="text-center">${h.prevCount}/${h.currCount}</td>
+                    <td class="text-center">${formatMinutesToHours(totalMins)}</td>
+                    <td class="text-center">${h.absentDays}</td>
+                    <td class="text-center">${statusBadge}</td>
+                    <td class="text-center">
+                        <button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>
+                    </td>
+                </tr>`;
+            }
+        });
+        
+        if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
 
-            const byDiv = {};
-            deductions.forEach(d => {
-                let dName = d.division;
-                if(dName.includes('MARPO')) dName = 'MARPOS';
-                if(dName.includes('SPLIT')) dName = 'SPLIT';
-                if(!byDiv[dName]) byDiv[dName] = [];
-                byDiv[dName].push(d);
-            });
+        // --- NEW: Flag Ceremony Monitoring (ALL DATA, NO MAY 1 LIMIT, DARPO-CS1 ONLY) ---
+        const { data: allFlagLogs } = await fetchSafe(supabaseClient.from('flag_attendance').select('emp_id, date, time_in, status'));
+            
+        const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
+        
+        let validMondays = new Set();
+        const flagStartDates = {};
 
-            let isFirst = true;
-            for (const div in byDiv) {
-                if (!isFirst) doc.addPage();
-                isFirst = false;
+        (allFlagLogs || []).forEach(log => {
+            validMondays.add(log.date);
+            
+            const d = new Date(log.date);
+            d.setHours(0,0,0,0);
+            if (!flagStartDates[log.emp_id] || d < flagStartDates[log.emp_id]) {
+                flagStartDates[log.emp_id] = d;
+            }
+        });
+        
+        let mondays = Array.from(validMondays).sort((a,b) => new Date(b) - new Date(a)); 
 
-                doc.setFont("helvetica", "bold"); doc.setFontSize(14);
-                doc.text("SUMMARY OF DEDUCTIONS", 105, 20, { align: "center" });
-                doc.setFontSize(11);
-                doc.text(`Division/Office: ${div}`, 105, 28, { align: "center" });
-                doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-                doc.text(`Period: ${mName} ${y}`, 105, 34, { align: "center" });
+        const [allFlagTravelRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
+            fetchSafe(supabaseClient.from('itinerary').select('emp_id, travel_date')),
+            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED')),
+            fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date'))
+        ]);
+        
+        const flagExcused = new Set();
+        (allFlagTravelRes.data || []).forEach(t => flagExcused.add(t.emp_id + '_' + t.travel_date));
+        (allFlagLeaveRes.data || []).forEach(l => flagExcused.add(l.emp_id + '_' + l.date));
+        (allFlagPsoRes.data || []).forEach(p => {
+            let currD = new Date(p.start_date);
+            let endD = new Date(p.end_date);
+            while(currD <= endD) {
+                flagExcused.add(p.emp_id + '_' + currD.toISOString().split('T')[0]);
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
 
-                let yPos = 45;
-                doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-                doc.rect(10, yPos, 20, 6); doc.text("EMP NO", 20, yPos + 4, { align: "center" });
-                doc.rect(30, yPos, 60, 6); doc.text("NAME", 60, yPos + 4, { align: "center" });
-                doc.rect(90, yPos, 25, 6); doc.text("TARDINESS", 102.5, yPos + 4, { align: "center" });
-                doc.rect(115, yPos, 25, 6); doc.text("UNDERTIME", 127.5, yPos + 4, { align: "center" });
-                doc.rect(140, yPos, 25, 6); doc.text("GATE PASS", 152.5, yPos + 4, { align: "center" });
-                doc.rect(165, yPos, 35, 6); doc.text("TOTAL DEDUCTION", 180, yPos + 4, { align: "center" });
-
-                yPos += 6;
-                doc.setFont("helvetica", "normal");
-                
-                byDiv[div].sort((a,b) => a.name.localeCompare(b.name)).forEach(r => {
-                    doc.rect(10, yPos, 20, 6); doc.text(r.emp_id, 20, yPos + 4, { align: "center" });
-                    doc.rect(30, yPos, 60, 6); doc.text(r.name.substring(0,35), 32, yPos + 4);
-                    doc.rect(90, yPos, 25, 6); doc.text(formatMinutesToHours(r.tardiness), 102.5, yPos + 4, { align: "center" });
-                    doc.rect(115, yPos, 25, 6); doc.text(formatMinutesToHours(r.undertime), 127.5, yPos + 4, { align: "center" });
-                    doc.rect(140, yPos, 25, 6); doc.text(formatMinutesToHours(r.gatepass), 152.5, yPos + 4, { align: "center" });
-                    doc.rect(165, yPos, 35, 6); doc.setFont("helvetica", "bold"); doc.text(formatMinutesToHours(r.total), 180, yPos + 4, { align: "center" });
-                    doc.setFont("helvetica", "normal");
-                    
-                    yPos += 6;
-                    if (yPos > 270) {
-                        doc.addPage();
-                        yPos = 20;
+        const { data: globalLogs } = await fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time'));
+        
+        (emps || []).forEach(e => {
+            if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
+            
+            let firstLogDate = flagStartDates[e.emp_id]; 
+            if (globalLogs) {
+                globalLogs.forEach(l => {
+                    if (l.emp_id === e.emp_id) {
+                        const dStr = l.log_time.split('T')[0];
+                        const d = new Date(dStr);
+                        d.setHours(0,0,0,0);
+                        if (!firstLogDate || d < firstLogDate) {
+                            firstLogDate = d;
+                        }
                     }
                 });
             }
 
-            if (Object.keys(byDiv).length === 0) {
-                doc.text("No deductions found for any employee this month.", 105, 50, { align: "center" });
+            if (!firstLogDate) return; 
+
+            let missedDates = [];
+            let presentCount = 0;
+            let expectedMondays = 0;
+
+            mondays.forEach(m => {
+                const mDate = new Date(m);
+                mDate.setHours(0,0,0,0);
+                
+                if (mDate >= firstLogDate) {
+                    expectedMondays++;
+                    const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
+                    const isExcused = flagExcused.has(e.emp_id + '_' + m); 
+                    
+                    const isPresent = log && String(log.status).toUpperCase() !== 'ABSENT' && String(log.time_in).toUpperCase() !== 'ABSENT' && log.time_in !== null;
+
+                    if (isPresent) {
+                        presentCount++;
+                    } else if (!isExcused) {
+                        missedDates.push(m);
+                    }
+                }
+            });
+
+            if (missedDates.length > 0) {
+                listF.innerHTML += `<tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
+                    <td class="text-center font-bold text-gray-700">${presentCount} / ${expectedMondays}</td>
+                    <td class="text-center text-xs text-gray-500">${missedDates.join(", ")}</td>
+                    <td class="text-center"><span class="px-2 py-0.5 rounded-full text-[10px] ${missedDates.length >= 3 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'} font-bold">${missedDates.length >= 3 ? 'FOR EXPLANATION' : 'WARNING'}</span></td>
+                    <td class="text-center">
+                        <button onclick="printFlagMemo('${e.emp_id}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>
+                    </td>
+                </tr>`;
+            }
+        });
+        if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
+    };
+
+    async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins) {
+        if (!confirm(`Generate memo for ${empName}?`)) return;
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); 
+            
+            const bgBase64 = await getBgMemo();
+            if (bgBase64) {
+                pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
+            }
+            
+            const todayDate = new Date();
+            const todayStr = todayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            const currYear = todayDate.getFullYear();
+            const currMonthName = todayDate.toLocaleDateString('en-US', { month: 'long' });
+            
+            const prevMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+            const prevMonthName = prevMonthDate.toLocaleDateString('en-US', { month: 'long' });
+            const prevYearStr = prevMonthDate.getFullYear();
+
+            const isHabitualLate = (prevCount >= 10 && currCount >= 10);
+            let memoType = "";
+            let memoTypeDb = "";
+            
+            if (isHabitualLate) {
+                memoType = "HABITUAL TARDINESS";
+                memoTypeDb = "Habitual Tardiness";
+            } else if (totalMins > 0) {
+                memoType = "ACCUMULATED TARDINESS AND ATTENDANCE MONITORING";
+                memoTypeDb = "Accumulated Tardiness";
+            } else {
+                alert("No tardiness criteria met for a memo.");
+                return;
             }
 
-            doc.save(`Deduction_Summary_${mName}_${y}.pdf`);
-            status.innerText = "Generated successfully.";
-        } catch(e) {
-            status.innerText = `Error: ${e.message}`;
-            alert("Error generating summary: " + e.message);
-        } finally {
-            btn.disabled = false; btn.innerText = "PRINT DEDUCTION SUMMARY";
+            let offenseCount = 1;
+            try {
+                const { data: pastMemos } = await supabaseClient
+                    .from('memo_records')
+                    .select('*')
+                    .eq('emp_id', empId)
+                    .eq('memo_type', memoTypeDb)
+                    .neq('month', currMonthName); 
+                
+                if (pastMemos) {
+                    offenseCount = pastMemos.length + 1;
+                }
+            } catch(e) {
+                console.error("Could not fetch past memos", e);
+            }
+
+            let offenseText = "";
+            let penaltyText = "";
+            let p1 = "";
+            let p2 = "";
+            let p3 = "";
+
+            if (memoTypeDb === "Habitual Tardiness") {
+                if (offenseCount === 1) {
+                    offenseText = "FIRST OFFENSE";
+                    penaltyText = "Suspension of one (1) month and one (1) day to six (6) months.";
+                } else {
+                    offenseText = "SECOND OFFENSE / FINAL WARNING";
+                    penaltyText = "Dismissal from the service.";
+                }
+                p1 = String(`A review of your Daily Time Records (DTR) shows that you incurred tardiness as follows:\n\n    ${prevMonthName} ${prevYearStr} - ${prevCount} instances of tardiness\n    ${currMonthName} ${currYear} - ${currCount} instances of tardiness`);
+                p2 = String(`Under the Revised Rules on Administrative Cases in the Civil Service (RRACCS), an employee is considered habitually tardy if he or she incurs at least ten (10) times of tardiness in a month for at least two (2) consecutive months. This constitutes a Less Grave Offense. As this is your ${offenseText}, the prescribed penalty is ${penaltyText}`);
+                p3 = String("In view thereof, you are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative case should be filed against you.\n\nFailure to respond within the prescribed period shall be deemed a waiver of your right to be heard.");
+            } else {
+                const totalHrs = (totalMins / 60.0).toFixed(2);
+                const daysEq = (totalMins / 60.0 / 8.0).toFixed(3);
+                
+                if (offenseCount === 1) {
+                    offenseText = "FIRST WARNING";
+                } else if (offenseCount === 2) {
+                    offenseText = "NOTICE TO EXPLAIN";
+                    memoType = `${memoType} (NOTICE TO EXPLAIN)`;
+                } else {
+                    offenseText = "FINAL WARNING";
+                }
+
+                p1 = String(`Based on the review of your Daily Time Records (DTR) for the month of ${currMonthName} ${currYear}, you have incurred a total of ${totalMins} minutes (${totalHrs} hours) of accumulated tardiness/undertime.`);
+                p2 = String(`Under Civil Service Commission (CSC) rules on attendance and leave, tardiness and undertime accumulated to eight (8) hours is equivalent to one (1) day absence. Accordingly, your accumulated tardiness is equivalent to ${daysEq} day/s, which shall be deducted from your available leave credits (Vacation Leave first, if available).`);
+                
+                if (offenseCount === 2) {
+                    p3 = String(`This serves as your NOTICE TO EXPLAIN. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative action should be taken against you for excessive tardiness. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`);
+                } else {
+                    p3 = String(`This serves as your ${offenseText}. You are strongly advised to improve your attendance. Continued excessive tardiness may result in an administrative case should it eventually qualify as Habitual Tardiness under Civil Service rules.`);
+                }
+            }
+
+            pdf.setMargins(30, 45, 30); 
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(12);
+            
+            pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
+            pdf.setFontSize(11);
+            pdf.text(`Series of ${currYear}`, 30, 51); 
+
+            pdf.setFontSize(11);
+            let currentY = 65;
+            const lineH = 8;
+            
+            pdf.text("TO", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${empName}`, 60, currentY); currentY += lineH;
+            pdf.text("FROM", 30, currentY); pdf.text(":", 55, currentY); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, currentY); currentY += lineH;
+            pdf.text("DATE", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${todayStr}`, 60, currentY); currentY += lineH;
+            pdf.text("SUBJECT", 30, currentY); pdf.text(":", 55, currentY); 
+            
+            const splitSubject = pdf.splitTextToSize(memoType, 130);
+            pdf.text(splitSubject, 60, currentY);
+            currentY += (splitSubject.length * lineH);
+
+            pdf.setLineWidth(0.6);
+            pdf.line(30, currentY, 215.9 - 30, currentY); 
+            currentY += 8;
+
+            pdf.setFont("helvetica", "normal");
+            
+            const linesP1 = pdf.splitTextToSize(p1, 155.9);
+            pdf.text(linesP1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesP1.length * 5) + 5;
+
+            const linesP2 = pdf.splitTextToSize(p2, 155.9);
+            pdf.text(linesP2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesP2.length * 5) + 5;
+
+            const linesP3 = pdf.splitTextToSize(p3, 155.9);
+            pdf.text(linesP3, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesP3.length * 5) + 10;
+
+            const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
+            const linesC1 = pdf.splitTextToSize(closing1, 155.9);
+            pdf.text(linesC1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesC1.length * 5) + 5;
+
+            const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
+            const linesC2 = pdf.splitTextToSize(closing2, 155.9);
+            pdf.text(linesC2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesC2.length * 5) + 15;
+
+            pdf.setFont("helvetica", "bold");
+            pdf.text("RICARDO C. GARCIA", 30, currentY); 
+
+            try {
+                await supabaseClient.from('memo_records').insert({
+                    emp_id: empId,
+                    memo_type: memoTypeDb,
+                    offense_level: offenseCount,
+                    month: currMonthName,
+                    year: currYear
+                });
+            } catch(e) {
+                console.error("Error logging memo to DB", e);
+            }
+
+            const traceId = `TRC-${empId}-${Math.floor(Date.now() / 1000)}`;
+            const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: ${memoType}\nLevel: ${offenseText}\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+            
+            let qrContainer = document.getElementById('hiddenQrContainer');
+            if (!qrContainer) {
+                qrContainer = document.createElement('div');
+                qrContainer.id = 'hiddenQrContainer';
+                qrContainer.style.position = 'fixed';
+                qrContainer.style.left = '-9999px';
+                qrContainer.style.top = '-9999px';
+                document.body.appendChild(qrContainer);
+            }
+            qrContainer.innerHTML = '';
+            
+            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
+            
+            setTimeout(() => {
+                try {
+                    const qrCanvas = qrContainer.querySelector('canvas');
+                    if (qrCanvas) {
+                        const qrDataUrl = qrCanvas.toDataURL('image/png');
+                        pdf.addImage(qrDataUrl, 'PNG', 30, currentY + 5, 22, 22);
+                    }
+                    pdf.save(`Memo_${empId}_${memoTypeDb.replace(" ", "_")}_${currMonthName}_${currYear}.pdf`);
+                } catch(err) {
+                    console.error(err);
+                    alert("Error saving PDF: " + err.message);
+                }
+            }, 300);
+
+        } catch(error) {
+            console.error(error);
+            alert("Error generating PDF: " + error.message);
+        }
+    }
+
+    async function printFlagMemo(empId, empName, missedDates) {
+        if (!confirm(`Generate Flag Ceremony Memo for ${empName}?`)) return;
+        
+        try {
+            const { jsPDF } = window.jspdf; 
+            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]);
+
+            const bgBase64 = await getBgMemo();
+            if (bgBase64) {
+                pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
+            }
+
+            const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            const currYear = new Date().getFullYear();
+            const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
+
+            pdf.setMargins(30, 45, 30); 
+            pdf.setFont("helvetica", "bold"); 
+            pdf.setFontSize(12);
+            
+            pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
+            pdf.setFontSize(11); 
+            pdf.text(`Series of ${currYear}`, 30, 51); 
+            
+            let y = 65; 
+            const lineH = 8;
+            pdf.text("TO", 30, y); pdf.text(":", 55, y); pdf.text(empName, 60, y); y += lineH;
+            pdf.text("FROM", 30, y); pdf.text(":", 55, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, y); y += lineH;
+            pdf.text("DATE", 30, y); pdf.text(":", 55, y); pdf.text(today, 60, y); y += lineH;
+            pdf.text("SUBJECT", 30, y); pdf.text(":", 55, y); pdf.text("NON-ATTENDANCE TO FLAG CEREMONY", 60, y);
+            
+            pdf.setLineWidth(0.6); 
+            pdf.line(30, y+5, 215.9 - 30, y+5); 
+            y += 15;
+
+            pdf.setFont("helvetica", "normal");
+            const p1 = String(`Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following date(s): ${missedDates}.`);
+            const p2 = String("Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory for all government officials and employees.");
+            const p3 = String("You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you for this violation of office rules. Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.");
+
+            const linesP1 = pdf.splitTextToSize(p1, 155.9);
+            pdf.text(linesP1, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesP1.length * 5) + 5; 
+            
+            const linesP2 = pdf.splitTextToSize(p2, 155.9);
+            pdf.text(linesP2, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesP2.length * 5) + 5; 
+            
+            const linesP3 = pdf.splitTextToSize(p3, 155.9);
+            pdf.text(linesP3, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesP3.length * 5) + 10; 
+
+            const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
+            const linesC1 = pdf.splitTextToSize(closing1, 155.9);
+            pdf.text(linesC1, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesC1.length * 5) + 5;
+
+            const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
+            const linesC2 = pdf.splitTextToSize(closing2, 155.9);
+            pdf.text(linesC2, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesC2.length * 5) + 15;
+            
+            pdf.setFont("helvetica", "bold"); 
+            pdf.text("RICARDO C. GARCIA", 30, y); 
+
+            try {
+                await supabaseClient.from('memo_records').insert({
+                    emp_id: empId,
+                    memo_type: "Flag Ceremony Non-Attendance",
+                    offense_level: 1, 
+                    month: currMonthName,
+                    year: currYear
+                });
+            } catch(e) {
+                console.error("Error logging memo to DB", e);
+            }
+
+            const traceId = `TRC-FLAG-${empId}-${Math.floor(Date.now() / 1000)}`;
+            const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: Non-Attendance to Flag Ceremony\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+            
+            let qrContainer = document.getElementById('hiddenQrContainer');
+            if (!qrContainer) {
+                qrContainer = document.createElement('div');
+                qrContainer.id = 'hiddenQrContainer';
+                qrContainer.style.position = 'fixed';
+                qrContainer.style.left = '-9999px';
+                qrContainer.style.top = '-9999px';
+                document.body.appendChild(qrContainer);
+            }
+            qrContainer.innerHTML = '';
+            
+            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
+            
+            setTimeout(() => {
+                try {
+                    const qrCanvas = qrContainer.querySelector('canvas');
+                    if (qrCanvas) {
+                        const qrDataUrl = qrCanvas.toDataURL('image/png');
+                        pdf.addImage(qrDataUrl, 'PNG', 30, y + 5, 22, 22);
+                    }
+                    pdf.save(`Flag_Ceremony_Memo_${empId}_${currMonthName}_${currYear}.pdf`);
+                } catch(err) {
+                    console.error(err);
+                    alert("Error saving PDF: " + err.message);
+                }
+            }, 300);
+
+        } catch(error) {
+            console.error(error);
+            alert("Error generating PDF: " + error.message);
         }
     }
 </script>
