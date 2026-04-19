@@ -598,9 +598,11 @@
             processCtoExpiration(false).catch(e => console.error(e));
 
             const currentYear = new Date().getFullYear();
+            
+            // Force leave explicitly includes APPROVED, DISAPPROVED, and APPLICATION of any VL type
             const { data: vlData } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, debit')
-                .in('transaction_type', ['APPLICATION', 'APPROVED'])
+                .in('transaction_type', ['APPLICATION', 'APPROVED', 'DISAPPROVED'])
                 .or(`type.ilike.%VL%,type.ilike.%VACATION%,type.ilike.%FORCE%`)
                 .gte('start_date', `${currentYear}-01-01`)
                 .lte('start_date', `${currentYear}-12-31`);
@@ -1220,6 +1222,16 @@
     }
 
     // --- TAB 6: DETAILED LEDGER MONITORING ---
+    function getLeaveCategory(typeStr) {
+        typeStr = (typeStr || '').toUpperCase();
+        if (typeStr.includes('VL') || typeStr.includes('VACATION') || typeStr.includes('GATE PASS') || typeStr.includes('FORCE LEAVE')) return 'VL';
+        if (typeStr.includes('SL') || typeStr.includes('SICK')) return 'SL';
+        if (typeStr.includes('SPL') || typeStr.includes('SPECIAL')) return 'SPL';
+        if (typeStr.includes('WL') || typeStr.includes('WELLNESS') || typeStr.includes('MANDATORY')) return 'WL';
+        if (typeStr.includes('CTO') || typeStr.includes('COMPENSATORY') || typeStr.includes('EXPIRATION')) return 'CTO';
+        return null;
+    }
+
     async function loadLedgerStatement() {
         const empId = document.getElementById('ledgEmpId').value;
         const startDate = document.getElementById('ledgStartDate').value;
@@ -1251,113 +1263,110 @@
             const emp = empDataMap[empId];
             if(!emp) throw new Error("Employee data missing.");
 
-            let currentBal = 0;
-            if (ledgType !== 'ALL') {
-                let balField = ledgType.toLowerCase() + '_balance';
-                currentBal = parseFloat(emp[balField] || 0);
-            }
-
             const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
                 .eq('emp_id', empId)
-                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'DISAPPROVED', 'FORFEITURE'])
-                .order('created_at', { ascending: true });
+                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'DISAPPROVED', 'FORFEITURE']);
 
             if (error) throw error;
 
             let relevantData = (allData || []).filter(t => {
-                const tType = (t.type || '').toUpperCase();
+                const cat = getLeaveCategory(t.type);
                 if (ledgType === 'ALL') return true;
-                if (ledgType === 'VL') return tType.includes('VL') || tType.includes('VACATION') || tType.includes('GATE PASS') || tType.includes('FORCE LEAVE');
-                if (ledgType === 'SL') return tType.includes('SL') || tType.includes('SICK');
-                if (ledgType === 'SPL') return tType.includes('SPL') || tType.includes('SPECIAL');
-                if (ledgType === 'WL') return tType.includes('WL') || tType.includes('WELLNESS') || tType.includes('MANDATORY');
-                if (ledgType === 'CTO') return tType.includes('CTO') || tType.includes('COMPENSATORY') || tType.includes('EXPIRATION');
-                return false;
+                return cat === ledgType;
             });
             
-            // Sort combined data by date (Newest to Oldest)
+            // Sort NEWEST TO OLDEST
             relevantData.sort((a,b) => new Date(b.created_at || b.start_date) - new Date(a.created_at || a.start_date));
 
             const dtEnd = new Date(`${endDate}T23:59:59`);
             const dtStart = new Date(`${startDate}T00:00:00`);
             
             let futureData = [];
-            let monthData = [];
+            let rangeData = [];
 
             relevantData.forEach(t => {
                 const tDate = new Date(t.created_at || t.start_date);
                 if(tDate > dtEnd) {
                     futureData.push(t);
                 } else if(tDate >= dtStart && tDate <= dtEnd) {
-                    monthData.push(t);
+                    rangeData.push(t);
                 }
             });
 
-            let endOfMonthBal = currentBal;
+            // Initialize tracker for all balances from Employees table
+            let balances = {
+                VL: parseFloat(emp.vl_balance || 0),
+                SL: parseFloat(emp.sl_balance || 0),
+                SPL: parseFloat(emp.spl_balance || 0),
+                WL: parseFloat(emp.wl_balance || 0),
+                CTO: parseFloat(emp.cto_balance || 0)
+            };
+
+            // Reverse future data to find balance at exact end of selected period
+            futureData.forEach(f => {
+                if (f.transaction_type !== 'DISAPPROVED') {
+                    const cat = getLeaveCategory(f.type);
+                    if (cat) {
+                        balances[cat] -= parseFloat(f.credit || 0);
+                        balances[cat] += parseFloat(f.debit || 0);
+                    }
+                }
+            });
+
+            // Set UI headers based on type
             if (ledgType !== 'ALL') {
-                futureData.forEach(f => {
-                    if (f.transaction_type !== 'DISAPPROVED') {
-                        // Reversing logic for Newest to Oldest
-                        endOfMonthBal -= parseFloat(f.credit || 0);
-                        endOfMonthBal += parseFloat(f.debit || 0);
+                const endBal = balances[ledgType];
+                
+                // Calculate backwards just to get the beginning balance for summary
+                let begBal = endBal;
+                let totalC = 0, totalD = 0;
+                rangeData.forEach(t => {
+                    if (t.transaction_type !== 'DISAPPROVED') {
+                        const c = parseFloat(t.credit || 0);
+                        const d = parseFloat(t.debit || 0);
+                        totalC += c; totalD += d;
+                        begBal -= c; begBal += d;
                     }
                 });
-            }
 
-            let begBal = endOfMonthBal;
-            let totalCreditMonth = 0;
-            let totalDebitMonth = 0;
-
-            monthData.forEach(t => {
-                if (t.transaction_type !== 'DISAPPROVED') {
-                    const c = parseFloat(t.credit || 0);
-                    const d = parseFloat(t.debit || 0);
-                    totalCreditMonth += c;
-                    totalDebitMonth += d;
-                    // Reversing logic for Newest to Oldest
-                    begBal -= c;
-                    begBal += d;
-                }
-            });
-
-            if (ledgType !== 'ALL') {
                 document.getElementById('lblBegBal').innerText = begBal.toFixed(3);
-                const net = totalCreditMonth - totalDebitMonth;
+                const net = totalC - totalD;
                 const netEl = document.getElementById('lblMovement');
                 netEl.innerText = (net > 0 ? '+' : '') + net.toFixed(3);
                 netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
-                document.getElementById('lblEndBal').innerText = endOfMonthBal.toFixed(3);
+                document.getElementById('lblEndBal').innerText = endBal.toFixed(3);
                 sumDiv.classList.remove('hidden');
             } else {
-                document.getElementById('lblAllVl').innerText = parseFloat(emp.vl_balance || 0).toFixed(3);
-                document.getElementById('lblAllSl').innerText = parseFloat(emp.sl_balance || 0).toFixed(3);
-                document.getElementById('lblAllSpl').innerText = parseFloat(emp.spl_balance || 0).toFixed(3);
-                document.getElementById('lblAllWl').innerText = parseFloat(emp.wl_balance || 0).toFixed(3);
-                document.getElementById('lblAllCto').innerText = parseFloat(emp.cto_balance || 0).toFixed(3);
+                document.getElementById('lblAllVl').innerText = balances.VL.toFixed(3);
+                document.getElementById('lblAllSl').innerText = balances.SL.toFixed(3);
+                document.getElementById('lblAllSpl').innerText = balances.SPL.toFixed(3);
+                document.getElementById('lblAllWl').innerText = balances.WL.toFixed(3);
+                document.getElementById('lblAllCto').innerText = balances.CTO.toFixed(3);
                 allBalDiv.classList.remove('hidden');
             }
 
-            if (monthData.length === 0) {
+            if (rangeData.length === 0) {
                 list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this range.</td></tr>`;
                 return;
             }
 
             let html = '';
-            let runningBal = endOfMonthBal;
-
-            monthData.forEach((t, index) => {
+            
+            // Loop from newest to oldest
+            rangeData.forEach(t => {
                 const isDisapproved = t.transaction_type === 'DISAPPROVED';
                 const cred = parseFloat(t.credit || 0);
                 const deb = parseFloat(t.debit || 0);
-                
+                const cat = getLeaveCategory(t.type);
+
                 let rowBalDisplay = '-';
 
-                if(!isDisapproved && ledgType !== 'ALL') {
-                    rowBalDisplay = runningBal.toFixed(3);
-                    // Update running balance for the NEXT row (older transaction)
-                    runningBal -= cred;
-                    runningBal += deb;
+                if (cat && !isDisapproved) {
+                    rowBalDisplay = balances[cat].toFixed(3);
+                    // Reverse the transaction for the NEXT older row
+                    balances[cat] -= cred;
+                    balances[cat] += deb;
                 }
 
                 const displayType = t.type ? t.type.toUpperCase() : '-';
@@ -1365,54 +1374,6 @@
                 
                 let credColor = cred > 0 ? 'text-green-600' : 'text-gray-400';
                 let debColor = deb > 0 ? 'text-red-600' : 'text-gray-400';
-
-                // Specific case for ALL LEAVE TYPES: Re-calculate the balance based on the specific type for that row
-                if (ledgType === 'ALL' && !isDisapproved) {
-                     let specificType = '';
-                     if (displayType.includes('VL') || displayType.includes('VACATION') || displayType.includes('GATE PASS') || displayType.includes('FORCE LEAVE')) specificType = 'vl_balance';
-                     else if (displayType.includes('SL') || displayType.includes('SICK')) specificType = 'sl_balance';
-                     else if (displayType.includes('SPL') || displayType.includes('SPECIAL')) specificType = 'spl_balance';
-                     else if (displayType.includes('WL') || displayType.includes('WELLNESS') || displayType.includes('MANDATORY')) specificType = 'wl_balance';
-                     else if (displayType.includes('CTO') || displayType.includes('COMPENSATORY') || displayType.includes('EXPIRATION')) specificType = 'cto_balance';
-                     
-                     if (specificType) {
-                         // Find the balance for this specific type by reversing future transactions of THIS TYPE ONLY
-                         let specificBal = parseFloat(emp[specificType] || 0);
-                         futureData.forEach(f => {
-                             const fType = (f.type || '').toUpperCase();
-                             let isMatch = false;
-                             if (specificType === 'vl_balance' && (fType.includes('VL') || fType.includes('VACATION') || fType.includes('GATE PASS') || fType.includes('FORCE LEAVE'))) isMatch = true;
-                             else if (specificType === 'sl_balance' && (fType.includes('SL') || fType.includes('SICK'))) isMatch = true;
-                             else if (specificType === 'spl_balance' && (fType.includes('SPL') || fType.includes('SPECIAL'))) isMatch = true;
-                             else if (specificType === 'wl_balance' && (fType.includes('WL') || fType.includes('WELLNESS') || fType.includes('MANDATORY'))) isMatch = true;
-                             else if (specificType === 'cto_balance' && (fType.includes('CTO') || fType.includes('COMPENSATORY') || fType.includes('EXPIRATION'))) isMatch = true;
-
-                             if (isMatch && f.transaction_type !== 'DISAPPROVED') {
-                                 specificBal -= parseFloat(f.credit || 0);
-                                 specificBal += parseFloat(f.debit || 0);
-                             }
-                         });
-                         
-                         // Find where this transaction is in the monthData to reverse up to this point
-                         let currentSpecificBal = specificBal;
-                         for (let i = 0; i < index; i++) {
-                             const pastT = monthData[i];
-                             const pastTType = (pastT.type || '').toUpperCase();
-                             let isMatch = false;
-                             if (specificType === 'vl_balance' && (pastTType.includes('VL') || pastTType.includes('VACATION') || pastTType.includes('GATE PASS') || pastTType.includes('FORCE LEAVE'))) isMatch = true;
-                             else if (specificType === 'sl_balance' && (pastTType.includes('SL') || pastTType.includes('SICK'))) isMatch = true;
-                             else if (specificType === 'spl_balance' && (pastTType.includes('SPL') || pastTType.includes('SPECIAL'))) isMatch = true;
-                             else if (specificType === 'wl_balance' && (pastTType.includes('WL') || pastTType.includes('WELLNESS') || pastTType.includes('MANDATORY'))) isMatch = true;
-                             else if (specificType === 'cto_balance' && (pastTType.includes('CTO') || pastTType.includes('COMPENSATORY') || pastTType.includes('EXPIRATION'))) isMatch = true;
-
-                             if (isMatch && pastT.transaction_type !== 'DISAPPROVED') {
-                                 currentSpecificBal -= parseFloat(pastT.credit || 0);
-                                 currentSpecificBal += parseFloat(pastT.debit || 0);
-                             }
-                         }
-                         rowBalDisplay = currentSpecificBal.toFixed(3);
-                     }
-                }
 
                 html += `
                     <tr class="${isDisapproved ? 'bg-red-50 opacity-70' : 'hover:bg-gray-50'}">
@@ -1427,7 +1388,6 @@
                     </tr>
                 `;
                 
-                // Store for printing
                 currentLedgerDataToPrint.push({
                     date: dateStr,
                     particulars: `${t.transaction_type.replace(/_/g, ' ')}: ${displayType}`,
