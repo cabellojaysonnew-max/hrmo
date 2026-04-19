@@ -138,14 +138,6 @@
                             <button onclick="generateYearlyCredits()" class="bg-[#D4AF37] text-black font-bold py-2 px-4 rounded hover:brightness-110 shadow">Grant Yearly Credits</button>
                         </div>
                     </div>
-                    
-                    <div class="card p-6 col-span-1 md:col-span-2 border-t-4 border-orange-500">
-                        <h3 class="font-bold text-orange-700 mb-4">Rolling CTO Forfeiture (1-Year Expiration)</h3>
-                        <p class="text-sm text-gray-600 mb-6">Compensatory Time-Off (CTO) credits automatically expire exactly 1 year after they were earned (issuance date). This system checks and applies expiration dynamically based on usage (FIFO), ensuring accurate balances. You can force a scan below.</p>
-                        <div class="flex gap-2 items-end">
-                            <button onclick="processCtoExpiration(true)" id="btnCtoExpire" class="bg-orange-600 text-white font-bold py-2 px-6 rounded hover:bg-orange-700 shadow">Force Scan Expired CTOs</button>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -263,16 +255,17 @@
 
             <div id="ledgerTab" class="tab-content">
                 <div class="card mb-6">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4 items-end flex-wrap">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-4 gap-4 items-end flex-wrap">
                         <div class="flex-1 min-w-[200px] relative">
                             <label class="form-label">Search Employee</label>
                             <input type="text" id="ledgEmpSearch" class="form-input" placeholder="Type to search employee..." autocomplete="off">
                             <div id="empSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
                             <input type="hidden" id="ledgEmpId">
                         </div>
-                        <div class="w-48">
+                        <div>
                             <label class="form-label">Leave Type</label>
                             <select id="ledgType" class="form-input">
+                                <option value="ALL">All Leave Types</option>
                                 <option value="VL">Vacation Leave (VL)</option>
                                 <option value="SL">Sick Leave (SL)</option>
                                 <option value="SPL">Special Privilege Leave (SPL)</option>
@@ -280,13 +273,18 @@
                                 <option value="CTO">Compensatory Time-Off (CTO)</option>
                             </select>
                         </div>
-                        <div class="w-48">
-                            <label class="form-label">Select Month/Year</label>
-                            <input type="month" id="ledgMonth" class="form-input">
+                        <div>
+                            <label class="form-label">Start Date</label>
+                            <input type="date" id="ledgStartDate" class="form-input">
                         </div>
                         <div>
-                            <button onclick="loadLedgerStatement()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow w-full">View Statement</button>
+                            <label class="form-label">End Date</label>
+                            <input type="date" id="ledgEndDate" class="form-input">
                         </div>
+                    </div>
+                    <div class="p-4 bg-gray-50 border-b flex justify-end gap-2">
+                        <button onclick="loadLedgerStatement()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow">View Statement</button>
+                        <button onclick="printDetailedLedger()" id="btnPrintLedger" class="bg-[#D4AF37] hover:brightness-110 text-black font-bold py-2 px-6 rounded shadow hidden">Print Ledger</button>
                     </div>
                     
                     <div class="p-6">
@@ -317,7 +315,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="ledger-list">
-                                    <tr><td colspan="5" class="table-td text-center text-gray-500">Select an employee, leave type, and month to view ledger.</td></tr>
+                                    <tr><td colspan="5" class="table-td text-center text-gray-500">Select an employee, leave type, and date range to view ledger.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -343,17 +341,25 @@
     // --- UTILS & GLOBALS ---
     const d = new Date();
     const currMonthStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const todayStr = d.toISOString().split('T')[0];
+    
     document.getElementById('genMonth').value = currMonthStr;
     document.getElementById('gpMonth').value = currMonthStr;
     document.getElementById('ctoMonth').value = currMonthStr;
-    document.getElementById('ledgMonth').value = currMonthStr;
     document.getElementById('genYear').value = d.getFullYear();
+    
+    // Default to current month for ledger dates
+    const firstDay = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+    document.getElementById('ledgStartDate').value = firstDay;
+    document.getElementById('ledgEndDate').value = lastDay;
 
     let empDataMap = {};
     let currentGatePasses = [];
     let currentCTOs = [];
     let currentForceLeaveStatus = {}; 
     let empSearchList = [];
+    let currentLedgerDataToPrint = [];
 
     // Ensure we process REGULAR employees only
     async function loadEmployeeMaps() {
@@ -408,7 +414,6 @@
             searchResults.classList.add('hidden');
         }
     });
-
 
     function switchTab(tabId) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -468,7 +473,6 @@
         if(!confirm("Are you sure you want to approve this leave?")) return;
         
         try {
-            // Schedule override multiplier check
             let multiplier = 1;
             const sDate = start_date;
             const eDate = end_date || start_date;
@@ -555,10 +559,6 @@
             const emps = Object.values(empDataMap);
             if (emps.length === 0) throw new Error("No REGULAR employees found.");
 
-            // Run auto CTO expiration silently in the background
-            processCtoExpiration(false).catch(e => console.error(e));
-
-            // Force Leave: Any VL (APPLICATION, APPROVED, or DISAPPROVED) per year. Max 5.
             const currentYear = new Date().getFullYear();
             const { data: vlData } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, debit')
@@ -695,7 +695,6 @@
         const monthVal = document.getElementById('genMonth').value;
         if(!monthVal) { alert("Please select a month."); return; }
         
-        // Prevent double crediting
         const { data: existing } = await supabaseClient.from('leave_ledger')
             .select('id').eq('type', 'VL/SL EARNED').eq('start_date', `${monthVal}-01`).limit(1);
         if(existing && existing.length > 0) {
@@ -743,7 +742,6 @@
         const yearVal = document.getElementById('genYear').value;
         if(!yearVal) { alert("Please enter a year."); return; }
         
-        // Prevent double crediting
         const { data: existing } = await supabaseClient.from('leave_ledger')
             .select('id').eq('type', 'SPL/WL GRANTED').eq('start_date', `${yearVal}-01-01`).limit(1);
         if(existing && existing.length > 0) {
@@ -782,110 +780,6 @@
             alert("Error: " + e.message);
         }
     }
-
-    async function processCtoExpiration(isManual = false) {
-        const btn = document.getElementById('btnCtoExpire');
-        if(btn) { btn.disabled = true; btn.innerText = "Scanning..."; }
-
-        try {
-            await loadEmployeeMaps();
-            
-            // 1. Get all CTO EARNED (Issuances)
-            const { data: earnedCtos } = await supabaseClient.from('leave_ledger')
-                .select('emp_id, credit, start_date, id')
-                .eq('transaction_type', 'CREDIT')
-                .eq('type', 'CTO EARNED')
-                .order('start_date', { ascending: true }); // ASC for FIFO
-
-            // 2. Get all CTO Debits (APPROVED usage and FORFEITURE)
-            const { data: usedCtos } = await supabaseClient.from('leave_ledger')
-                .select('emp_id, debit')
-                .in('transaction_type', ['APPROVED', 'FORFEITURE'])
-                .ilike('type', '%CTO%');
-
-            const usedMap = {};
-            if (usedCtos) {
-                usedCtos.forEach(c => {
-                    if(!usedMap[c.emp_id]) usedMap[c.emp_id] = 0;
-                    usedMap[c.emp_id] += parseFloat(c.debit || 0);
-                });
-            }
-
-            const updates = [];
-            const ledgers = [];
-            let expiredCount = 0;
-
-            const todayObj = new Date();
-            todayObj.setFullYear(todayObj.getFullYear() - 1);
-            const cutoffDate = todayObj.toISOString().split('T')[0]; // Exactly 1 year ago
-
-            const empGroups = {};
-            (earnedCtos || []).forEach(c => {
-                if(!empGroups[c.emp_id]) empGroups[c.emp_id] = [];
-                empGroups[c.emp_id].push(c);
-            });
-
-            for (const empId in empGroups) {
-                let totalUsed = usedMap[empId] || 0;
-                let totalExpiredForEmp = 0;
-
-                empGroups[empId].forEach(issuance => {
-                    if (issuance.start_date <= cutoffDate) {
-                        // This issuance is 1+ years old
-                        const credit = parseFloat(issuance.credit || 0);
-                        if (totalUsed >= credit) {
-                            // Fully consumed by usage
-                            totalUsed -= credit;
-                        } else {
-                            // Partially or not consumed at all -> Expires
-                            const expiredAmount = credit - totalUsed;
-                            totalUsed = 0; // Used is depleted
-                            totalExpiredForEmp += expiredAmount;
-                        }
-                    }
-                });
-
-                if (totalExpiredForEmp > 0) {
-                    const emp = empDataMap[empId];
-                    if (emp && parseFloat(emp.cto_balance || 0) > 0) {
-                        // Can't forfeit more than they currently have (failsafe)
-                        const actualForfeit = Math.min(totalExpiredForEmp, parseFloat(emp.cto_balance));
-                        
-                        if (actualForfeit > 0) {
-                            const newBal = (parseFloat(emp.cto_balance) - actualForfeit).toFixed(3);
-                            updates.push( supabaseClient.from('employees').update({ cto_balance: newBal }).eq('emp_id', empId) );
-                            
-                            ledgers.push({
-                                emp_id: empId,
-                                type: 'CTO EXPIRATION',
-                                debit: actualForfeit,
-                                transaction_type: 'FORFEITURE',
-                                remarks: `Automatic Forfeiture of CTO unused 1 year after issuance.`,
-                                start_date: new Date().toISOString().split('T')[0]
-                            });
-                            expiredCount++;
-                        }
-                    }
-                }
-            }
-
-            if (updates.length > 0) {
-                await Promise.all(updates);
-                await supabaseClient.from('leave_ledger').insert(ledgers);
-                await loadEmployeeMaps();
-                if(isManual && btn) alert(`Successfully processed auto-expiration. Deducted expired CTO for ${expiredCount} employee(s).`);
-            } else {
-                if(isManual && btn) alert(`System scanned successfully. No expired CTO balances found.`);
-            }
-
-        } catch (e) {
-            console.error(e);
-            if(isManual && btn) alert("Error processing CTO expiration: " + e.message);
-        } finally {
-            if(btn) { btn.disabled = false; btn.innerText = "Force Scan Expired CTOs"; }
-        }
-    }
-
 
     // --- TAB 4: GATE PASS PROCESSING ---
     async function loadGatePasses() {
@@ -1177,33 +1071,38 @@
     // --- TAB 6: DETAILED LEDGER MONITORING ---
     async function loadLedgerStatement() {
         const empId = document.getElementById('ledgEmpId').value;
-        const monthVal = document.getElementById('ledgMonth').value;
+        const startDate = document.getElementById('ledgStartDate').value;
+        const endDate = document.getElementById('ledgEndDate').value;
         const ledgType = document.getElementById('ledgType').value;
         const list = document.getElementById('ledger-list');
         const sumDiv = document.getElementById('ledgerSummary');
+        const btnPrint = document.getElementById('btnPrintLedger');
 
-        if (!empId || !monthVal) {
-            alert("Please select both an Employee and a Month.");
+        if (!empId || !startDate || !endDate) {
+            alert("Please select an Employee and a valid Date Range.");
+            return;
+        }
+
+        if (new Date(endDate) < new Date(startDate)) {
+            alert("End Date cannot be before Start Date.");
             return;
         }
 
         list.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching ledger data...</td></tr>`;
         sumDiv.classList.add('hidden');
+        btnPrint.classList.add('hidden');
+        currentLedgerDataToPrint = []; 
 
         try {
-            const parts = monthVal.split('-');
-            const yy = parseInt(parts[0], 10);
-            const mm = parseInt(parts[1], 10);
-            const lastDay = new Date(yy, mm, 0).getDate();
-            const startDate = `${monthVal}-01`;
-            const endDate = `${monthVal}-${lastDay}`;
-
             await loadEmployeeMaps();
             const emp = empDataMap[empId];
             if(!emp) throw new Error("Employee data missing.");
-            
-            let balField = ledgType.toLowerCase() + '_balance';
-            let currentBal = parseFloat(emp[balField] || 0);
+
+            let currentBal = 0;
+            if (ledgType !== 'ALL') {
+                let balField = ledgType.toLowerCase() + '_balance';
+                currentBal = parseFloat(emp[balField] || 0);
+            }
 
             const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
@@ -1215,6 +1114,7 @@
 
             let relevantData = (allData || []).filter(t => {
                 const tType = (t.type || '').toUpperCase();
+                if (ledgType === 'ALL') return true;
                 if (ledgType === 'VL') return tType.includes('VL') || tType.includes('VACATION') || tType.includes('GATE PASS') || tType.includes('FORCE LEAVE');
                 if (ledgType === 'SL') return tType.includes('SL') || tType.includes('SICK');
                 if (ledgType === 'SPL') return tType.includes('SPL') || tType.includes('SPECIAL');
@@ -1241,12 +1141,14 @@
             });
 
             let endOfMonthBal = currentBal;
-            futureData.forEach(f => {
-                if (f.transaction_type !== 'DISAPPROVED') {
-                    endOfMonthBal -= parseFloat(f.credit || 0);
-                    endOfMonthBal += parseFloat(f.debit || 0);
-                }
-            });
+            if (ledgType !== 'ALL') {
+                futureData.forEach(f => {
+                    if (f.transaction_type !== 'DISAPPROVED') {
+                        endOfMonthBal -= parseFloat(f.credit || 0);
+                        endOfMonthBal += parseFloat(f.debit || 0);
+                    }
+                });
+            }
 
             let begBal = endOfMonthBal;
             let totalCreditMonth = 0;
@@ -1263,16 +1165,18 @@
                 }
             });
 
-            document.getElementById('lblBegBal').innerText = begBal.toFixed(3);
-            const net = totalCreditMonth - totalDebitMonth;
-            const netEl = document.getElementById('lblMovement');
-            netEl.innerText = (net > 0 ? '+' : '') + net.toFixed(3);
-            netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
-            document.getElementById('lblEndBal').innerText = endOfMonthBal.toFixed(3);
-            sumDiv.classList.remove('hidden');
+            if (ledgType !== 'ALL') {
+                document.getElementById('lblBegBal').innerText = begBal.toFixed(3);
+                const net = totalCreditMonth - totalDebitMonth;
+                const netEl = document.getElementById('lblMovement');
+                netEl.innerText = (net > 0 ? '+' : '') + net.toFixed(3);
+                netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
+                document.getElementById('lblEndBal').innerText = endOfMonthBal.toFixed(3);
+                sumDiv.classList.remove('hidden');
+            }
 
             if (monthData.length === 0) {
-                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this month.</td></tr>`;
+                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this range.</td></tr>`;
                 return;
             }
 
@@ -1284,7 +1188,7 @@
                 const cred = parseFloat(t.credit || 0);
                 const deb = parseFloat(t.debit || 0);
                 
-                if(!isDisapproved) {
+                if(!isDisapproved && ledgType !== 'ALL') {
                     runningBal += cred;
                     runningBal -= deb;
                 }
@@ -1304,15 +1208,91 @@
                         </td>
                         <td class="table-td font-bold ${credColor}">${cred > 0 ? '+'+cred.toFixed(3) : '-'}</td>
                         <td class="table-td font-bold ${debColor}">${deb > 0 ? '-'+deb.toFixed(3) : '-'}</td>
-                        <td class="table-td font-bold">${isDisapproved ? '-' : runningBal.toFixed(3)}</td>
+                        <td class="table-td font-bold">${isDisapproved || ledgType === 'ALL' ? '-' : runningBal.toFixed(3)}</td>
                     </tr>
                 `;
+                
+                // Store for printing
+                currentLedgerDataToPrint.push({
+                    date: dateStr,
+                    particulars: `${t.transaction_type.replace(/_/g, ' ')}: ${displayType}`,
+                    credit: cred > 0 ? `+${cred.toFixed(3)}` : '-',
+                    debit: deb > 0 ? `-${deb.toFixed(3)}` : '-',
+                    runningBal: isDisapproved || ledgType === 'ALL' ? '-' : runningBal.toFixed(3)
+                });
             });
             list.innerHTML = html;
+            btnPrint.classList.remove('hidden'); // Show print button
 
         } catch (e) {
             list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
         }
+    }
+
+    function printDetailedLedger() {
+        if (currentLedgerDataToPrint.length === 0) return;
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        
+        const empId = document.getElementById('ledgEmpId').value;
+        const empName = empDataMap[empId] ? empDataMap[empId].full_name.toUpperCase() : empId;
+        const startDate = document.getElementById('ledgStartDate').value;
+        const endDate = document.getElementById('ledgEndDate').value;
+        const ledgType = document.getElementById('ledgType').options[document.getElementById('ledgType').selectedIndex].text;
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text("DETAILED LEAVE LEDGER", 105, 20, { align: "center" });
+        
+        doc.setFontSize(10);
+        doc.text(`Employee: ${empName} (${empId})`, 14, 30);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Leave Type: ${ledgType}`, 14, 35);
+        doc.text(`Period: ${startDate} to ${endDate}`, 14, 40);
+
+        let y = 50;
+        
+        // Table Header
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.rect(14, y, 25, 6); doc.text("DATE", 26.5, y + 4, { align: "center" });
+        doc.rect(39, y, 70, 6); doc.text("PARTICULARS / TYPE", 74, y + 4, { align: "center" });
+        doc.rect(109, y, 30, 6); doc.text("CREDIT", 124, y + 4, { align: "center" });
+        doc.rect(139, y, 30, 6); doc.text("DEBIT", 154, y + 4, { align: "center" });
+        doc.rect(169, y, 27, 6); doc.text("BALANCE", 182.5, y + 4, { align: "center" });
+        
+        y += 6;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+
+        currentLedgerDataToPrint.forEach(row => {
+            if (y > 270) {
+                doc.addPage();
+                y = 20;
+                // Redraw Header on new page
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.rect(14, y, 25, 6); doc.text("DATE", 26.5, y + 4, { align: "center" });
+                doc.rect(39, y, 70, 6); doc.text("PARTICULARS / TYPE", 74, y + 4, { align: "center" });
+                doc.rect(109, y, 30, 6); doc.text("CREDIT", 124, y + 4, { align: "center" });
+                doc.rect(139, y, 30, 6); doc.text("DEBIT", 154, y + 4, { align: "center" });
+                doc.rect(169, y, 27, 6); doc.text("BALANCE", 182.5, y + 4, { align: "center" });
+                y += 6;
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(8);
+            }
+
+            doc.rect(14, y, 25, 6); doc.text(row.date, 26.5, y + 4, { align: "center" });
+            doc.rect(39, y, 70, 6); doc.text(row.particulars.substring(0, 45), 41, y + 4);
+            doc.rect(109, y, 30, 6); doc.text(row.credit, 124, y + 4, { align: "center" });
+            doc.rect(139, y, 30, 6); doc.text(row.debit, 154, y + 4, { align: "center" });
+            doc.rect(169, y, 27, 6); doc.text(row.runningBal, 182.5, y + 4, { align: "center" });
+
+            y += 6;
+        });
+
+        doc.save(`Ledger_${empId}_${startDate}_to_${endDate}.pdf`);
     }
 
 </script>
