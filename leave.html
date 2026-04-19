@@ -621,7 +621,6 @@
             
             const { data: vlData } = await supabaseClient.from('leave_ledger')
                 .select('emp_id, debit, type, transaction_type')
-                .ilike('type', '%VL%')
                 .gte('start_date', `${currentYear}-01-01`)
                 .lte('start_date', `${currentYear}-12-31`);
 
@@ -629,7 +628,7 @@
                 vlData.forEach(fl => {
                     const tType = (fl.type || '').toUpperCase();
                     if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE')) {
-                        if (['APPLICATION', 'APPROVED', 'DISAPPROVED'].includes(fl.transaction_type)) {
+                        if (['APPROVED', 'DISAPPROVED'].includes(fl.transaction_type)) {
                             if(!currentForceLeaveStatus[fl.emp_id]) currentForceLeaveStatus[fl.emp_id] = 0;
                             currentForceLeaveStatus[fl.emp_id] += Math.abs(parseFloat(fl.debit || 0));
                         }
