@@ -53,6 +53,7 @@
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('gpTab')">Gate Pass Posting</button>
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('ctoTab')">CTO Posting</button>
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('ledgerTab')">Detailed Ledger</button>
+                <button id="navManualTab" class="tab-btn whitespace-nowrap hidden" onclick="switchTab('manualTab')">Manual Input</button>
             </div>
         </div>
 
@@ -384,6 +385,37 @@
                 </div>
             </div>
 
+            <div id="manualTab" class="tab-content">
+                <div class="card">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                        <h3 class="font-bold text-[#003811]">Manual Leave Credits Input (Temporary)</h3>
+                        <div class="flex gap-4 items-center">
+                            <label class="font-bold text-sm text-[#003811] uppercase">As of Month:</label>
+                            <input type="month" id="manualMonth" class="form-input w-48">
+                            <button onclick="saveManualCredits()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow">Save All</button>
+                        </div>
+                    </div>
+                    <div class="overflow-y-auto max-h-[60vh]">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="sticky top-0 bg-[#f9fafb] z-10 shadow-sm">
+                                <tr>
+                                    <th class="table-th">Emp ID</th>
+                                    <th class="table-th">Name</th>
+                                    <th class="table-th">VL Bal</th>
+                                    <th class="table-th">SL Bal</th>
+                                    <th class="table-th">SPL Bal</th>
+                                    <th class="table-th">WL Bal</th>
+                                    <th class="table-th">CTO Bal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manual-list">
+                                <tr><td colspan="7" class="table-td text-center text-gray-500">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
@@ -408,6 +440,7 @@
     document.getElementById('genMonth').value = currMonthStr;
     document.getElementById('gpMonth').value = currMonthStr;
     document.getElementById('ctoMonth').value = currMonthStr;
+    document.getElementById('manualMonth').value = currMonthStr;
     document.getElementById('genYear').value = d.getFullYear();
     document.getElementById('scanCtoDate').value = todayStr;
     
@@ -416,6 +449,11 @@
     const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
     document.getElementById('ledgStartDate').value = firstDay;
     document.getElementById('ledgEndDate').value = lastDay;
+
+    // Show temporary tab
+    if (new Date() <= new Date('2026-05-31T23:59:59')) {
+        document.getElementById('navManualTab').classList.remove('hidden');
+    }
 
     let empDataMap = {};
     let currentGatePasses = [];
@@ -493,6 +531,7 @@
     function execTabLogic(tabId) {
         if(tabId === 'appsTab') loadApplications();
         if(tabId === 'monitorTab') loadCreditsMonitor();
+        if(tabId === 'manualTab') loadManualCredits();
     }
 
     // Initialize Maps
@@ -1596,6 +1635,89 @@
         });
 
         doc.save(`Ledger_${empId}_${startDate}_to_${endDate}.pdf`);
+    }
+
+    // --- TAB 7: MANUAL LEAVE CREDITS INPUT ---
+    async function loadManualCredits() {
+        const list = document.getElementById('manual-list');
+        const emps = Object.values(empDataMap);
+        if(emps.length === 0) {
+            list.innerHTML = `<tr><td colspan="7" class="table-td text-center">No regular employees found.</td></tr>`;
+            return;
+        }
+        let html = '';
+        emps.forEach(emp => {
+            html += `
+                <tr class="hover:bg-gray-50">
+                    <td class="table-td font-mono font-bold text-xs">${emp.emp_id}</td>
+                    <td class="table-td font-bold text-xs">${emp.full_name ? emp.full_name.toUpperCase() : ''}</td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_vl_${emp.emp_id}" value="${parseFloat(emp.vl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_sl_${emp.emp_id}" value="${parseFloat(emp.sl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_spl_${emp.emp_id}" value="${parseFloat(emp.spl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_wl_${emp.emp_id}" value="${parseFloat(emp.wl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_cto_${emp.emp_id}" value="${parseFloat(emp.cto_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
+                </tr>
+            `;
+        });
+        list.innerHTML = html;
+    }
+
+    async function saveManualCredits() {
+        const monthVal = document.getElementById('manualMonth').value;
+        if(!monthVal) { alert("Please select an 'As of Month'."); return; }
+        if(!confirm("Are you sure you want to update all these balances? This will permanently override their current records.")) return;
+
+        const emps = Object.values(empDataMap);
+        const updates = [];
+        const ledgers = [];
+
+        for (const emp of emps) {
+            const vl = document.getElementById(`man_vl_${emp.emp_id}`).value;
+            const sl = document.getElementById(`man_sl_${emp.emp_id}`).value;
+            const spl = document.getElementById(`man_spl_${emp.emp_id}`).value;
+            const wl = document.getElementById(`man_wl_${emp.emp_id}`).value;
+            const cto = document.getElementById(`man_cto_${emp.emp_id}`).value;
+
+            updates.push(
+                supabaseClient.from('employees').update({
+                    vl_balance: String(vl),
+                    sl_balance: String(sl),
+                    spl_balance: String(spl),
+                    wl_balance: String(wl),
+                    cto_balance: String(cto)
+                }).eq('emp_id', emp.emp_id)
+            );
+
+            ledgers.push({
+                emp_id: emp.emp_id,
+                type: 'MANUAL INPUT',
+                credit: 0,
+                debit: 0,
+                transaction_type: 'CREDIT',
+                remarks: `Manual Balance Setting (As of ${monthVal}): VL:${vl}, SL:${sl}, SPL:${spl}, WL:${wl}, CTO:${cto}`,
+                start_date: `${monthVal}-01`
+            });
+        }
+
+        try {
+            const saveBtn = event.target;
+            saveBtn.innerText = "Saving...";
+            saveBtn.disabled = true;
+
+            await Promise.all(updates);
+            await supabaseClient.from('leave_ledger').insert(ledgers);
+            
+            alert("Balances updated successfully!");
+            await loadEmployeeMaps();
+            loadManualCredits();
+            
+            saveBtn.innerText = "Save All";
+            saveBtn.disabled = false;
+        } catch(e) {
+            alert("Error saving: " + e.message);
+            event.target.innerText = "Save All";
+            event.target.disabled = false;
+        }
     }
 
 </script>
