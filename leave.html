@@ -72,12 +72,14 @@
                                     <th class="table-th">Employee</th>
                                     <th class="table-th">Type</th>
                                     <th class="table-th">Dates</th>
-                                    <th class="table-th">Base Days</th>
+                                    <th class="table-th">CURRENT LEAVE BALANCE</th>
+                                    <th class="table-th">BASE DAYS</th>
+                                    <th class="table-th">BALANCE AFTER</th>
                                     <th class="table-th text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="app-list">
-                                <tr><td colspan="6" class="table-td text-center text-gray-500">Loading applications...</td></tr>
+                                <tr><td colspan="8" class="table-td text-center text-gray-500">Loading applications...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -499,28 +501,44 @@
     // --- TAB 1: APPLICATIONS ---
     async function loadApplications() {
         const list = document.getElementById('app-list');
-        list.innerHTML = `<tr><td colspan="6" class="table-td text-center">Loading...</td></tr>`;
+        list.innerHTML = `<tr><td colspan="8" class="table-td text-center">Loading...</td></tr>`;
 
         const { data, error } = await supabaseClient.from('leave_ledger')
             .select('*')
             .eq('transaction_type', 'APPLICATION')
             .order('created_at', { ascending: false });
 
-        if (error) { list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-red-500">Error loading applications.</td></tr>`; return; }
-        if (!data || data.length === 0) { list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">No pending leave applications found.</td></tr>`; return; }
+        if (error) { list.innerHTML = `<tr><td colspan="8" class="table-td text-center text-red-500">Error loading applications.</td></tr>`; return; }
+        if (!data || data.length === 0) { list.innerHTML = `<tr><td colspan="8" class="table-td text-center text-gray-500">No pending leave applications found.</td></tr>`; return; }
 
         let html = '';
         data.forEach(app => {
             const emp = empDataMap[app.emp_id];
             const name = emp ? emp.full_name : app.emp_id;
             const dates = app.end_date ? `${app.start_date} to ${app.end_date}` : app.start_date;
+            
+            const tType = (app.type || '').toUpperCase();
+            let currentBal = 0;
+            if (emp) {
+                if(tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE')) currentBal = parseFloat(emp.vl_balance || 0);
+                else if(tType.includes('SL') || tType.includes('SICK')) currentBal = parseFloat(emp.sl_balance || 0);
+                else if(tType.includes('SPL')) currentBal = parseFloat(emp.spl_balance || 0);
+                else if(tType.includes('WL') || tType.includes('WELLNESS')) currentBal = parseFloat(emp.wl_balance || 0);
+                else if(tType.includes('CTO')) currentBal = parseFloat(emp.cto_balance || 0);
+            }
+            
+            const baseDays = parseFloat(app.debit || 0);
+            const balanceAfter = currentBal - baseDays;
+
             html += `
                 <tr>
                     <td class="table-td font-mono font-bold text-xs">${app.emp_id}</td>
                     <td class="table-td font-bold">${name.toUpperCase()}</td>
                     <td class="table-td">${(app.type || '').toUpperCase()}</td>
                     <td class="table-td">${dates}</td>
-                    <td class="table-td font-bold">${parseFloat(app.debit || 0).toFixed(3)}</td>
+                    <td class="table-td font-bold">${currentBal.toFixed(3)}</td>
+                    <td class="table-td font-bold">${baseDays.toFixed(3)}</td>
+                    <td class="table-td font-bold ${balanceAfter < 0 ? 'text-red-600' : 'text-green-600'}">${balanceAfter.toFixed(3)}</td>
                     <td class="table-td text-center">
                         <button onclick="approveLeave('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700 mr-2 shadow">Approve</button>
                         <button onclick="disapproveLeave('${app.id}', '${app.emp_id}', '${app.type}', ${app.debit})" class="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 shadow">Disapprove</button>
@@ -896,6 +914,7 @@
                 empGroups[c.emp_id].push(c);
             });
 
+            let html = '';
             for (const empId in empGroups) {
                 let totalUsed = usedMap[empId] || 0;
                 let employeeExpirations = [];
@@ -976,8 +995,6 @@
         }
     }
     
-    let html = ''; // scoped specifically for the above function loop
-
     async function forfeitSingleCTO(empId, amount, scanDate) {
         if(!confirm(`Are you sure you want to officially FORFEIT ${amount.toFixed(3)} expired CTO balance for ${empDataMap[empId]?.full_name || empId}?`)) return;
         
