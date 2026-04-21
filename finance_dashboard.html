@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finance Deep Research - Claims Tracking</title>
+    <title>Claim Tracker and Validation System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
@@ -17,7 +17,7 @@
 
     <div class="max-w-7xl mx-auto">
         <div class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold text-[#003811]">Finance Deep Research (Claims Tracking)</h1>
+            <h1 class="text-3xl font-bold text-[#003811]">Claim Tracker and Validation System</h1>
             <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded font-bold hover:bg-red-700 transition-colors">Logout</button>
         </div>
 
@@ -92,7 +92,6 @@
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(async () => {
             try {
-                // CHANGED: Querying 'employees' instead of 'employee'
                 const { data, error } = await supabaseClient
                     .from('employees') 
                     .select('emp_id, full_name')
@@ -227,7 +226,6 @@
                 const tr = document.createElement('tr');
                 tr.className = "border-b hover:bg-gray-50 transition-colors";
                 
-                // CHANGED: Passed "this" as the first argument to updateTag
                 tr.innerHTML = `
                     <td class="p-3 border font-semibold">${currentDate}</td>
                     <td class="p-3 border text-sm">
@@ -265,7 +263,6 @@
         }
     }
 
-    // CHANGED: Added selectElement parameter so we can apply styles directly to it
     async function updateTag(selectElement, empId, date, type, toRef, psoRef) {
         if(!type) return;
         
