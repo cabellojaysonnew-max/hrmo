@@ -525,7 +525,10 @@
             let presentCount = 0;
             let expectedMondays = 0;
 
-            mondays.forEach(m => {
+            // Only evaluate mondays in the CURRENT MONTH
+            const currentMonthPrefix = todayStr.substring(0, 7);
+            
+            mondays.filter(m => m.startsWith(currentMonthPrefix)).forEach(m => {
                 const mDate = new Date(m);
                 mDate.setHours(0,0,0,0);
                 
@@ -545,11 +548,16 @@
             });
 
             if (missedDates.length > 0) {
+                let fBadgeClass = 'bg-yellow-100 text-yellow-800 border border-yellow-300';
+                let fBadgeText = 'REMINDER';
+                if (missedDates.length === 2) { fBadgeClass = 'bg-orange-100 text-orange-800 border border-orange-300'; fBadgeText = 'WARNING'; }
+                else if (missedDates.length >= 3) { fBadgeClass = 'bg-red-600 text-white'; fBadgeText = 'REPRIMAND'; }
+
                 listF.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
                     <td class="text-center font-bold text-gray-700">${presentCount} / ${expectedMondays}</td>
                     <td class="text-center text-xs text-gray-500">${missedDates.join(", ")}</td>
-                    <td class="text-center"><span class="px-2 py-0.5 rounded-full text-[10px] ${missedDates.length >= 3 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'} font-bold">${missedDates.length >= 3 ? 'FOR EXPLANATION' : 'WARNING'}</span></td>
+                    <td class="text-center"><span class="px-2 py-1 rounded text-[10px] ${fBadgeClass} font-bold">${fBadgeText}</span></td>
                     <td class="text-center">
                         <button onclick="printFlagMemo('${e.emp_id}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>
                     </td>
@@ -641,7 +649,7 @@
                     memoType = `${memoType} (NOTICE TO EXPLAIN)`;
                 }
                 p1 = String(`A review of your Daily Time Records (DTR) shows that you incurred ${absentDays} days of unauthorized absences for the month of ${currMonthName} ${currYear}.`);
-                p2 = String(`Please be reminded of the Civil Service Commission (CSC) rules on Habitual Absences. An employee is considered habitually absent if they incur unauthorized absences of at least 2.5 days in a month for three (3) consecutive months, or for three (3) months in a semester, or three (3) consecutive months in a year. This constitutes a grave offense.`);
+                p2 = String(`Under Civil Service Commission (CSC) rules, an employee is considered Habitually Absent if they incur unauthorized absences of at least 2.5 days in a month for three (3) consecutive months, or for three (3) months in a semester, or three (3) consecutive months in a year. This constitutes a grave offense.`);
                 p3 = String(`This serves as your ${offenseText}. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative disciplinary action should be taken against you for unauthorized absenteeism. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`);
             } else {
                 const totalHrs = (totalMins / 60.0).toFixed(2);
@@ -781,6 +789,13 @@
             const currYear = new Date().getFullYear();
             const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 
+            const missedArray = missedDates.split(',').map(d => d.trim()).filter(d => d !== '');
+            const missedCount = missedArray.length;
+            
+            let actionLevel = "REMINDER";
+            if (missedCount === 2) actionLevel = "WARNING";
+            if (missedCount >= 3) actionLevel = "REPRIMAND";
+
             pdf.setFont("helvetica", "bold"); 
             pdf.setFontSize(12);
             
@@ -793,7 +808,7 @@
             pdf.text("TO", 30, y); pdf.text(":", 55, y); pdf.text(empName, 60, y); y += lineH;
             pdf.text("FROM", 30, y); pdf.text(":", 55, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, y); y += lineH;
             pdf.text("DATE", 30, y); pdf.text(":", 55, y); pdf.text(today, 60, y); y += lineH;
-            pdf.text("SUBJECT", 30, y); pdf.text(":", 55, y); pdf.text("NON-ATTENDANCE TO FLAG CEREMONY", 60, y);
+            pdf.text("SUBJECT", 30, y); pdf.text(":", 55, y); pdf.text(`NON-ATTENDANCE TO FLAG CEREMONY (${actionLevel})`, 60, y);
             
             pdf.setLineWidth(0.6); 
             pdf.line(30, y+5, 215.9 - 30, y+5); 
@@ -801,8 +816,17 @@
 
             pdf.setFont("helvetica", "normal");
             const p1 = String(`Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following date(s): ${missedDates}.`);
-            const p2 = String("Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory for all government officials and employees.");
-            const p3 = String("You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you for this violation of office rules. Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.");
+            const p2 = String("Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory. Under office rules, non-attendance in a single month warrants: one (1) missed ceremony = REMINDER, two (2) = WARNING, and three (3) or more = REPRIMAND.");
+            
+            let p3 = "";
+            if (missedCount === 1) {
+                p3 = "This serves as your REMINDER. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you.";
+            } else if (missedCount === 2) {
+                p3 = "This serves as your WARNING. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you.";
+            } else {
+                p3 = "This serves as your REPRIMAND. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no formal administrative disciplinary action should be taken against you for your repeated failure to attend.";
+            }
+            p3 += " Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.";
 
             const linesP1 = pdf.splitTextToSize(p1, 155.9);
             pdf.text(linesP1, 30, y, { maxWidth: 155.9, align: 'justify' });
@@ -832,8 +856,8 @@
             try {
                 await supabaseClient.from('memo_records').insert({
                     emp_id: empId,
-                    memo_type: "Flag Ceremony Non-Attendance",
-                    offense_level: 1, 
+                    memo_type: `Flag Ceremony ${actionLevel}`,
+                    offense_level: missedCount, 
                     month: currMonthName,
                     year: currYear
                 });
@@ -842,7 +866,7 @@
             }
 
             const traceId = `TRC-FLAG-${empId}-${Math.floor(Date.now() / 1000)}`;
-            const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: Non-Attendance to Flag Ceremony\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+            const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: Non-Attendance to Flag Ceremony\nLevel: ${actionLevel}\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
             
             let qrContainer = document.getElementById('hiddenQrContainer');
             if (!qrContainer) {
