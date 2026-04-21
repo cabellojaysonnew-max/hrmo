@@ -11,6 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js"></script>
+    <script src="supabase-config.js"></script>
     
     <script>
         // Configure PDF.js worker
@@ -211,10 +212,6 @@
 
     <script>
         // --- Initialization & Setup ---
-        const SB_URL = "https://ytfpiyfapvybihlngxks.supabase.co";
-        const SB_KEY = "sb_publishable_poSZUQ9HI4wcY9poEo5b1w_Z-pAJbKo"; 
-        const db = window.supabase.createClient(SB_URL, SB_KEY);
-
         let employees = [];
         let computedDates = [];
         let matchedPersonnel = [];
@@ -224,7 +221,7 @@
 
         // Fetch Employees on load
         async function fetchEmployees() {
-            const { data, error } = await db.from('employees').select('emp_id, full_name, unit, division, position');
+            const { data, error } = await supabaseClient.from('employees').select('emp_id, full_name, unit, division, position');
             if (!error && data) employees = data;
         }
         fetchEmployees();
@@ -503,7 +500,7 @@
             }
 
             // Standard upsert
-            const { error } = await db.from('pso_records').upsert(payload);
+            const { error } = await supabaseClient.from('pso_records').upsert(payload);
             
             if (error) {
                 alert("Database Error: " + error.message + "\n\nMake sure you have added 'status' and 'schedule_rule' to your pso_records table!");
@@ -530,7 +527,7 @@
             resArea.innerHTML = `<span class="loader border-t-dar"></span> Searching...`;
 
             // Grouping by SO number and Employee to show summary
-            const { data, error } = await db.from('pso_records').select('*').eq('pso_no', query).eq('status', 'ACTIVE').order('start_date', { ascending: true });
+            const { data, error } = await supabaseClient.from('pso_records').select('*').eq('pso_no', query).eq('status', 'ACTIVE').order('start_date', { ascending: true });
             
             if (error) { resArea.innerHTML = "Error: " + error.message; return; }
             if (!data || data.length === 0) { resArea.innerHTML = "No Active records found for this SO Number."; return; }
@@ -569,7 +566,7 @@
             
             if(!confirm(msg)) return;
 
-            let query = db.from('pso_records').update({ status: 'CANCELLED' }).eq('pso_no', soNumber);
+            let query = supabaseClient.from('pso_records').update({ status: 'CANCELLED' }).eq('pso_no', soNumber);
             if (fromDate) {
                 query = query.gte('start_date', fromDate);
             }
