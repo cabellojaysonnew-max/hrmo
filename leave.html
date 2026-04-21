@@ -60,7 +60,7 @@
         <div class="flex-1 overflow-y-auto px-8 pb-8">
             
             <div id="appsTab" class="tab-content active">
-                <div class="card">
+                <div class="card mb-6">
                     <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                         <h3 class="font-bold text-[#003811]">Pending Leave Applications</h3>
                         <button onclick="loadApplications()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
@@ -81,6 +81,27 @@
                             </thead>
                             <tbody id="app-list">
                                 <tr><td colspan="8" class="table-td text-center text-gray-500">Loading applications...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="p-4 border-b border-gray-200 bg-green-50 flex justify-between items-center">
+                        <h3 class="font-bold text-green-800">Approved Leaves for Today</h3>
+                        <span id="approvedDateDisplay" class="text-xs font-bold text-gray-600"></span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="table-th bg-green-100">Emp ID</th>
+                                    <th class="table-th bg-green-100">Employee Name</th>
+                                    <th class="table-th bg-green-100">Leave Type</th>
+                                </tr>
+                            </thead>
+                            <tbody id="approved-today-list">
+                                <tr><td colspan="3" class="table-td text-center text-gray-500">Loading approved leaves...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -443,6 +464,7 @@
     document.getElementById('manualMonth').value = currMonthStr;
     document.getElementById('genYear').value = d.getFullYear();
     document.getElementById('scanCtoDate').value = todayStr;
+    document.getElementById('approvedDateDisplay').innerText = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
     // Default to current month for ledger dates
     const firstDay = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
@@ -529,13 +551,13 @@
     }
 
     function execTabLogic(tabId) {
-        if(tabId === 'appsTab') loadApplications();
+        if(tabId === 'appsTab') { loadApplications(); loadApprovedLeavesToday(); }
         if(tabId === 'monitorTab') loadCreditsMonitor();
         if(tabId === 'manualTab') loadManualCredits();
     }
 
     // Initialize Maps
-    loadEmployeeMaps();
+    loadEmployeeMaps().then(() => { loadApprovedLeavesToday(); });
 
     // --- TAB 1: APPLICATIONS ---
     async function loadApplications() {
@@ -586,6 +608,41 @@
             `;
         });
         list.innerHTML = html;
+    }
+
+    async function loadApprovedLeavesToday() {
+        const list = document.getElementById('approved-today-list');
+        list.innerHTML = `<tr><td colspan="3" class="table-td text-center">Loading...</td></tr>`;
+
+        try {
+            const { data, error } = await supabaseClient.from('leave_ledger')
+                .select('emp_id, type')
+                .eq('start_date', todayStr)
+                .eq('transaction_type', 'APPROVED');
+
+            if (error) throw error;
+            if (!data || data.length === 0) { 
+                list.innerHTML = `<tr><td colspan="3" class="table-td text-center text-gray-500">No approved leaves for today.</td></tr>`; 
+                return; 
+            }
+
+            let html = '';
+            data.forEach(app => {
+                const emp = empDataMap[app.emp_id];
+                const name = emp ? emp.full_name : app.emp_id;
+
+                html += `
+                    <tr class="hover:bg-green-50">
+                        <td class="table-td font-mono text-xs">${app.emp_id}</td>
+                        <td class="table-td font-bold">${name.toUpperCase()}</td>
+                        <td class="table-td">${(app.type || '').toUpperCase()}</td>
+                    </tr>
+                `;
+            });
+            list.innerHTML = html;
+        } catch (e) {
+            list.innerHTML = `<tr><td colspan="3" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+        }
     }
 
     async function approveLeave(id, emp_id, start_date, end_date, base_debit, type) {
@@ -643,6 +700,7 @@
             alert(`Leave Approved successfully. Deducted ${final_debit} days.`);
             await loadEmployeeMaps(); 
             loadApplications();
+            loadApprovedLeavesToday();
         } catch(e) {
             alert("Error: " + e.message);
         }
