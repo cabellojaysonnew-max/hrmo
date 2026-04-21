@@ -152,8 +152,9 @@
     document.getElementById('activeUser').innerText = currentUser.full_name;
     document.getElementById('userRoleBadge').innerText = currentUser.role;
 
-    // Split roles into an array, clean whitespace, and capitalize for safe mapping
-    const userRoles = (currentUser.role || '').toUpperCase().split(',').map(r => r.trim());
+    // Split roles into an array, clean whitespace, and normalize underscores for safe mapping
+    const rawRole = (currentUser.role || '').toUpperCase();
+    const userRoles = rawRole.replace(/_/g, ' ').split(',').map(r => r.trim());
     
     // Check if the user possesses the HRMO role anywhere in their assigned roles
     const isHR = userRoles.includes('HRMO') || userRoles.some(r => r.includes('HR'));
@@ -162,6 +163,7 @@
     const isLimited = !isHR && (userRoles.includes('CHIEF') || userRoles.includes('UNIT HEAD'));
     
     const targetDivision = currentUser.division;
+    const targetUnit = currentUser.unit;
     const SYSTEM_START_DATE = "2026-05-01";
 
     function logout() { sessionStorage.removeItem('currentUser'); window.location.href = 'index.html'; }
@@ -204,13 +206,22 @@
         const todayDate = new Date();
         const todayStr = todayDate.toISOString().split('T')[0];
         document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        document.getElementById('scopeLabel').innerText = isLimited ? `Division: ${targetDivision}` : "Provincial Oversight";
-
-        // Fetch Employees
+        
+        // Fetch Employees - Dynamic Query Building based on normalized roles
         let empQuery = supabaseClient.from('employees').select('*');
+        let scopeText = "Provincial Oversight";
+
         if (isLimited) {
-            empQuery = empQuery.eq('division', targetDivision);
+            if (userRoles.includes('UNIT HEAD') && targetUnit && targetUnit !== 'NULL' && targetUnit !== 'null' && targetUnit.trim() !== '') {
+                empQuery = empQuery.eq('unit', targetUnit);
+                scopeText = `Unit: ${targetUnit}`;
+            } else if (targetDivision) {
+                empQuery = empQuery.eq('division', targetDivision);
+                scopeText = `Division: ${targetDivision}`;
+            }
         }
+        
+        document.getElementById('scopeLabel').innerText = scopeText;
         const { data: emps } = await fetchSafe(empQuery);
         
         const empIds = new Set((emps || []).map(e => e.emp_id));
