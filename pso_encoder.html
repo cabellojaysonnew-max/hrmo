@@ -229,7 +229,6 @@
         let employees = [];
         let computedDates = [];
         let matchedPersonnel = [];
-        let activeScheduleRule = ""; 
 
         document.getElementById('soYear').value = new Date().getFullYear();
 
@@ -262,7 +261,6 @@
         function generateDates() {
             const type = document.getElementById('scheduleType').value;
             computedDates = [];
-            activeScheduleRule = "";
 
             // Projection setup for "Until Cancelled" (12 months max)
             const getEndDate = (startStr, isUntilCancelled, providedEndStr) => {
@@ -276,7 +274,7 @@
 
             if (type === 'single') {
                 const d = document.getElementById('dSingle').value;
-                if(d) { computedDates.push(d); activeScheduleRule = "Single Day"; }
+                if(d) computedDates.push(d);
             } 
             else if (type === 'range') {
                 let st = new Date(document.getElementById('dStart').value);
@@ -286,7 +284,6 @@
                         computedDates.push(st.toISOString().split('T')[0]);
                         st.setDate(st.getDate() + 1);
                     }
-                    activeScheduleRule = "Consecutive Range";
                 }
             } 
             else if (type === 'recur_week') {
@@ -305,7 +302,6 @@
                         }
                         st.setDate(st.getDate() + 1);
                     }
-                    activeScheduleRule = `Weekly: Days [${checkedDays.join(',')}] ${isInfinite ? '(Infinite)' : ''}`;
                 }
             }
             else if (type === 'recur_month_spec') {
@@ -351,7 +347,6 @@
                         
                         current.setMonth(current.getMonth() + 1);
                     }
-                    activeScheduleRule = `Monthly Nth: Days [${checkedNths.join(',')}] ${isInfinite ? '(Infinite)' : ''}`;
                 }
             }
 
@@ -363,7 +358,7 @@
             }
         }
 
-        // --- File Extraction (PDF.js + Tesseract.js) ---
+        // --- Intelligent File Extraction (Hybrid PDF Native + Canvas OCR) ---
         async function runExtraction() {
             const fileInput = document.getElementById('fileUpload');
             const btn = document.getElementById('extractBtn');
@@ -387,7 +382,7 @@
                 } else {
                     throw new Error("Unsupported file format.");
                 }
-                alert("Text extracted! Review the raw text box.");
+                alert("Extraction Complete! Review the raw text box to fix any OCR mistakes.");
             } catch (err) {
                 alert("Extraction Failed: " + err.message);
             } finally {
@@ -400,12 +395,43 @@
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let fullText = '';
+            
+            let tesseractWorker = null;
+
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
+                
+                // Attempt 1: Native Digital Text Extraction
                 const content = await page.getTextContent();
                 const strings = content.items.map(item => item.str);
-                fullText += strings.join(' ') + '\n';
+                const pageText = strings.join(' ').trim();
+                
+                // If it looks like a digital PDF, use the native text
+                if (pageText.length > 50) {
+                    fullText += pageText + '\n';
+                } 
+                // Attempt 2: If blank, it's likely a scanned PDF. Render to Canvas and OCR it.
+                else {
+                    if (!tesseractWorker) {
+                        tesseractWorker = await Tesseract.createWorker('eng');
+                    }
+                    
+                    const viewport = page.getViewport({ scale: 1.5 }); // Scale up for better OCR accuracy
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                    
+                    // Run OCR on the rendered image
+                    const imgData = canvas.toDataURL('image/png');
+                    const ret = await tesseractWorker.recognize(imgData);
+                    fullText += ret.data.text + '\n';
+                }
             }
+            
+            if (tesseractWorker) await tesseractWorker.terminate();
             return fullText;
         }
 
@@ -414,25 +440,14 @@
             const text = document.getElementById('rawText').value;
             if(!text.trim()) return alert("No raw text to process.");
 
-            // 1. Clean the text: remove numbers and non-name punctuation, replace with spaces
-            const cleanText = text.replace(/[^a-zA-ZÑñ\s-]/g, ' ').replace(/\s+/g, ' ');
+            // Split by newlines, commas, semicolons, or multiple spaces (handles tabular data)
+            let chunks = text.split(/[\n,;]+|\s{2,}/).map(f => f.trim()).filter(f => f.length > 4);
 
-            // 2. Intelligent Name Chunking: Extract sequences of 2 to 4 capitalized words (Typical names)
-            const namePattern = /([A-ZÑ][a-zñA-ZÑ-]+\s+){1,3}[A-ZÑ][a-zñA-ZÑ-]+/g;
-            let potentialNames = cleanText.match(namePattern) || [];
-
-            // Fallback: If the regex misses (e.g., all uppercase text), fallback to standard split
-            if (potentialNames.length === 0) {
-                potentialNames = text.split(/[\n,]+|\s{2,}/).map(f => f.trim()).filter(f => f.length > 5);
-            }
-
-            potentialNames = potentialNames.map(n => n.trim());
-
-            // 3. Setup Fuse.js for Fuzzy Matching against the DB
+            // Setup Fuse.js for Fuzzy Matching against the DB
             const fuse = new Fuse(employees, {
                 keys: ['full_name'],
                 includeScore: true,
-                threshold: 0.35, // Stricter threshold limits false positives
+                threshold: 0.4, // Stricter threshold limits false positives
                 ignoreLocation: true,
                 useExtendedSearch: true
             });
@@ -440,14 +455,17 @@
             matchedPersonnel = [];
             let unmatchedFragments = [];
 
-            // 4. Score each potential name
-            potentialNames.forEach(frag => {
-                if (frag.length < 5 || frag.toLowerCase().includes("special order")) return; 
+            // Score each chunk
+            chunks.forEach(frag => {
+                const lowerFrag = frag.toLowerCase();
+                // Filter out standard government document boilerplate noise
+                if (lowerFrag.includes("special order") || lowerFrag.includes("republic of the") || lowerFrag.includes("department of") || lowerFrag.includes("memorandum") || lowerFrag.length < 5) return; 
 
                 const results = fuse.search(frag);
                 
-                if (results.length > 0 && results[0].score < 0.35) {
+                if (results.length > 0 && results[0].score < 0.4) {
                     const emp = results[0].item;
+                    // Prevent duplicates
                     if (!matchedPersonnel.some(m => m.emp_id === emp.emp_id)) {
                         matchedPersonnel.push(emp);
                     }
@@ -465,7 +483,7 @@
             
             const listUI = document.getElementById('matchedList');
             if (matchedPersonnel.length === 0) {
-                listUI.innerHTML = `<div class="p-3 bg-red-50 text-red-600 rounded-lg text-xs font-bold text-center border border-red-200">No matches found. Try cleaning up the raw text.</div>`;
+                listUI.innerHTML = `<div class="p-3 bg-red-50 text-red-600 rounded-lg text-xs font-bold text-center border border-red-200">No matches found. Check the raw text for typos or formatting issues.</div>`;
             } else {
                 listUI.innerHTML = matchedPersonnel.map(emp => `
                     <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm">
@@ -525,8 +543,7 @@
                 }
             }
 
-            // Using standard insert, relying on Supabase to handle any exact duplicates if needed, or allowing multiples depending on exact schema constraints.
-            // Note: Since you opted NOT to alter the table, we removed the schedule_rule and status fields and the upsert constraint.
+            // Using standard insert based on your schema structure
             const { error } = await supabaseClient.from('pso_records').insert(payload);
             
             if (error) {
@@ -593,7 +610,7 @@
             
             if(!confirm(msg)) return;
 
-            // Using DELETE instead of updating a 'status' column to match existing schema constraints
+            // Using DELETE instead of updating a 'status' column to match your existing schema constraints
             let query = supabaseClient.from('pso_records').delete().eq('pso_no', soNumber);
             if (fromDate) {
                 query = query.gte('start_date', fromDate);
