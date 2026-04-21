@@ -11,6 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js"></script>
+    
     <script src="supabase-config.js"></script>
     
     <script>
@@ -215,11 +216,11 @@
         let employees = [];
         let computedDates = [];
         let matchedPersonnel = [];
-        let activeScheduleRule = ""; // To save alongside the record
+        let activeScheduleRule = ""; 
 
         document.getElementById('soYear').value = new Date().getFullYear();
 
-        // Fetch Employees on load
+        // Fetch Employees on load using globally available supabaseClient
         async function fetchEmployees() {
             const { data, error } = await supabaseClient.from('employees').select('emp_id, full_name, unit, division, position');
             if (!error && data) employees = data;
@@ -499,8 +500,8 @@
                 }
             }
 
-            // Standard upsert
-            const { error } = await supabaseClient.from('pso_records').upsert(payload);
+            // Standard upsert - requires UNIQUE constraint in SQL (pso_no, emp_id, start_date)
+            const { error } = await supabaseClient.from('pso_records').upsert(payload, { onConflict: 'pso_no, emp_id, start_date' });
             
             if (error) {
                 alert("Database Error: " + error.message + "\n\nMake sure you have added 'status' and 'schedule_rule' to your pso_records table!");
