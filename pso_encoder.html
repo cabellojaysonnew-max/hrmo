@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DAR SO Encoder Pro</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <style>
+        :root { --dar-green: #003811; --dar-gold: #D4AF37; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #f3f4f6; }
+        .bg-dar { background-color: var(--dar-green); } .text-dar { color: var(--dar-green); }
+        .bg-gold { background-color: var(--dar-gold); } .text-gold { color: var(--dar-gold); }
+        .btn-primary { background-color: var(--dar-green); color: white; border-radius: 0.5rem; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+        .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+        ::-webkit-scrollbar { display: none; }
+        
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid var(--dar-green); width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="h-[100dvh] w-full flex flex-col overflow-hidden text-gray-800 bg-slate-200 lg:p-4">
+
+    <div id="app" class="w-full h-full lg:max-w-7xl mx-auto flex flex-col relative shadow-2xl bg-white lg:rounded-3xl overflow-hidden">
+        
+        <header class="flex-none w-full h-16 bg-dar text-white px-6 flex justify-between items-center shadow-md z-50">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">📜</span>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-wide">SPECIAL ORDER ENCODER</h1>
+                    <p class="text-[10px] text-dar-gold font-bold uppercase tracking-widest">Intelligent Parsing System</p>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-grow w-full overflow-y-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div class="space-y-6 flex flex-col h-full">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">1. Document Details</h2>
+                    <div class="grid grid-cols-3 gap-3 mb-3">
+                        <div class="col-span-1">
+                            <label class="text-[10px] font-black text-dar uppercase mb-1 block">Type</label>
+                            <select id="soType" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-dar">
+                                <option value="SO">SO</option>
+                                <option value="RSO" selected>RSO</option>
+                                <option value="PSO">PSO</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-black text-dar uppercase mb-1 block">Control Number</label>
+                            <input type="number" id="soNumber" placeholder="e.g., 220" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-dar">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-dar uppercase mb-1 block">Series Year</label>
+                        <input type="number" id="soYear" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-dar">
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex-grow">
+                    <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">2. Schedule Engine</h2>
+                    <select id="scheduleType" onchange="toggleScheduleUI()" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 text-dar outline-none mb-4">
+                        <option value="single">One Day Only</option>
+                        <option value="range">Date Range (Consecutive Days)</option>
+                        <option value="recur_date">Recurrence: Specific Date Every Month</option>
+                        <option value="recur_week">Recurrence: Specific Weekdays of Month</option>
+                    </select>
+
+                    <div id="ui-single" class="sched-ui space-y-3">
+                        <div><label class="text-[10px] font-black text-slate-500 uppercase">Select Date</label><input type="date" id="dSingle" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50"></div>
+                    </div>
+
+                    <div id="ui-range" class="sched-ui space-y-3 hidden">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="text-[10px] font-black text-slate-500 uppercase">Start Date</label><input type="date" id="dStart" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50"></div>
+                            <div><label class="text-[10px] font-black text-slate-500 uppercase">End Date</label><input type="date" id="dEnd" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50"></div>
+                        </div>
+                    </div>
+
+                    <div id="ui-recur_date" class="sched-ui space-y-3 hidden">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="text-[10px] font-black text-slate-500 uppercase">Target Month</label><input type="month" id="rMonth" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50"></div>
+                            <div><label class="text-[10px] font-black text-slate-500 uppercase">Day of Month</label><input type="number" id="rDay" placeholder="e.g., 15" min="1" max="31" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50"></div>
+                        </div>
+                    </div>
+
+                    <div id="ui-recur_week" class="sched-ui space-y-4 hidden">
+                        <div><label class="text-[10px] font-black text-slate-500 uppercase">Target Month</label><input type="month" id="wMonth" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50 mb-3"></div>
+                        <div>
+                            <label class="text-[10px] font-black text-dar uppercase mb-2 block border-b pb-1">Occurrences (Check all that apply)</label>
+                            <div class="grid grid-cols-3 gap-2 mb-3">
+                                <label class="flex items-center gap-1 text-xs font-bold"><input type="checkbox" value="1" class="w-Nth"> 1st</label>
+                                <label class="flex items-center gap-1 text-xs font-bold"><input type="checkbox" value="2" class="w-Nth"> 2nd</label>
+                                <label class="flex items-center gap-1 text-xs font-bold"><input type="checkbox" value="3" class="w-Nth"> 3rd</label>
+                                <label class="flex items-center gap-1 text-xs font-bold"><input type="checkbox" value="4" class="w-Nth"> 4th</label>
+                                <label class="flex items-center gap-1 text-xs font-bold"><input type="checkbox" value="5" class="w-Nth"> Last</label>
+                            </div>
+                            <label class="text-[10px] font-black text-dar uppercase mb-1 block">Target Day</label>
+                            <select id="wDay" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 outline-none">
+                                <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
+                                <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button onclick="generateDates()" class="w-full mt-5 bg-slate-800 text-white py-3 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition">Compute Dates</button>
+                    <div id="computedDatesLabel" class="mt-3 text-[10px] text-slate-500 font-bold uppercase leading-relaxed h-12 overflow-y-auto">No dates computed yet.</div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full">
+                <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">3. Personnel Extractor</h2>
+                
+                <div class="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                    <label class="text-[10px] font-black text-dar uppercase mb-2 block">Extract from Image/Print Screen</label>
+                    <input type="file" id="imageUpload" accept="image/*" class="w-full text-xs mb-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-dar file:text-white hover:file:bg-slate-800 transition">
+                    <button id="ocrBtn" onclick="runOCR()" class="w-full border-2 border-dar text-dar py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-dar hover:text-white transition disabled:opacity-50">Scan Image</button>
+                </div>
+
+                <div class="flex-grow flex flex-col">
+                    <label class="text-[10px] font-black text-dar uppercase mb-2 block flex justify-between">
+                        <span>Raw Text Data</span>
+                        <span class="text-slate-400 font-normal normal-case">(Paste text or view OCR output)</span>
+                    </label>
+                    <textarea id="rawText" class="w-full flex-grow p-3 border border-slate-200 rounded-xl text-xs font-mono bg-slate-50 outline-none focus:ring-2 focus:ring-dar resize-none mb-4" placeholder="Paste list of names here, separated by commas or newlines..."></textarea>
+                    
+                    <button onclick="matchPersonnel()" class="w-full btn-primary py-3.5 text-xs tracking-widest shadow-md">Match Against Database</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full relative">
+                <div class="flex justify-between items-center border-b pb-2 mb-4">
+                    <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">4. Validation Payload</h2>
+                    <span id="matchCount" class="bg-green-100 text-green-800 text-[10px] font-black px-2 py-1 rounded">0 MATCHED</span>
+                </div>
+                
+                <div class="flex-grow overflow-y-auto no-scrollbar space-y-2 mb-4" id="matchedList">
+                    <div class="h-full flex flex-col items-center justify-center opacity-40">
+                        <span class="text-4xl mb-2">🧑‍🤝‍🧑</span>
+                        <p class="text-[10px] font-bold uppercase text-center">Run matcher to see<br>identified personnel.</p>
+                    </div>
+                </div>
+
+                <div id="unmatchedAlert" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-[10px] font-bold text-red-700 h-24 overflow-y-auto">
+                    <span class="block uppercase border-b border-red-200 pb-1 mb-1 tracking-widest">⚠️ Unrecognized Fragments:</span>
+                    <div id="unmatchedList"></div>
+                </div>
+
+                <button onclick="commitToDatabase()" class="w-full bg-gold text-dar py-4 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg active:scale-95 transition flex justify-center items-center gap-2">
+                    💾 Encode Special Order
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- Initialization & Setup ---
+        const SB_URL = "https://ytfpiyfapvybihlngxks.supabase.co";
+        const SB_KEY = "sb_publishable_poSZUQ9HI4wcY9poEo5b1w_Z-pAJbKo"; 
+        const db = window.supabase.createClient(SB_URL, SB_KEY);
+
+        let employees = [];
+        let computedDates = [];
+        let matchedPersonnel = [];
+
+        document.getElementById('soYear').value = new Date().getFullYear();
+
+        // Fetch Employees on load
+        async function fetchEmployees() {
+            const { data, error } = await db.from('employees').select('emp_id, full_name, unit, position');
+            if (!error && data) employees = data;
+        }
+        fetchEmployees();
+
+        // --- Schedule Engine Logic ---
+        function toggleScheduleUI() {
+            document.querySelectorAll('.sched-ui').forEach(el => el.classList.add('hidden'));
+            document.getElementById('ui-' + document.getElementById('scheduleType').value).classList.remove('hidden');
+        }
+
+        function generateDates() {
+            const type = document.getElementById('scheduleType').value;
+            computedDates = [];
+
+            if (type === 'single') {
+                const d = document.getElementById('dSingle').value;
+                if(d) computedDates.push(d);
+            } 
+            else if (type === 'range') {
+                let st = new Date(document.getElementById('dStart').value);
+                let en = new Date(document.getElementById('dEnd').value);
+                if(st && en && st <= en) {
+                    while (st <= en) {
+                        computedDates.push(st.toISOString().split('T')[0]);
+                        st.setDate(st.getDate() + 1);
+                    }
+                }
+            } 
+            else if (type === 'recur_date') {
+                const ym = document.getElementById('rMonth').value;
+                const d = document.getElementById('rDay').value;
+                if (ym && d) {
+                    const dateStr = `${ym}-${String(d).padStart(2, '0')}`;
+                    computedDates.push(dateStr);
+                }
+            } 
+            else if (type === 'recur_week') {
+                const ym = document.getElementById('wMonth').value;
+                const dayOfWeek = parseInt(document.getElementById('wDay').value);
+                const checkedNths = Array.from(document.querySelectorAll('.w-Nth:checked')).map(cb => parseInt(cb.value));
+                
+                if (ym && checkedNths.length > 0) {
+                    const [year, month] = ym.split('-').map(Number);
+                    
+                    // Count occurrences of the specific day
+                    let count = 0;
+                    let lastDateFound = null;
+                    const daysInMonth = new Date(year, month, 0).getDate();
+
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        let date = new Date(year, month - 1, d);
+                        if (date.getDay() === dayOfWeek) {
+                            count++;
+                            lastDateFound = date;
+                            // Add if it matches 1st, 2nd, 3rd, 4th
+                            if (checkedNths.includes(count)) {
+                                computedDates.push(date.toISOString().split('T')[0]);
+                            }
+                        }
+                    }
+                    // Handle "Last" (5) specifically
+                    if (checkedNths.includes(5) && lastDateFound) {
+                        const lastIso = lastDateFound.toISOString().split('T')[0];
+                        if (!computedDates.includes(lastIso)) computedDates.push(lastIso);
+                    }
+                }
+            }
+
+            const label = document.getElementById('computedDatesLabel');
+            if(computedDates.length === 0) {
+                label.innerHTML = "<span class='text-red-500'>Missing parameters or invalid range.</span>";
+            } else {
+                label.innerHTML = `<span class="text-dar font-black">${computedDates.length} Dates Computed:</span><br>` + computedDates.join(', ');
+            }
+        }
+
+        // --- OCR Integration (Tesseract.js) ---
+        async function runOCR() {
+            const fileInput = document.getElementById('imageUpload');
+            const btn = document.getElementById('ocrBtn');
+            const textArea = document.getElementById('rawText');
+
+            if (!fileInput.files.length) return alert("Please select an image file first.");
+            
+            btn.disabled = true;
+            btn.innerHTML = `<span class="loader border-t-dar"></span> Scanning...`;
+            
+            try {
+                const worker = await Tesseract.createWorker('eng');
+                const ret = await worker.recognize(fileInput.files[0]);
+                await worker.terminate();
+                
+                // Append result
+                textArea.value = textArea.value + (textArea.value ? "\n" : "") + ret.data.text;
+                alert("Text extracted successfully! Review the raw text box to fix any typos before matching.");
+            } catch (err) {
+                alert("OCR Failed: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Scan Image";
+            }
+        }
+
+        // --- Personnel Matching Logic ---
+        function matchPersonnel() {
+            const text = document.getElementById('rawText').value;
+            if(!text.trim()) return alert("No raw text to process.");
+
+            // Split by comma or newline, clean up extra spaces and noise
+            let fragments = text.split(/[\n,]+/).map(f => f.trim().toUpperCase().replace(/[^A-ZÑ -]/g, '')).filter(f => f.length > 3);
+            
+            matchedPersonnel = [];
+            let unmatchedFragments = [];
+
+            // Fuzzy matching against Employee Table
+            fragments.forEach(frag => {
+                let matchFound = false;
+                for (let emp of employees) {
+                    const empNameRaw = emp.full_name.toUpperCase();
+                    // Checking if fragment is inside name, or name is inside fragment
+                    if (empNameRaw.includes(frag) || frag.includes(empNameRaw)) {
+                        // Prevent duplicates
+                        if (!matchedPersonnel.some(m => m.emp_id === emp.emp_id)) {
+                            matchedPersonnel.push(emp);
+                        }
+                        matchFound = true;
+                        break;
+                    }
+                }
+                if (!matchFound) unmatchedFragments.push(frag);
+            });
+
+            renderMatches(unmatchedFragments);
+        }
+
+        function renderMatches(unmatched) {
+            document.getElementById('matchCount').innerText = `${matchedPersonnel.length} MATCHED`;
+            
+            const listUI = document.getElementById('matchedList');
+            if (matchedPersonnel.length === 0) {
+                listUI.innerHTML = `<div class="p-3 bg-red-50 text-red-600 rounded-lg text-xs font-bold text-center border border-red-200">No strict matches found. Check spellings.</div>`;
+            } else {
+                listUI.innerHTML = matchedPersonnel.map(emp => `
+                    <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm">
+                        <div>
+                            <p class="text-[11px] font-black text-dar leading-tight">${emp.full_name}</p>
+                            <p class="text-[8px] text-slate-500 font-bold uppercase tracking-widest">${emp.position || 'STAFF'} | ${emp.unit || 'DAR'}</p>
+                        </div>
+                        <button onclick="removeMatch('${emp.emp_id}')" class="text-red-400 hover:text-red-600 font-bold px-2">✕</button>
+                    </div>
+                `).join('');
+            }
+
+            const errUI = document.getElementById('unmatchedAlert');
+            if (unmatched.length > 0) {
+                document.getElementById('unmatchedList').innerHTML = unmatched.map(u => `<div class="truncate">• ${u}</div>`).join('');
+                errUI.classList.remove('hidden');
+            } else {
+                errUI.classList.add('hidden');
+            }
+        }
+
+        function removeMatch(id) {
+            matchedPersonnel = matchedPersonnel.filter(m => m.emp_id !== id);
+            renderMatches([]); // We don't recalculate unmatched here, just clear the UI
+        }
+
+        // --- Database Commit ---
+        async function commitToDatabase() {
+            const type = document.getElementById('soType').value;
+            const no = document.getElementById('soNumber').value;
+            const yr = document.getElementById('soYear').value;
+
+            if(!no || !yr) return alert("Please specify SO Control Number and Series Year.");
+            if(computedDates.length === 0) return alert("Please configure and compute Schedule Dates.");
+            if(matchedPersonnel.length === 0) return alert("Please match at least one employee.");
+
+            const fullSoNumber = `${type} ${no} series of ${yr}`;
+            const confirmMsg = `Encode ${fullSoNumber} for ${matchedPersonnel.length} personnel across ${computedDates.length} day(s)?`;
+            
+            if(!confirm(confirmMsg)) return;
+
+            const payload = [];
+            // Create a record for every employee on every date computed
+            for (const emp of matchedPersonnel) {
+                for (const date of computedDates) {
+                    payload.push({
+                        so_no: fullSoNumber,
+                        emp_id: emp.emp_id,
+                        emp_name: emp.full_name,
+                        date: date
+                    });
+                }
+            }
+
+            // Using UPSERT strategy per standard requirements for record insertion
+            const { error } = await db.from('pso_records').upsert(payload, { onConflict: 'emp_id, date' });
+            
+            if (error) {
+                alert("Database Error: " + error.message);
+            } else {
+                alert(`Successfully Encoded ${fullSoNumber}! Created ${payload.length} records.`);
+                // Reset UI
+                document.getElementById('rawText').value = "";
+                matchedPersonnel = [];
+                computedDates = [];
+                document.getElementById('soNumber').value = "";
+                renderMatches([]);
+                document.getElementById('computedDatesLabel').innerHTML = "No dates computed yet.";
+            }
+        }
+    </script>
+</body>
+</html>
