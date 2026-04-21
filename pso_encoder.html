@@ -28,9 +28,9 @@
         .form-input:focus { outline: none; border-color: var(--dar-green); box-shadow: 0 0 0 1px var(--dar-green); }
         .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--dar-green); margin-bottom: 0.25rem; text-transform: uppercase; }
         
-        .btn-primary { background-color: var(--dar-green); color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; padding: 0.5rem 1rem; font-size: 0.875rem; transition: 0.2s; }
-        .btn-primary:hover { background-color: #002200; }
-        .btn-primary:active { transform: scale(0.98); }
+        .btn-dark { background-color: #1F2937; color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; padding: 0.5rem 1rem; font-size: 0.875rem; transition: 0.2s; }
+        .btn-dark:hover { background-color: #002200; }
+        .btn-dark:active { transform: scale(0.98); }
         
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -133,30 +133,34 @@
                                 <label class="form-label text-xs">Start Date</label>
                                 <input type="date" id="repStart" class="form-input">
                             </div>
-                            <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                                <label class="text-[10px] font-bold text-[#003811] uppercase mb-2 block border-b pb-1">Week/s</label>
-                                <div class="grid grid-cols-5 gap-2 mb-3">
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="rep-week"> 1st</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="rep-week"> 2nd</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="rep-week"> 3rd</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="rep-week"> 4th</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="rep-week"> 5th</label>
+                            
+                            <div>
+                                <label class="form-label text-[#003811] mb-2">Week/s</label>
+                                <div class="grid grid-cols-5 gap-2 mb-4">
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="rep-week"> 1st</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="rep-week"> 2nd</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="rep-week"> 3rd</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="rep-week"> 4th</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="rep-week"> 5th</label>
                                 </div>
-                                <label class="text-[10px] font-bold text-[#003811] uppercase mb-2 block border-b pb-1">Day/s</label>
+                                
+                                <label class="form-label text-[#003811] mb-2">Day/s</label>
                                 <div class="grid grid-cols-5 gap-2">
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="rep-day"> M</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="rep-day"> T</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="rep-day"> W</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="rep-day"> Th</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="rep-day"> F</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="rep-day"> M</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="rep-day"> T</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="rep-day"> W</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="rep-day"> Th</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="rep-day"> F</label>
                                 </div>
                             </div>
-                            <p class="text-[10px] text-gray-500 italic">* Ends only upon cancellation.</p>
+                            <p class="text-[10px] text-gray-400 italic mt-2">* Generates 1 year ahead. Ends only upon cancellation.</p>
                         </div>
 
-                        <button onclick="generateDates()" class="w-full mt-4 bg-gray-800 text-white font-bold py-2 rounded uppercase text-xs hover:bg-gray-900 transition">COMPUTE DATES</button>
+                        <button onclick="generateDates()" class="btn-dark w-full mt-6 py-3">COMPUTE DATES</button>
                         
-                        <div id="computedDatesLabel" class="mt-3 p-3 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-600 font-bold leading-relaxed h-16 overflow-y-auto uppercase">No dates computed yet.</div>
+                        <div id="computedDatesLabel" class="mt-4 text-xs font-bold text-gray-500 uppercase h-16 overflow-y-auto">
+                            NO DATES COMPUTED YET.
+                        </div>
                     </div>
                 </div>
 
@@ -167,6 +171,7 @@
                         <div class="mb-4 shrink-0 bg-gray-50 p-4 border border-gray-200 rounded">
                             <label class="form-label text-xs">Upload PDF/Image or Paste</label>
                             <p class="text-[10px] text-gray-500 mb-2">You can select multiple files or press <b>Ctrl+V</b> repeatedly to add to the list.</p>
+                            
                             <input type="file" id="fileUpload" accept="image/*,application/pdf" multiple class="w-full text-xs mb-3 bg-white border border-gray-300 p-2 rounded cursor-pointer">
                             <button id="extractBtn" onclick="runExtraction()" class="w-full bg-white border border-[#003811] text-[#003811] py-2 rounded text-xs font-bold uppercase hover:bg-green-50 transition disabled:opacity-50">
                                 Extract Text
@@ -175,14 +180,20 @@
                         </div>
 
                         <div class="flex-grow flex flex-col min-h-0">
-                            <label class="form-label text-xs flex justify-between items-end">
+                            <label class="form-label flex justify-between items-end text-[#003811]">
                                 <span>Raw Text Data</span>
+                                <span class="text-gray-400 font-normal normal-case text-[10px]">(Review & Edit before matching)</span>
                             </label>
                             <textarea id="rawText" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs font-mono bg-white outline-none focus:border-[#003811] resize-none mb-4" placeholder="Text will appear here..."></textarea>
                             
-                            <button onclick="matchPersonnel()" class="w-full bg-gray-800 text-white font-bold py-3 rounded uppercase text-xs transition hover:bg-gray-900 shrink-0">
-                                MATCH PERSONNEL
-                            </button>
+                            <div class="flex gap-2 shrink-0">
+                                <button onclick="matchPersonnel(true)" class="w-1/2 bg-gray-200 text-gray-800 py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-gray-300 transition">
+                                    Match & Replace
+                                </button>
+                                <button onclick="matchPersonnel(false)" class="w-1/2 bg-[#003811] text-white py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-[#002200] transition shadow-md">
+                                    Match & Append
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -438,8 +449,8 @@
             return fullText;
         }
 
-        // --- Personnel Matching ---
-        function matchPersonnel() {
+        // --- Personnel Matching (Replace vs Append) ---
+        function matchPersonnel(isReplace) {
             const text = document.getElementById('rawText').value;
             if(!text.trim()) return alert("No raw text to process.");
 
@@ -453,7 +464,9 @@
                 ignoreLocation: true
             });
 
-            matchedPersonnel = [];
+            if (isReplace) {
+                matchedPersonnel = [];
+            }
             let unmatchedFragments = [];
 
             chunks.forEach(frag => {
@@ -463,7 +476,9 @@
                 const results = fuse.search(frag);
                 if (results.length > 0 && results[0].score < 0.4) {
                     const emp = results[0].item;
-                    if (!matchedPersonnel.some(m => m.emp_id === emp.emp_id)) matchedPersonnel.push(emp);
+                    if (!matchedPersonnel.some(m => m.emp_id === emp.emp_id)) {
+                        matchedPersonnel.push(emp);
+                    }
                 } else {
                     unmatchedFragments.push(frag);
                 }
@@ -471,6 +486,10 @@
 
             unmatchedFragments = [...new Set(unmatchedFragments)];
             renderMatches(unmatchedFragments);
+            
+            // Clear the text box automatically to prepare for the next batch/paste
+            document.getElementById('rawText').value = '';
+            document.getElementById('extractStatus').innerText = "Text cleared for next batch.";
         }
 
         function renderMatches(unmatched) {
@@ -481,7 +500,7 @@
                 listUI.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded text-xs font-bold text-center border border-red-200">No matches found. Clean up text or encode manually.</div>`;
             } else {
                 listUI.innerHTML = matchedPersonnel.map(emp => `
-                    <div class="flex justify-between items-center bg-white p-3 rounded border border-gray-200 mb-2">
+                    <div class="flex justify-between items-center bg-white p-3 rounded border border-gray-200 mb-2 shadow-sm">
                         <div>
                             <p class="text-xs font-bold text-[#003811] leading-tight uppercase">${emp.full_name}</p>
                             <p class="text-[10px] text-gray-500 font-bold uppercase">${emp.position || 'STAFF'} | ${emp.division || emp.unit || 'DAR'}</p>
