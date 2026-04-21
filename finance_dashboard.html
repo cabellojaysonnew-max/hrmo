@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Deep Research - Claims Tracking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        :root { --color-primary: #003811; --color-secondary: #D4AF37; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
+        .table-header { background-color: var(--color-primary); color: white; }
+    </style>
+</head>
+<body class="p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-[#003811]">Finance Deep Research (Claims Tracking)</h1>
+            <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded font-bold">Logout</button>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-[#003811] mb-1">Employee ID</label>
+                    <input type="text" id="searchEmpId" class="w-full border p-2 rounded" placeholder="Enter Emp ID">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-[#003811] mb-1">Month</label>
+                    <input type="month" id="searchMonth" class="w-full border p-2 rounded">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="researchEmployee()" class="bg-[#003811] text-white px-6 py-2 rounded font-bold w-full hover:bg-green-800">Research Claims</button>
+                </div>
+            </div>
+            <p id="statusMsg" class="text-sm font-bold mt-4"></p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="table-header">
+                        <th class="p-3 border">Date</th>
+                        <th class="p-3 border">Travel Order (TO)</th>
+                        <th class="p-3 border">PSO / RSO</th>
+                        <th class="p-3 border">Conflict Status</th>
+                        <th class="p-3 border w-64">Claim Tagging</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsTable">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+    // Auth Check
+    const userStr = sessionStorage.getItem('currentUser');
+    if (!userStr) window.location.href = 'index.html';
+    const user = JSON.parse(userStr);
+    if (user.role !== 'BUDGET' && user.role !== 'ACCOUNTING') window.location.href = 'index.html';
+
+    function logout() {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+    }
+
+    async function researchEmployee() {
+        const empId = document.getElementById('searchEmpId').value.trim();
+        const monthVal = document.getElementById('searchMonth').value;
+        const statusMsg = document.getElementById('statusMsg');
+        const tbody = document.getElementById('resultsTable');
+        
+        if (!empId || !monthVal) {
+            statusMsg.innerText = "Please enter both Employee ID and Month.";
+            statusMsg.className = "text-red-600 text-sm font-bold mt-4";
+            return;
+        }
+
+        statusMsg.innerText = "Fetching records...";
+        statusMsg.className = "text-blue-600 text-sm font-bold mt-4";
+        tbody.innerHTML = "";
+
+        const [year, month] = monthVal.split('-');
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const startDate = `${year}-${month}-01`;
+        const endDate = `${year}-${month}-${daysInMonth}`;
+
+        try {
+            // 1. Fetch Travel Orders for employee
+            const { data: toData, error: toErr } = await supabaseClient
+                .from('travel_orders')
+                .select('to_no, status')
+                .eq('emp_id', empId)
+                .eq('status', 'APPROVED');
+            if (toErr) throw toErr;
+
+            let itineraries = [];
+            if (toData && toData.length > 0) {
+                const toNumbers = toData.map(t => t.to_no);
+                const { data: itinData, error: itinErr } = await supabaseClient
+                    .from('itinerary')
+                    .select('*')
+                    .in('to_no', toNumbers)
+                    .gte('travel_date', startDate)
+                    .lte('travel_date', endDate);
+                if (itinErr) throw itinErr;
+                itineraries = itinData || [];
+            }
+
+            // 2. Fetch PSOs for employee
+            const { data: psoData, error: psoErr } = await supabaseClient
+                .from('pso_records')
+                .select('*')
+                .eq('emp_id', empId)
+                .lte('start_date', endDate)
+                .gte('end_date', startDate);
+            if (psoErr) throw psoErr;
+
+            // 3. Fetch Existing Claim Tags
+            const { data: tagsData, error: tagsErr } = await supabaseClient
+                .from('financial_claims')
+                .select('*')
+                .eq('emp_id', empId)
+                .gte('claim_date', startDate)
+                .lte('claim_date', endDate);
+            if (tagsErr) throw tagsErr;
+
+            // Map tags by date
+            const existingTags = {};
+            if(tagsData) {
+                tagsData.forEach(t => { existingTags[t.claim_date] = t; });
+            }
+
+            // Build daily view
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDate = `${year}-${month}-${String(day).padStart(2, '0')}`;
+                
+                // Find matching TOs for this exact day
+                const dayTOs = itineraries.filter(i => i.travel_date === currentDate);
+                
+                // Find matching PSOs where this day falls between start and end
+                const dayPSOs = (psoData || []).filter(p => {
+                    return currentDate >= p.start_date && currentDate <= p.end_date;
+                });
+
+                if (dayTOs.length === 0 && dayPSOs.length === 0) continue; // Skip days with no activity
+
+                const hasConflict = dayTOs.length > 0 && dayPSOs.length > 0;
+                const toRef = dayTOs.length > 0 ? dayTOs[0].to_no : '';
+                const psoRef = dayPSOs.length > 0 ? dayPSOs[0].pso_no : '';
+
+                const tagRecord = existingTags[currentDate] || {};
+                const currentTag = tagRecord.acknowledged_type || '';
+
+                const tr = document.createElement('tr');
+                tr.className = "border-b hover:bg-gray-50";
+                
+                tr.innerHTML = `
+                    <td class="p-3 border font-semibold">${currentDate}</td>
+                    <td class="p-3 border text-sm">
+                        ${dayTOs.map(t => `<span class="font-bold text-green-700">${t.to_no}</span><br>${t.destination}`).join('<hr class="my-1">') || '-'}
+                    </td>
+                    <td class="p-3 border text-sm">
+                        ${dayPSOs.map(p => `<span class="font-bold text-blue-700">${p.pso_no}</span><br>${p.subject}`).join('<hr class="my-1">') || '-'}
+                    </td>
+                    <td class="p-3 border text-center font-bold ${hasConflict ? 'text-red-600 bg-red-50' : 'text-gray-500'}">
+                        ${hasConflict ? 'CONFLICT' : 'CLEAR'}
+                    </td>
+                    <td class="p-3 border">
+                        <select onchange="updateTag('${empId}', '${currentDate}', this.value, '${toRef}', '${psoRef}')" class="w-full border p-1 rounded">
+                            <option value="">-- Select Tag --</option>
+                            ${dayTOs.length > 0 ? `<option value="TO" ${currentTag === 'TO' ? 'selected' : ''}>Acknowledge TO</option>` : ''}
+                            ${dayPSOs.length > 0 ? `<option value="PSO" ${currentTag === 'PSO' ? 'selected' : ''}>Acknowledge PSO</option>` : ''}
+                            <option value="NONE" ${currentTag === 'NONE' ? 'selected' : ''}>Void Both / None</option>
+                        </select>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            if (tbody.innerHTML === "") {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">No TOs or PSOs found for this month.</td></tr>`;
+            }
+
+            statusMsg.innerText = "Research complete.";
+            statusMsg.className = "text-green-600 text-sm font-bold mt-4";
+
+        } catch (error) {
+            statusMsg.innerText = "Error: " + error.message;
+            statusMsg.className = "text-red-600 text-sm font-bold mt-4";
+        }
+    }
+
+    async function updateTag(empId, date, type, toRef, psoRef) {
+        if(!type) return;
+        
+        let refNo = '';
+        if (type === 'TO') refNo = toRef;
+        if (type === 'PSO') refNo = psoRef;
+
+        try {
+            const { error } = await supabaseClient
+                .from('financial_claims')
+                .upsert({ 
+                    emp_id: empId, 
+                    claim_date: date, 
+                    acknowledged_type: type,
+                    reference_no: refNo
+                }, { onConflict: 'emp_id, claim_date' });
+
+            if (error) throw error;
+            alert(`Claim for ${date} successfully tagged as ${type}`);
+        } catch (error) {
+            alert("Error saving tag: " + error.message);
+        }
+    }
+</script>
+</body>
+</html>
