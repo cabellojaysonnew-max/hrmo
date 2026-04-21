@@ -18,24 +18,29 @@
     <div class="max-w-7xl mx-auto">
         <div class="flex justify-between items-center mb-8">
             <h1 class="text-3xl font-bold text-[#003811]">Finance Deep Research (Claims Tracking)</h1>
-            <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded font-bold">Logout</button>
+            <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded font-bold hover:bg-red-700 transition-colors">Logout</button>
         </div>
 
         <div class="bg-white p-6 rounded-lg shadow mb-8">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-bold text-[#003811] mb-1">Employee ID</label>
-                    <input type="text" id="searchEmpId" class="w-full border p-2 rounded" placeholder="Enter Emp ID">
+                <div class="relative">
+                    <label class="block text-sm font-bold text-[#003811] mb-1">Employee Name or ID</label>
+                    <input type="text" id="employeeSearch" onkeyup="searchEmployees(this.value)" autocomplete="off" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811]" placeholder="Search name e.g., Jay...">
+                    <input type="hidden" id="selectedEmpId">
+                    
+                    <div id="searchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded shadow-lg mt-1 hidden max-h-48 overflow-y-auto">
+                        </div>
                 </div>
+
                 <div>
                     <label class="block text-sm font-bold text-[#003811] mb-1">Month</label>
-                    <input type="month" id="searchMonth" class="w-full border p-2 rounded">
+                    <input type="month" id="searchMonth" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811]">
                 </div>
                 <div class="flex items-end">
                     <button onclick="researchEmployee()" class="bg-[#003811] text-white px-6 py-2 rounded font-bold w-full hover:bg-green-800 transition-colors">Research Claims</button>
                 </div>
             </div>
-            <p id="statusMsg" class="text-sm font-bold mt-4"></p>
+            <p id="statusMsg" class="text-sm font-bold mt-4 min-h-[1.25rem]"></p>
         </div>
 
         <div class="bg-white rounded-lg shadow overflow-x-auto">
@@ -50,7 +55,7 @@
                     </tr>
                 </thead>
                 <tbody id="resultsTable">
-                    <tr><td colspan="5" class="p-4 text-center text-gray-500">Enter Employee ID and Month to begin research.</td></tr>
+                    <tr><td colspan="5" class="p-4 text-center text-gray-500 font-medium">Search an employee and month to begin tracking claims.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -61,27 +66,93 @@
     const userStr = sessionStorage.getItem('currentUser');
     if (!userStr) window.location.href = 'index.html';
     const user = JSON.parse(userStr);
-    if (user.unit !== 'BUDGET' && user.unit !== 'ACCOUNTING') window.location.href = 'index.html';
+    
+    // Ensure unit is upper case to prevent login bypass issues
+    const userUnit = (user.unit || "").toUpperCase().trim();
+    if (userUnit !== 'BUDGET' && userUnit !== 'ACCOUNTING') window.location.href = 'index.html';
 
     function logout() {
         sessionStorage.clear();
         window.location.href = 'index.html';
     }
 
+    // --- NEW: Autocomplete Search Logic ---
+    let searchTimeout;
+    async function searchEmployees(query) {
+        const resultsDiv = document.getElementById('searchResults');
+        
+        // Reset hidden ID if user is typing
+        document.getElementById('selectedEmpId').value = '';
+
+        if (!query || query.length < 2) {
+            resultsDiv.classList.add('hidden');
+            return;
+        }
+
+        // Debounce to prevent spamming the database on every keystroke
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(async () => {
+            try {
+                // Search by full_name OR emp_id
+                const { data, error } = await supabaseClient
+                    .from('employee') 
+                    .select('emp_id, full_name')
+                    .or(`full_name.ilike.%${query}%,emp_id.ilike.%${query}%`)
+                    .limit(10);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    resultsDiv.innerHTML = data.map(emp => `
+                        <div class="p-3 hover:bg-green-50 cursor-pointer border-b text-sm transition-colors" 
+                             onclick="selectEmployee('${emp.emp_id}', '${emp.full_name}')">
+                            <span class="font-bold text-[#003811]">${emp.full_name}</span> 
+                            <span class="text-gray-500 text-xs ml-2">ID: ${emp.emp_id}</span>
+                        </div>
+                    `).join('');
+                    resultsDiv.classList.remove('hidden');
+                } else {
+                    resultsDiv.innerHTML = `<div class="p-3 text-sm text-gray-500 italic">No employees found matching "${query}"</div>`;
+                    resultsDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error("Search error:", err);
+            }
+        }, 300); // Wait 300ms after user stops typing
+    }
+
+    function selectEmployee(empId, fullName) {
+        // Fill the visible box with the name, and the hidden box with the ID
+        document.getElementById('employeeSearch').value = fullName;
+        document.getElementById('selectedEmpId').value = empId;
+        document.getElementById('searchResults').classList.add('hidden');
+    }
+
+    // Close dropdown if clicked outside
+    document.addEventListener('click', function(e) {
+        const searchInput = document.getElementById('employeeSearch');
+        const searchResults = document.getElementById('searchResults');
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.classList.add('hidden');
+        }
+    });
+    // --------------------------------------
+
     async function researchEmployee() {
-        const empId = document.getElementById('searchEmpId').value.trim();
+        // Use the hidden ID if they clicked a dropdown item, otherwise use whatever they typed (in case they typed an exact ID manually)
+        const empId = document.getElementById('selectedEmpId').value || document.getElementById('employeeSearch').value.trim();
         const monthVal = document.getElementById('searchMonth').value;
         const statusMsg = document.getElementById('statusMsg');
         const tbody = document.getElementById('resultsTable');
         
         if (!empId || !monthVal) {
-            statusMsg.innerText = "Please enter both Employee ID and Month.";
-            statusMsg.className = "text-red-600 text-sm font-bold mt-4";
+            statusMsg.innerText = "Please select an Employee and a Month.";
+            statusMsg.className = "text-red-600 text-sm font-bold mt-4 min-h-[1.25rem]";
             return;
         }
 
         statusMsg.innerText = "Fetching records...";
-        statusMsg.className = "text-blue-600 text-sm font-bold mt-4";
+        statusMsg.className = "text-blue-600 text-sm font-bold mt-4 min-h-[1.25rem]";
         tbody.innerHTML = "";
 
         const [year, month] = monthVal.split('-');
@@ -156,7 +227,7 @@
                 const currentTag = tagRecord.acknowledged_type || '';
 
                 const tr = document.createElement('tr');
-                tr.className = "border-b hover:bg-gray-50";
+                tr.className = "border-b hover:bg-gray-50 transition-colors";
                 
                 tr.innerHTML = `
                     <td class="p-3 border font-semibold">${currentDate}</td>
@@ -167,10 +238,10 @@
                         ${dayPSOs.map(p => `<span class="font-bold text-blue-700">${p.pso_no}</span><br><span class="text-xs text-gray-600">${p.subject}</span>`).join('<hr class="my-1 border-gray-200">') || '<span class="text-gray-400">-</span>'}
                     </td>
                     <td class="p-3 border text-center font-bold ${hasConflict ? 'text-red-600 bg-red-50' : 'text-gray-500'}">
-                        ${hasConflict ? 'CONFLICT DETECTED' : 'CLEAR'}
+                        ${hasConflict ? 'CONFLICT' : 'CLEAR'}
                     </td>
                     <td class="p-3 border">
-                        <select onchange="updateTag('${empId}', '${currentDate}', this.value, '${toRef}', '${psoRef}')" class="w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:border-[#003811]">
+                        <select onchange="updateTag('${empId}', '${currentDate}', this.value, '${toRef}', '${psoRef}')" class="w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:border-[#003811] ${currentTag ? 'bg-green-50 font-semibold' : ''}">
                             <option value="">-- Select Tag --</option>
                             ${dayTOs.length > 0 ? `<option value="TO" ${currentTag === 'TO' ? 'selected' : ''}>Acknowledge TO (${toRef})</option>` : ''}
                             ${dayPSOs.length > 0 ? `<option value="PSO" ${currentTag === 'PSO' ? 'selected' : ''}>Acknowledge PSO (${psoRef})</option>` : ''}
@@ -182,15 +253,15 @@
             }
 
             if (!foundActivity) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">No TOs or PSOs found for this employee in ${monthVal}.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500 font-medium">No TOs or PSOs found for this employee in ${monthVal}.</td></tr>`;
             }
 
             statusMsg.innerText = "Research complete.";
-            statusMsg.className = "text-green-600 text-sm font-bold mt-4";
+            statusMsg.className = "text-green-600 text-sm font-bold mt-4 min-h-[1.25rem]";
 
         } catch (error) {
             statusMsg.innerText = "Error: " + error.message;
-            statusMsg.className = "text-red-600 text-sm font-bold mt-4";
+            statusMsg.className = "text-red-600 text-sm font-bold mt-4 min-h-[1.25rem]";
             console.error(error);
         }
     }
@@ -213,7 +284,11 @@
                 }, { onConflict: 'emp_id, claim_date' });
 
             if (error) throw error;
-            // Visual feedback could be added here if desired
+            
+            // Add visual feedback to the select box background
+            const activeSelect = event.target;
+            activeSelect.classList.add('bg-green-50', 'font-semibold');
+
         } catch (error) {
             alert("Error saving tag: " + error.message);
         }
