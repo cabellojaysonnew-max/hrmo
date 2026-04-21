@@ -23,13 +23,13 @@
         :root { --dar-green: #003811; --dar-gold: #D4AF37; }
         body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
         
-        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
-        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; overflow: hidden; }
+        .form-input { width: 100%; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; color: #1f2937; transition: border-color 0.2s; }
         .form-input:focus { outline: none; border-color: var(--dar-green); box-shadow: 0 0 0 1px var(--dar-green); }
         .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--dar-green); margin-bottom: 0.25rem; text-transform: uppercase; }
         
-        .btn-dark { background-color: #1F2937; color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; padding: 0.5rem 1rem; font-size: 0.875rem; transition: 0.2s; }
-        .btn-dark:hover { background-color: #002200; }
+        .btn-dark { background-color: #1F2937; color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; padding: 0.75rem 1rem; font-size: 0.875rem; transition: 0.2s; text-align: center; cursor: pointer; }
+        .btn-dark:hover { background-color: #111827; }
         .btn-dark:active { transform: scale(0.98); }
         
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -41,14 +41,16 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .modal-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .modal-box { background: white; width: 100%; max-width: 900px; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
-        .chk-day, .w-Nth { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; }
+        .modal-box { background: white; width: 100%; max-width: 1000px; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
+        input[type="checkbox"] { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; margin-top: 0.1rem; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 hidden md:block border-b border-[#006400]">
+    <nav class="bg-[#003811] w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 border-b border-[#006400]">
             <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold">SO ENCODER</p>
         </div>
@@ -62,7 +64,7 @@
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">REPORTS</a>
             <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">USERS</a>
         </div>
-        <div class="p-4 bg-black/20 hidden md:block">
+        <div class="p-4 bg-black/20">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
             <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
         </div>
@@ -70,67 +72,70 @@
 
     <main class="flex-1 flex flex-col h-full bg-[#F3F4F6] relative">
         
-        <div class="p-8 pb-4 flex justify-between items-end border-b border-gray-200 bg-white shadow-sm z-10 shrink-0">
-            <div>
-                <h2 class="text-3xl font-bold text-[#003811]">SO Encoder</h2>
-            </div>
-            <button onclick="openManageModal()" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold px-6 py-2.5 rounded transition uppercase tracking-widest shadow-sm">
-                Manage Active ORDERS
+        <div class="p-8 pb-4 flex justify-between items-center border-b border-gray-200 bg-white shrink-0 shadow-sm">
+            <h2 class="text-3xl font-bold text-[#003811] uppercase tracking-wide">SO ENCODER</h2>
+            <button onclick="openManageModal()" class="bg-white border border-gray-300 text-[#003811] hover:bg-gray-50 px-4 py-2 font-bold rounded uppercase text-xs flex items-center gap-2 transition shadow-sm">
+                ⚙️ MANAGE ACTIVE ORDERS
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-8">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-screen-2xl mx-auto items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto">
                 
-                <div class="lg:col-span-4 flex flex-col gap-6">
-                    <div class="card p-6">
-                        <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4">1. Document Details</h2>
-                        <div class="grid grid-cols-3 gap-4 mb-4">
-                            <div class="col-span-1">
-                                <label class="form-label">Type</label>
-                                <select id="soType" class="form-input font-bold text-[#003811]">
+                <div class="flex flex-col gap-6">
+                    
+                    <div class="card p-6 border-t-2 border-t-gray-200">
+                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">1. Document Details</h2>
+                        
+                        <div class="mb-4">
+                            <label class="form-label text-[#003811]">Subject / Purpose</label>
+                            <input type="text" id="soSubject" placeholder="e.g., QMS Audit Deployment" class="form-input text-gray-600 font-bold">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="form-label text-[#003811]">Type</label>
+                                <select id="soType" class="form-input font-bold text-gray-800">
                                     <option value="SO">SO</option>
                                     <option value="RSO" selected>RSO</option>
                                     <option value="PSO">PSO</option>
                                 </select>
                             </div>
-                            <div class="col-span-1">
-                                <label class="form-label text-[10px]">SO/RSO/PSO No.</label>
-                                <input type="number" id="soNumber" placeholder="e.g., 220" class="form-input font-bold text-[#003811]">
-                            </div>
-                            <div class="col-span-1">
-                                <label class="form-label">Series</label>
-                                <input type="number" id="soYear" class="form-input font-bold text-[#003811]">
+                            <div>
+                                <label class="form-label text-[#003811]">Control Number</label>
+                                <input type="number" id="soNumber" placeholder="e.g., 220" class="form-input font-bold text-gray-800">
                             </div>
                         </div>
+                        
                         <div>
-                            <label class="form-label">Subject / Purpose</label>
-                            <input type="text" id="soSubject" placeholder="e.g., QMS Audit Deployment" class="form-input font-semibold text-gray-800">
+                            <label class="form-label text-[#003811]">Series Year</label>
+                            <input type="number" id="soYear" class="form-input font-bold text-gray-800">
                         </div>
                     </div>
 
-                    <div class="card p-6 flex-grow">
-                        <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4">2. Schedule Engine</h2>
-                        <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold mb-4 text-[#003811] bg-yellow-50/50">
+                    <div class="card p-6 border-t-2 border-t-gray-200 flex-grow">
+                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">2. Schedule Engine</h2>
+                        
+                        <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold text-sm mb-4 text-gray-800">
                             <option value="single">One Day Only</option>
                             <option value="range">Range</option>
                             <option value="repetitive">Repeatitive</option>
                         </select>
 
                         <div id="ui-single" class="sched-ui space-y-4">
-                            <div><label class="form-label text-xs">Select Date</label><input type="date" id="dSingle" class="form-input"></div>
+                            <div><label class="form-label text-[#003811]">Select Date</label><input type="date" id="dSingle" class="form-input"></div>
                         </div>
 
                         <div id="ui-range" class="sched-ui space-y-4 hidden">
                             <div class="grid grid-cols-2 gap-4">
-                                <div><label class="form-label text-xs">Start Date</label><input type="date" id="dStart" class="form-input"></div>
-                                <div><label class="form-label text-xs">End Date</label><input type="date" id="dEnd" class="form-input"></div>
+                                <div><label class="form-label text-[#003811]">Start Date</label><input type="date" id="dStart" class="form-input"></div>
+                                <div><label class="form-label text-[#003811]">End Date</label><input type="date" id="dEnd" class="form-input"></div>
                             </div>
                         </div>
 
                         <div id="ui-repetitive" class="sched-ui space-y-4 hidden">
                             <div>
-                                <label class="form-label text-xs">Start Date</label>
+                                <label class="form-label text-[#003811]">Start Date</label>
                                 <input type="date" id="repStart" class="form-input">
                             </div>
                             
@@ -164,16 +169,16 @@
                     </div>
                 </div>
 
-                <div class="lg:col-span-4 flex flex-col h-full">
-                    <div class="card p-6 flex flex-col h-[calc(100vh-140px)]">
-                        <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4 shrink-0">3. Personnel Extractor</h2>
+                <div class="flex flex-col h-full">
+                    <div class="card p-6 flex flex-col h-[calc(100vh-140px)] border-t-2 border-t-gray-200">
+                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 shrink-0 text-gray-500">3. Personnel Extractor</h2>
                         
-                        <div class="mb-4 shrink-0 bg-gray-50 p-4 border border-gray-200 rounded">
-                            <label class="form-label text-xs">Upload PDF/Image or Paste</label>
-                            <p class="text-[10px] text-gray-500 mb-2">You can select multiple files or press <b>Ctrl+V</b> repeatedly to add to the list.</p>
+                        <div class="mb-4 shrink-0 bg-[#f8faf9] p-4 border border-[#e5e7e6] rounded">
+                            <label class="form-label text-[#003811]">Upload PDF/Image or Paste</label>
+                            <p class="text-[10px] text-gray-500 mb-3">You can select multiple files or press <b>Ctrl+V</b> repeatedly to add to the list.</p>
                             
                             <input type="file" id="fileUpload" accept="image/*,application/pdf" multiple class="w-full text-xs mb-3 bg-white border border-gray-300 p-2 rounded cursor-pointer">
-                            <button id="extractBtn" onclick="runExtraction()" class="w-full bg-white border border-[#003811] text-[#003811] py-2 rounded text-xs font-bold uppercase hover:bg-green-50 transition disabled:opacity-50">
+                            <button id="extractBtn" onclick="runExtraction()" class="w-full bg-white border border-[#003811] text-[#003811] py-2 rounded text-xs font-bold uppercase hover:bg-gray-50 transition disabled:opacity-50">
                                 Extract Text
                             </button>
                             <p id="extractStatus" class="text-[10px] text-center mt-2 font-bold text-[#003811]"></p>
@@ -198,10 +203,10 @@
                     </div>
                 </div>
 
-                <div class="lg:col-span-4 flex flex-col h-full">
-                    <div class="card p-6 flex flex-col h-[calc(100vh-140px)]">
+                <div class="flex flex-col h-full">
+                    <div class="card p-6 flex flex-col h-[calc(100vh-140px)] border-t-2 border-t-gray-200">
                         <div class="flex justify-between items-center border-b border-gray-100 pb-2 mb-4 shrink-0">
-                            <h2 class="form-label text-gray-500 mb-0">4. Personnel Payload</h2>
+                            <h2 class="form-label text-gray-500 mb-0">4. Personnel</h2>
                             <span id="matchCount" class="bg-gray-100 text-[#003811] text-xs font-bold px-2 py-1 rounded border border-gray-200">0 MATCHED</span>
                         </div>
                         
@@ -217,7 +222,7 @@
                             <div id="unmatchedList" class="space-y-1 font-mono text-[10px]"></div>
                         </div>
 
-                        <button onclick="commitToDatabase()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shrink-0 mt-auto">
+                        <button onclick="commitToDatabase()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shrink-0 mt-auto shadow">
                             ENCODE SPECIAL ORDER
                         </button>
                     </div>
@@ -228,23 +233,31 @@
     </main>
 
     <div id="manageModal" class="hidden modal-overlay">
-        <div class="modal-box bg-[#F3F4F6]">
-            <div class="px-6 py-4 border-b flex justify-between items-center bg-[#003811] text-white shrink-0">
-                <h2 class="font-bold text-sm tracking-widest uppercase">⚙️ Manage Active Orders</h2>
-                <button onclick="closeManageModal()" class="text-white hover:text-red-400 text-2xl font-light leading-none transition">✕</button>
+        <div class="modal-box bg-[#F3F4F6] w-full max-w-5xl h-[85vh]">
+            
+            <div class="px-6 py-4 border-b flex justify-between items-center bg-white shrink-0">
+                <h2 class="font-bold text-lg text-[#003811] tracking-widest uppercase">⚙️ Manage Active Orders</h2>
+                <button onclick="closeManageModal()" class="text-gray-400 hover:text-red-500 text-2xl font-light leading-none transition">✕</button>
             </div>
             
-            <div class="p-6 flex flex-col h-full overflow-hidden">
-                <div class="flex gap-2 mb-4 shrink-0 bg-white p-4 rounded border border-gray-200 shadow-sm">
-                    <input type="text" id="searchSoInput" placeholder="Enter Full No (e.g., RSO 220 series of 2026)" class="flex-grow p-2 border border-gray-300 rounded text-sm font-bold outline-none focus:border-[#003811]">
-                    <button onclick="searchSO()" class="bg-[#003811] text-white px-6 font-bold uppercase rounded hover:bg-[#002200]">Search</button>
+            <div class="p-6 flex flex-col h-full overflow-hidden bg-gray-50">
+                
+                <div id="soListContainer" class="flex flex-col h-full">
+                    <div class="flex gap-2 mb-4 shrink-0">
+                        <input type="text" id="filterSoInput" onkeyup="filterSOList(this.value)" placeholder="Search SO Number or Subject..." class="flex-grow p-3 border border-gray-300 rounded text-sm font-bold outline-none focus:border-[#003811] shadow-sm">
+                    </div>
+                    <div id="allSoList" class="flex-grow overflow-y-auto space-y-3 pr-2 pb-6">
+                        </div>
                 </div>
 
-                <div id="soSearchResults" class="flex-grow bg-white rounded border border-gray-200 overflow-hidden flex flex-col shadow-sm">
-                    <div class="h-full flex items-center justify-center text-gray-400 text-sm font-bold uppercase p-8 text-center">
-                        Enter an exact Number to view and manage participants and schedules.
-                    </div>
+                <div id="soDetailContainer" class="hidden flex-col h-full">
+                    <button onclick="backToSoList()" class="mb-4 text-[#003811] font-bold text-xs uppercase tracking-widest flex items-center gap-1 hover:underline w-max">
+                        ← Back to List
+                    </button>
+                    <div id="soSearchResults" class="flex-grow bg-white rounded border border-gray-200 overflow-hidden flex flex-col shadow-sm">
+                        </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -266,6 +279,7 @@
         let computedDates = [];
         let matchedPersonnel = [];
         let activeManageSO = ""; 
+        let allActiveSOs = []; // Holds grouped active SOs for the list view
 
         document.getElementById('soYear').value = new Date().getFullYear();
 
@@ -407,8 +421,9 @@
                 }
                 status.innerText = "Extraction complete! You can upload/paste more to add to the list.";
             } catch (err) {
+                console.error(err);
                 status.innerText = "Extraction Failed.";
-                alert(err.message);
+                alert("Extraction Error: Make sure your files are clear images or readable PDFs.");
             } finally {
                 btn.disabled = false;
                 // Reset file input so same file can be selected again if needed
@@ -436,7 +451,7 @@
             
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
-                const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better OCR
+                const viewport = page.getViewport({ scale: 1.5 }); // Adjusted scale to prevent memory crash
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 canvas.height = viewport.height; canvas.width = viewport.width;
@@ -571,21 +586,105 @@
         // ==========================================
         // --- MANAGE / CANCEL / RESCHEDULE LOGIC ---
         // ==========================================
-        function openManageModal() { document.getElementById('manageModal').classList.remove('hidden'); }
+        
+        function openManageModal() { 
+            document.getElementById('manageModal').classList.remove('hidden'); 
+            loadAllActiveSOs();
+        }
+        
         function closeManageModal() { 
             document.getElementById('manageModal').classList.add('hidden'); 
-            document.getElementById('soSearchResults').innerHTML = '<div class="h-full flex items-center justify-center text-gray-400 text-sm font-bold uppercase p-8 text-center">Enter an exact Number to view and manage participants and schedules.</div>'; 
-            document.getElementById('searchSoInput').value = ''; 
-            activeManageSO = ""; 
+            backToSoList();
         }
 
-        async function searchSO() {
-            const query = document.getElementById('searchSoInput').value.trim();
-            if(!query) return;
-            activeManageSO = query;
+        function backToSoList() {
+            document.getElementById('soListContainer').classList.remove('hidden');
+            document.getElementById('soDetailContainer').classList.add('hidden');
+            document.getElementById('soDetailContainer').classList.remove('flex');
+            document.getElementById('filterSoInput').value = '';
+            renderSOList(allActiveSOs);
+        }
+
+        // Fetch and display all active SOs
+        async function loadAllActiveSOs() {
+            const listDiv = document.getElementById('allSoList');
+            listDiv.innerHTML = `<div class="flex items-center justify-center h-full mt-10"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading Active Orders...</span></div>`;
             
+            // Get today to only show "active" meaning they have dates today or in the future
+            const today = new Date().toISOString().split('T')[0];
+            
+            const { data, error } = await supabaseClient.from('pso_records')
+                .select('*')
+                .gte('start_date', today) // Only show ones that are currently active/future
+                .order('start_date', { ascending: true });
+            
+            if (error) {
+                listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error: ${error.message}</div>`;
+                return;
+            }
+
+            // Group by PSO No
+            const soMap = {};
+            data.forEach(d => {
+                if (!soMap[d.pso_no]) {
+                    soMap[d.pso_no] = {
+                        pso_no: d.pso_no,
+                        subject: d.subject || 'No Subject',
+                        dates: new Set(),
+                        emps: new Set()
+                    };
+                }
+                soMap[d.pso_no].dates.add(d.start_date);
+                soMap[d.pso_no].emps.add(d.emp_id);
+            });
+
+            allActiveSOs = Object.values(soMap).map(so => ({
+                ...so,
+                dateCount: so.dates.size,
+                empCount: so.emps.size,
+                datesArr: Array.from(so.dates).sort()
+            })).sort((a,b) => b.datesArr[0]?.localeCompare(a.datesArr[0])); // Sort by recent dates
+
+            renderSOList(allActiveSOs);
+        }
+
+        function renderSOList(soArray) {
+            const listDiv = document.getElementById('allSoList');
+            if (soArray.length === 0) {
+                listDiv.innerHTML = `<div class="text-gray-500 font-bold p-8 text-center text-sm uppercase mt-10">No Active Orders Found.</div>`;
+                return;
+            }
+
+            listDiv.innerHTML = soArray.map(so => `
+                <div class="bg-white p-5 rounded border border-gray-200 shadow-sm flex justify-between items-center hover:border-[#003811] cursor-pointer transition group" onclick="viewSODetails('${so.pso_no}')">
+                    <div>
+                        <h3 class="font-black text-[#003811] text-lg uppercase">${so.pso_no}</h3>
+                        <p class="text-xs text-gray-500 font-bold mb-3">${so.subject}</p>
+                        <div class="flex gap-3 text-[10px] font-bold text-gray-500 uppercase">
+                            <span class="bg-gray-100 border border-gray-200 px-2 py-1 rounded">👥 ${so.empCount} Personnel</span>
+                            <span class="bg-gray-100 border border-gray-200 px-2 py-1 rounded">📅 ${so.dateCount} Active Dates</span>
+                        </div>
+                    </div>
+                    <div class="text-gray-300 text-3xl font-light px-4 group-hover:text-[#D4AF37] transition transform group-hover:translate-x-1">→</div>
+                </div>
+            `).join('');
+        }
+
+        function filterSOList(query) {
+            const q = query.toLowerCase();
+            const filtered = allActiveSOs.filter(so => so.pso_no.toLowerCase().includes(q) || so.subject.toLowerCase().includes(q));
+            renderSOList(filtered);
+        }
+
+        // Detail View Logic
+        async function viewSODetails(query) {
+            activeManageSO = query;
+            document.getElementById('soListContainer').classList.add('hidden');
+            document.getElementById('soDetailContainer').classList.remove('hidden');
+            document.getElementById('soDetailContainer').classList.add('flex');
+
             const resArea = document.getElementById('soSearchResults');
-            resArea.innerHTML = `<div class="h-full flex items-center justify-center"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading...</span></div>`;
+            resArea.innerHTML = `<div class="h-full flex items-center justify-center"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading Details...</span></div>`;
 
             const { data, error } = await supabaseClient.from('pso_records').select('*').eq('pso_no', query).order('start_date', { ascending: true });
             
@@ -698,21 +797,21 @@
             if(!confirm(`WARNING: This will permanently cancel ALL dates and personnel for ${activeManageSO}. Continue?`)) return;
             const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO);
             if(error) alert("Error: " + error.message);
-            else { alert("SO Cancelled completely."); searchSO(); }
+            else { alert("SO Cancelled completely."); loadAllActiveSOs(); backToSoList(); }
         }
 
         async function removeParticipantFromSO(empId, name) {
             if(!confirm(`Remove ${name} from ${activeManageSO} entirely?`)) return;
             const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO).eq('emp_id', empId);
             if(error) alert("Error: " + error.message);
-            else searchSO();
+            else viewSODetails(activeManageSO);
         }
 
         async function cancelDateFromSO(dateStr) {
             if(!confirm(`Cancel the schedule on ${dateStr} for EVERYONE in ${activeManageSO}?`)) return;
             const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO).eq('start_date', dateStr);
             if(error) alert("Error: " + error.message);
-            else searchSO();
+            else viewSODetails(activeManageSO);
         }
 
         async function addParticipantToSO() {
@@ -741,7 +840,7 @@
 
             const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
             if(insErr) alert("Error adding: " + insErr.message);
-            else { alert("Participant added!"); searchSO(); }
+            else { alert("Participant added!"); viewSODetails(activeManageSO); }
         }
 
         async function addDateToSO() {
@@ -770,7 +869,7 @@
 
             const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
             if(insErr) alert("Error adding date: " + insErr.message);
-            else { alert("Date added to schedule!"); searchSO(); }
+            else { alert("Date added to schedule!"); viewSODetails(activeManageSO); }
         }
 
         async function rescheduleDate(oldDate) {
@@ -786,7 +885,7 @@
                 .eq('start_date', oldDate);
 
             if(error) alert("Error rescheduling: " + error.message);
-            else { alert("Schedule successfully moved!"); searchSO(); }
+            else { alert("Schedule successfully moved!"); viewSODetails(activeManageSO); }
         }
 
     </script>
