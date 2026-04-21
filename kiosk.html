@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Terminal - DAR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #003811; overflow: hidden; color: white; }
+        .clock-text { font-size: 5rem; font-weight: bold; line-height: 1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); color: #D4AF37; }
+        .date-text { font-size: 1.5rem; font-weight: 600; color: #E5E7EB; }
+        #video-container { position: relative; width: 100%; max-width: 500px; border-radius: 1rem; overflow: hidden; border: 4px solid #D4AF37; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        video { width: 100%; height: auto; transform: scaleX(-1); /* Mirror effect */ }
+        .scanner-input { background: rgba(255,255,255,0.1); border: 2px solid #D4AF37; color: white; text-align: center; font-size: 2rem; font-weight: bold; letter-spacing: 0.1em; outline: none; transition: all 0.3s; }
+        .scanner-input:focus { background: rgba(255,255,255,0.2); box-shadow: 0 0 15px rgba(212, 175, 55, 0.5); }
+        .scanner-input::placeholder { color: rgba(255,255,255,0.5); font-size: 1.5rem; }
+        
+        .toast-enter { animation: slideIn 0.3s forwards; }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body class="flex h-screen items-center justify-center relative p-8">
+
+    <div id="networkStatus" class="absolute top-4 right-4 px-4 py-2 rounded-full font-bold text-sm bg-green-600 shadow-lg flex items-center gap-2">
+        <div class="w-3 h-3 rounded-full bg-white animate-pulse"></div>
+        SYSTEM ONLINE
+    </div>
+
+    <div class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+        
+        <div class="flex flex-col items-center justify-center">
+            <div id="video-container">
+                <video id="webcam" autoplay playsinline></video>
+                <div class="absolute bottom-4 left-0 w-full text-center">
+                    <span class="bg-black/50 px-3 py-1 rounded text-xs tracking-widest uppercase">CAMERA ACTIVE</span>
+                </div>
+            </div>
+            <canvas id="canvas" class="hidden"></canvas>
+            <p class="mt-4 text-gray-400 text-sm text-center">Look directly at the camera when scanning.<br>Image will be captured automatically.</p>
+        </div>
+
+        <div class="flex flex-col items-center justify-center text-center">
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold uppercase tracking-widest text-gray-300 mb-2">Department of Agrarian Reform</h1>
+                <div id="clock" class="clock-text">--:--:-- --</div>
+                <div id="date" class="date-text mt-2">Loading Date...</div>
+            </div>
+
+            <div class="w-full max-w-md bg-white/5 p-8 rounded-xl backdrop-blur-sm border border-white/10 shadow-2xl">
+                <p class="mb-4 text-sm font-bold text-[#D4AF37] uppercase tracking-wider">Scan QR or Enter ID</p>
+                <input type="text" id="empIdInput" class="scanner-input w-full py-4 rounded-lg mb-6" placeholder="Awaiting Input..." autofocus autocomplete="off">
+                <button onclick="processAttendance()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded-lg font-bold text-xl uppercase tracking-wider hover:bg-yellow-500 transition-colors shadow-lg">
+                    LOG ATTENDANCE
+                </button>
+            </div>
+
+            <div id="resultCard" class="hidden mt-8 w-full max-w-md bg-white p-6 rounded-xl shadow-2xl toast-enter border-l-8">
+                <p id="resTime" class="text-gray-500 text-sm font-bold mb-1"></p>
+                <h2 id="resName" class="text-2xl font-black text-[#003811] mb-1"></h2>
+                <p id="resStatus" class="text-3xl font-black uppercase tracking-widest"></p>
+                <p id="resQueueMsg" class="text-xs text-orange-600 font-bold mt-3 hidden">Saved Offline. Will sync when connected.</p>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // DEVICE CONFIG
+    const DEVICE_ID = "TERMINAL_01"; // Change if deploying to multiple PCs
+
+    // GLOBALS
+    let video = document.getElementById('webcam');
+    let canvas = document.getElementById('canvas');
+    let isOnline = navigator.onLine;
+    let resetTimer = null;
+    let knownEmployees = {}; // Cache for offline name resolution
+
+    // ==========================================
+    // INITIALIZATION
+    // ==========================================
+    window.onload = async () => {
+        startClock();
+        initWebcam();
+        updateNetworkStatus();
+        
+        // Cache employees for offline name display
+        if (isOnline) await cacheEmployees();
+        
+        // Force focus on input for barcode/QR scanners
+        document.addEventListener('click', () => document.getElementById('empIdInput').focus());
+        document.getElementById('empIdInput').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') processAttendance();
+        });
+
+        // Network Listeners
+        window.addEventListener('online', () => { isOnline = true; updateNetworkStatus(); syncOfflineLogs(); });
+        window.addEventListener('offline', () => { isOnline = false; updateNetworkStatus(); });
+
+        // Initial Sync check
+        if (isOnline) syncOfflineLogs();
+    };
+
+    // ==========================================
+    // CLOCK & UI
+    // ==========================================
+    function startClock() {
+        setInterval(() => {
+            const now = new Date();
+            // Strict 12-hour format requirement
+            let hours = now.getHours();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            document.getElementById('clock').innerText = `${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
+            
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('date').innerText = now.toLocaleDateString('en-US', options);
+        }, 1000);
+    }
+
+    function updateNetworkStatus() {
+        const indicator = document.getElementById('networkStatus');
+        if (isOnline) {
+            indicator.className = "absolute top-4 right-4 px-4 py-2 rounded-full font-bold text-sm bg-green-600 shadow-lg flex items-center gap-2";
+            indicator.innerHTML = `<div class="w-3 h-3 rounded-full bg-white animate-pulse"></div> SYSTEM ONLINE`;
+        } else {
+            indicator.className = "absolute top-4 right-4 px-4 py-2 rounded-full font-bold text-sm bg-red-600 shadow-lg flex items-center gap-2";
+            indicator.innerHTML = `<div class="w-3 h-3 rounded-full bg-white"></div> OFFLINE MODE`;
+        }
+    }
+
+    // ==========================================
+    // WEBCAM CAPTURE
+    // ==========================================
+    async function initWebcam() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            video.srcObject = stream;
+        } catch (err) {
+            console.error("Camera error:", err);
+            alert("Webcam access denied or unavailable. Attendance requires camera.");
+        }
+    }
+
+    function captureImage() {
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Return compressed base64 JPEG
+        return canvas.toDataURL('image/jpeg', 0.5); 
+    }
+
+    // ==========================================
+    // CORE LOGIC
+    // ==========================================
+    async function cacheEmployees() {
+        try {
+            const { data, error } = await supabaseClient.from('employees').select('emp_id, full_name');
+            if (!error && data) {
+                data.forEach(e => knownEmployees[e.emp_id] = e.full_name);
+                localStorage.setItem('cachedEmployees', JSON.stringify(knownEmployees));
+            }
+        } catch (e) { console.error("Cache fail", e); }
+    }
+
+    function getCachedName(empId) {
+        if (Object.keys(knownEmployees).length === 0) {
+            const cached = localStorage.getItem('cachedEmployees');
+            if (cached) knownEmployees = JSON.parse(cached);
+        }
+        return knownEmployees[empId] || "Unknown / Unregistered";
+    }
+
+    async function processAttendance() {
+        const input = document.getElementById('empIdInput');
+        const empId = input.value.trim();
+        input.value = ''; // Clear immediately for next person
+        input.focus();
+
+        if (!empId) return;
+
+        // 1. Capture exact time and image
+        const logTimeISO = new Date().toISOString();
+        const base64Image = captureImage();
+        const empName = isOnline ? await fetchNameOnline(empId) : getCachedName(empId);
+
+        // 2. Determine IN or OUT
+        let logType = "TIME IN";
+        let colorClass = "border-green-500 text-green-600";
+        
+        if (isOnline) {
+            logType = await determineStatusOnline(empId);
+        } else {
+            logType = determineStatusOffline(empId);
+        }
+
+        if (logType.includes("OUT")) colorClass = "border-orange-500 text-orange-600";
+
+        // 3. Create Payload
+        const payload = {
+            emp_id: empId,
+            log_time: logTimeISO,
+            device_id: DEVICE_ID,
+            capture_image: base64Image
+        };
+
+        // 4. Save (Online or Offline)
+        let savedOffline = false;
+        if (isOnline) {
+            const success = await pushLogToSupabase(payload);
+            if (!success) {
+                saveLogOffline(payload);
+                savedOffline = true;
+            }
+        } else {
+            saveLogOffline(payload);
+            savedOffline = true;
+        }
+
+        // 5. Update UI
+        showResult(empName, logType, colorClass, savedOffline);
+    }
+
+    // ==========================================
+    // DATABASE INTERACTIONS
+    // ==========================================
+    async function fetchNameOnline(empId) {
+        const { data, error } = await supabaseClient.from('employees').select('full_name').eq('emp_id', empId).single();
+        if (data) {
+            knownEmployees[empId] = data.full_name; // update cache
+            return data.full_name;
+        }
+        return getCachedName(empId);
+    }
+
+    async function determineStatusOnline(empId) {
+        // Find if they have logged in today
+        const today = new Date().toISOString().split('T')[0];
+        const { data, error } = await supabaseClient
+            .from('attendance_logs')
+            .select('log_time')
+            .eq('emp_id', empId)
+            .gte('log_time', today + "T00:00:00Z")
+            .lte('log_time', today + "T23:59:59Z")
+            .order('log_time', { ascending: true });
+
+        if (error || !data || data.length === 0) return "TIME IN";
+        // If odd number of logs (1, 3, 5), they are clocked IN, so next is OUT.
+        return data.length % 2 !== 0 ? "TIME OUT" : "TIME IN";
+    }
+
+    function determineStatusOffline(empId) {
+        // Basic fallback: toggle based on local storage history
+        let history = JSON.parse(localStorage.getItem('offlineStatusHistory') || '{}');
+        const today = new Date().toISOString().split('T')[0];
+        
+        if (!history[today]) history[today] = {};
+        
+        let currentStatus = history[today][empId] || "OUT";
+        let nextStatus = currentStatus === "OUT" ? "TIME IN" : "TIME OUT";
+        
+        history[today][empId] = nextStatus === "TIME IN" ? "IN" : "OUT";
+        localStorage.setItem('offlineStatusHistory', JSON.stringify(history));
+        
+        return nextStatus;
+    }
+
+    async function pushLogToSupabase(payload) {
+        try {
+            const { error } = await supabaseClient.from('attendance_logs').insert([payload]);
+            return !error;
+        } catch (e) {
+            console.error("Push failed:", e);
+            return false;
+        }
+    }
+
+    // ==========================================
+    // OFFLINE QUEUE
+    // ==========================================
+    function saveLogOffline(payload) {
+        let queue = JSON.parse(localStorage.getItem('attendanceQueue') || '[]');
+        queue.push(payload);
+        localStorage.setItem('attendanceQueue', JSON.stringify(queue));
+    }
+
+    async function syncOfflineLogs() {
+        if (!isOnline) return;
+        let queue = JSON.parse(localStorage.getItem('attendanceQueue') || '[]');
+        if (queue.length === 0) return;
+
+        let failedQueue = [];
+        for (let payload of queue) {
+            const success = await pushLogToSupabase(payload);
+            if (!success) failedQueue.push(payload);
+        }
+
+        localStorage.setItem('attendanceQueue', JSON.stringify(failedQueue));
+        if (failedQueue.length === 0) {
+            console.log("All offline logs synced successfully.");
+        }
+    }
+
+    // ==========================================
+    // UI FEEDBACK (10 SEC RESET)
+    // ==========================================
+    function showResult(name, status, colorClass, isOfflineMsg) {
+        const card = document.getElementById('resultCard');
+        const now = new Date();
+        
+        // Use exact 12hr format for the UI log display
+        let hours = now.getHours();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; 
+        const min = String(now.getMinutes()).padStart(2, '0');
+        
+        document.getElementById('resTime').innerText = `Logged at ${hours}:${min} ${ampm}`;
+        document.getElementById('resName').innerText = name;
+        document.getElementById('resStatus').innerText = status;
+        document.getElementById('resStatus').className = `text-4xl font-black uppercase tracking-widest ${colorClass}`;
+        
+        const offlineWarning = document.getElementById('resQueueMsg');
+        if (isOfflineMsg) {
+            offlineWarning.classList.remove('hidden');
+        } else {
+            offlineWarning.classList.add('hidden');
+        }
+
+        card.className = `mt-8 w-full max-w-md bg-white p-6 rounded-xl shadow-2xl toast-enter border-l-8 ${colorClass}`;
+        card.classList.remove('hidden');
+
+        // Requirement #4: Reset after 10 seconds
+        if (resetTimer) clearTimeout(resetTimer);
+        resetTimer = setTimeout(() => {
+            card.classList.add('hidden');
+        }, 10000);
+    }
+</script>
+</body>
+</html>
