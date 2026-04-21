@@ -55,14 +55,7 @@
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold">SO ENCODER</p>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
-            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">DASHBOARD</a>
-            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">PDS MANAGER</a>
-            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">ATTENDANCE</a>
-            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">LEAVE PROCESSING</a>
-            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">GATE PASS & CTO</a>
             <a href="pso_encoder.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors">SO ENCODER</a>
-            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">REPORTS</a>
-            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">USERS</a>
         </div>
         <div class="p-4 bg-black/20">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
@@ -263,11 +256,24 @@
     </div>
 
     <script>
-        // --- Auth Check ---
+        // --- Auth & Role Check ---
         const userStr = sessionStorage.getItem('currentUser');
-        if (!userStr) window.location.href = 'index.html'; 
-        const user = JSON.parse(userStr);
-        document.getElementById('activeUser').innerText = `User: ${user.full_name ? user.full_name.toUpperCase() : user.username}`;
+        if (!userStr) {
+            window.location.href = 'index.html'; 
+        } else {
+            const user = JSON.parse(userStr);
+            
+            // STRICT REDIRECT: Ensure user has PSO ENCODER privileges
+            if (!user.role || !user.role.toUpperCase().includes('PSO ENCODER')) {
+                // If they are not an Admin/Chief, boot them to dashboard/index
+                if (!user.role.toUpperCase().includes('ADMIN') && !user.role.toUpperCase().includes('CHIEF')) {
+                    alert("Unauthorized access. Redirecting...");
+                    window.location.href = 'dashboard.html';
+                }
+            }
+            
+            document.getElementById('activeUser').innerText = `User: ${user.full_name ? user.full_name.toUpperCase() : user.username}`;
+        }
 
         function logout() {
             sessionStorage.removeItem('currentUser');
