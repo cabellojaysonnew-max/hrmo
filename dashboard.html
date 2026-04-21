@@ -152,9 +152,15 @@
     document.getElementById('activeUser').innerText = currentUser.full_name;
     document.getElementById('userRoleBadge').innerText = currentUser.role;
 
-    const userRole = currentUser.role.toUpperCase();
-    const isLimited = userRole === 'CHIEF' || userRole === 'UNIT HEAD';
-    const isHR = userRole === 'HRMO' || userRole.includes('HR');
+    // Split roles into an array, clean whitespace, and capitalize for safe mapping
+    const userRoles = (currentUser.role || '').toUpperCase().split(',').map(r => r.trim());
+    
+    // Check if the user possesses the HRMO role anywhere in their assigned roles
+    const isHR = userRoles.includes('HRMO') || userRoles.some(r => r.includes('HR'));
+    
+    // Limits apply ONLY if the user is strictly a CHIEF or UNIT HEAD and does NOT also have HR rights
+    const isLimited = !isHR && (userRoles.includes('CHIEF') || userRoles.includes('UNIT HEAD'));
+    
     const targetDivision = currentUser.division;
     const SYSTEM_START_DATE = "2026-05-01";
 
