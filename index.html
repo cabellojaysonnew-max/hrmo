@@ -40,10 +40,10 @@
     </div>
 
 <script>
-    // Redirect if already logged in based on role
+    // Redirect if already logged in based on unit
     if (sessionStorage.getItem('currentUser')) {
         const user = JSON.parse(sessionStorage.getItem('currentUser'));
-        if (user.role === 'BUDGET' || user.role === 'ACCOUNTING') {
+        if (user.unit === 'BUDGET' || user.unit === 'ACCOUNTING') {
             window.location.href = 'finance_dashboard.html';
         } else {
             window.location.href = 'dashboard.html';
@@ -66,8 +66,8 @@
                 // Save user session
                 sessionStorage.setItem('currentUser', JSON.stringify(data));
                 
-                // Route based on role
-                if (data.role === 'BUDGET' || data.role === 'ACCOUNTING') {
+                // Route based on unit
+                if (data.unit === 'BUDGET' || data.unit === 'ACCOUNTING') {
                     window.location.href = 'finance_dashboard.html';
                 } else {
                     window.location.href = 'dashboard.html';
