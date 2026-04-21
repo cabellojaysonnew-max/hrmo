@@ -154,6 +154,7 @@
 
     const userRole = currentUser.role.toUpperCase();
     const isLimited = userRole === 'CHIEF' || userRole === 'UNIT HEAD';
+    const isHR = userRole === 'HRMO' || userRole.includes('HR');
     const targetDivision = currentUser.division;
     const SYSTEM_START_DATE = "2026-05-01";
 
@@ -508,15 +509,17 @@
                     statusBadge = `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-bold border border-yellow-300">MONITORING</span>`;
                 }
 
+                let actionColumn = isHR ? 
+                    `<button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins}, ${h.absentDays})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>` 
+                    : `<span class="text-[10px] text-gray-400 italic">HR Only</span>`;
+
                 listH.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold">${h.name}</td>
                     <td class="text-center">${h.prevCount}/${h.currCount}</td>
                     <td class="text-center">${formatMinutesToHours(totalMins)}</td>
                     <td class="text-center">${h.absentDays}</td>
                     <td class="text-center">${statusBadge}</td>
-                    <td class="text-center">
-                        <button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins}, ${h.absentDays})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>
-                    </td>
+                    <td class="text-center">${actionColumn}</td>
                 </tr>`;
             }
         });
@@ -622,14 +625,16 @@
                 if (missedDates.length === 2) { fBadgeClass = 'bg-orange-100 text-orange-800 border border-orange-300'; fBadgeText = 'WARNING'; }
                 else if (missedDates.length >= 3) { fBadgeClass = 'bg-red-600 text-white'; fBadgeText = 'REPRIMAND'; }
 
+                let actionColumn = isHR ? 
+                    `<button onclick="printFlagMemo('${e.emp_id}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>`
+                    : `<span class="text-[10px] text-gray-400 italic">HR Only</span>`;
+
                 listF.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
                     <td class="text-center font-bold text-gray-700">${presentCount} / ${expectedMondays}</td>
                     <td class="text-center text-xs text-gray-500">${missedDates.join(", ")}</td>
                     <td class="text-center"><span class="px-2 py-1 rounded text-[10px] ${fBadgeClass} font-bold">${fBadgeText}</span></td>
-                    <td class="text-center">
-                        <button onclick="printFlagMemo('${e.emp_id}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>
-                    </td>
+                    <td class="text-center">${actionColumn}</td>
                 </tr>`;
             }
         });
