@@ -32,7 +32,7 @@
                     <input type="month" id="searchMonth" class="w-full border p-2 rounded">
                 </div>
                 <div class="flex items-end">
-                    <button onclick="researchEmployee()" class="bg-[#003811] text-white px-6 py-2 rounded font-bold w-full hover:bg-green-800">Research Claims</button>
+                    <button onclick="researchEmployee()" class="bg-[#003811] text-white px-6 py-2 rounded font-bold w-full hover:bg-green-800 transition-colors">Research Claims</button>
                 </div>
             </div>
             <p id="statusMsg" class="text-sm font-bold mt-4"></p>
@@ -45,12 +45,13 @@
                         <th class="p-3 border">Date</th>
                         <th class="p-3 border">Travel Order (TO)</th>
                         <th class="p-3 border">PSO / RSO</th>
-                        <th class="p-3 border">Conflict Status</th>
+                        <th class="p-3 border text-center">Conflict Status</th>
                         <th class="p-3 border w-64">Claim Tagging</th>
                     </tr>
                 </thead>
                 <tbody id="resultsTable">
-                    </tbody>
+                    <tr><td colspan="5" class="p-4 text-center text-gray-500">Enter Employee ID and Month to begin research.</td></tr>
+                </tbody>
             </table>
         </div>
     </div>
@@ -60,7 +61,7 @@
     const userStr = sessionStorage.getItem('currentUser');
     if (!userStr) window.location.href = 'index.html';
     const user = JSON.parse(userStr);
-    if (user.role !== 'BUDGET' && user.role !== 'ACCOUNTING') window.location.href = 'index.html';
+    if (user.unit !== 'BUDGET' && user.unit !== 'ACCOUNTING') window.location.href = 'index.html';
 
     function logout() {
         sessionStorage.clear();
@@ -89,7 +90,7 @@
         const endDate = `${year}-${month}-${daysInMonth}`;
 
         try {
-            // 1. Fetch Travel Orders for employee
+            // 1. Fetch Approved Travel Orders
             const { data: toData, error: toErr } = await supabaseClient
                 .from('travel_orders')
                 .select('to_no, status')
@@ -110,7 +111,7 @@
                 itineraries = itinData || [];
             }
 
-            // 2. Fetch PSOs for employee
+            // 2. Fetch PSOs
             const { data: psoData, error: psoErr } = await supabaseClient
                 .from('pso_records')
                 .select('*')
@@ -128,25 +129,24 @@
                 .lte('claim_date', endDate);
             if (tagsErr) throw tagsErr;
 
-            // Map tags by date
             const existingTags = {};
             if(tagsData) {
                 tagsData.forEach(t => { existingTags[t.claim_date] = t; });
             }
 
+            let foundActivity = false;
+
             // Build daily view
             for (let day = 1; day <= daysInMonth; day++) {
                 const currentDate = `${year}-${month}-${String(day).padStart(2, '0')}`;
                 
-                // Find matching TOs for this exact day
                 const dayTOs = itineraries.filter(i => i.travel_date === currentDate);
-                
-                // Find matching PSOs where this day falls between start and end
                 const dayPSOs = (psoData || []).filter(p => {
                     return currentDate >= p.start_date && currentDate <= p.end_date;
                 });
 
-                if (dayTOs.length === 0 && dayPSOs.length === 0) continue; // Skip days with no activity
+                if (dayTOs.length === 0 && dayPSOs.length === 0) continue; 
+                foundActivity = true;
 
                 const hasConflict = dayTOs.length > 0 && dayPSOs.length > 0;
                 const toRef = dayTOs.length > 0 ? dayTOs[0].to_no : '';
@@ -161,19 +161,19 @@
                 tr.innerHTML = `
                     <td class="p-3 border font-semibold">${currentDate}</td>
                     <td class="p-3 border text-sm">
-                        ${dayTOs.map(t => `<span class="font-bold text-green-700">${t.to_no}</span><br>${t.destination}`).join('<hr class="my-1">') || '-'}
+                        ${dayTOs.map(t => `<span class="font-bold text-green-700">${t.to_no}</span><br><span class="text-xs text-gray-600">${t.destination}</span>`).join('<hr class="my-1 border-gray-200">') || '<span class="text-gray-400">-</span>'}
                     </td>
                     <td class="p-3 border text-sm">
-                        ${dayPSOs.map(p => `<span class="font-bold text-blue-700">${p.pso_no}</span><br>${p.subject}`).join('<hr class="my-1">') || '-'}
+                        ${dayPSOs.map(p => `<span class="font-bold text-blue-700">${p.pso_no}</span><br><span class="text-xs text-gray-600">${p.subject}</span>`).join('<hr class="my-1 border-gray-200">') || '<span class="text-gray-400">-</span>'}
                     </td>
                     <td class="p-3 border text-center font-bold ${hasConflict ? 'text-red-600 bg-red-50' : 'text-gray-500'}">
-                        ${hasConflict ? 'CONFLICT' : 'CLEAR'}
+                        ${hasConflict ? 'CONFLICT DETECTED' : 'CLEAR'}
                     </td>
                     <td class="p-3 border">
-                        <select onchange="updateTag('${empId}', '${currentDate}', this.value, '${toRef}', '${psoRef}')" class="w-full border p-1 rounded">
+                        <select onchange="updateTag('${empId}', '${currentDate}', this.value, '${toRef}', '${psoRef}')" class="w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:border-[#003811]">
                             <option value="">-- Select Tag --</option>
-                            ${dayTOs.length > 0 ? `<option value="TO" ${currentTag === 'TO' ? 'selected' : ''}>Acknowledge TO</option>` : ''}
-                            ${dayPSOs.length > 0 ? `<option value="PSO" ${currentTag === 'PSO' ? 'selected' : ''}>Acknowledge PSO</option>` : ''}
+                            ${dayTOs.length > 0 ? `<option value="TO" ${currentTag === 'TO' ? 'selected' : ''}>Acknowledge TO (${toRef})</option>` : ''}
+                            ${dayPSOs.length > 0 ? `<option value="PSO" ${currentTag === 'PSO' ? 'selected' : ''}>Acknowledge PSO (${psoRef})</option>` : ''}
                             <option value="NONE" ${currentTag === 'NONE' ? 'selected' : ''}>Void Both / None</option>
                         </select>
                     </td>
@@ -181,8 +181,8 @@
                 tbody.appendChild(tr);
             }
 
-            if (tbody.innerHTML === "") {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">No TOs or PSOs found for this month.</td></tr>`;
+            if (!foundActivity) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">No TOs or PSOs found for this employee in ${monthVal}.</td></tr>`;
             }
 
             statusMsg.innerText = "Research complete.";
@@ -191,6 +191,7 @@
         } catch (error) {
             statusMsg.innerText = "Error: " + error.message;
             statusMsg.className = "text-red-600 text-sm font-bold mt-4";
+            console.error(error);
         }
     }
 
@@ -212,7 +213,7 @@
                 }, { onConflict: 'emp_id, claim_date' });
 
             if (error) throw error;
-            alert(`Claim for ${date} successfully tagged as ${type}`);
+            // Visual feedback could be added here if desired
         } catch (error) {
             alert("Error saving tag: " + error.message);
         }
