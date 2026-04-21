@@ -430,7 +430,7 @@
             const isHabitualLate = (h.prevCount >= 10 && h.currCount >= 10);
             const totalMins = h.totalLateMins + h.totalUtMins;
             const isExcessiveLate = totalMins >= 480;
-            const isAbsenteeism = h.absentDays >= 3;
+            const isAbsenteeism = h.absentDays >= 2.5;
 
             if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
                 hasHabitual = true;
@@ -454,7 +454,7 @@
                     <td class="text-center">${h.absentDays}</td>
                     <td class="text-center">${statusBadge}</td>
                     <td class="text-center">
-                        <button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>
+                        <button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins}, ${h.absentDays})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>
                     </td>
                 </tr>`;
             }
@@ -559,7 +559,7 @@
         if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
     };
 
-    async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins) {
+    async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins, absentDays = 0) {
         if (!confirm(`Generate memo for ${empName}?`)) return;
 
         try {
@@ -581,17 +581,22 @@
             const prevYearStr = prevMonthDate.getFullYear();
 
             const isHabitualLate = (prevCount >= 10 && currCount >= 10);
+            const isHabitualAbsent = (absentDays >= 2.5);
+
             let memoType = "";
             let memoTypeDb = "";
             
             if (isHabitualLate) {
                 memoType = "HABITUAL TARDINESS";
                 memoTypeDb = "Habitual Tardiness";
+            } else if (isHabitualAbsent) {
+                memoType = "UNAUTHORIZED ABSENTEEISM";
+                memoTypeDb = "Unauthorized Absenteeism";
             } else if (totalMins > 0) {
                 memoType = "ACCUMULATED TARDINESS AND ATTENDANCE MONITORING";
                 memoTypeDb = "Accumulated Tardiness";
             } else {
-                alert("No tardiness criteria met for a memo.");
+                alert("No tardiness or absenteeism criteria met for a memo.");
                 return;
             }
 
@@ -628,6 +633,16 @@
                 p1 = String(`A review of your Daily Time Records (DTR) shows that you incurred tardiness as follows:\n\n    ${prevMonthName} ${prevYearStr} - ${prevCount} instances of tardiness\n    ${currMonthName} ${currYear} - ${currCount} instances of tardiness`);
                 p2 = String(`Under the Revised Rules on Administrative Cases in the Civil Service (RRACCS), an employee is considered habitually tardy if he or she incurs at least ten (10) times of tardiness in a month for at least two (2) consecutive months. This constitutes a Less Grave Offense. As this is your ${offenseText}, the prescribed penalty is ${penaltyText}`);
                 p3 = String("In view thereof, you are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative case should be filed against you.\n\nFailure to respond within the prescribed period shall be deemed a waiver of your right to be heard.");
+            } else if (memoTypeDb === "Unauthorized Absenteeism") {
+                if (offenseCount === 1) {
+                    offenseText = "FIRST WARNING";
+                } else {
+                    offenseText = "NOTICE TO EXPLAIN / FINAL WARNING";
+                    memoType = `${memoType} (NOTICE TO EXPLAIN)`;
+                }
+                p1 = String(`A review of your Daily Time Records (DTR) shows that you incurred ${absentDays} days of unauthorized absences for the month of ${currMonthName} ${currYear}.`);
+                p2 = String(`Please be reminded of the Civil Service Commission (CSC) rules on Habitual Absences. An employee is considered habitually absent if they incur unauthorized absences of at least 2.5 days in a month for three (3) consecutive months, or for three (3) months in a semester, or three (3) consecutive months in a year. This constitutes a grave offense.`);
+                p3 = String(`This serves as your ${offenseText}. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative disciplinary action should be taken against you for unauthorized absenteeism. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`);
             } else {
                 const totalHrs = (totalMins / 60.0).toFixed(2);
                 const daysEq = (totalMins / 60.0 / 8.0).toFixed(3);
@@ -651,7 +666,6 @@
                 }
             }
 
-            pdf.setMargins(30, 45, 30); 
             pdf.setFont("helvetica", "bold");
             pdf.setFontSize(12);
             
@@ -767,7 +781,6 @@
             const currYear = new Date().getFullYear();
             const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 
-            pdf.setMargins(30, 45, 30); 
             pdf.setFont("helvetica", "bold"); 
             pdf.setFontSize(12);
             
