@@ -145,6 +145,7 @@
     </main>
 
 <script>
+    /* No revision should be made unless explicitly instructed. */
     const userData = sessionStorage.getItem('currentUser');
     if (!userData) { window.location.href = 'index.html'; }
     const currentUser = JSON.parse(userData);
@@ -208,15 +209,26 @@
         const empIds = new Set((emps || []).map(e => e.emp_id));
         document.getElementById('statTotal').innerText = emps?.length || 0;
 
-        const [travel, pso, leave, logs, scheduleOverrides] = await Promise.all([
-            fetchSafe(supabaseClient.from('itinerary').select('emp_id, destination').eq('travel_date', todayStr)),
+        const [travelItin, pso, leave, logs, scheduleOverrides] = await Promise.all([
+            fetchSafe(supabaseClient.from('itinerary').select('to_no, destination').eq('travel_date', todayStr)),
             fetchSafe(supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr)),
             fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).eq('transaction_t', 'APPROVED')),
             fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59')),
             fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr))
         ]);
 
-        const travelMap = Object.fromEntries((travel.data || []).map(i => [i.emp_id, i.destination]));
+        let travelOrdersToday = { data: [] };
+        const todayToNos = (travelItin.data || []).map(i => i.to_no);
+        if (todayToNos.length > 0) {
+            travelOrdersToday = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').in('to_no', todayToNos).eq('status', 'APPROVED'));
+        }
+
+        const travelMap = {};
+        (travelOrdersToday.data || []).forEach(to => {
+            const itin = (travelItin.data || []).find(i => i.to_no === to.to_no);
+            if (itin) travelMap[to.emp_id] = itin.destination;
+        });
+
         const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
         const overrideMap = {}; (scheduleOverrides.data || []).forEach(o => overrideMap[o.emp_id] = o);
         const logMap = {}; (logs.data || []).forEach(l => { if (!logMap[l.emp_id] || new Date(l.log_time) < logMap[l.emp_id]) logMap[l.emp_id] = new Date(l.log_time); });
@@ -270,18 +282,27 @@
         const startCurrMonth = reqStartCurrMonth.toISOString().split('T')[0];
         const endCurrMonth = new Date(currYear, currMonth + 1, 0).toISOString().split('T')[0]; 
 
-        const [histLogsRes, histTravel, histPso, histLeave, histOverrides] = await Promise.all([
+        const [histLogsRes, histTravelItin, histPso, histLeave, histOverrides] = await Promise.all([
             fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59')),
-            fetchSafe(supabaseClient.from('itinerary').select('emp_id, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr)),
+            fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr)),
             fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth)),
             fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startCurrMonth).lte('date', todayStr)),
             fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth))
         ]);
 
+        const histToNos = (histTravelItin.data || []).map(i => i.to_no);
+        let histTravelOrders = { data: [] };
+        if (histToNos.length > 0) {
+            histTravelOrders = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').in('to_no', histToNos).eq('status', 'APPROVED'));
+        }
+
         const histLogs = histLogsRes.data || [];
         const excused = new Set();
         
-        (histTravel.data || []).forEach(t => excused.add(t.emp_id + '_' + t.travel_date));
+        (histTravelOrders.data || []).forEach(to => {
+            const matchingItins = (histTravelItin.data || []).filter(i => i.to_no === to.to_no);
+            matchingItins.forEach(itin => excused.add(to.emp_id + '_' + itin.travel_date));
+        });
         (histLeave.data || []).forEach(l => excused.add(l.emp_id + '_' + l.date));
         (histPso.data || []).forEach(p => {
             let currD = new Date(p.start_date);
@@ -486,14 +507,21 @@
             .filter(m => m.startsWith(currentMonthPrefix))
             .sort((a,b) => new Date(b) - new Date(a)); 
 
-        const [allFlagTravelRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
-            fetchSafe(supabaseClient.from('itinerary').select('emp_id, travel_date')),
+        const [allFlagTravelItinRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
+            fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date')),
             fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED')),
             fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date'))
         ]);
         
+        let allFlagTravelOrders = { data: [] };
+        const allFlagToNos = (allFlagTravelItinRes.data || []).map(i => i.to_no);
+        allFlagTravelOrders = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED'));
+
         const flagExcused = new Set();
-        (allFlagTravelRes.data || []).forEach(t => flagExcused.add(t.emp_id + '_' + t.travel_date));
+        (allFlagTravelOrders.data || []).forEach(to => {
+            const matchingItins = (allFlagTravelItinRes.data || []).filter(i => i.to_no === to.to_no);
+            matchingItins.forEach(itin => flagExcused.add(to.emp_id + '_' + itin.travel_date));
+        });
         (allFlagLeaveRes.data || []).forEach(l => flagExcused.add(l.emp_id + '_' + l.date));
         (allFlagPsoRes.data || []).forEach(p => {
             let currD = new Date(p.start_date);
