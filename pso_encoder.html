@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Special Orders Encoder - DAR HRMO</title>
+    <title>SO Encoder - DAR HRMO</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -23,13 +23,14 @@
         :root { --dar-green: #003811; --dar-gold: #D4AF37; }
         body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
         
-        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; overflow: hidden; }
-        .form-input { width: 100%; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; color: #1f2937; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
         .form-input:focus { outline: none; border-color: var(--dar-green); box-shadow: 0 0 0 1px var(--dar-green); }
         .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--dar-green); margin-bottom: 0.25rem; text-transform: uppercase; }
         
-        .btn-dark { background-color: #1F2937; color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; transition: 0.2s; text-align: center; cursor: pointer; }
-        .btn-dark:hover { background-color: #111827; }
+        .btn-primary { background-color: var(--dar-green); color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; padding: 0.5rem 1rem; font-size: 0.875rem; transition: 0.2s; }
+        .btn-primary:hover { background-color: #002200; }
+        .btn-primary:active { transform: scale(0.98); }
         
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -40,16 +41,14 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .modal-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .modal-box { background: white; width: 100%; max-width: 1000px; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
-        
-        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
-        input[type="checkbox"] { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; }
+        .modal-box { background: white; width: 100%; max-width: 900px; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+        .chk-day, .w-Nth { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <nav class="bg-[#003811] w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 border-b border-[#006400]">
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
             <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold">SO ENCODER</p>
         </div>
@@ -63,7 +62,7 @@
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">REPORTS</a>
             <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">USERS</a>
         </div>
-        <div class="p-4 bg-black/20">
+        <div class="p-4 bg-black/20 hidden md:block">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
             <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
         </div>
@@ -71,20 +70,21 @@
 
     <main class="flex-1 flex flex-col h-full bg-[#F3F4F6] relative">
         
-        <div class="p-8 pb-4 flex justify-between items-center border-b border-gray-200 bg-white shrink-0">
-            <h2 class="text-3xl font-bold text-[#003811]">Special Orders Encoder</h2>
-            <button onclick="openManageModal()" class="bg-white border border-[#003811] text-[#003811] hover:bg-gray-50 px-4 py-2 font-bold rounded uppercase text-xs flex items-center gap-2 transition">
-                ⚙️ MANAGE ACTIVE ORDERS
+        <div class="p-8 pb-4 flex justify-between items-end border-b border-gray-200 bg-white shadow-sm z-10 shrink-0">
+            <div>
+                <h2 class="text-3xl font-bold text-[#003811]">SO Encoder</h2>
+            </div>
+            <button onclick="openManageModal()" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold px-6 py-2.5 rounded transition uppercase tracking-widest shadow-sm">
+                Manage Active ORDERS
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-8">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-screen-2xl mx-auto items-start">
                 
-                <div class="flex flex-col gap-6">
+                <div class="lg:col-span-4 flex flex-col gap-6">
                     <div class="card p-6">
                         <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4">1. Document Details</h2>
-                        
                         <div class="grid grid-cols-3 gap-4 mb-4">
                             <div class="col-span-1">
                                 <label class="form-label">Type</label>
@@ -111,8 +111,7 @@
 
                     <div class="card p-6 flex-grow">
                         <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4">2. Schedule Engine</h2>
-                        
-                        <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold text-sm mb-4 border-[#D4AF37] bg-[#fdfbf7]">
+                        <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold mb-4 text-[#003811] bg-yellow-50/50">
                             <option value="single">One Day Only</option>
                             <option value="range">Range</option>
                             <option value="repetitive">Repeatitive</option>
@@ -155,15 +154,13 @@
                             <p class="text-[10px] text-gray-500 italic">* Ends only upon cancellation.</p>
                         </div>
 
-                        <button onclick="generateDates()" class="btn-dark w-full mt-4 py-3">COMPUTE DATES</button>
+                        <button onclick="generateDates()" class="w-full mt-4 bg-gray-800 text-white font-bold py-2 rounded uppercase text-xs hover:bg-gray-900 transition">COMPUTE DATES</button>
                         
-                        <div id="computedDatesLabel" class="mt-4 text-xs font-bold text-gray-500 uppercase h-16 overflow-y-auto">
-                            NO DATES COMPUTED YET.
-                        </div>
+                        <div id="computedDatesLabel" class="mt-3 p-3 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-600 font-bold leading-relaxed h-16 overflow-y-auto uppercase">No dates computed yet.</div>
                     </div>
                 </div>
 
-                <div class="flex flex-col h-full">
+                <div class="lg:col-span-4 flex flex-col h-full">
                     <div class="card p-6 flex flex-col h-[calc(100vh-140px)]">
                         <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4 shrink-0">3. Personnel Extractor</h2>
                         
@@ -183,17 +180,17 @@
                             </label>
                             <textarea id="rawText" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs font-mono bg-white outline-none focus:border-[#003811] resize-none mb-4" placeholder="Text will appear here..."></textarea>
                             
-                            <button onclick="matchPersonnel()" class="btn-dark w-full py-3 shrink-0">
+                            <button onclick="matchPersonnel()" class="w-full bg-gray-800 text-white font-bold py-3 rounded uppercase text-xs transition hover:bg-gray-900 shrink-0">
                                 MATCH PERSONNEL
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex flex-col h-full">
+                <div class="lg:col-span-4 flex flex-col h-full">
                     <div class="card p-6 flex flex-col h-[calc(100vh-140px)]">
                         <div class="flex justify-between items-center border-b border-gray-100 pb-2 mb-4 shrink-0">
-                            <h2 class="form-label text-gray-500 mb-0">4. Validation Payload</h2>
+                            <h2 class="form-label text-gray-500 mb-0">4. Personnel Payload</h2>
                             <span id="matchCount" class="bg-gray-100 text-[#003811] text-xs font-bold px-2 py-1 rounded border border-gray-200">0 MATCHED</span>
                         </div>
                         
