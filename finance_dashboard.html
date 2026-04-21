@@ -76,12 +76,12 @@
         window.location.href = 'index.html';
     }
 
-    // --- NEW: Autocomplete Search Logic ---
+    // --- Autocomplete Search Logic ---
     let searchTimeout;
     async function searchEmployees(query) {
         const resultsDiv = document.getElementById('searchResults');
         
-        // Reset hidden ID if user is typing
+        // Reset hidden ID if user is typing manually
         document.getElementById('selectedEmpId').value = '';
 
         if (!query || query.length < 2) {
@@ -89,13 +89,12 @@
             return;
         }
 
-        // Debounce to prevent spamming the database on every keystroke
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(async () => {
             try {
-                // Search by full_name OR emp_id
+                // CHANGED: Querying 'employees' instead of 'employee'
                 const { data, error } = await supabaseClient
-                    .from('employee') 
+                    .from('employees') 
                     .select('emp_id, full_name')
                     .or(`full_name.ilike.%${query}%,emp_id.ilike.%${query}%`)
                     .limit(10);
@@ -118,11 +117,10 @@
             } catch (err) {
                 console.error("Search error:", err);
             }
-        }, 300); // Wait 300ms after user stops typing
+        }, 300);
     }
 
     function selectEmployee(empId, fullName) {
-        // Fill the visible box with the name, and the hidden box with the ID
         document.getElementById('employeeSearch').value = fullName;
         document.getElementById('selectedEmpId').value = empId;
         document.getElementById('searchResults').classList.add('hidden');
@@ -139,7 +137,7 @@
     // --------------------------------------
 
     async function researchEmployee() {
-        // Use the hidden ID if they clicked a dropdown item, otherwise use whatever they typed (in case they typed an exact ID manually)
+        // Use the hidden ID if they clicked a dropdown item, otherwise use what they typed
         const empId = document.getElementById('selectedEmpId').value || document.getElementById('employeeSearch').value.trim();
         const monthVal = document.getElementById('searchMonth').value;
         const statusMsg = document.getElementById('statusMsg');
@@ -229,6 +227,7 @@
                 const tr = document.createElement('tr');
                 tr.className = "border-b hover:bg-gray-50 transition-colors";
                 
+                // CHANGED: Passed "this" as the first argument to updateTag
                 tr.innerHTML = `
                     <td class="p-3 border font-semibold">${currentDate}</td>
                     <td class="p-3 border text-sm">
@@ -241,7 +240,7 @@
                         ${hasConflict ? 'CONFLICT' : 'CLEAR'}
                     </td>
                     <td class="p-3 border">
-                        <select onchange="updateTag('${empId}', '${currentDate}', this.value, '${toRef}', '${psoRef}')" class="w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:border-[#003811] ${currentTag ? 'bg-green-50 font-semibold' : ''}">
+                        <select onchange="updateTag(this, '${empId}', '${currentDate}', this.value, '${toRef}', '${psoRef}')" class="w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:border-[#003811] ${currentTag ? 'bg-green-50 font-semibold' : ''}">
                             <option value="">-- Select Tag --</option>
                             ${dayTOs.length > 0 ? `<option value="TO" ${currentTag === 'TO' ? 'selected' : ''}>Acknowledge TO (${toRef})</option>` : ''}
                             ${dayPSOs.length > 0 ? `<option value="PSO" ${currentTag === 'PSO' ? 'selected' : ''}>Acknowledge PSO (${psoRef})</option>` : ''}
@@ -266,7 +265,8 @@
         }
     }
 
-    async function updateTag(empId, date, type, toRef, psoRef) {
+    // CHANGED: Added selectElement parameter so we can apply styles directly to it
+    async function updateTag(selectElement, empId, date, type, toRef, psoRef) {
         if(!type) return;
         
         let refNo = '';
@@ -285,9 +285,8 @@
 
             if (error) throw error;
             
-            // Add visual feedback to the select box background
-            const activeSelect = event.target;
-            activeSelect.classList.add('bg-green-50', 'font-semibold');
+            // Apply visual feedback safely using the passed element
+            selectElement.classList.add('bg-green-50', 'font-semibold');
 
         } catch (error) {
             alert("Error saving tag: " + error.message);
