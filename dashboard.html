@@ -230,23 +230,49 @@
         });
 
         const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
+        
+        const psoMap = {};
+        (pso.data || []).forEach(p => { 
+            if (empIds.has(p.emp_id)) psoMap[p.emp_id] = p; 
+        });
+
         const overrideMap = {}; (scheduleOverrides.data || []).forEach(o => overrideMap[o.emp_id] = o);
         const logMap = {}; (logs.data || []).forEach(l => { if (!logMap[l.emp_id] || new Date(l.log_time) < logMap[l.emp_id]) logMap[l.emp_id] = new Date(l.log_time); });
 
-        const psoSet = new Set((pso.data || []).filter(p => empIds.has(p.emp_id)).map(p => p.emp_id));
-        document.getElementById('statTravel').innerText = (emps || []).filter(e => travelMap[e.emp_id]).length;
-        document.getElementById('statPSO').innerText = psoSet.size;
+        document.getElementById('statTravel').innerText = Object.keys(travelMap).length;
+        document.getElementById('statPSO').innerText = Object.keys(psoMap).length;
 
         const listT = document.getElementById('listTravel'); const listP = document.getElementById('listPSO'); 
         const listL = document.getElementById('listLeave'); const listLA = document.getElementById('listLateAbsent');
         listT.innerHTML = ''; listP.innerHTML = ''; listL.innerHTML = ''; listLA.innerHTML = '';
 
         (emps || []).forEach(e => {
-            if (travelMap[e.emp_id]) listT.innerHTML += `<div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded mb-1 text-[11px] truncate"><span class="font-bold">${e.full_name}</span> - ${travelMap[e.emp_id]}</div>`;
-            if (leaveMap[e.emp_id]) listL.innerHTML += `<div class="p-2 bg-green-50 border-l-4 border-green-600 rounded mb-1 text-[11px] truncate"><span class="font-bold">${e.full_name}</span> - ${leaveMap[e.emp_id]}</div>`;
+            // Check for multi-status conflicts
+            let conflictCount = 0;
+            if (travelMap[e.emp_id]) conflictCount++;
+            if (psoMap[e.emp_id]) conflictCount++;
+            if (leaveMap[e.emp_id]) conflictCount++;
             
+            const isConflict = conflictCount > 1;
+            const conflictStyle = isConflict ? 'bg-red-100 border-red-600 text-red-900 font-bold' : '';
+
+            // Populate Dashboards with Conflict Awareness
+            if (travelMap[e.emp_id]) {
+                const style = isConflict ? conflictStyle : 'bg-blue-50 border-blue-500 text-[#1F2937]';
+                listT.innerHTML += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${travelMap[e.emp_id]}</div>`;
+            }
+            if (psoMap[e.emp_id]) {
+                const style = isConflict ? conflictStyle : 'bg-red-50 border-red-500 text-[#1F2937]';
+                listP.innerHTML += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${psoMap[e.emp_id].pso_no} (${psoMap[e.emp_id].subject})</div>`;
+            }
+            if (leaveMap[e.emp_id]) {
+                const style = isConflict ? conflictStyle : 'bg-green-50 border-green-600 text-[#1F2937]';
+                listL.innerHTML += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${leaveMap[e.emp_id]}</div>`;
+            }
+            
+            // Late & Absent Monitor (DARPO-CS1 Only)
             if (String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
-                if (!travelMap[e.emp_id] && !psoSet.has(e.emp_id) && !leaveMap[e.emp_id]) {
+                if (!travelMap[e.emp_id] && !psoMap[e.emp_id] && !leaveMap[e.emp_id]) {
                     
                     let expectedDays = ['1', '2', '3', '4', '5'];
                     let cutoffStr = e.flexi_range_end || '08:00:00';
@@ -263,13 +289,15 @@
                     const dayOfWeek = todayDate.getDay().toString();
                     
                     if (expectedDays.includes(dayOfWeek)) {
+                        const cutoffDate = new Date(`${todayStr}T${cutoffStr}`);
+                        const now = new Date(); 
+
                         if (logMap[e.emp_id]) {
-                            const cutoffDate = new Date(todayStr + 'T' + cutoffStr);
                             if (logMap[e.emp_id] > cutoffDate) {
-                                listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-orange-700">LATE</span></div>`;
+                                listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-orange-700 font-bold">LATE</span></div>`;
                             }
-                        } else if (todayDate.getHours() >= 9) {
-                            listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-gray-500 italic">ABSENT</span></div>`;
+                        } else if (now > cutoffDate) {
+                            listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-gray-500 font-bold italic">ABSENT / NO LOG</span></div>`;
                         }
                     }
                 }
