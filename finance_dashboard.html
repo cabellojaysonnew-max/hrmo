@@ -216,10 +216,10 @@
                 const tagRecord = existingTags[currentDate] || {};
                 const currentTag = tagRecord.acknowledged_type || '';
 
-                // Dynamic Button Styling
-                const btnClassTO = currentTag === 'TO' ? 'bg-[#003811] text-white border-[#003811]' : 'bg-green-50 text-[#003811] border-[#003811] hover:bg-green-100';
-                const btnClassPSO = currentTag === 'PSO' ? 'bg-blue-700 text-white border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-700 hover:bg-blue-100';
-                const btnClassVOID = currentTag === 'NONE' ? 'bg-red-600 text-white border-red-600' : 'bg-red-50 text-red-600 border-red-600 hover:bg-red-100';
+                // Dynamic Select Styling based on current tag
+                let selectClass = "w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:border-[#003811] transition-colors";
+                if (currentTag === 'TO') selectClass += " bg-green-50 text-[#003811] font-semibold";
+                if (currentTag === 'PSO_VOID') selectClass += " bg-red-50 text-red-700 font-semibold";
 
                 const tr = document.createElement('tr');
                 tr.className = "border-b hover:bg-gray-50 transition-colors";
@@ -236,11 +236,11 @@
                         ${hasConflict ? 'CONFLICT' : 'CLEAR'}
                     </td>
                     <td class="p-3 border">
-                        <div class="flex flex-col gap-2">
-                            ${dayTOs.length > 0 ? `<button onclick="updateTag(this, '${empId}', '${currentDate}', 'TO', '${toRef}', '${psoRef}')" class="w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm ${btnClassTO}">Acknowledge TO</button>` : ''}
-                            ${dayPSOs.length > 0 ? `<button onclick="updateTag(this, '${empId}', '${currentDate}', 'PSO', '${toRef}', '${psoRef}')" class="w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm ${btnClassPSO}">Acknowledge PSO</button>` : ''}
-                            <button onclick="updateTag(this, '${empId}', '${currentDate}', 'NONE', '${toRef}', '${psoRef}')" class="w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm ${btnClassVOID}">Void Tag</button>
-                        </div>
+                        <select onchange="updateTag(this, '${empId}', '${currentDate}', this.value, '${toRef}', '${psoRef}')" class="${selectClass}">
+                            <option value="">-- Select Tag --</option>
+                            <option value="TO" ${currentTag === 'TO' ? 'selected' : ''}>PROCESSED TO CLAIM</option>
+                            <option value="PSO_VOID" ${currentTag === 'PSO_VOID' ? 'selected' : ''}>PSO / VOID TO</option>
+                        </select>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -261,12 +261,16 @@
     }
 
     // --- Interactive Tag Updating ---
-    async function updateTag(btnElement, empId, date, type, toRef, psoRef) {
-        if(!type) return;
+    async function updateTag(selectElement, empId, date, type, toRef, psoRef) {
+        if(!type) {
+            // Reset styles if "-- Select Tag --" is chosen
+            selectElement.className = "w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:border-[#003811] transition-colors";
+            return;
+        }
         
         let refNo = '';
         if (type === 'TO') refNo = toRef;
-        if (type === 'PSO') refNo = psoRef;
+        if (type === 'PSO_VOID') refNo = psoRef || 'VOID'; // Assigns PSO number if it exists, otherwise just flags as VOID
 
         try {
             const { error } = await supabaseClient
@@ -280,24 +284,12 @@
 
             if (error) throw error;
             
-            // Visual Update - Reset all buttons in this row to default unselected styles
-            const container = btnElement.parentElement;
-            const buttons = container.querySelectorAll('button');
+            // Visual Update - Reset all background/text colors
+            selectElement.className = "w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:border-[#003811] transition-colors";
             
-            buttons.forEach(btn => {
-                if (btn.innerText.includes('TO')) {
-                    btn.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-green-50 text-[#003811] border-[#003811] hover:bg-green-100";
-                } else if (btn.innerText.includes('PSO')) {
-                    btn.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-700 hover:bg-blue-100";
-                } else if (btn.innerText.includes('Void')) {
-                    btn.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-red-50 text-red-600 border-red-600 hover:bg-red-100";
-                }
-            });
-
-            // Apply solid active style to the strictly clicked button
-            if (type === 'TO') btnElement.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-[#003811] text-white border-[#003811]";
-            if (type === 'PSO') btnElement.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-blue-700 text-white border-blue-700";
-            if (type === 'NONE') btnElement.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-red-600 text-white border-red-600";
+            // Apply new color based on selection
+            if (type === 'TO') selectElement.classList.add('bg-green-50', 'text-[#003811]', 'font-semibold');
+            if (type === 'PSO_VOID') selectElement.classList.add('bg-red-50', 'text-red-700', 'font-semibold');
 
         } catch (error) {
             alert("Error saving tag: " + error.message);
