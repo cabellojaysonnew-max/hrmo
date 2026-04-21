@@ -40,9 +40,14 @@
     </div>
 
 <script>
-    // Redirect if already logged in
+    // Redirect if already logged in based on role
     if (sessionStorage.getItem('currentUser')) {
-        window.location.href = 'dashboard.html';
+        const user = JSON.parse(sessionStorage.getItem('currentUser'));
+        if (user.role === 'BUDGET' || user.role === 'ACCOUNTING') {
+            window.location.href = 'finance_dashboard.html';
+        } else {
+            window.location.href = 'dashboard.html';
+        }
     }
 
     async function login() {
@@ -56,10 +61,17 @@
         
         try {
             const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
+            if (error) throw new Error("Authentication failed");
             if (data && data.password === p) {
                 // Save user session
                 sessionStorage.setItem('currentUser', JSON.stringify(data));
-                window.location.href = 'dashboard.html';
+                
+                // Route based on role
+                if (data.role === 'BUDGET' || data.role === 'ACCOUNTING') {
+                    window.location.href = 'finance_dashboard.html';
+                } else {
+                    window.location.href = 'dashboard.html';
+                }
             } else { throw new Error("Invalid Credentials"); }
         } catch (e) { 
             status.innerText = e.message; 
