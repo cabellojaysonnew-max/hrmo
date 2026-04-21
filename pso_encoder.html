@@ -23,13 +23,14 @@
         :root { --dar-green: #003811; --dar-gold: #D4AF37; }
         body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
         
-        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; overflow: hidden; }
-        .form-input { width: 100%; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; color: #1f2937; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
         .form-input:focus { outline: none; border-color: var(--dar-green); box-shadow: 0 0 0 1px var(--dar-green); }
         .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--dar-green); margin-bottom: 0.25rem; text-transform: uppercase; }
         
-        .btn-dark { background-color: #1F2937; color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; transition: 0.2s; text-align: center; cursor: pointer; }
-        .btn-dark:hover { background-color: #111827; }
+        .btn-primary { background-color: var(--dar-green); color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; padding: 0.5rem 1rem; font-size: 0.875rem; transition: 0.2s; }
+        .btn-primary:hover { background-color: #002200; }
+        .btn-primary:active { transform: scale(0.98); }
         
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -40,16 +41,14 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .modal-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .modal-box { background: white; width: 100%; max-width: 1000px; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
-        
-        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
-        input[type="checkbox"] { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; }
+        .modal-box { background: white; width: 100%; max-width: 900px; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+        .chk-day, .w-Nth { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <nav class="bg-[#003811] w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 border-b border-[#006400]">
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
             <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold">SO ENCODER</p>
         </div>
@@ -63,7 +62,7 @@
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">REPORTS</a>
             <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">USERS</a>
         </div>
-        <div class="p-4 bg-black/20">
+        <div class="p-4 bg-black/20 hidden md:block">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
             <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
         </div>
@@ -71,27 +70,29 @@
 
     <main class="flex-1 flex flex-col h-full bg-[#F3F4F6] relative">
         
-        <div class="p-8 pb-4 flex justify-between items-center border-b border-gray-200 bg-white shrink-0">
-            <h2 class="text-3xl font-bold text-[#003811]">Special Orders Encoder</h2>
-            <button onclick="openManageModal()" class="bg-white border border-[#003811] text-[#003811] hover:bg-gray-50 px-4 py-2 font-bold rounded uppercase text-xs flex items-center gap-2 transition">
-                ⚙️ MANAGE ACTIVE ORDERS
+        <div class="p-8 pb-4 flex justify-between items-end border-b border-gray-200 bg-white shadow-sm z-10 shrink-0">
+            <div>
+                <h2 class="text-3xl font-bold text-[#003811]">SO Encoder</h2>
+            </div>
+            <button onclick="openManageModal()" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold px-6 py-2.5 rounded transition uppercase tracking-widest shadow-sm">
+                Manage Active ORDERS
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-8">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-screen-2xl mx-auto items-start">
                 
-                <div class="flex flex-col gap-6">
+                <div class="lg:col-span-4 flex flex-col gap-6">
                     <div class="card p-6">
-                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">1. Document Details</h2>
+                        <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4">1. Document Details</h2>
                         <div class="mb-4">
                             <label class="form-label">Subject / Purpose</label>
-                            <input type="text" id="soSubject" placeholder="e.g., QMS Audit Deployment" class="form-input font-bold text-sm">
+                            <input type="text" id="soSubject" placeholder="e.g., QMS Audit Deployment" class="form-input font-semibold text-gray-800">
                         </div>
                         <div class="grid grid-cols-3 gap-4 mb-4">
                             <div class="col-span-1">
                                 <label class="form-label">Type</label>
-                                <select id="soType" class="form-input font-bold text-sm">
+                                <select id="soType" class="form-input font-bold text-[#003811]">
                                     <option value="SO">SO</option>
                                     <option value="RSO" selected>RSO</option>
                                     <option value="PSO">PSO</option>
@@ -99,23 +100,22 @@
                             </div>
                             <div class="col-span-2">
                                 <label class="form-label">Control Number</label>
-                                <input type="number" id="soNumber" placeholder="e.g., 220" class="form-input font-bold text-sm">
+                                <input type="number" id="soNumber" placeholder="e.g., 220" class="form-input font-bold text-[#003811]">
                             </div>
                         </div>
                         <div>
                             <label class="form-label">Series Year</label>
-                            <input type="number" id="soYear" class="form-input font-bold text-sm">
+                            <input type="number" id="soYear" class="form-input font-bold text-[#003811]">
                         </div>
                     </div>
 
                     <div class="card p-6 flex-grow">
-                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">2. Schedule Engine</h2>
-                        
-                        <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold text-sm mb-4">
+                        <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4">2. Schedule Engine</h2>
+                        <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold mb-4 text-[#003811]">
                             <option value="single">One Day Only</option>
                             <option value="range">Date Range (Consecutive Days)</option>
-                            <option value="recur_week">Recurrence: Specific Days of Week</option>
-                            <option value="recur_month_spec" selected>Recurrence: Specific Weekdays of Month</option>
+                            <option value="recur_week">Weekly Recurrence (e.g., Every Mon/Fri)</option>
+                            <option value="recur_month_spec" selected>Monthly Recurrence (e.g., 1st & 3rd Friday)</option>
                         </select>
 
                         <div id="ui-single" class="sched-ui space-y-4 hidden">
@@ -137,11 +137,11 @@
                             <div class="bg-gray-50 p-3 rounded border border-gray-200">
                                 <label class="form-label mb-2 border-b pb-1">Days of the Week</label>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="1" class="chk-day"> Monday</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="2" class="chk-day"> Tuesday</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="3" class="chk-day"> Wednesday</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="4" class="chk-day"> Thursday</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="5" class="chk-day"> Friday</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="chk-day"> Monday</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="chk-day"> Tuesday</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="chk-day"> Wednesday</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="chk-day"> Thursday</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="chk-day"> Friday</label>
                                 </div>
                             </div>
                         </div>
@@ -155,24 +155,24 @@
                             <div>
                                 <label class="form-label text-xs mb-2">Occurrences (Check all that apply)</label>
                                 <div class="grid grid-cols-3 gap-2 mb-3">
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="1" class="chk-nth"> 1st</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="2" class="chk-nth"> 2nd</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="3" class="chk-nth"> 3rd</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="4" class="chk-nth"> 4th</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="5" class="chk-nth"> Last</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="chk-nth"> 1st</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="chk-nth"> 2nd</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="chk-nth"> 3rd</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="chk-nth"> 4th</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="chk-nth"> Last</label>
                                 </div>
                             </div>
 
                             <div>
                                 <label class="form-label text-xs">Target Day</label>
-                                <select id="mTargetDay" class="form-input">
+                                <select id="mTargetDay" class="form-input text-xs font-bold text-[#003811] p-2">
                                     <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
                                     <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
                                 </select>
                             </div>
                         </div>
 
-                        <button onclick="generateDates()" class="btn-dark w-full mt-4 py-3">COMPUTE DATES</button>
+                        <button onclick="generateDates()" class="w-full bg-gray-800 text-white font-bold py-3 mt-4 rounded uppercase text-xs transition hover:bg-gray-900">COMPUTE DATES</button>
                         
                         <div id="computedDatesLabel" class="mt-4 text-xs font-bold text-gray-500 uppercase h-16 overflow-y-auto">
                             NO DATES COMPUTED YET.
@@ -180,15 +180,16 @@
                     </div>
                 </div>
 
-                <div class="lg:col-span-1 flex flex-col h-full">
+                <div class="lg:col-span-4 flex flex-col h-full">
                     <div class="card p-6 flex flex-col h-[calc(100vh-140px)]">
-                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500 shrink-0">3. Personnel Extractor</h2>
+                        <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4 shrink-0">3. Personnel Extractor</h2>
                         
-                        <div class="mb-4 shrink-0 bg-gray-50 p-4 border border-gray-200 rounded">
-                            <label class="form-label text-xs">Extract from PDF or Image</label>
+                        <div class="mb-4 shrink-0 bg-green-50/50 p-4 border border-green-100 rounded">
+                            <label class="form-label text-xs">Upload or Paste (Ctrl+V)</label>
+                            <p class="text-[10px] text-gray-500 mb-2">Select a PDF/Image, or paste a screenshot directly onto this page.</p>
                             <input type="file" id="fileUpload" accept="image/*,application/pdf" class="w-full text-xs mb-3 bg-white border border-gray-300 p-2 rounded cursor-pointer">
                             <button id="extractBtn" onclick="runExtraction()" class="w-full bg-white border border-[#003811] text-[#003811] py-2 rounded text-xs font-bold uppercase hover:bg-green-50 transition disabled:opacity-50">
-                                Extract Content
+                                Extract File Content
                             </button>
                             <p id="extractStatus" class="text-[10px] text-center mt-2 font-bold text-[#003811]"></p>
                         </div>
@@ -198,7 +199,7 @@
                                 <span>Raw Text Data</span>
                                 <span class="text-gray-400 font-normal normal-case text-[10px]">(Review & Edit before matching)</span>
                             </label>
-                            <textarea id="rawText" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs font-mono bg-white outline-none focus:border-[#003811] resize-none mb-4" placeholder="Paste list of names here, or use the extractor above..."></textarea>
+                            <textarea id="rawText" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs font-mono bg-gray-50 outline-none focus:border-[#003811] resize-none mb-4" placeholder="Paste text here, or use the extractor above..."></textarea>
                             
                             <button onclick="matchPersonnel()" class="w-full bg-[#003811] text-white py-3 rounded text-sm font-bold uppercase tracking-widest hover:bg-[#002200] transition flex items-center justify-center gap-2 shrink-0">
                                 MATCH PERSONNEL
@@ -207,7 +208,7 @@
                     </div>
                 </div>
 
-                <div class="lg:col-span-1 flex flex-col h-full">
+                <div class="lg:col-span-4 flex flex-col h-full">
                     <div class="card p-6 flex flex-col h-[calc(100vh-140px)]">
                         <div class="flex justify-between items-center border-b border-gray-100 pb-2 mb-4 shrink-0">
                             <h2 class="form-label text-gray-500 mb-0">4. Validation Payload</h2>
@@ -284,6 +285,21 @@
         }
         fetchEmployees();
 
+        // --- Global Paste Listener for Images ---
+        document.addEventListener('paste', function(e) {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    const blob = item.getAsFile();
+                    const status = document.getElementById('extractStatus');
+                    status.innerText = "Pasted image detected. Running OCR...";
+                    runExtraction(blob); // Pass the blob directly
+                    break;
+                }
+            }
+        });
+
         // --- Schedule Engine ---
         function toggleScheduleUI() {
             document.querySelectorAll('.sched-ui').forEach(el => el.classList.add('hidden'));
@@ -355,17 +371,20 @@
         }
 
         // --- Robust PDF/Image Extraction ---
-        async function runExtraction() {
+        async function runExtraction(pastedFile = null) {
             const fileInput = document.getElementById('fileUpload');
             const btn = document.getElementById('extractBtn');
             const textArea = document.getElementById('rawText');
             const status = document.getElementById('extractStatus');
 
-            if (!fileInput.files.length) return alert("Please select a file.");
+            let file = pastedFile;
+            if (!file) {
+                if (!fileInput.files.length) return alert("Please select a file or paste an image (Ctrl+V).");
+                file = fileInput.files[0];
+            }
             
-            const file = fileInput.files[0];
             btn.disabled = true;
-            status.innerText = "Analyzing file type...";
+            if(!pastedFile) status.innerText = "Analyzing file...";
             
             try {
                 if (file.type === "application/pdf") {
@@ -435,7 +454,7 @@
             const text = document.getElementById('rawText').value;
             if(!text.trim()) return alert("No raw text to process.");
 
-            // Basic chunking: newlines, commas, double spaces
+            // Advanced chunking to ignore numbers/punctuation
             let chunks = text.split(/[\n,;]+|\s{2,}/).map(f => f.trim().replace(/[^a-zA-ZÑñ. -]/g, '')).filter(f => f.length > 4);
 
             const fuse = new Fuse(employees, {
@@ -473,10 +492,10 @@
                 listUI.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded text-xs font-bold text-center border border-red-200">No matches found. Clean up text or encode manually.</div>`;
             } else {
                 listUI.innerHTML = matchedPersonnel.map(emp => `
-                    <div class="flex justify-between items-center bg-white p-3 rounded border border-gray-200">
+                    <div class="flex justify-between items-center bg-white p-3 rounded border border-gray-200 mb-2">
                         <div>
                             <p class="text-xs font-bold text-[#003811] leading-tight uppercase">${emp.full_name}</p>
-                            <p class="text-[10px] text-gray-500 font-bold uppercase">${emp.position || 'STAFF'}</p>
+                            <p class="text-[10px] text-gray-500 font-bold uppercase">${emp.position || 'STAFF'} | ${emp.division || emp.unit || 'DAR'}</p>
                         </div>
                         <button onclick="removeMatch('${emp.emp_id}')" class="text-gray-400 hover:text-red-600 font-bold px-2 text-lg">✕</button>
                     </div>
@@ -547,7 +566,7 @@
         function openManageModal() { document.getElementById('manageModal').classList.remove('hidden'); }
         function closeManageModal() { 
             document.getElementById('manageModal').classList.add('hidden'); 
-            document.getElementById('soSearchResults').innerHTML = '<div class="h-full flex items-center justify-center text-gray-400 text-sm font-bold uppercase">Enter an exact SO Number to view and manage participants and schedules.</div>'; 
+            document.getElementById('soSearchResults').innerHTML = '<div class="h-full flex items-center justify-center text-gray-400 text-sm font-bold uppercase p-8 text-center">Enter an exact SO Number to view and manage participants and schedules.</div>'; 
             document.getElementById('searchSoInput').value = ''; 
             activeManageSO = ""; 
         }
