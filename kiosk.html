@@ -13,7 +13,6 @@
         .clock-text { font-size: 5rem; font-weight: bold; line-height: 1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); color: #D4AF37; }
         .date-text { font-size: 1.5rem; font-weight: 600; color: #E5E7EB; }
         
-        /* HARDWARE ACCELERATED CAMERA CONTAINERS */
         #face-video-container { position: relative; width: 100%; max-width: 450px; border-radius: 1rem; overflow: hidden; border: 4px solid #D4AF37; box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #000; will-change: transform; transform: translateZ(0); }
         #face-video { width: 100%; height: auto; transform: scaleX(-1); will-change: transform; }
         
@@ -44,7 +43,6 @@
     </div>
 
     <div class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        
         <div class="lg:col-span-5 flex flex-col items-center justify-center gap-6">
             <div class="flex flex-col items-center">
                 <div id="face-video-container">
@@ -86,7 +84,7 @@
                 <h2 id="resName" class="text-3xl font-black text-[#003811] mb-1 leading-tight"></h2>
                 <p id="resDivision" class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4"></p>
                 <p id="resStatus" class="text-4xl font-black uppercase tracking-widest"></p>
-                <p class="text-xs text-gray-400 font-bold mt-4">Data secured. Ready for next scan.</p>
+                <p class="text-xs text-gray-400 font-bold mt-4">Data secured locally. Ready for next scan.</p>
             </div>
         </div>
     </div>
@@ -106,7 +104,6 @@
     </div>
 
 <script>
-    // PERFORMANCE CONFIG
     const DEVICE_ID = "TERMINAL_01"; 
     const SYNC_INTERVAL_MS = 60 * 60 * 1000; 
     const SCAN_COOLDOWN_MS = 3000; 
@@ -128,7 +125,6 @@
         updateNetworkStatus();
         updateQueueCounter();
         
-        // Non-blocking initialization
         setTimeout(async () => {
             if (isOnline) await syncEmployeeCache();
             await populateCameras();
@@ -144,7 +140,6 @@
             if (e.key === 'Enter') handleManualInput();
         });
         
-        // Keep input focused for pure hardware scanners
         document.addEventListener('click', (e) => {
             if(!e.target.closest('#settings-modal') && e.target.tagName !== 'BUTTON') {
                 document.getElementById('empIdInput').focus();
@@ -220,7 +215,6 @@
         
         if (prefQRCam) {
             html5QrCode = new Html5Qrcode("qr-reader");
-            // OPTIMIZATION: Reduced FPS and disabled flip for CPU efficiency
             const config = { fps: 4, qrbox: { width: 250, height: 250 }, disableFlip: true };
             
             html5QrCode.start(
@@ -239,17 +233,30 @@
         }
     }
 
-    // OPTIMIZATION: Aggressive downscaling and compression
     function captureFaceImage() {
         if (!faceVideo.videoWidth) return null;
-        const context = canvas.getContext('2d', { alpha: false }); // Disable alpha for speed
+        const context = canvas.getContext('2d', { alpha: false }); 
         const targetWidth = 320; 
         const scale = targetWidth / faceVideo.videoWidth;
         canvas.width = targetWidth;
         canvas.height = faceVideo.videoHeight * scale;
-        
         context.drawImage(faceVideo, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL('image/jpeg', 0.4); // 40% Quality JPEG
+        return canvas.toDataURL('image/jpeg', 0.4); 
+    }
+
+    // --- NEW: LOCAL FOLDER SAVING LOGIC ---
+    async function saveImageToLocalDrive(empId, base64Image, logTimeISO) {
+        if (!base64Image) return;
+        try {
+            const response = await fetch('http://localhost:3000/save-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ empId: empId, base64Image: base64Image, timestamp: logTimeISO })
+            });
+            if (!response.ok) console.warn("Failed to save image locally. Is Node running?");
+        } catch (error) {
+            console.warn("Local server unreachable. Ensure 'node server.js' is running in cmd.", error);
+        }
     }
 
     function openSettings() { document.getElementById('settings-modal').classList.remove('hidden'); }
@@ -298,7 +305,6 @@
         const logTimeISO = now.toISOString();
         const t12 = get12HourTime(now); 
         
-        // 1. Instantly update UI for immediate feedback
         const emp = getEmployeeData(empId);
         let logType = determineStatusLocal(empId, todayDate);
         let colorClass = logType.includes("OUT") ? "border-orange-500 text-orange-600" : "border-green-500 text-green-600";
@@ -307,9 +313,11 @@
 
         showResult(emp.full_name, emp.division, logType, colorClass, t12.formattedString, isFlagLogged);
 
-        // 2. Process heavy lifting (Image + Queueing) asynchronously
         setTimeout(() => {
             const base64Image = captureFaceImage();
+            
+            // Trigger local folder save
+            saveImageToLocalDrive(empId, base64Image, logTimeISO);
             
             queueSyncTask('attendance_logs', {
                 emp_id: empId,
@@ -329,9 +337,8 @@
                     status: 'PRESENT'
                 });
             }
-        }, 10); // 10ms delay yields thread to browser to render the UI card first
+        }, 10); 
 
-        // Cooldown reset
         setTimeout(() => { isProcessing = false; }, SCAN_COOLDOWN_MS);
     }
 
@@ -355,7 +362,6 @@
         updateQueueCounter();
         
         if (isOnline) {
-            // Debounce automatic syncs to prevent hammering the network
             clearTimeout(window.autoSyncTimer);
             window.autoSyncTimer = setTimeout(() => syncLogs(false), 2000);
         }
