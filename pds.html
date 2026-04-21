@@ -180,7 +180,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                 <div>
                                     <label class="form-label">Division</label>
                                     <select id="f_division" class="form-input">
@@ -192,6 +192,16 @@
                                     </select>
                                 </div>
                                 <div><label class="form-label">Unit</label><input type="text" id="f_unit" class="form-input"></div>
+                                <div>
+                                    <label class="form-label">Status</label>
+                                    <select id="f_status" class="form-input">
+                                        <option value="Active">Active</option>
+                                        <option value="Renewed">Renewed</option>
+                                        <option value="Resigned">Resigned</option>
+                                        <option value="Retired">Retired</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div class="p-4 bg-gray-50 border rounded grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -317,7 +327,7 @@
         "civil_status", "citizenship", "height", "weight", "blood_type", "gsis_id_no", 
         "pag_ibig_id_no", "philhealth_no", "sss_no", "tin_no", "agency_employee_no", 
         "residential_address", "permanent_address", "mobile_number", "email_address", 
-        "mobile_device_id", "laptop_device_id", "mobile_device", "schedule_type", "type"
+        "mobile_device_id", "laptop_device_id", "mobile_device", "schedule_type", "type", "status"
     ];
 
     window.onload = async () => {
@@ -430,6 +440,7 @@
         document.getElementById('pdsForm').reset();
         document.getElementById('pds_id').value = '';
         document.getElementById('f_schedule_type').value = 'Flexi';
+        document.getElementById('f_status').value = 'Active';
         document.getElementById('overrideBanner').classList.add('hidden');
         document.getElementById('overrideBanner').classList.remove('flex');
     }
