@@ -480,7 +480,11 @@
             }
         });
         
-        let mondays = Array.from(validMondays).sort((a,b) => new Date(b) - new Date(a)); 
+        // STRICT FILTER FOR CURRENT MONTH ONLY
+        const currentMonthPrefix = todayStr.substring(0, 7);
+        let mondays = Array.from(validMondays)
+            .filter(m => m.startsWith(currentMonthPrefix))
+            .sort((a,b) => new Date(b) - new Date(a)); 
 
         const [allFlagTravelRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
             fetchSafe(supabaseClient.from('itinerary').select('emp_id, travel_date')),
@@ -525,10 +529,7 @@
             let presentCount = 0;
             let expectedMondays = 0;
 
-            // Only evaluate mondays in the CURRENT MONTH
-            const currentMonthPrefix = todayStr.substring(0, 7);
-            
-            mondays.filter(m => m.startsWith(currentMonthPrefix)).forEach(m => {
+            mondays.forEach(m => {
                 const mDate = new Date(m);
                 mDate.setHours(0,0,0,0);
                 
@@ -738,7 +739,7 @@
             }
 
             const traceId = `TRC-${empId}-${Math.floor(Date.now() / 1000)}`;
-            const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: ${memoType}\nLevel: ${offenseText}\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+            const qrPayload = `DAR HRMO RECORD\nTrace: ${traceId}\nEmp: ${empId}\nType: ${memoTypeDb}\nDate: ${new Date().toLocaleDateString()}`;
             
             let qrContainer = document.getElementById('hiddenQrContainer');
             if (!qrContainer) {
@@ -751,7 +752,7 @@
             }
             qrContainer.innerHTML = '';
             
-            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
+            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100, correctLevel: QRCode.CorrectLevel.L });
             
             setTimeout(() => {
                 try {
@@ -866,7 +867,7 @@
             }
 
             const traceId = `TRC-FLAG-${empId}-${Math.floor(Date.now() / 1000)}`;
-            const qrPayload = `DAR CS1 HRMO OFFICIAL RECORD\nTrace ID: ${traceId}\nType: Non-Attendance to Flag Ceremony\nLevel: ${actionLevel}\nIssued To: ${empName} (${empId})\nGenerated: ${new Date().toLocaleString()}`;
+            const qrPayload = `DAR HRMO RECORD\nTrace: ${traceId}\nEmp: ${empId}\nType: Flag Ceremony\nLevel: ${actionLevel}\nDate: ${new Date().toLocaleDateString()}`;
             
             let qrContainer = document.getElementById('hiddenQrContainer');
             if (!qrContainer) {
@@ -879,7 +880,7 @@
             }
             qrContainer.innerHTML = '';
             
-            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100 });
+            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100, correctLevel: QRCode.CorrectLevel.L });
             
             setTimeout(() => {
                 try {
