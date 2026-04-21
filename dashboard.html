@@ -212,7 +212,7 @@
         const [travelItin, pso, leave, logs, scheduleOverrides] = await Promise.all([
             fetchSafe(supabaseClient.from('itinerary').select('to_no, destination').eq('travel_date', todayStr)),
             fetchSafe(supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr)),
-            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, type').eq('date', todayStr).eq('transaction_t', 'APPROVED')),
+            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, type').eq('start_date', todayStr).eq('transaction_type', 'APPROVED')),
             fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59')),
             fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr))
         ]);
@@ -253,7 +253,7 @@
 
                     if (overrideMap[e.emp_id]) {
                         if (overrideMap[e.emp_id].working_days) {
-                            expectedDays = overrideMap[e.emp_id].working_days.split(',');
+                            expectedDays = overrideMap[e.emp_id].working_days.split(',').map(d => d.trim());
                         }
                         if (overrideMap[e.emp_id].start_time) {
                             cutoffStr = overrideMap[e.emp_id].start_time;
@@ -298,7 +298,7 @@
             fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59')),
             fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr)),
             fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth)),
-            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startCurrMonth).lte('date', todayStr)),
+            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, start_date').eq('transaction_type', 'APPROVED').gte('start_date', startCurrMonth).lte('start_date', todayStr)),
             fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth))
         ]);
 
@@ -315,7 +315,7 @@
             const matchingItins = (histTravelItin.data || []).filter(i => i.to_no === to.to_no);
             matchingItins.forEach(itin => excused.add(to.emp_id + '_' + itin.travel_date));
         });
-        (histLeave.data || []).forEach(l => excused.add(l.emp_id + '_' + l.date));
+        (histLeave.data || []).forEach(l => excused.add(l.emp_id + '_' + l.start_date));
         (histPso.data || []).forEach(p => {
             let currD = new Date(p.start_date);
             let endD = new Date(p.end_date);
@@ -376,7 +376,7 @@
                 if (histOverrideMap[emp_id]) {
                     const override = histOverrideMap[emp_id].find(o => o.date === dateStr);
                     if (override && override.working_days) {
-                        expectedDays = override.working_days.split(',');
+                        expectedDays = override.working_days.split(',').map(d => d.trim());
                     }
                 }
                 
@@ -409,7 +409,7 @@
                 if (histOverrideMap[emp_id]) {
                     const override = histOverrideMap[emp_id].find(o => o.date === dateStr);
                     if (override) {
-                        if(override.working_days) expectedDays = override.working_days.split(',');
+                        if(override.working_days) expectedDays = override.working_days.split(',').map(d => d.trim());
                         startReqStr = override.start;
                         cutoffStr = override.start; 
                         overrideEndStr = override.end; 
@@ -521,7 +521,7 @@
 
         const [allFlagTravelItinRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
             fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date')),
-            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED')),
+            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, start_date').eq('transaction_type', 'APPROVED')),
             fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date'))
         ]);
         
@@ -534,7 +534,7 @@
             const matchingItins = (allFlagTravelItinRes.data || []).filter(i => i.to_no === to.to_no);
             matchingItins.forEach(itin => flagExcused.add(to.emp_id + '_' + itin.travel_date));
         });
-        (allFlagLeaveRes.data || []).forEach(l => flagExcused.add(l.emp_id + '_' + l.date));
+        (allFlagLeaveRes.data || []).forEach(l => flagExcused.add(l.emp_id + '_' + l.start_date));
         (allFlagPsoRes.data || []).forEach(p => {
             let currD = new Date(p.start_date);
             let endD = new Date(p.end_date);
