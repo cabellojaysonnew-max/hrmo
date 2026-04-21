@@ -40,10 +40,12 @@
     </div>
 
 <script>
-    // Redirect if already logged in based on unit
+    // Redirect if already logged in based on role and unit
     if (sessionStorage.getItem('currentUser')) {
         const user = JSON.parse(sessionStorage.getItem('currentUser'));
-        if (user.unit === 'BUDGET' || user.unit === 'ACCOUNTING') {
+        if (user.role && user.role.toUpperCase().includes('PSO ENCODER')) {
+            window.location.href = 'pso_encoder.html';
+        } else if (user.unit === 'BUDGET' || user.unit === 'ACCOUNTING') {
             window.location.href = 'finance_dashboard.html';
         } else {
             window.location.href = 'dashboard.html';
@@ -66,8 +68,10 @@
                 // Save user session
                 sessionStorage.setItem('currentUser', JSON.stringify(data));
                 
-                // Route based on unit
-                if (data.unit === 'BUDGET' || data.unit === 'ACCOUNTING') {
+                // Route based on role and unit (handles multi-role scenarios)
+                if (data.role && data.role.toUpperCase().includes('PSO ENCODER')) {
+                    window.location.href = 'pso_encoder.html';
+                } else if (data.unit === 'BUDGET' || data.unit === 'ACCOUNTING') {
                     window.location.href = 'finance_dashboard.html';
                 } else {
                     window.location.href = 'dashboard.html';
