@@ -81,7 +81,6 @@
     async function searchEmployees(query) {
         const resultsDiv = document.getElementById('searchResults');
         
-        // Reset hidden ID if user is typing manually
         document.getElementById('selectedEmpId').value = '';
 
         if (!query || query.length < 2) {
@@ -125,7 +124,6 @@
         document.getElementById('searchResults').classList.add('hidden');
     }
 
-    // Close dropdown if clicked outside
     document.addEventListener('click', function(e) {
         const searchInput = document.getElementById('employeeSearch');
         const searchResults = document.getElementById('searchResults');
@@ -133,10 +131,9 @@
             searchResults.classList.add('hidden');
         }
     });
-    // --------------------------------------
 
+    // --- Core Research Logic ---
     async function researchEmployee() {
-        // Use the hidden ID if they clicked a dropdown item, otherwise use what they typed
         const empId = document.getElementById('selectedEmpId').value || document.getElementById('employeeSearch').value.trim();
         const monthVal = document.getElementById('searchMonth').value;
         const statusMsg = document.getElementById('statusMsg');
@@ -158,7 +155,6 @@
         const endDate = `${year}-${month}-${daysInMonth}`;
 
         try {
-            // 1. Fetch Approved Travel Orders
             const { data: toData, error: toErr } = await supabaseClient
                 .from('travel_orders')
                 .select('to_no, status')
@@ -179,7 +175,6 @@
                 itineraries = itinData || [];
             }
 
-            // 2. Fetch PSOs
             const { data: psoData, error: psoErr } = await supabaseClient
                 .from('pso_records')
                 .select('*')
@@ -188,7 +183,6 @@
                 .gte('end_date', startDate);
             if (psoErr) throw psoErr;
 
-            // 3. Fetch Existing Claim Tags
             const { data: tagsData, error: tagsErr } = await supabaseClient
                 .from('financial_claims')
                 .select('*')
@@ -204,7 +198,6 @@
 
             let foundActivity = false;
 
-            // Build daily view
             for (let day = 1; day <= daysInMonth; day++) {
                 const currentDate = `${year}-${month}-${String(day).padStart(2, '0')}`;
                 
@@ -223,6 +216,11 @@
                 const tagRecord = existingTags[currentDate] || {};
                 const currentTag = tagRecord.acknowledged_type || '';
 
+                // Dynamic Button Styling
+                const btnClassTO = currentTag === 'TO' ? 'bg-[#003811] text-white border-[#003811]' : 'bg-green-50 text-[#003811] border-[#003811] hover:bg-green-100';
+                const btnClassPSO = currentTag === 'PSO' ? 'bg-blue-700 text-white border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-700 hover:bg-blue-100';
+                const btnClassVOID = currentTag === 'NONE' ? 'bg-red-600 text-white border-red-600' : 'bg-red-50 text-red-600 border-red-600 hover:bg-red-100';
+
                 const tr = document.createElement('tr');
                 tr.className = "border-b hover:bg-gray-50 transition-colors";
                 
@@ -238,12 +236,11 @@
                         ${hasConflict ? 'CONFLICT' : 'CLEAR'}
                     </td>
                     <td class="p-3 border">
-                        <select onchange="updateTag(this, '${empId}', '${currentDate}', this.value, '${toRef}', '${psoRef}')" class="w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:border-[#003811] ${currentTag ? 'bg-green-50 font-semibold' : ''}">
-                            <option value="">-- Select Tag --</option>
-                            ${dayTOs.length > 0 ? `<option value="TO" ${currentTag === 'TO' ? 'selected' : ''}>Acknowledge TO (${toRef})</option>` : ''}
-                            ${dayPSOs.length > 0 ? `<option value="PSO" ${currentTag === 'PSO' ? 'selected' : ''}>Acknowledge PSO (${psoRef})</option>` : ''}
-                            <option value="NONE" ${currentTag === 'NONE' ? 'selected' : ''}>Void Both / None</option>
-                        </select>
+                        <div class="flex flex-col gap-2">
+                            ${dayTOs.length > 0 ? `<button onclick="updateTag(this, '${empId}', '${currentDate}', 'TO', '${toRef}', '${psoRef}')" class="w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm ${btnClassTO}">Acknowledge TO</button>` : ''}
+                            ${dayPSOs.length > 0 ? `<button onclick="updateTag(this, '${empId}', '${currentDate}', 'PSO', '${toRef}', '${psoRef}')" class="w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm ${btnClassPSO}">Acknowledge PSO</button>` : ''}
+                            <button onclick="updateTag(this, '${empId}', '${currentDate}', 'NONE', '${toRef}', '${psoRef}')" class="w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm ${btnClassVOID}">Void Tag</button>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -263,7 +260,8 @@
         }
     }
 
-    async function updateTag(selectElement, empId, date, type, toRef, psoRef) {
+    // --- Interactive Tag Updating ---
+    async function updateTag(btnElement, empId, date, type, toRef, psoRef) {
         if(!type) return;
         
         let refNo = '';
@@ -282,8 +280,24 @@
 
             if (error) throw error;
             
-            // Apply visual feedback safely using the passed element
-            selectElement.classList.add('bg-green-50', 'font-semibold');
+            // Visual Update - Reset all buttons in this row to default unselected styles
+            const container = btnElement.parentElement;
+            const buttons = container.querySelectorAll('button');
+            
+            buttons.forEach(btn => {
+                if (btn.innerText.includes('TO')) {
+                    btn.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-green-50 text-[#003811] border-[#003811] hover:bg-green-100";
+                } else if (btn.innerText.includes('PSO')) {
+                    btn.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-700 hover:bg-blue-100";
+                } else if (btn.innerText.includes('Void')) {
+                    btn.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-red-50 text-red-600 border-red-600 hover:bg-red-100";
+                }
+            });
+
+            // Apply solid active style to the strictly clicked button
+            if (type === 'TO') btnElement.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-[#003811] text-white border-[#003811]";
+            if (type === 'PSO') btnElement.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-blue-700 text-white border-blue-700";
+            if (type === 'NONE') btnElement.className = "w-full text-left px-3 py-2 border rounded text-sm font-semibold transition-colors shadow-sm bg-red-600 text-white border-red-600";
 
         } catch (error) {
             alert("Error saving tag: " + error.message);
