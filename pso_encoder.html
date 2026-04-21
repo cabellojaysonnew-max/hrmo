@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SO Encoder - DAR HRMO</title>
+    <title>Special Orders Encoder - DAR HRMO</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -23,14 +23,13 @@
         :root { --dar-green: #003811; --dar-gold: #D4AF37; }
         body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
         
-        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
-        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; overflow: hidden; }
+        .form-input { width: 100%; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; color: #1f2937; }
         .form-input:focus { outline: none; border-color: var(--dar-green); box-shadow: 0 0 0 1px var(--dar-green); }
         .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--dar-green); margin-bottom: 0.25rem; text-transform: uppercase; }
         
-        .btn-primary { background-color: var(--dar-green); color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; padding: 0.5rem 1rem; font-size: 0.875rem; transition: 0.2s; }
-        .btn-primary:hover { background-color: #002200; }
-        .btn-primary:active { transform: scale(0.98); }
+        .btn-dark { background-color: #1F2937; color: white; border-radius: 0.375rem; font-weight: bold; text-transform: uppercase; transition: 0.2s; text-align: center; cursor: pointer; }
+        .btn-dark:hover { background-color: #111827; }
         
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -41,14 +40,16 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .modal-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .modal-box { background: white; width: 100%; max-width: 900px; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
-        .chk-day, .w-Nth { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; }
+        .modal-box { background: white; width: 100%; max-width: 1000px; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
+        input[type="checkbox"] { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 hidden md:block border-b border-[#006400]">
+    <nav class="bg-[#003811] w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 border-b border-[#006400]">
             <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold">SO ENCODER</p>
         </div>
@@ -62,7 +63,7 @@
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">REPORTS</a>
             <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400] transition-colors">USERS</a>
         </div>
-        <div class="p-4 bg-black/20 hidden md:block">
+        <div class="p-4 bg-black/20">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
             <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
         </div>
@@ -70,25 +71,20 @@
 
     <main class="flex-1 flex flex-col h-full bg-[#F3F4F6] relative">
         
-        <div class="p-8 pb-4 flex justify-between items-end border-b border-gray-200 bg-white shadow-sm z-10 shrink-0">
-            <div>
-                <h2 class="text-3xl font-bold text-[#003811]">SO Encoder</h2>
-            </div>
-            <button onclick="openManageModal()" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold px-6 py-2.5 rounded transition uppercase tracking-widest shadow-sm">
-                Manage Active ORDERS
+        <div class="p-8 pb-4 flex justify-between items-center border-b border-gray-200 bg-white shrink-0">
+            <h2 class="text-3xl font-bold text-[#003811]">Special Orders Encoder</h2>
+            <button onclick="openManageModal()" class="bg-white border border-[#003811] text-[#003811] hover:bg-gray-50 px-4 py-2 font-bold rounded uppercase text-xs flex items-center gap-2 transition">
+                ⚙️ MANAGE ACTIVE ORDERS
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-8">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-screen-2xl mx-auto items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 
-                <div class="lg:col-span-4 flex flex-col gap-6">
+                <div class="flex flex-col gap-6">
                     <div class="card p-6">
                         <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4">1. Document Details</h2>
-                        <div class="mb-4">
-                            <label class="form-label">Subject / Purpose</label>
-                            <input type="text" id="soSubject" placeholder="e.g., QMS Audit Deployment" class="form-input font-semibold text-gray-800">
-                        </div>
+                        
                         <div class="grid grid-cols-3 gap-4 mb-4">
                             <div class="col-span-1">
                                 <label class="form-label">Type</label>
@@ -98,27 +94,31 @@
                                     <option value="PSO">PSO</option>
                                 </select>
                             </div>
-                            <div class="col-span-2">
-                                <label class="form-label">Control Number</label>
+                            <div class="col-span-1">
+                                <label class="form-label text-[10px]">SO/RSO/PSO No.</label>
                                 <input type="number" id="soNumber" placeholder="e.g., 220" class="form-input font-bold text-[#003811]">
+                            </div>
+                            <div class="col-span-1">
+                                <label class="form-label">Series</label>
+                                <input type="number" id="soYear" class="form-input font-bold text-[#003811]">
                             </div>
                         </div>
                         <div>
-                            <label class="form-label">Series Year</label>
-                            <input type="number" id="soYear" class="form-input font-bold text-[#003811]">
+                            <label class="form-label">Subject / Purpose</label>
+                            <input type="text" id="soSubject" placeholder="e.g., QMS Audit Deployment" class="form-input font-semibold text-gray-800">
                         </div>
                     </div>
 
                     <div class="card p-6 flex-grow">
                         <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4">2. Schedule Engine</h2>
-                        <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold mb-4 text-[#003811]">
+                        
+                        <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold text-sm mb-4 border-[#D4AF37] bg-[#fdfbf7]">
                             <option value="single">One Day Only</option>
-                            <option value="range">Date Range (Consecutive Days)</option>
-                            <option value="recur_week">Weekly Recurrence (e.g., Every Mon/Fri)</option>
-                            <option value="recur_month_spec" selected>Monthly Recurrence (e.g., 1st & 3rd Friday)</option>
+                            <option value="range">Range</option>
+                            <option value="repetitive">Repeatitive</option>
                         </select>
 
-                        <div id="ui-single" class="sched-ui space-y-4 hidden">
+                        <div id="ui-single" class="sched-ui space-y-4">
                             <div><label class="form-label text-xs">Select Date</label><input type="date" id="dSingle" class="form-input"></div>
                         </div>
 
@@ -129,50 +129,33 @@
                             </div>
                         </div>
 
-                        <div id="ui-recur_week" class="sched-ui space-y-4 hidden">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div><label class="form-label text-xs">Start Date</label><input type="date" id="wStart" class="form-input"></div>
-                                <div><label class="form-label text-xs">End Date</label><input type="date" id="wEnd" class="form-input"></div>
+                        <div id="ui-repetitive" class="sched-ui space-y-4 hidden">
+                            <div>
+                                <label class="form-label text-xs">Start Date</label>
+                                <input type="date" id="repStart" class="form-input">
                             </div>
                             <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                                <label class="form-label mb-2 border-b pb-1">Days of the Week</label>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="chk-day"> Monday</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="chk-day"> Tuesday</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="chk-day"> Wednesday</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="chk-day"> Thursday</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="chk-day"> Friday</label>
+                                <label class="text-[10px] font-bold text-[#003811] uppercase mb-2 block border-b pb-1">Week/s</label>
+                                <div class="grid grid-cols-5 gap-2 mb-3">
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="rep-week"> 1st</label>
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="rep-week"> 2nd</label>
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="rep-week"> 3rd</label>
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="rep-week"> 4th</label>
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="rep-week"> 5th</label>
+                                </div>
+                                <label class="text-[10px] font-bold text-[#003811] uppercase mb-2 block border-b pb-1">Day/s</label>
+                                <div class="grid grid-cols-5 gap-2">
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="rep-day"> M</label>
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="rep-day"> T</label>
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="rep-day"> W</label>
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="rep-day"> Th</label>
+                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="rep-day"> F</label>
                                 </div>
                             </div>
+                            <p class="text-[10px] text-gray-500 italic">* Ends only upon cancellation.</p>
                         </div>
 
-                        <div id="ui-recur_month_spec" class="sched-ui space-y-4">
-                            <div>
-                                <label class="form-label text-xs">Target Month</label>
-                                <input type="month" id="mTargetMonth" class="form-input">
-                            </div>
-                            
-                            <div>
-                                <label class="form-label text-xs mb-2">Occurrences (Check all that apply)</label>
-                                <div class="grid grid-cols-3 gap-2 mb-3">
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="chk-nth"> 1st</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="chk-nth"> 2nd</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="chk-nth"> 3rd</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="chk-nth"> 4th</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="chk-nth"> Last</label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="form-label text-xs">Target Day</label>
-                                <select id="mTargetDay" class="form-input text-xs font-bold text-[#003811] p-2">
-                                    <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
-                                    <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <button onclick="generateDates()" class="w-full bg-gray-800 text-white font-bold py-3 mt-4 rounded uppercase text-xs transition hover:bg-gray-900">COMPUTE DATES</button>
+                        <button onclick="generateDates()" class="btn-dark w-full mt-4 py-3">COMPUTE DATES</button>
                         
                         <div id="computedDatesLabel" class="mt-4 text-xs font-bold text-gray-500 uppercase h-16 overflow-y-auto">
                             NO DATES COMPUTED YET.
@@ -180,16 +163,16 @@
                     </div>
                 </div>
 
-                <div class="lg:col-span-4 flex flex-col h-full">
+                <div class="flex flex-col h-full">
                     <div class="card p-6 flex flex-col h-[calc(100vh-140px)]">
                         <h2 class="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 pb-2 mb-4 shrink-0">3. Personnel Extractor</h2>
                         
-                        <div class="mb-4 shrink-0 bg-green-50/50 p-4 border border-green-100 rounded">
-                            <label class="form-label text-xs">Upload or Paste (Ctrl+V)</label>
-                            <p class="text-[10px] text-gray-500 mb-2">Select a PDF/Image, or paste a screenshot directly onto this page.</p>
-                            <input type="file" id="fileUpload" accept="image/*,application/pdf" class="w-full text-xs mb-3 bg-white border border-gray-300 p-2 rounded cursor-pointer">
+                        <div class="mb-4 shrink-0 bg-gray-50 p-4 border border-gray-200 rounded">
+                            <label class="form-label text-xs">Upload PDF/Image or Paste</label>
+                            <p class="text-[10px] text-gray-500 mb-2">You can select multiple files or press <b>Ctrl+V</b> repeatedly to add to the list.</p>
+                            <input type="file" id="fileUpload" accept="image/*,application/pdf" multiple class="w-full text-xs mb-3 bg-white border border-gray-300 p-2 rounded cursor-pointer">
                             <button id="extractBtn" onclick="runExtraction()" class="w-full bg-white border border-[#003811] text-[#003811] py-2 rounded text-xs font-bold uppercase hover:bg-green-50 transition disabled:opacity-50">
-                                Extract File Content
+                                Extract Text
                             </button>
                             <p id="extractStatus" class="text-[10px] text-center mt-2 font-bold text-[#003811]"></p>
                         </div>
@@ -197,18 +180,17 @@
                         <div class="flex-grow flex flex-col min-h-0">
                             <label class="form-label text-xs flex justify-between items-end">
                                 <span>Raw Text Data</span>
-                                <span class="text-gray-400 font-normal normal-case text-[10px]">(Review & Edit before matching)</span>
                             </label>
-                            <textarea id="rawText" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs font-mono bg-gray-50 outline-none focus:border-[#003811] resize-none mb-4" placeholder="Paste text here, or use the extractor above..."></textarea>
+                            <textarea id="rawText" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs font-mono bg-white outline-none focus:border-[#003811] resize-none mb-4" placeholder="Text will appear here..."></textarea>
                             
-                            <button onclick="matchPersonnel()" class="w-full bg-[#003811] text-white py-3 rounded text-sm font-bold uppercase tracking-widest hover:bg-[#002200] transition flex items-center justify-center gap-2 shrink-0">
+                            <button onclick="matchPersonnel()" class="btn-dark w-full py-3 shrink-0">
                                 MATCH PERSONNEL
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div class="lg:col-span-4 flex flex-col h-full">
+                <div class="flex flex-col h-full">
                     <div class="card p-6 flex flex-col h-[calc(100vh-140px)]">
                         <div class="flex justify-between items-center border-b border-gray-100 pb-2 mb-4 shrink-0">
                             <h2 class="form-label text-gray-500 mb-0">4. Validation Payload</h2>
@@ -224,7 +206,7 @@
 
                         <div id="unmatchedAlert" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded text-xs font-bold text-red-700 h-32 overflow-y-auto shrink-0">
                             <span class="block uppercase border-b border-red-200 pb-1 mb-1">⚠️ Unrecognized Text:</span>
-                            <div id="unmatchedList" class="space-y-1"></div>
+                            <div id="unmatchedList" class="space-y-1 font-mono text-[10px]"></div>
                         </div>
 
                         <button onclick="commitToDatabase()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shrink-0 mt-auto">
@@ -245,14 +227,14 @@
             </div>
             
             <div class="p-6 flex flex-col h-full overflow-hidden">
-                <div class="flex gap-2 mb-4 shrink-0 bg-white p-4 rounded border border-gray-200">
-                    <input type="text" id="searchSoInput" placeholder="Enter Full Control No (e.g., RSO 220 series of 2026)" class="flex-grow p-2 border border-gray-300 rounded text-sm font-bold outline-none focus:border-[#003811]">
+                <div class="flex gap-2 mb-4 shrink-0 bg-white p-4 rounded border border-gray-200 shadow-sm">
+                    <input type="text" id="searchSoInput" placeholder="Enter Full No (e.g., RSO 220 series of 2026)" class="flex-grow p-2 border border-gray-300 rounded text-sm font-bold outline-none focus:border-[#003811]">
                     <button onclick="searchSO()" class="bg-[#003811] text-white px-6 font-bold uppercase rounded hover:bg-[#002200]">Search</button>
                 </div>
 
-                <div id="soSearchResults" class="flex-grow bg-white rounded border border-gray-200 overflow-hidden flex flex-col">
+                <div id="soSearchResults" class="flex-grow bg-white rounded border border-gray-200 overflow-hidden flex flex-col shadow-sm">
                     <div class="h-full flex items-center justify-center text-gray-400 text-sm font-bold uppercase p-8 text-center">
-                        Enter an exact SO Number to view and manage participants and schedules.
+                        Enter an exact Number to view and manage participants and schedules.
                     </div>
                 </div>
             </div>
@@ -294,7 +276,7 @@
                     const blob = item.getAsFile();
                     const status = document.getElementById('extractStatus');
                     status.innerText = "Pasted image detected. Running OCR...";
-                    runExtraction(blob); // Pass the blob directly
+                    runExtraction(blob); 
                     break;
                 }
             }
@@ -324,40 +306,43 @@
                     }
                 }
             } 
-            else if (type === 'recur_week') {
-                const stStr = document.getElementById('wStart').value;
-                const enStr = document.getElementById('wEnd').value;
-                const checkedDays = Array.from(document.querySelectorAll('.chk-day:checked')).map(cb => parseInt(cb.value));
+            else if (type === 'repetitive') {
+                const stStr = document.getElementById('repStart').value;
+                const checkedWeeks = Array.from(document.querySelectorAll('.rep-week:checked')).map(cb => parseInt(cb.value));
+                const checkedDays = Array.from(document.querySelectorAll('.rep-day:checked')).map(cb => parseInt(cb.value));
 
-                if (stStr && enStr && checkedDays.length > 0) {
+                if (stStr && checkedWeeks.length > 0 && checkedDays.length > 0) {
                     let st = new Date(stStr);
-                    let en = new Date(enStr);
-                    while (st <= en) {
-                        if (checkedDays.includes(st.getDay())) computedDates.push(st.toISOString().split('T')[0]);
-                        st.setDate(st.getDate() + 1);
-                    }
-                }
-            }
-            else if (type === 'recur_month_spec') {
-                const monthStr = document.getElementById('mTargetMonth').value;
-                const targetDay = parseInt(document.getElementById('mTargetDay').value);
-                const checkedNths = Array.from(document.querySelectorAll('.chk-nth:checked')).map(cb => parseInt(cb.value));
+                    // Project 1 year into the future
+                    let en = new Date(st);
+                    en.setFullYear(en.getFullYear() + 1);
+                    
+                    let current = new Date(st.getFullYear(), st.getMonth(), 1);
+                    
+                    while (current <= en) {
+                        const year = current.getFullYear();
+                        const month = current.getMonth();
+                        const daysInMonth = new Date(year, month + 1, 0).getDate();
+                        
+                        // Counts occurrence of a specific weekday in the current month
+                        let dayCounts = { 1:0, 2:0, 3:0, 4:0, 5:0 };
 
-                if (monthStr && checkedNths.length > 0) {
-                    const [yy, mm] = monthStr.split('-').map(Number);
-                    const daysInMonth = new Date(yy, mm, 0).getDate();
-                    let count = 0; let lastDateFound = null;
-
-                    for (let d = 1; d <= daysInMonth; d++) {
-                        let iterDate = new Date(yy, mm - 1, d);
-                        if (iterDate.getDay() === targetDay) {
-                            count++; lastDateFound = iterDate;
-                            if (checkedNths.includes(count)) computedDates.push(iterDate.toISOString().split('T')[0]);
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            let iterDate = new Date(year, month, d);
+                            let dayOfWeek = iterDate.getDay();
+                            
+                            // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri
+                            if (checkedDays.includes(dayOfWeek)) {
+                                dayCounts[dayOfWeek]++;
+                                // Check if current occurrence is selected in weeks
+                                if (checkedWeeks.includes(dayCounts[dayOfWeek])) {
+                                    if (iterDate >= st && iterDate <= en) {
+                                        computedDates.push(iterDate.toISOString().split('T')[0]);
+                                    }
+                                }
+                            }
                         }
-                    }
-                    if (checkedNths.includes(5) && lastDateFound) {
-                        const lastIso = lastDateFound.toISOString().split('T')[0];
-                        if (!computedDates.includes(lastIso)) computedDates.push(lastIso);
+                        current.setMonth(current.getMonth() + 1);
                     }
                 }
             }
@@ -366,7 +351,7 @@
             if(computedDates.length === 0) {
                 label.innerHTML = "<span class='text-red-500'>Missing parameters or invalid selection.</span>";
             } else {
-                label.innerHTML = `<span class="text-[#003811]">${computedDates.length} DATES COMPUTED:</span><br><span class="font-normal text-gray-700">${computedDates.join(', ')}</span>`;
+                label.innerHTML = `<span class="text-[#003811]">${computedDates.length} DATES COMPUTED:</span><br><span class="font-normal text-gray-700 leading-tight">${computedDates.join(', ')}</span>`;
             }
         }
 
@@ -377,42 +362,49 @@
             const textArea = document.getElementById('rawText');
             const status = document.getElementById('extractStatus');
 
-            let file = pastedFile;
-            if (!file) {
+            let filesToProcess = [];
+            if (pastedFile) {
+                filesToProcess.push(pastedFile);
+            } else {
                 if (!fileInput.files.length) return alert("Please select a file or paste an image (Ctrl+V).");
-                file = fileInput.files[0];
+                filesToProcess = Array.from(fileInput.files);
             }
             
             btn.disabled = true;
-            if(!pastedFile) status.innerText = "Analyzing file...";
+            status.innerText = "Analyzing file(s)...";
             
             try {
-                if (file.type === "application/pdf") {
-                    status.innerText = "Reading PDF Text layer...";
-                    let text = await extractNativePDFText(file);
-                    
-                    // Fallback to OCR if PDF has no digital text (scanned image)
-                    if (text.trim().length < 50) {
-                        status.innerText = "Scanned PDF detected. Running OCR. This may take a minute...";
-                        text = await extractOCRFromPDF(file);
+                for (let file of filesToProcess) {
+                    let text = '';
+                    if (file.type === "application/pdf") {
+                        status.innerText = `Reading PDF (${file.name})...`;
+                        text = await extractNativePDFText(file);
+                        
+                        // Fallback to OCR if PDF has no digital text (scanned image)
+                        if (text.trim().length < 50) {
+                            status.innerText = `Scanned PDF detected. Running OCR...`;
+                            text = await extractOCRFromPDF(file);
+                        }
+                    } else if (file.type.startsWith("image/")) {
+                        status.innerText = `Running OCR on Image...`;
+                        const worker = await Tesseract.createWorker('eng');
+                        const ret = await worker.recognize(file);
+                        await worker.terminate();
+                        text = ret.data.text;
+                    } else {
+                        console.warn("Unsupported format:", file.type);
+                        continue;
                     }
-                    
                     textArea.value = textArea.value + (textArea.value ? "\n\n" : "") + text;
-                } else if (file.type.startsWith("image/")) {
-                    status.innerText = "Running OCR on Image...";
-                    const worker = await Tesseract.createWorker('eng');
-                    const ret = await worker.recognize(file);
-                    await worker.terminate();
-                    textArea.value = textArea.value + (textArea.value ? "\n\n" : "") + ret.data.text;
-                } else {
-                    throw new Error("Unsupported format. Use PDF or Image.");
                 }
-                status.innerText = "Extraction complete! Please review raw text.";
+                status.innerText = "Extraction complete! You can upload/paste more to add to the list.";
             } catch (err) {
                 status.innerText = "Extraction Failed.";
                 alert(err.message);
             } finally {
                 btn.disabled = false;
+                // Reset file input so same file can be selected again if needed
+                if(!pastedFile) fileInput.value = '';
             }
         }
 
@@ -454,7 +446,7 @@
             const text = document.getElementById('rawText').value;
             if(!text.trim()) return alert("No raw text to process.");
 
-            // Advanced chunking to ignore numbers/punctuation
+            // Chunking: newlines, commas, double spaces
             let chunks = text.split(/[\n,;]+|\s{2,}/).map(f => f.trim().replace(/[^a-zA-ZÑñ. -]/g, '')).filter(f => f.length > 4);
 
             const fuse = new Fuse(employees, {
@@ -518,12 +510,12 @@
 
         // --- Database Encode ---
         async function commitToDatabase() {
-            const subj = document.getElementById('soSubject').value.trim();
             const type = document.getElementById('soType').value;
             const no = document.getElementById('soNumber').value;
             const yr = document.getElementById('soYear').value;
+            const subj = document.getElementById('soSubject').value.trim();
 
-            if(!subj || !no || !yr) return alert("Subject, Control No, and Year are required.");
+            if(!no || !yr || !subj) return alert("Type, Number, Year, and Subject are required.");
             if(computedDates.length === 0) return alert("Compute Schedule Dates first.");
             if(matchedPersonnel.length === 0) return alert("Match at least one participant.");
 
@@ -566,7 +558,7 @@
         function openManageModal() { document.getElementById('manageModal').classList.remove('hidden'); }
         function closeManageModal() { 
             document.getElementById('manageModal').classList.add('hidden'); 
-            document.getElementById('soSearchResults').innerHTML = '<div class="h-full flex items-center justify-center text-gray-400 text-sm font-bold uppercase p-8 text-center">Enter an exact SO Number to view and manage participants and schedules.</div>'; 
+            document.getElementById('soSearchResults').innerHTML = '<div class="h-full flex items-center justify-center text-gray-400 text-sm font-bold uppercase p-8 text-center">Enter an exact Number to view and manage participants and schedules.</div>'; 
             document.getElementById('searchSoInput').value = ''; 
             activeManageSO = ""; 
         }
