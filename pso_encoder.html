@@ -3,12 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DAR SO Encoder Pro</title>
+    <title>DAR SO Encoder Pro v2</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js"></script>
+    
+    <script>
+        // Configure PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
     <style>
         :root { --dar-green: #003811; --dar-gold: #D4AF37; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #f3f4f6; }
@@ -18,11 +26,15 @@
         .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
         ::-webkit-scrollbar { display: none; }
         
-        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid var(--dar-green); width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid var(--dar-green); width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .modal-fade { animation: fadeIn 0.2s ease-in-out; } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .modal-box { background: white; width: 100%; max-width: 600px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
     </style>
 </head>
-<body class="h-[100dvh] w-full flex flex-col overflow-hidden text-gray-800 bg-slate-200 lg:p-4">
+<body class="h-[100dvh] w-full flex flex-col overflow-hidden text-gray-800 bg-slate-200 lg:p-4 relative">
 
     <div id="app" class="w-full h-full lg:max-w-7xl mx-auto flex flex-col relative shadow-2xl bg-white lg:rounded-3xl overflow-hidden">
         
@@ -31,9 +43,10 @@
                 <span class="text-2xl">📜</span>
                 <div>
                     <h1 class="font-bold text-lg leading-tight tracking-wide">SPECIAL ORDER ENCODER</h1>
-                    <p class="text-[10px] text-dar-gold font-bold uppercase tracking-widest">Intelligent Parsing System</p>
+                    <p class="text-[10px] text-dar-gold font-bold uppercase tracking-widest">Intelligent Parsing System v2</p>
                 </div>
             </div>
+            <button onclick="openManageModal()" class="bg-white/20 hover:bg-white/30 text-xs font-bold px-4 py-2 rounded-full transition uppercase tracking-wider">Manage / Cancel SO</button>
         </header>
 
         <main class="flex-grow w-full overflow-y-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -41,6 +54,10 @@
             <div class="space-y-6 flex flex-col h-full">
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">1. Document Details</h2>
+                    <div class="mb-3">
+                        <label class="text-[10px] font-black text-dar uppercase mb-1 block">Subject / Purpose</label>
+                        <input type="text" id="soSubject" placeholder="e.g., QMS Audit Deployment" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-dar">
+                    </div>
                     <div class="grid grid-cols-3 gap-3 mb-3">
                         <div class="col-span-1">
                             <label class="text-[10px] font-black text-dar uppercase mb-1 block">Type</label>
@@ -52,7 +69,7 @@
                         </div>
                         <div class="col-span-2">
                             <label class="text-[10px] font-black text-dar uppercase mb-1 block">Control Number</label>
-                            <input type="number" id="soNumber" placeholder="e.g., 220" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-dar">
+                            <input type="text" id="soNumber" placeholder="220" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-dar">
                         </div>
                     </div>
                     <div>
@@ -66,8 +83,8 @@
                     <select id="scheduleType" onchange="toggleScheduleUI()" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 text-dar outline-none mb-4">
                         <option value="single">One Day Only</option>
                         <option value="range">Date Range (Consecutive Days)</option>
-                        <option value="recur_date">Recurrence: Specific Date Every Month</option>
-                        <option value="recur_week">Recurrence: Specific Weekdays of Month</option>
+                        <option value="recur_week">Weekly Recurrence (e.g., Every Mon/Fri)</option>
+                        <option value="recur_month_spec">Monthly Recurrence (e.g., 1st & 3rd Friday)</option>
                     </select>
 
                     <div id="ui-single" class="sched-ui space-y-3">
@@ -81,15 +98,27 @@
                         </div>
                     </div>
 
-                    <div id="ui-recur_date" class="sched-ui space-y-3 hidden">
-                        <div class="grid grid-cols-2 gap-3">
-                            <div><label class="text-[10px] font-black text-slate-500 uppercase">Target Month</label><input type="month" id="rMonth" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50"></div>
-                            <div><label class="text-[10px] font-black text-slate-500 uppercase">Day of Month</label><input type="number" id="rDay" placeholder="e.g., 15" min="1" max="31" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50"></div>
+                    <div id="ui-recur_week" class="sched-ui space-y-4 hidden">
+                        <div><label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Start Date</label><input type="date" id="wStart" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50 mb-3"></div>
+                        <div>
+                            <label class="text-[10px] font-black text-dar uppercase mb-2 block border-b pb-1">Select Days (Check all that apply)</label>
+                            <div class="grid grid-cols-2 gap-2 mb-3">
+                                <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="1" class="chk-day w-4 h-4 text-dar"> Monday</label>
+                                <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="2" class="chk-day w-4 h-4 text-dar"> Tuesday</label>
+                                <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="3" class="chk-day w-4 h-4 text-dar"> Wednesday</label>
+                                <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="4" class="chk-day w-4 h-4 text-dar"> Thursday</label>
+                                <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" value="5" class="chk-day w-4 h-4 text-dar"> Friday</label>
+                            </div>
                         </div>
+                        <div class="flex items-center gap-2 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                            <input type="checkbox" id="wUntilCancelled" onchange="toggleUntilCancelled('wEnd')" class="w-4 h-4 text-dar">
+                            <label class="text-xs font-black text-yellow-800 uppercase">Continue Until Cancelled</label>
+                        </div>
+                        <div id="wEndWrapper"><label class="text-[10px] font-black text-slate-500 uppercase block mb-1">End Date</label><input type="date" id="wEnd" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50"></div>
                     </div>
 
-                    <div id="ui-recur_week" class="sched-ui space-y-4 hidden">
-                        <div><label class="text-[10px] font-black text-slate-500 uppercase">Target Month</label><input type="month" id="wMonth" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50 mb-3"></div>
+                    <div id="ui-recur_month_spec" class="sched-ui space-y-4 hidden">
+                        <div><label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Start Date</label><input type="date" id="mStart" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50 mb-3"></div>
                         <div>
                             <label class="text-[10px] font-black text-dar uppercase mb-2 block border-b pb-1">Occurrences (Check all that apply)</label>
                             <div class="grid grid-cols-3 gap-2 mb-3">
@@ -100,15 +129,20 @@
                                 <label class="flex items-center gap-1 text-xs font-bold"><input type="checkbox" value="5" class="w-Nth"> Last</label>
                             </div>
                             <label class="text-[10px] font-black text-dar uppercase mb-1 block">Target Day</label>
-                            <select id="wDay" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 outline-none">
+                            <select id="mDay" class="w-full p-2.5 border rounded-lg text-sm font-bold bg-slate-50 outline-none mb-3">
                                 <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
                                 <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
                             </select>
                         </div>
+                        <div class="flex items-center gap-2 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                            <input type="checkbox" id="mUntilCancelled" onchange="toggleUntilCancelled('mEnd')" class="w-4 h-4 text-dar">
+                            <label class="text-xs font-black text-yellow-800 uppercase">Continue Until Cancelled</label>
+                        </div>
+                        <div id="mEndWrapper"><label class="text-[10px] font-black text-slate-500 uppercase block mb-1">End Date</label><input type="date" id="mEnd" class="w-full p-2.5 border rounded-lg text-sm bg-slate-50"></div>
                     </div>
 
-                    <button onclick="generateDates()" class="w-full mt-5 bg-slate-800 text-white py-3 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition">Compute Dates</button>
-                    <div id="computedDatesLabel" class="mt-3 text-[10px] text-slate-500 font-bold uppercase leading-relaxed h-12 overflow-y-auto">No dates computed yet.</div>
+                    <button onclick="generateDates()" class="w-full mt-5 bg-slate-800 text-white py-3 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition shadow">Compute Dates</button>
+                    <div id="computedDatesLabel" class="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-600 font-bold uppercase leading-relaxed h-20 overflow-y-auto">No dates computed yet.</div>
                 </div>
             </div>
 
@@ -116,26 +150,26 @@
                 <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">3. Personnel Extractor</h2>
                 
                 <div class="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                    <label class="text-[10px] font-black text-dar uppercase mb-2 block">Extract from Image/Print Screen</label>
-                    <input type="file" id="imageUpload" accept="image/*" class="w-full text-xs mb-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-dar file:text-white hover:file:bg-slate-800 transition">
-                    <button id="ocrBtn" onclick="runOCR()" class="w-full border-2 border-dar text-dar py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-dar hover:text-white transition disabled:opacity-50">Scan Image</button>
+                    <label class="text-[10px] font-black text-dar uppercase mb-2 block">Extract from PDF or Image</label>
+                    <input type="file" id="fileUpload" accept="image/*,application/pdf" class="w-full text-xs mb-3 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-dar file:text-white hover:file:bg-slate-800 transition">
+                    <button id="extractBtn" onclick="runExtraction()" class="w-full border-2 border-dar text-dar py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-dar hover:text-white transition disabled:opacity-50">Extract Content</button>
                 </div>
 
                 <div class="flex-grow flex flex-col">
                     <label class="text-[10px] font-black text-dar uppercase mb-2 block flex justify-between">
                         <span>Raw Text Data</span>
-                        <span class="text-slate-400 font-normal normal-case">(Paste text or view OCR output)</span>
+                        <span class="text-slate-400 font-normal normal-case">(Review & Edit before matching)</span>
                     </label>
-                    <textarea id="rawText" class="w-full flex-grow p-3 border border-slate-200 rounded-xl text-xs font-mono bg-slate-50 outline-none focus:ring-2 focus:ring-dar resize-none mb-4" placeholder="Paste list of names here, separated by commas or newlines..."></textarea>
+                    <textarea id="rawText" class="w-full flex-grow p-3 border border-slate-200 rounded-xl text-xs font-mono bg-slate-50 outline-none focus:ring-2 focus:ring-dar resize-none mb-4" placeholder="Paste list of names here, or use the extractor above..."></textarea>
                     
-                    <button onclick="matchPersonnel()" class="w-full btn-primary py-3.5 text-xs tracking-widest shadow-md">Match Against Database</button>
+                    <button onclick="matchPersonnel()" class="w-full btn-primary py-3.5 text-xs tracking-widest shadow-md flex items-center justify-center gap-2"><span class="text-lg">🧠</span> Intelligent Match</button>
                 </div>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full relative">
                 <div class="flex justify-between items-center border-b pb-2 mb-4">
                     <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">4. Validation Payload</h2>
-                    <span id="matchCount" class="bg-green-100 text-green-800 text-[10px] font-black px-2 py-1 rounded">0 MATCHED</span>
+                    <span id="matchCount" class="bg-green-100 text-green-800 text-[10px] font-black px-2 py-1 rounded shadow-sm">0 MATCHED</span>
                 </div>
                 
                 <div class="flex-grow overflow-y-auto no-scrollbar space-y-2 mb-4" id="matchedList">
@@ -145,7 +179,7 @@
                     </div>
                 </div>
 
-                <div id="unmatchedAlert" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-[10px] font-bold text-red-700 h-24 overflow-y-auto">
+                <div id="unmatchedAlert" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-[10px] font-bold text-red-700 h-24 overflow-y-auto shadow-inner">
                     <span class="block uppercase border-b border-red-200 pb-1 mb-1 tracking-widest">⚠️ Unrecognized Fragments:</span>
                     <div id="unmatchedList"></div>
                 </div>
@@ -157,6 +191,24 @@
         </main>
     </div>
 
+    <div id="manageModal" class="hidden modal-overlay modal-fade">
+        <div class="modal-box max-w-2xl bg-slate-50">
+            <div class="p-5 border-b flex justify-between items-center bg-white shrink-0 rounded-t-2xl">
+                <h2 class="font-black text-dar uppercase text-sm tracking-widest">Manage / Cancel Active SO</h2>
+                <button onclick="closeManageModal()" class="text-slate-400 hover:text-red-500 text-2xl font-light leading-none">✕</button>
+            </div>
+            <div class="p-6">
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="searchSoInput" placeholder="Enter Full SO Number (e.g., RSO 220 series of 2026)" class="flex-grow p-3 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-dar">
+                    <button onclick="searchSO()" class="btn-primary px-6 text-xs tracking-widest rounded-xl">Search</button>
+                </div>
+                <div id="soSearchResults" class="bg-white rounded-xl border border-slate-200 h-64 overflow-y-auto p-4 flex flex-col items-center justify-center text-slate-400 text-xs font-bold uppercase">
+                    Enter an SO number to find related records.
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // --- Initialization & Setup ---
         const SB_URL = "https://ytfpiyfapvybihlngxks.supabase.co";
@@ -166,12 +218,13 @@
         let employees = [];
         let computedDates = [];
         let matchedPersonnel = [];
+        let activeScheduleRule = ""; // To save alongside the record
 
         document.getElementById('soYear').value = new Date().getFullYear();
 
         // Fetch Employees on load
         async function fetchEmployees() {
-            const { data, error } = await db.from('employees').select('emp_id, full_name, unit, position');
+            const { data, error } = await db.from('employees').select('emp_id, full_name, unit, division, position');
             if (!error && data) employees = data;
         }
         fetchEmployees();
@@ -182,13 +235,37 @@
             document.getElementById('ui-' + document.getElementById('scheduleType').value).classList.remove('hidden');
         }
 
+        function toggleUntilCancelled(endInputId) {
+            const wrapper = document.getElementById(endInputId + 'Wrapper');
+            const input = document.getElementById(endInputId);
+            const isChecked = event.target.checked;
+            
+            if (isChecked) {
+                wrapper.classList.add('opacity-50', 'pointer-events-none');
+                input.value = "";
+            } else {
+                wrapper.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        }
+
         function generateDates() {
             const type = document.getElementById('scheduleType').value;
             computedDates = [];
+            activeScheduleRule = "";
+
+            // Projection setup for "Until Cancelled" (12 months max to save DB bloat)
+            const getEndDate = (startStr, isUntilCancelled, providedEndStr) => {
+                if (isUntilCancelled) {
+                    const d = new Date(startStr);
+                    d.setFullYear(d.getFullYear() + 1); // 1 year projection
+                    return d;
+                }
+                return new Date(providedEndStr);
+            };
 
             if (type === 'single') {
                 const d = document.getElementById('dSingle').value;
-                if(d) computedDates.push(d);
+                if(d) { computedDates.push(d); activeScheduleRule = "Single Day"; }
             } 
             else if (type === 'range') {
                 let st = new Date(document.getElementById('dStart').value);
@@ -198,45 +275,72 @@
                         computedDates.push(st.toISOString().split('T')[0]);
                         st.setDate(st.getDate() + 1);
                     }
-                }
-            } 
-            else if (type === 'recur_date') {
-                const ym = document.getElementById('rMonth').value;
-                const d = document.getElementById('rDay').value;
-                if (ym && d) {
-                    const dateStr = `${ym}-${String(d).padStart(2, '0')}`;
-                    computedDates.push(dateStr);
+                    activeScheduleRule = "Consecutive Range";
                 }
             } 
             else if (type === 'recur_week') {
-                const ym = document.getElementById('wMonth').value;
-                const dayOfWeek = parseInt(document.getElementById('wDay').value);
-                const checkedNths = Array.from(document.querySelectorAll('.w-Nth:checked')).map(cb => parseInt(cb.value));
-                
-                if (ym && checkedNths.length > 0) {
-                    const [year, month] = ym.split('-').map(Number);
-                    
-                    // Count occurrences of the specific day
-                    let count = 0;
-                    let lastDateFound = null;
-                    const daysInMonth = new Date(year, month, 0).getDate();
+                const stStr = document.getElementById('wStart').value;
+                const isInfinite = document.getElementById('wUntilCancelled').checked;
+                const enStr = document.getElementById('wEnd').value;
+                const checkedDays = Array.from(document.querySelectorAll('.chk-day:checked')).map(cb => parseInt(cb.value));
 
-                    for (let d = 1; d <= daysInMonth; d++) {
-                        let date = new Date(year, month - 1, d);
-                        if (date.getDay() === dayOfWeek) {
-                            count++;
-                            lastDateFound = date;
-                            // Add if it matches 1st, 2nd, 3rd, 4th
-                            if (checkedNths.includes(count)) {
-                                computedDates.push(date.toISOString().split('T')[0]);
+                if (stStr && (isInfinite || enStr) && checkedDays.length > 0) {
+                    let st = new Date(stStr);
+                    let en = getEndDate(stStr, isInfinite, enStr);
+                    
+                    while (st <= en) {
+                        if (checkedDays.includes(st.getDay())) {
+                            computedDates.push(st.toISOString().split('T')[0]);
+                        }
+                        st.setDate(st.getDate() + 1);
+                    }
+                    activeScheduleRule = `Weekly: Days [${checkedDays.join(',')}] ${isInfinite ? '(Infinite)' : ''}`;
+                }
+            }
+            else if (type === 'recur_month_spec') {
+                const stStr = document.getElementById('mStart').value;
+                const isInfinite = document.getElementById('mUntilCancelled').checked;
+                const enStr = document.getElementById('mEnd').value;
+                
+                const targetDay = parseInt(document.getElementById('mDay').value);
+                const checkedNths = Array.from(document.querySelectorAll('.w-Nth:checked')).map(cb => parseInt(cb.value));
+
+                if (stStr && (isInfinite || enStr) && checkedNths.length > 0) {
+                    let st = new Date(stStr);
+                    let en = getEndDate(stStr, isInfinite, enStr);
+                    
+                    // Iterate month by month
+                    let current = new Date(st.getFullYear(), st.getMonth(), 1);
+                    while (current <= en) {
+                        const year = current.getFullYear();
+                        const month = current.getMonth();
+                        const daysInMonth = new Date(year, month + 1, 0).getDate();
+                        
+                        let count = 0;
+                        let lastDateFound = null;
+
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            let iterDate = new Date(year, month, d);
+                            // Only add if it falls within the absolute start/end boundaries
+                            if (iterDate >= st && iterDate <= en) {
+                                if (iterDate.getDay() === targetDay) {
+                                    count++;
+                                    lastDateFound = iterDate;
+                                    if (checkedNths.includes(count)) {
+                                        computedDates.push(iterDate.toISOString().split('T')[0]);
+                                    }
+                                }
                             }
                         }
+                        
+                        if (checkedNths.includes(5) && lastDateFound && lastDateFound >= st && lastDateFound <= en) {
+                            const lastIso = lastDateFound.toISOString().split('T')[0];
+                            if (!computedDates.includes(lastIso)) computedDates.push(lastIso);
+                        }
+                        
+                        current.setMonth(current.getMonth() + 1);
                     }
-                    // Handle "Last" (5) specifically
-                    if (checkedNths.includes(5) && lastDateFound) {
-                        const lastIso = lastDateFound.toISOString().split('T')[0];
-                        if (!computedDates.includes(lastIso)) computedDates.push(lastIso);
-                    }
+                    activeScheduleRule = `Monthly Nth: Days [${checkedNths.join(',')}] ${isInfinite ? '(Infinite)' : ''}`;
                 }
             }
 
@@ -244,64 +348,88 @@
             if(computedDates.length === 0) {
                 label.innerHTML = "<span class='text-red-500'>Missing parameters or invalid range.</span>";
             } else {
-                label.innerHTML = `<span class="text-dar font-black">${computedDates.length} Dates Computed:</span><br>` + computedDates.join(', ');
+                label.innerHTML = `<span class="text-dar font-black">${computedDates.length} Dates Computed ${document.getElementById('wUntilCancelled')?.checked || document.getElementById('mUntilCancelled')?.checked ? '(1-Year Projection)' : ''}:</span><br>` + computedDates.join(', ');
             }
         }
 
-        // --- OCR Integration (Tesseract.js) ---
-        async function runOCR() {
-            const fileInput = document.getElementById('imageUpload');
-            const btn = document.getElementById('ocrBtn');
+        // --- File Extraction (PDF.js + Tesseract.js) ---
+        async function runExtraction() {
+            const fileInput = document.getElementById('fileUpload');
+            const btn = document.getElementById('extractBtn');
             const textArea = document.getElementById('rawText');
 
-            if (!fileInput.files.length) return alert("Please select an image file first.");
+            if (!fileInput.files.length) return alert("Please select a file first.");
             
+            const file = fileInput.files[0];
             btn.disabled = true;
-            btn.innerHTML = `<span class="loader border-t-dar"></span> Scanning...`;
+            btn.innerHTML = `<span class="loader border-t-dar"></span> Extracting...`;
             
             try {
-                const worker = await Tesseract.createWorker('eng');
-                const ret = await worker.recognize(fileInput.files[0]);
-                await worker.terminate();
-                
-                // Append result
-                textArea.value = textArea.value + (textArea.value ? "\n" : "") + ret.data.text;
-                alert("Text extracted successfully! Review the raw text box to fix any typos before matching.");
+                if (file.type === "application/pdf") {
+                    const text = await extractTextFromPDF(file);
+                    textArea.value = textArea.value + (textArea.value ? "\n\n" : "") + text;
+                } else if (file.type.startsWith("image/")) {
+                    const worker = await Tesseract.createWorker('eng');
+                    const ret = await worker.recognize(file);
+                    await worker.terminate();
+                    textArea.value = textArea.value + (textArea.value ? "\n\n" : "") + ret.data.text;
+                } else {
+                    throw new Error("Unsupported file format.");
+                }
+                alert("Text extracted! Review the raw text box.");
             } catch (err) {
-                alert("OCR Failed: " + err.message);
+                alert("Extraction Failed: " + err.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = "Scan Image";
+                btn.innerHTML = "Extract Content";
             }
         }
 
-        // --- Personnel Matching Logic ---
+        async function extractTextFromPDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const strings = content.items.map(item => item.str);
+                fullText += strings.join(' ') + '\n';
+            }
+            return fullText;
+        }
+
+        // --- Intelligent Personnel Matching (Fuse.js) ---
         function matchPersonnel() {
             const text = document.getElementById('rawText').value;
             if(!text.trim()) return alert("No raw text to process.");
 
-            // Split by comma or newline, clean up extra spaces and noise
-            let fragments = text.split(/[\n,]+/).map(f => f.trim().toUpperCase().replace(/[^A-ZÑ -]/g, '')).filter(f => f.length > 3);
+            // Basic cleanup: split by newlines, commas, filter short strings
+            let fragments = text.split(/[\n,]+/).map(f => f.trim().replace(/[^a-zA-ZÑñ. -]/g, '')).filter(f => f.length > 4);
             
+            // Setup Fuse.js for fuzzy matching against the employees array
+            const fuse = new Fuse(employees, {
+                keys: ['full_name'],
+                includeScore: true,
+                threshold: 0.4, // Lower is stricter. 0.4 allows for typos and missing initials.
+                ignoreLocation: true
+            });
+
             matchedPersonnel = [];
             let unmatchedFragments = [];
 
-            // Fuzzy matching against Employee Table
             fragments.forEach(frag => {
-                let matchFound = false;
-                for (let emp of employees) {
-                    const empNameRaw = emp.full_name.toUpperCase();
-                    // Checking if fragment is inside name, or name is inside fragment
-                    if (empNameRaw.includes(frag) || frag.includes(empNameRaw)) {
-                        // Prevent duplicates
-                        if (!matchedPersonnel.some(m => m.emp_id === emp.emp_id)) {
-                            matchedPersonnel.push(emp);
-                        }
-                        matchFound = true;
-                        break;
+                const results = fuse.search(frag);
+                
+                // If we have a good match
+                if (results.length > 0 && results[0].score < 0.5) {
+                    const emp = results[0].item;
+                    // Prevent duplicates
+                    if (!matchedPersonnel.some(m => m.emp_id === emp.emp_id)) {
+                        matchedPersonnel.push(emp);
                     }
+                } else {
+                    unmatchedFragments.push(frag);
                 }
-                if (!matchFound) unmatchedFragments.push(frag);
             });
 
             renderMatches(unmatchedFragments);
@@ -312,13 +440,13 @@
             
             const listUI = document.getElementById('matchedList');
             if (matchedPersonnel.length === 0) {
-                listUI.innerHTML = `<div class="p-3 bg-red-50 text-red-600 rounded-lg text-xs font-bold text-center border border-red-200">No strict matches found. Check spellings.</div>`;
+                listUI.innerHTML = `<div class="p-3 bg-red-50 text-red-600 rounded-lg text-xs font-bold text-center border border-red-200">No matches found. Try cleaning up the raw text.</div>`;
             } else {
                 listUI.innerHTML = matchedPersonnel.map(emp => `
                     <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm">
                         <div>
                             <p class="text-[11px] font-black text-dar leading-tight">${emp.full_name}</p>
-                            <p class="text-[8px] text-slate-500 font-bold uppercase tracking-widest">${emp.position || 'STAFF'} | ${emp.unit || 'DAR'}</p>
+                            <p class="text-[8px] text-slate-500 font-bold uppercase tracking-widest">${emp.position || 'STAFF'} | ${emp.division || emp.unit || 'DAR'}</p>
                         </div>
                         <button onclick="removeMatch('${emp.emp_id}')" class="text-red-400 hover:text-red-600 font-bold px-2">✕</button>
                     </div>
@@ -336,15 +464,17 @@
 
         function removeMatch(id) {
             matchedPersonnel = matchedPersonnel.filter(m => m.emp_id !== id);
-            renderMatches([]); // We don't recalculate unmatched here, just clear the UI
+            renderMatches([]); 
         }
 
         // --- Database Commit ---
         async function commitToDatabase() {
+            const subj = document.getElementById('soSubject').value.trim();
             const type = document.getElementById('soType').value;
             const no = document.getElementById('soNumber').value;
             const yr = document.getElementById('soYear').value;
 
+            if(!subj) return alert("Please provide a Subject / Purpose.");
             if(!no || !yr) return alert("Please specify SO Control Number and Series Year.");
             if(computedDates.length === 0) return alert("Please configure and compute Schedule Dates.");
             if(matchedPersonnel.length === 0) return alert("Please match at least one employee.");
@@ -355,32 +485,100 @@
             if(!confirm(confirmMsg)) return;
 
             const payload = [];
-            // Create a record for every employee on every date computed
+            
             for (const emp of matchedPersonnel) {
                 for (const date of computedDates) {
                     payload.push({
-                        so_no: fullSoNumber,
+                        pso_no: fullSoNumber,
+                        subject: subj,
                         emp_id: emp.emp_id,
-                        emp_name: emp.full_name,
-                        date: date
+                        full_name: emp.full_name,
+                        division: emp.division || emp.unit,
+                        start_date: date, // Using discrete dates per row based on schema
+                        end_date: date,   // Same as start_date for distinct tracking
+                        status: 'ACTIVE', // Requires the new 'status' column
+                        schedule_rule: activeScheduleRule // Requires the new 'schedule_rule' column
                     });
                 }
             }
 
-            // Using UPSERT strategy per standard requirements for record insertion
-            const { error } = await db.from('pso_records').upsert(payload, { onConflict: 'emp_id, date' });
+            // Standard upsert
+            const { error } = await db.from('pso_records').upsert(payload);
             
             if (error) {
-                alert("Database Error: " + error.message);
+                alert("Database Error: " + error.message + "\n\nMake sure you have added 'status' and 'schedule_rule' to your pso_records table!");
             } else {
-                alert(`Successfully Encoded ${fullSoNumber}! Created ${payload.length} records.`);
-                // Reset UI
+                alert(`Successfully Encoded ${fullSoNumber}! Created ${payload.length} specific day deployments.`);
                 document.getElementById('rawText').value = "";
                 matchedPersonnel = [];
                 computedDates = [];
                 document.getElementById('soNumber').value = "";
+                document.getElementById('soSubject').value = "";
                 renderMatches([]);
                 document.getElementById('computedDatesLabel').innerHTML = "No dates computed yet.";
+            }
+        }
+
+        // --- Manage / Cancel Logic ---
+        function openManageModal() { document.getElementById('manageModal').classList.remove('hidden'); }
+        function closeManageModal() { document.getElementById('manageModal').classList.add('hidden'); document.getElementById('soSearchResults').innerHTML = 'Enter an SO number to find related records.'; document.getElementById('searchSoInput').value = ''; }
+
+        async function searchSO() {
+            const query = document.getElementById('searchSoInput').value.trim();
+            if(!query) return;
+            const resArea = document.getElementById('soSearchResults');
+            resArea.innerHTML = `<span class="loader border-t-dar"></span> Searching...`;
+
+            // Grouping by SO number and Employee to show summary
+            const { data, error } = await db.from('pso_records').select('*').eq('pso_no', query).eq('status', 'ACTIVE').order('start_date', { ascending: true });
+            
+            if (error) { resArea.innerHTML = "Error: " + error.message; return; }
+            if (!data || data.length === 0) { resArea.innerHTML = "No Active records found for this SO Number."; return; }
+
+            const empSummary = {};
+            data.forEach(d => {
+                if(!empSummary[d.emp_id]) empSummary[d.emp_id] = { name: d.full_name, dates: [] };
+                empSummary[d.emp_id].dates.push(d.start_date);
+            });
+
+            resArea.innerHTML = `
+                <div class="w-full h-full text-left font-normal text-gray-800 normal-case flex flex-col">
+                    <div class="flex justify-between items-center border-b pb-2 mb-3">
+                        <h3 class="font-black text-dar uppercase text-sm">${query}</h3>
+                        <div class="flex gap-2">
+                            <input type="date" id="cancelFromDate" class="p-1.5 border rounded text-xs bg-slate-50" title="Cancel from this date forward">
+                            <button onclick="cancelSO('${query}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded text-[10px] font-black uppercase hover:bg-red-100 transition">Cancel SO</button>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 uppercase font-bold mb-2">Active Personnel (${Object.keys(empSummary).length})</p>
+                    <div class="flex-grow overflow-y-auto space-y-2 pr-2">
+                        ${Object.values(empSummary).map(emp => `
+                            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs">
+                                <span class="font-black">${emp.name}</span> <span class="text-[9px] text-slate-400">(${emp.dates.length} scheduled deployments)</span>
+                                <p class="text-[9px] text-dar mt-1 italic">${emp.dates.slice(0,3).join(', ')} ${emp.dates.length>3 ? '...' : ''}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function cancelSO(soNumber) {
+            const fromDate = document.getElementById('cancelFromDate').value;
+            const msg = fromDate ? `Cancel ${soNumber} from ${fromDate} forward?` : `Cancel entirely for ALL dates?`;
+            
+            if(!confirm(msg)) return;
+
+            let query = db.from('pso_records').update({ status: 'CANCELLED' }).eq('pso_no', soNumber);
+            if (fromDate) {
+                query = query.gte('start_date', fromDate);
+            }
+
+            const { error } = await query;
+            if (error) alert("Error cancelling: " + error.message);
+            else {
+                alert("Successfully cancelled records.");
+                searchSO(); // Refresh
             }
         }
     </script>
