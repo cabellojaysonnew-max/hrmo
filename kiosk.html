@@ -13,6 +13,7 @@
         .clock-text { font-size: 5rem; font-weight: bold; line-height: 1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); color: #D4AF37; }
         .date-text { font-size: 1.5rem; font-weight: 600; color: #E5E7EB; }
         
+        /* HARDWARE ACCELERATED CAMERA CONTAINERS */
         #face-video-container { position: relative; width: 100%; max-width: 450px; border-radius: 1rem; overflow: hidden; border: 4px solid #D4AF37; box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #000; will-change: transform; transform: translateZ(0); }
         #face-video { width: 100%; height: auto; transform: scaleX(-1); will-change: transform; }
         
@@ -30,7 +31,9 @@
 <body class="flex h-screen items-center justify-center relative p-8">
 
     <div class="absolute top-4 left-4">
-        <button onclick="openSettings()" class="bg-gray-800 text-white p-3 rounded-full shadow-lg hover:bg-gray-700 transition" title="Camera Settings">⚙️ Setup</button>
+        <button onclick="openSettings()" class="bg-gray-800 text-white p-3 rounded-full shadow-lg hover:bg-gray-700 transition" title="Camera Settings">
+            ⚙️ Setup
+        </button>
     </div>
 
     <div class="absolute top-4 right-4 flex flex-col gap-2 items-end z-10">
@@ -43,6 +46,7 @@
     </div>
 
     <div class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        
         <div class="lg:col-span-5 flex flex-col items-center justify-center gap-6">
             <div class="flex flex-col items-center">
                 <div id="face-video-container">
@@ -93,8 +97,14 @@
         <div class="bg-white text-gray-800 p-8 rounded-xl w-full max-w-md shadow-2xl">
             <h2 class="text-xl font-black text-[#003811] mb-6 uppercase border-b pb-2">Hardware Setup</h2>
             <div class="space-y-4">
-                <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Face Capture Camera (Photo)</label><select id="sel-face-cam" class="w-full p-2 border rounded bg-gray-50 text-sm"></select></div>
-                <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">QR Scanner Camera</label><select id="sel-qr-cam" class="w-full p-2 border rounded bg-gray-50 text-sm"></select></div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Face Capture Camera (Photo)</label>
+                    <select id="sel-face-cam" class="w-full p-2 border rounded bg-gray-50 text-sm"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">QR Scanner Camera</label>
+                    <select id="sel-qr-cam" class="w-full p-2 border rounded bg-gray-50 text-sm"></select>
+                </div>
             </div>
             <div class="mt-8 flex gap-3">
                 <button onclick="saveSettings()" class="flex-1 bg-[#003811] text-white py-3 rounded font-bold hover:bg-green-800 transition">SAVE & RESTART</button>
@@ -104,8 +114,9 @@
     </div>
 
 <script>
+    // PERFORMANCE CONFIG
     const DEVICE_ID = "TERMINAL_01"; 
-    const SYNC_INTERVAL_MS = 60 * 60 * 1000; 
+    const SYNC_INTERVAL_MS = 60 * 60 * 1000; // 1 Hour
     const SCAN_COOLDOWN_MS = 3000; 
 
     let faceVideo = document.getElementById('face-video');
@@ -125,8 +136,9 @@
         updateNetworkStatus();
         updateQueueCounter();
         
+        // Non-blocking initialization
         setTimeout(async () => {
-            if (isOnline) await syncEmployeeCache();
+            await syncEmployeeCache(); // Now fetches from local Node.js server
             await populateCameras();
             startCameras();
         }, 100);
@@ -140,6 +152,7 @@
             if (e.key === 'Enter') handleManualInput();
         });
         
+        // Keep input focused for pure hardware scanners
         document.addEventListener('click', (e) => {
             if(!e.target.closest('#settings-modal') && e.target.tagName !== 'BUTTON') {
                 document.getElementById('empIdInput').focus();
@@ -215,6 +228,7 @@
         
         if (prefQRCam) {
             html5QrCode = new Html5Qrcode("qr-reader");
+            // OPTIMIZATION: Reduced FPS and disabled flip for CPU efficiency
             const config = { fps: 4, qrbox: { width: 250, height: 250 }, disableFlip: true };
             
             html5QrCode.start(
@@ -233,6 +247,7 @@
         }
     }
 
+    // OPTIMIZATION: Aggressive downscaling and compression for speed
     function captureFaceImage() {
         if (!faceVideo.videoWidth) return null;
         const context = canvas.getContext('2d', { alpha: false }); 
@@ -244,7 +259,29 @@
         return canvas.toDataURL('image/jpeg', 0.4); 
     }
 
-    // --- NEW: LOCAL FOLDER SAVING LOGIC ---
+    // --- LOCAL DB CACHING ---
+    async function syncEmployeeCache() {
+        try {
+            // Fetch from ultra-fast local Node.js SQLite database
+            const response = await fetch('http://localhost:3000/api/local-employees');
+            
+            if (response.ok) {
+                const data = await response.json();
+                cachedEmployees = {};
+                data.forEach(e => cachedEmployees[e.emp_id] = e);
+                
+                // Keep a browser backup just in case the Node server restarts
+                localStorage.setItem('masterEmployeeCache', JSON.stringify(cachedEmployees));
+                console.log("Loaded employees from local SQLite database.");
+            }
+        } catch (e) { 
+            console.warn("Could not reach local employee database. Falling back to browser cache.", e); 
+            const stored = localStorage.getItem('masterEmployeeCache');
+            if (stored) cachedEmployees = JSON.parse(stored);
+        }
+    }
+
+    // --- LOCAL FOLDER SAVING LOGIC ---
     async function saveImageToLocalDrive(empId, base64Image, logTimeISO) {
         if (!base64Image) return;
         try {
@@ -268,17 +305,6 @@
         localStorage.setItem('prefQRCam', prefQRCam);
         closeSettings();
         startCameras();
-    }
-
-    async function syncEmployeeCache() {
-        try {
-            const { data, error } = await supabaseClient.from('employees').select('*');
-            if (!error && data) {
-                cachedEmployees = {};
-                data.forEach(e => cachedEmployees[e.emp_id] = e);
-                localStorage.setItem('masterEmployeeCache', JSON.stringify(cachedEmployees));
-            }
-        } catch (e) {}
     }
 
     function getEmployeeData(empId) {
@@ -323,7 +349,7 @@
                 emp_id: empId,
                 log_time: logTimeISO,
                 device_id: DEVICE_ID,
-                capture_image: base64Image
+                capture_image: base64Image // Keeping it in payload just as backup
             });
 
             if (isFlagLogged) {
@@ -394,7 +420,7 @@
         
         for (let task of queue) {
             try {
-                const { error } = await supabaseClient.from(task.table).insert([task.data]);
+                const { error } = await window.supabaseClient.from(task.table).insert([task.data]);
                 if (error) failedQueue.push(task); 
             } catch (e) {
                 failedQueue.push(task);
