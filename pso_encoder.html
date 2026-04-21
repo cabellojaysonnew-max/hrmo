@@ -48,7 +48,10 @@
                     <p class="text-[10px] text-dar-gold font-bold uppercase tracking-widest">Intelligent Parsing System v2</p>
                 </div>
             </div>
-            <button onclick="openManageModal()" class="bg-white/20 hover:bg-white/30 text-xs font-bold px-4 py-2 rounded-full transition uppercase tracking-wider">Manage / Cancel SO</button>
+            <div class="flex gap-2">
+                <button onclick="openManageModal()" class="bg-white/20 hover:bg-white/30 text-xs font-bold px-4 py-2 rounded-full transition uppercase tracking-wider">Manage SO</button>
+                <button onclick="logout()" class="bg-red-600/90 hover:bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-full transition uppercase tracking-wider shadow">Logout</button>
+            </div>
         </header>
 
         <main class="flex-grow w-full overflow-y-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -212,6 +215,16 @@
     </div>
 
     <script>
+        // --- Auth Check ---
+        const userStr = sessionStorage.getItem('currentUser');
+        if (!userStr) window.location.href = 'index.html'; 
+        const user = JSON.parse(userStr);
+
+        function logout() {
+            sessionStorage.clear();
+            window.location.href = 'index.html';
+        }
+
         // --- Initialization & Setup ---
         let employees = [];
         let computedDates = [];
@@ -220,7 +233,7 @@
 
         document.getElementById('soYear').value = new Date().getFullYear();
 
-        // Fetch Employees on load using globally available supabaseClient
+        // Fetch Employees on load using globally available supabaseClient from supabase-config.js
         async function fetchEmployees() {
             const { data, error } = await supabaseClient.from('employees').select('emp_id, full_name, unit, division, position');
             if (!error && data) employees = data;
@@ -251,11 +264,11 @@
             computedDates = [];
             activeScheduleRule = "";
 
-            // Projection setup for "Until Cancelled" (12 months max to save DB bloat)
+            // Projection setup for "Until Cancelled" (12 months max)
             const getEndDate = (startStr, isUntilCancelled, providedEndStr) => {
                 if (isUntilCancelled) {
                     const d = new Date(startStr);
-                    d.setFullYear(d.getFullYear() + 1); // 1 year projection
+                    d.setFullYear(d.getFullYear() + 1); 
                     return d;
                 }
                 return new Date(providedEndStr);
@@ -396,32 +409,45 @@
             return fullText;
         }
 
-        // --- Intelligent Personnel Matching (Fuse.js) ---
+        // --- UPGRADED Intelligent Personnel Matching ---
         function matchPersonnel() {
             const text = document.getElementById('rawText').value;
             if(!text.trim()) return alert("No raw text to process.");
 
-            // Basic cleanup: split by newlines, commas, filter short strings
-            let fragments = text.split(/[\n,]+/).map(f => f.trim().replace(/[^a-zA-ZÑñ. -]/g, '')).filter(f => f.length > 4);
-            
-            // Setup Fuse.js for fuzzy matching against the employees array
+            // 1. Clean the text: remove numbers and non-name punctuation, replace with spaces
+            const cleanText = text.replace(/[^a-zA-ZÑñ\s-]/g, ' ').replace(/\s+/g, ' ');
+
+            // 2. Intelligent Name Chunking: Extract sequences of 2 to 4 capitalized words (Typical names)
+            const namePattern = /([A-ZÑ][a-zñA-ZÑ-]+\s+){1,3}[A-ZÑ][a-zñA-ZÑ-]+/g;
+            let potentialNames = cleanText.match(namePattern) || [];
+
+            // Fallback: If the regex misses (e.g., all uppercase text), fallback to standard split
+            if (potentialNames.length === 0) {
+                potentialNames = text.split(/[\n,]+|\s{2,}/).map(f => f.trim()).filter(f => f.length > 5);
+            }
+
+            potentialNames = potentialNames.map(n => n.trim());
+
+            // 3. Setup Fuse.js for Fuzzy Matching against the DB
             const fuse = new Fuse(employees, {
                 keys: ['full_name'],
                 includeScore: true,
-                threshold: 0.4, // Lower is stricter. 0.4 allows for typos and missing initials.
-                ignoreLocation: true
+                threshold: 0.35, // Stricter threshold limits false positives
+                ignoreLocation: true,
+                useExtendedSearch: true
             });
 
             matchedPersonnel = [];
             let unmatchedFragments = [];
 
-            fragments.forEach(frag => {
+            // 4. Score each potential name
+            potentialNames.forEach(frag => {
+                if (frag.length < 5 || frag.toLowerCase().includes("special order")) return; 
+
                 const results = fuse.search(frag);
                 
-                // If we have a good match
-                if (results.length > 0 && results[0].score < 0.5) {
+                if (results.length > 0 && results[0].score < 0.35) {
                     const emp = results[0].item;
-                    // Prevent duplicates
                     if (!matchedPersonnel.some(m => m.emp_id === emp.emp_id)) {
                         matchedPersonnel.push(emp);
                     }
@@ -430,6 +456,7 @@
                 }
             });
 
+            unmatchedFragments = [...new Set(unmatchedFragments)];
             renderMatches(unmatchedFragments);
         }
 
@@ -492,19 +519,18 @@
                         emp_id: emp.emp_id,
                         full_name: emp.full_name,
                         division: emp.division || emp.unit,
-                        start_date: date, // Using discrete dates per row based on schema
-                        end_date: date,   // Same as start_date for distinct tracking
-                        status: 'ACTIVE', // Requires the new 'status' column
-                        schedule_rule: activeScheduleRule // Requires the new 'schedule_rule' column
+                        start_date: date, 
+                        end_date: date,   
                     });
                 }
             }
 
-            // Standard upsert - requires UNIQUE constraint in SQL (pso_no, emp_id, start_date)
-            const { error } = await supabaseClient.from('pso_records').upsert(payload, { onConflict: 'pso_no, emp_id, start_date' });
+            // Using standard insert, relying on Supabase to handle any exact duplicates if needed, or allowing multiples depending on exact schema constraints.
+            // Note: Since you opted NOT to alter the table, we removed the schedule_rule and status fields and the upsert constraint.
+            const { error } = await supabaseClient.from('pso_records').insert(payload);
             
             if (error) {
-                alert("Database Error: " + error.message + "\n\nMake sure you have added 'status' and 'schedule_rule' to your pso_records table!");
+                alert("Database Error: " + error.message);
             } else {
                 alert(`Successfully Encoded ${fullSoNumber}! Created ${payload.length} specific day deployments.`);
                 document.getElementById('rawText').value = "";
@@ -528,7 +554,7 @@
             resArea.innerHTML = `<span class="loader border-t-dar"></span> Searching...`;
 
             // Grouping by SO number and Employee to show summary
-            const { data, error } = await supabaseClient.from('pso_records').select('*').eq('pso_no', query).eq('status', 'ACTIVE').order('start_date', { ascending: true });
+            const { data, error } = await supabaseClient.from('pso_records').select('*').eq('pso_no', query).order('start_date', { ascending: true });
             
             if (error) { resArea.innerHTML = "Error: " + error.message; return; }
             if (!data || data.length === 0) { resArea.innerHTML = "No Active records found for this SO Number."; return; }
@@ -567,7 +593,8 @@
             
             if(!confirm(msg)) return;
 
-            let query = supabaseClient.from('pso_records').update({ status: 'CANCELLED' }).eq('pso_no', soNumber);
+            // Using DELETE instead of updating a 'status' column to match existing schema constraints
+            let query = supabaseClient.from('pso_records').delete().eq('pso_no', soNumber);
             if (fromDate) {
                 query = query.gte('start_date', fromDate);
             }
@@ -576,7 +603,7 @@
             if (error) alert("Error cancelling: " + error.message);
             else {
                 alert("Successfully cancelled records.");
-                searchSO(); // Refresh
+                searchSO(); 
             }
         }
     </script>
