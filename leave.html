@@ -75,12 +75,13 @@
                                     <th class="table-th">Dates</th>
                                     <th class="table-th">CURRENT LEAVE BALANCE</th>
                                     <th class="table-th">BASE DAYS</th>
+                                    <th class="table-th text-blue-800">CREDITABLE DAYS</th>
                                     <th class="table-th">BALANCE AFTER</th>
                                     <th class="table-th text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="app-list">
-                                <tr><td colspan="8" class="table-td text-center text-gray-500">Loading applications...</td></tr>
+                                <tr><td colspan="9" class="table-td text-center text-gray-500">Loading applications...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -562,18 +563,18 @@
     // --- TAB 1: APPLICATIONS ---
     async function loadApplications() {
         const list = document.getElementById('app-list');
-        list.innerHTML = `<tr><td colspan="8" class="table-td text-center">Loading...</td></tr>`;
+        list.innerHTML = `<tr><td colspan="9" class="table-td text-center">Loading...</td></tr>`;
 
         const { data, error } = await supabaseClient.from('leave_ledger')
             .select('*')
             .eq('transaction_type', 'APPLICATION')
             .order('created_at', { ascending: false });
 
-        if (error) { list.innerHTML = `<tr><td colspan="8" class="table-td text-center text-red-500">Error loading applications.</td></tr>`; return; }
-        if (!data || data.length === 0) { list.innerHTML = `<tr><td colspan="8" class="table-td text-center text-gray-500">No pending leave applications found.</td></tr>`; return; }
+        if (error) { list.innerHTML = `<tr><td colspan="9" class="table-td text-center text-red-500">Error loading applications.</td></tr>`; return; }
+        if (!data || data.length === 0) { list.innerHTML = `<tr><td colspan="9" class="table-td text-center text-gray-500">No pending leave applications found.</td></tr>`; return; }
 
         let html = '';
-        data.forEach(app => {
+        for (const app of data) {
             const emp = empDataMap[app.emp_id];
             const name = emp ? emp.full_name : app.emp_id;
             const dates = app.end_date ? `${app.start_date} to ${app.end_date}` : app.start_date;
@@ -589,7 +590,32 @@
             }
             
             const baseDays = parseFloat(app.debit || 0);
-            const balanceAfter = currentBal - baseDays;
+            let multiplier = 1;
+
+            // Check Schedule Override for Multiplier before rendering the list
+            const sDate = app.start_date;
+            const eDate = app.end_date || app.start_date;
+
+            const { data: over } = await supabaseClient.from('schedule_overrides')
+                .select('*')
+                .eq('emp_id', app.emp_id)
+                .lte('start_date', eDate)
+                .gte('end_date', sDate);
+
+            if(over && over.length > 0) {
+                const activeOverride = over[0];
+                if (activeOverride.working_days) {
+                    const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
+                    if (wDays.length === 4) {
+                        if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK') || tType.includes('CTO') || tType.includes('COMPENSATORY')) {
+                            multiplier = 1.25;
+                        }
+                    }
+                }
+            }
+
+            const creditableDays = baseDays * multiplier;
+            const balanceAfter = currentBal - creditableDays;
 
             html += `
                 <tr>
@@ -599,6 +625,7 @@
                     <td class="table-td">${dates}</td>
                     <td class="table-td font-bold">${currentBal.toFixed(3)}</td>
                     <td class="table-td font-bold">${baseDays.toFixed(3)}</td>
+                    <td class="table-td font-bold text-blue-600">${creditableDays.toFixed(3)}</td>
                     <td class="table-td font-bold ${balanceAfter < 0 ? 'text-red-600' : 'text-green-600'}">${balanceAfter.toFixed(3)}</td>
                     <td class="table-td text-center">
                         <button onclick="approveLeave('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700 mr-2 shadow">Approve</button>
@@ -606,7 +633,7 @@
                     </td>
                 </tr>
             `;
-        });
+        }
         list.innerHTML = html;
     }
 
@@ -652,19 +679,27 @@
             let multiplier = 1;
             const sDate = start_date;
             const eDate = end_date || start_date;
+            const tType = type.toUpperCase();
             
-            const { data: over } = await supabaseClient.from('schedule_override')
+            const { data: over } = await supabaseClient.from('schedule_overrides')
                 .select('*')
                 .eq('emp_id', emp_id)
-                .gte('date', sDate)
-                .lte('date', eDate);
+                .lte('start_date', eDate)
+                .gte('end_date', sDate);
                 
             if(over && over.length > 0) {
-                if(over.some(o => o.weight == 1.5 || o.multiplier == 1.5)) multiplier = 1.5;
+                const activeOverride = over[0];
+                if (activeOverride.working_days) {
+                    const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
+                    if (wDays.length === 4) {
+                        if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK') || tType.includes('CTO') || tType.includes('COMPENSATORY')) {
+                            multiplier = 1.25;
+                        }
+                    }
+                }
             }
 
             const final_debit = base_debit * multiplier;
-            const tType = type.toUpperCase();
 
             const empData = empDataMap[emp_id];
             if (!empData) throw new Error("Employee not found in registry (Ensure type=REGULAR).");
@@ -693,7 +728,7 @@
                 .update({ 
                     transaction_type: 'APPROVED', 
                     debit: final_debit, 
-                    remarks: multiplier > 1 ? `Approved (Multiplier ${multiplier}x applied)` : 'Approved' 
+                    remarks: multiplier > 1 ? `Approved (Multiplier ${multiplier}x applied due to Compressed Schedule)` : 'Approved' 
                 })
                 .eq('id', id);
             
