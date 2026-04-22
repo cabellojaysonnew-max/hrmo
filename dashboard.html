@@ -224,7 +224,7 @@
         document.getElementById('scopeLabel').innerText = scopeText;
         const { data: emps } = await fetchSafe(empQuery);
         
-        const empIds = new Set((emps || []).map(e => e.emp_id));
+        const empIds = new Set((emps || []).map(e => String(e.emp_id).trim()));
         document.getElementById('statTotal').innerText = emps?.length || 0;
 
         const [travelItin, pso, leave, logs, scheduleOverrides] = await Promise.all([
@@ -236,7 +236,7 @@
         ]);
 
         let travelOrdersToday = { data: [] };
-        const todayToNos = (travelItin.data || []).map(i => i.to_no);
+        const todayToNos = (travelItin.data || []).map(i => String(i.to_no).trim());
         if (todayToNos.length > 0) {
             travelOrdersToday = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').in('to_no', todayToNos).eq('status', 'APPROVED'));
         }
@@ -244,78 +244,91 @@
         // STRICTLY FILTER ALL MAPS TO ONLY INCLUDE EMPLOYEES WITHIN THE PERMITTED SCOPE
         const travelMap = {};
         (travelOrdersToday.data || []).forEach(to => {
-            if (empIds.has(to.emp_id)) {
-                const itin = (travelItin.data || []).find(i => i.to_no === to.to_no);
-                if (itin) travelMap[to.emp_id] = itin.destination;
+            const eId = String(to.emp_id).trim();
+            if (empIds.has(eId)) {
+                const itin = (travelItin.data || []).find(i => String(i.to_no).trim() === String(to.to_no).trim());
+                if (itin) travelMap[eId] = itin.destination;
             }
         });
 
         const leaveMap = {};
         (leave.data || []).forEach(l => {
-            if (empIds.has(l.emp_id)) leaveMap[l.emp_id] = l.type;
+            const eId = String(l.emp_id).trim();
+            if (empIds.has(eId)) leaveMap[eId] = l.type;
         });
         
         const psoMap = {};
         (pso.data || []).forEach(p => { 
-            if (empIds.has(p.emp_id)) psoMap[p.emp_id] = p; 
+            const eId = String(p.emp_id).trim();
+            if (empIds.has(eId)) psoMap[eId] = p; 
         });
 
         const overrideMap = {}; 
         (scheduleOverrides.data || []).forEach(o => {
-            if (empIds.has(o.emp_id)) overrideMap[o.emp_id] = o;
+            const eId = String(o.emp_id).trim();
+            if (empIds.has(eId)) overrideMap[eId] = o;
         });
 
         const logMap = {}; 
         (logs.data || []).forEach(l => { 
-            if (empIds.has(l.emp_id)) {
-                if (!logMap[l.emp_id] || new Date(l.log_time) < logMap[l.emp_id]) logMap[l.emp_id] = new Date(l.log_time); 
+            const eId = String(l.emp_id).trim();
+            if (empIds.has(eId)) {
+                if (!logMap[eId] || new Date(l.log_time) < logMap[eId]) logMap[eId] = new Date(l.log_time); 
             }
         });
 
-        document.getElementById('statTravel').innerText = Object.keys(travelMap).length;
-        document.getElementById('statPSO').innerText = Object.keys(psoMap).length;
-
         const listT = document.getElementById('listTravel'); const listP = document.getElementById('listPSO'); 
         const listL = document.getElementById('listLeave'); const listLA = document.getElementById('listLateAbsent');
-        listT.innerHTML = ''; listP.innerHTML = ''; listL.innerHTML = ''; listLA.innerHTML = '';
+        
+        let htmlTravel = '';
+        let htmlPSO = '';
+        let htmlLeave = '';
+        let htmlLate = '';
+        
+        let countTravel = 0;
+        let countPSO = 0;
 
         (emps || []).forEach(e => {
+            const eId = String(e.emp_id).trim();
+            
             // Check for multi-status conflicts
             let conflictCount = 0;
-            if (travelMap[e.emp_id]) conflictCount++;
-            if (psoMap[e.emp_id]) conflictCount++;
-            if (leaveMap[e.emp_id]) conflictCount++;
+            if (travelMap[eId]) conflictCount++;
+            if (psoMap[eId]) conflictCount++;
+            if (leaveMap[eId]) conflictCount++;
             
             const isConflict = conflictCount > 1;
             const conflictStyle = isConflict ? 'bg-red-100 border-red-600 text-red-900 font-bold' : '';
 
             // Populate Dashboards with Conflict Awareness
-            if (travelMap[e.emp_id]) {
+            if (travelMap[eId]) {
+                countTravel++;
                 const style = isConflict ? conflictStyle : 'bg-blue-50 border-blue-500 text-[#1F2937]';
-                listT.innerHTML += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${travelMap[e.emp_id]}</div>`;
+                htmlTravel += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${travelMap[eId]}</div>`;
             }
-            if (psoMap[e.emp_id]) {
+            if (psoMap[eId]) {
+                countPSO++;
                 const style = isConflict ? conflictStyle : 'bg-red-50 border-red-500 text-[#1F2937]';
-                listP.innerHTML += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${psoMap[e.emp_id].pso_no} (${psoMap[e.emp_id].subject})</div>`;
+                htmlPSO += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${psoMap[eId].pso_no} (${psoMap[eId].subject})</div>`;
             }
-            if (leaveMap[e.emp_id]) {
+            if (leaveMap[eId]) {
                 const style = isConflict ? conflictStyle : 'bg-green-50 border-green-600 text-[#1F2937]';
-                listL.innerHTML += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${leaveMap[e.emp_id]}</div>`;
+                htmlLeave += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${leaveMap[eId]}</div>`;
             }
             
             // Late & Absent Monitor (DARPO-CS1 Only)
             if (String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
-                if (!travelMap[e.emp_id] && !psoMap[e.emp_id] && !leaveMap[e.emp_id]) {
+                if (!travelMap[eId] && !psoMap[eId] && !leaveMap[eId]) {
                     
                     let expectedDays = ['1', '2', '3', '4', '5'];
                     let cutoffStr = e.flexi_range_end || '08:00:00';
 
-                    if (overrideMap[e.emp_id]) {
-                        if (overrideMap[e.emp_id].working_days) {
-                            expectedDays = overrideMap[e.emp_id].working_days.split(',').map(d => d.trim());
+                    if (overrideMap[eId]) {
+                        if (overrideMap[eId].working_days) {
+                            expectedDays = overrideMap[eId].working_days.split(',').map(d => d.trim());
                         }
-                        if (overrideMap[e.emp_id].start_time) {
-                            cutoffStr = overrideMap[e.emp_id].start_time;
+                        if (overrideMap[eId].start_time) {
+                            cutoffStr = overrideMap[eId].start_time;
                         }
                     }
                     
@@ -325,17 +338,26 @@
                         const cutoffDate = new Date(`${todayStr}T${cutoffStr}`);
                         const now = new Date(); 
 
-                        if (logMap[e.emp_id]) {
-                            if (logMap[e.emp_id] > cutoffDate) {
-                                listLA.innerHTML += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-orange-700 font-bold">LATE</span></div>`;
+                        if (logMap[eId]) {
+                            if (logMap[eId] > cutoffDate) {
+                                htmlLate += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-orange-700 font-bold">LATE</span></div>`;
                             }
                         } else if (now > cutoffDate) {
-                            listLA.innerHTML += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-gray-500 font-bold italic">ABSENT / NO LOG</span></div>`;
+                            htmlLate += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-gray-500 font-bold italic">ABSENT / NO LOG</span></div>`;
                         }
                     }
                 }
             }
         });
+
+        // Set strictly matching summary counts
+        document.getElementById('statTravel').innerText = countTravel;
+        document.getElementById('statPSO').innerText = countPSO;
+        
+        listT.innerHTML = htmlTravel || '<div class="text-center text-gray-400 text-xs mt-10">No records found</div>';
+        listP.innerHTML = htmlPSO || '<div class="text-center text-gray-400 text-xs mt-10">No records found</div>';
+        listL.innerHTML = htmlLeave || '<div class="text-center text-gray-400 text-xs mt-10">No records found</div>';
+        listLA.innerHTML = htmlLate || '<div class="text-center text-gray-400 text-xs mt-10">All accounted for</div>';
 
         // --- Tardiness & Habitual Monitoring (DARPO-CS1 ONLY) ---
         const currMonth = todayDate.getMonth(); 
@@ -363,7 +385,7 @@
             fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth))
         ]);
 
-        const histToNos = (histTravelItin.data || []).map(i => i.to_no);
+        const histToNos = (histTravelItin.data || []).map(i => String(i.to_no).trim());
         let histTravelOrders = { data: [] };
         if (histToNos.length > 0) {
             histTravelOrders = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').in('to_no', histToNos).eq('status', 'APPROVED'));
@@ -373,16 +395,16 @@
         const excused = new Set();
         
         (histTravelOrders.data || []).forEach(to => {
-            const matchingItins = (histTravelItin.data || []).filter(i => i.to_no === to.to_no);
-            matchingItins.forEach(itin => excused.add(to.emp_id + '_' + itin.travel_date));
+            const matchingItins = (histTravelItin.data || []).filter(i => String(i.to_no).trim() === String(to.to_no).trim());
+            matchingItins.forEach(itin => excused.add(String(to.emp_id).trim() + '_' + itin.travel_date));
         });
-        (histLeave.data || []).forEach(l => excused.add(l.emp_id + '_' + l.start_date));
+        (histLeave.data || []).forEach(l => excused.add(String(l.emp_id).trim() + '_' + l.start_date));
         (histPso.data || []).forEach(p => {
             let currD = new Date(p.start_date);
             let endD = new Date(p.end_date);
             while(currD <= endD) {
                 if (currD >= sysStart) {
-                    excused.add(p.emp_id + '_' + currD.toISOString().split('T')[0]);
+                    excused.add(String(p.emp_id).trim() + '_' + currD.toISOString().split('T')[0]);
                 }
                 currD.setDate(currD.getDate() + 1);
             }
@@ -390,12 +412,13 @@
         
         const histOverrideMap = {};
         (histOverrides.data || []).forEach(o => {
-            if (!histOverrideMap[o.emp_id]) histOverrideMap[o.emp_id] = [];
+            const eId = String(o.emp_id).trim();
+            if (!histOverrideMap[eId]) histOverrideMap[eId] = [];
             let currD = new Date(o.start_date);
             let endD = new Date(o.end_date);
             while(currD <= endD) {
                 if (currD >= sysStart) {
-                    histOverrideMap[o.emp_id].push({
+                    histOverrideMap[eId].push({
                         date: currD.toISOString().split('T')[0],
                         start: o.start_time,
                         end: o.end_time,
@@ -416,21 +439,23 @@
         const habMap = {};
         (emps || []).forEach(e => {
             if (String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
-                habMap[e.emp_id] = { id: e.emp_id, name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
+                const eId = String(e.emp_id).trim();
+                habMap[eId] = { id: eId, name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
             }
         });
 
         const empLogDates = {};
         histLogs.forEach(l => {
-            if (!habMap[l.emp_id]) return; 
+            const eId = String(l.emp_id).trim();
+            if (!habMap[eId]) return; 
             const d = l.log_time.split('T')[0];
-            if (!empLogDates[l.emp_id]) empLogDates[l.emp_id] = {};
-            if (!empLogDates[l.emp_id][d]) empLogDates[l.emp_id][d] = [];
-            empLogDates[l.emp_id][d].push(new Date(l.log_time));
+            if (!empLogDates[eId]) empLogDates[eId] = {};
+            if (!empLogDates[eId][d]) empLogDates[eId][d] = [];
+            empLogDates[eId][d].push(new Date(l.log_time));
         });
 
         Object.keys(habMap).forEach(emp_id => {
-            const e = emps.find(x => x.emp_id === emp_id);
+            const e = emps.find(x => String(x.emp_id).trim() === emp_id);
             
             datesToCheck.forEach(dateStr => {
                 let expectedDays = ['1', '2', '3', '4', '5'];
@@ -571,8 +596,9 @@
             
             const d = new Date(log.date);
             d.setHours(0,0,0,0);
-            if (!flagStartDates[log.emp_id] || d < flagStartDates[log.emp_id]) {
-                flagStartDates[log.emp_id] = d;
+            const eId = String(log.emp_id).trim();
+            if (!flagStartDates[eId] || d < flagStartDates[eId]) {
+                flagStartDates[eId] = d;
             }
         });
         
@@ -589,20 +615,22 @@
         ]);
         
         let allFlagTravelOrders = { data: [] };
-        const allFlagToNos = (allFlagTravelItinRes.data || []).map(i => i.to_no);
-        allFlagTravelOrders = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED'));
+        const allFlagToNos = (allFlagTravelItinRes.data || []).map(i => String(i.to_no).trim());
+        if (allFlagToNos.length > 0) {
+            allFlagTravelOrders = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED'));
+        }
 
         const flagExcused = new Set();
         (allFlagTravelOrders.data || []).forEach(to => {
-            const matchingItins = (allFlagTravelItinRes.data || []).filter(i => i.to_no === to.to_no);
-            matchingItins.forEach(itin => flagExcused.add(to.emp_id + '_' + itin.travel_date));
+            const matchingItins = (allFlagTravelItinRes.data || []).filter(i => String(i.to_no).trim() === String(to.to_no).trim());
+            matchingItins.forEach(itin => flagExcused.add(String(to.emp_id).trim() + '_' + itin.travel_date));
         });
-        (allFlagLeaveRes.data || []).forEach(l => flagExcused.add(l.emp_id + '_' + l.start_date));
+        (allFlagLeaveRes.data || []).forEach(l => flagExcused.add(String(l.emp_id).trim() + '_' + l.start_date));
         (allFlagPsoRes.data || []).forEach(p => {
             let currD = new Date(p.start_date);
             let endD = new Date(p.end_date);
             while(currD <= endD) {
-                flagExcused.add(p.emp_id + '_' + currD.toISOString().split('T')[0]);
+                flagExcused.add(String(p.emp_id).trim() + '_' + currD.toISOString().split('T')[0]);
                 currD.setDate(currD.getDate() + 1);
             }
         });
@@ -611,11 +639,12 @@
         
         (emps || []).forEach(e => {
             if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
+            const eId = String(e.emp_id).trim();
             
-            let firstLogDate = flagStartDates[e.emp_id]; 
+            let firstLogDate = flagStartDates[eId]; 
             if (globalLogs) {
                 globalLogs.forEach(l => {
-                    if (l.emp_id === e.emp_id) {
+                    if (String(l.emp_id).trim() === eId) {
                         const dStr = l.log_time.split('T')[0];
                         const d = new Date(dStr);
                         d.setHours(0,0,0,0);
@@ -638,8 +667,8 @@
                 
                 if (mDate >= firstLogDate) {
                     expectedMondays++;
-                    const log = (allFlagLogs || []).find(l => l.emp_id === e.emp_id && l.date === m);
-                    const isExcused = flagExcused.has(e.emp_id + '_' + m); 
+                    const log = (allFlagLogs || []).find(l => String(l.emp_id).trim() === eId && l.date === m);
+                    const isExcused = flagExcused.has(eId + '_' + m); 
                     
                     const isPresent = log && String(log.status).toUpperCase() !== 'ABSENT' && String(log.time_in).toUpperCase() !== 'ABSENT' && log.time_in !== null;
 
@@ -658,7 +687,7 @@
                 else if (missedDates.length >= 3) { fBadgeClass = 'bg-red-600 text-white'; fBadgeText = 'REPRIMAND'; }
 
                 let actionColumn = isHR ? 
-                    `<button onclick="printFlagMemo('${e.emp_id}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>`
+                    `<button onclick="printFlagMemo('${eId}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>`
                     : `<span class="text-[10px] text-gray-400 italic">HR Only</span>`;
 
                 listF.innerHTML += `<tr class="hover:bg-gray-50">
