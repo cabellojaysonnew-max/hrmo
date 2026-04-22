@@ -151,9 +151,9 @@
                         </div>
                         <button onclick="loadLeaveSummary()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-4 rounded shadow">Generate Summary</button>
                     </div>
-                    <div class="overflow-auto w-full" style="max-height: calc(100vh - 260px);">
-                        <table class="w-full min-w-max text-left border-collapse text-[11px]">
-                            <thead class="sticky top-0 bg-[#f9fafb] z-10 shadow-sm">
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] border-b border-gray-200 w-full">
+                        <table class="w-full min-w-max text-left border-collapse text-[11px] whitespace-nowrap">
+                            <thead class="sticky top-0 bg-[#f9fafb] z-10 shadow-sm border-b border-gray-300">
                                 <tr>
                                     <th class="table-th border-r border-b" rowspan="2">Emp No.</th>
                                     <th class="table-th border-r border-b" rowspan="2">Name</th>
@@ -945,8 +945,8 @@
 
             // Sort per station (division), then name
             emps.sort((a, b) => {
-                let statA = (a.station || a.division || 'ZZZ').toUpperCase();
-                let statB = (b.station || b.division || 'ZZZ').toUpperCase();
+                let statA = (a.station || a.division || 'UNASSIGNED').toUpperCase();
+                let statB = (b.station || b.division || 'UNASSIGNED').toUpperCase();
                 if (statA < statB) return -1;
                 if (statA > statB) return 1;
                 let nameA = (a.full_name || '').toUpperCase();
@@ -967,6 +967,7 @@
             const endOfMonth = new Date(y, m, 0, 23, 59, 59);
             
             let html = '';
+            let currentStation = null;
             
             emps.forEach(emp => {
                 let base = {
@@ -1007,12 +1008,23 @@
                     WL: beg.WL + cred.WL - used.WL,
                     CTO: beg.CTO + cred.CTO - used.CTO
                 };
+
+                let empStation = (emp.station || emp.division || 'UNASSIGNED').toUpperCase();
+
+                if (empStation !== currentStation) {
+                    html += `
+                        <tr class="bg-gray-200">
+                            <td colspan="23" class="p-2 font-bold text-[#003811] text-xs uppercase border-b border-gray-300">STATION: ${empStation}</td>
+                        </tr>
+                    `;
+                    currentStation = empStation;
+                }
                 
                 html += `
                     <tr class="hover:bg-gray-100 border-b">
                         <td class="p-2 border-r font-bold">${emp.emp_id}</td>
                         <td class="p-2 border-r whitespace-nowrap font-bold">${emp.full_name ? emp.full_name.toUpperCase() : ''}</td>
-                        <td class="p-2 border-r whitespace-nowrap text-gray-600">${(emp.station || emp.division || '').toUpperCase()}</td>
+                        <td class="p-2 border-r whitespace-nowrap text-gray-600">${empStation}</td>
                         
                         <td class="p-2 border-r bg-blue-50/30">${beg.VL.toFixed(3)}</td><td class="p-2 border-r bg-blue-50/30 text-green-600">${cred.VL.toFixed(3)}</td><td class="p-2 border-r bg-blue-50/30 text-red-600">${used.VL.toFixed(3)}</td><td class="p-2 border-r bg-blue-50/30 font-bold">${end.VL.toFixed(3)}</td>
                         <td class="p-2 border-r bg-red-50/30">${beg.SL.toFixed(3)}</td><td class="p-2 border-r bg-red-50/30 text-green-600">${cred.SL.toFixed(3)}</td><td class="p-2 border-r bg-red-50/30 text-red-600">${used.SL.toFixed(3)}</td><td class="p-2 border-r bg-red-50/30 font-bold">${end.SL.toFixed(3)}</td>
