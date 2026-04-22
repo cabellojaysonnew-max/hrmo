@@ -241,21 +241,36 @@
             travelOrdersToday = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').in('to_no', todayToNos).eq('status', 'APPROVED'));
         }
 
+        // STRICTLY FILTER ALL MAPS TO ONLY INCLUDE EMPLOYEES WITHIN THE PERMITTED SCOPE
         const travelMap = {};
         (travelOrdersToday.data || []).forEach(to => {
-            const itin = (travelItin.data || []).find(i => i.to_no === to.to_no);
-            if (itin) travelMap[to.emp_id] = itin.destination;
+            if (empIds.has(to.emp_id)) {
+                const itin = (travelItin.data || []).find(i => i.to_no === to.to_no);
+                if (itin) travelMap[to.emp_id] = itin.destination;
+            }
         });
 
-        const leaveMap = Object.fromEntries((leave.data || []).map(l => [l.emp_id, l.type]));
+        const leaveMap = {};
+        (leave.data || []).forEach(l => {
+            if (empIds.has(l.emp_id)) leaveMap[l.emp_id] = l.type;
+        });
         
         const psoMap = {};
         (pso.data || []).forEach(p => { 
             if (empIds.has(p.emp_id)) psoMap[p.emp_id] = p; 
         });
 
-        const overrideMap = {}; (scheduleOverrides.data || []).forEach(o => overrideMap[o.emp_id] = o);
-        const logMap = {}; (logs.data || []).forEach(l => { if (!logMap[l.emp_id] || new Date(l.log_time) < logMap[l.emp_id]) logMap[l.emp_id] = new Date(l.log_time); });
+        const overrideMap = {}; 
+        (scheduleOverrides.data || []).forEach(o => {
+            if (empIds.has(o.emp_id)) overrideMap[o.emp_id] = o;
+        });
+
+        const logMap = {}; 
+        (logs.data || []).forEach(l => { 
+            if (empIds.has(l.emp_id)) {
+                if (!logMap[l.emp_id] || new Date(l.log_time) < logMap[l.emp_id]) logMap[l.emp_id] = new Date(l.log_time); 
+            }
+        });
 
         document.getElementById('statTravel').innerText = Object.keys(travelMap).length;
         document.getElementById('statPSO').innerText = Object.keys(psoMap).length;
