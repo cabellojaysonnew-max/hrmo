@@ -49,6 +49,7 @@
             <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
                 <button class="tab-btn active whitespace-nowrap" onclick="switchTab('appsTab')">Applications</button>
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('monitorTab')">Credits & Force Leave</button>
+                <button class="tab-btn whitespace-nowrap" onclick="switchTab('summaryTab')">Summary of Credits</button>
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('genTab')">Generate Credits</button>
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('gpTab')">Gate Pass Posting</button>
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('ctoTab')">CTO Posting</button>
@@ -135,6 +136,44 @@
                             </thead>
                             <tbody id="monitor-list">
                                 <tr><td colspan="8" class="table-td text-center text-gray-500">Loading balances...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="summaryTab" class="tab-content">
+                <div class="card mb-6">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end">
+                        <div class="w-64">
+                            <label class="form-label">Select Month</label>
+                            <input type="month" id="summaryMonth" class="form-input">
+                        </div>
+                        <button onclick="loadLeaveSummary()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-4 rounded shadow">Generate Summary</button>
+                    </div>
+                    <div class="overflow-x-auto max-h-[70vh]">
+                        <table class="w-full text-left border-collapse text-[11px]">
+                            <thead class="sticky top-0 bg-[#f9fafb] z-10 shadow-sm">
+                                <tr>
+                                    <th class="table-th border-r border-b" rowspan="2">Emp No.</th>
+                                    <th class="table-th border-r border-b" rowspan="2">Name</th>
+                                    <th class="table-th border-r border-b" rowspan="2">Station</th>
+                                    <th class="table-th border-r border-b text-center bg-blue-50" colspan="4">Vacation Leave (VL)</th>
+                                    <th class="table-th border-r border-b text-center bg-red-50" colspan="4">Sick Leave (SL)</th>
+                                    <th class="table-th border-r border-b text-center bg-yellow-50" colspan="4">Special Privilege (SPL)</th>
+                                    <th class="table-th border-r border-b text-center bg-green-50" colspan="4">Wellness Leave (WL)</th>
+                                    <th class="table-th border-b text-center bg-purple-50" colspan="4">Compensatory (CTO)</th>
+                                </tr>
+                                <tr>
+                                    <th class="table-th bg-blue-50 border-r px-2">Beg</th><th class="table-th bg-blue-50 border-r px-2">Earned</th><th class="table-th bg-blue-50 border-r px-2">Used</th><th class="table-th bg-blue-50 border-r px-2">End</th>
+                                    <th class="table-th bg-red-50 border-r px-2">Beg</th><th class="table-th bg-red-50 border-r px-2">Earned</th><th class="table-th bg-red-50 border-r px-2">Used</th><th class="table-th bg-red-50 border-r px-2">End</th>
+                                    <th class="table-th bg-yellow-50 border-r px-2">Beg</th><th class="table-th bg-yellow-50 border-r px-2">Earned</th><th class="table-th bg-yellow-50 border-r px-2">Used</th><th class="table-th bg-yellow-50 border-r px-2">End</th>
+                                    <th class="table-th bg-green-50 border-r px-2">Beg</th><th class="table-th bg-green-50 border-r px-2">Earned</th><th class="table-th bg-green-50 border-r px-2">Used</th><th class="table-th bg-green-50 border-r px-2">End</th>
+                                    <th class="table-th bg-purple-50 border-r px-2">Beg</th><th class="table-th bg-purple-50 border-r px-2">Earned</th><th class="table-th bg-purple-50 border-r px-2">Used</th><th class="table-th bg-purple-50 px-2">End</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summary-list">
+                                <tr><td colspan="23" class="table-td text-center text-gray-500">Select a month to generate summary.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -459,6 +498,7 @@
     const currMonthStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     const todayStr = d.toISOString().split('T')[0];
     
+    document.getElementById('summaryMonth').value = currMonthStr;
     document.getElementById('genMonth').value = currMonthStr;
     document.getElementById('gpMonth').value = currMonthStr;
     document.getElementById('ctoMonth').value = currMonthStr;
@@ -554,6 +594,7 @@
     function execTabLogic(tabId) {
         if(tabId === 'appsTab') { loadApplications(); loadApprovedLeavesToday(); }
         if(tabId === 'monitorTab') loadCreditsMonitor();
+        if(tabId === 'summaryTab') loadLeaveSummary();
         if(tabId === 'manualTab') loadManualCredits();
     }
 
@@ -618,13 +659,13 @@
             const balanceAfter = currentBal - creditableDays;
 
             let actionHtml = `
-                <button onclick="approveLeave('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500 transition-all duration-200">Approve</button>
-                <button onclick="disapproveLeave('${app.id}', '${app.emp_id}', '${app.type}', ${app.debit})" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 transition-all duration-200">Disapprove</button>
+                <button onclick="approveLeave('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500 transition-all duration-200 shadow">Approve</button>
+                <button onclick="disapproveLeave('${app.id}', '${app.emp_id}', '${app.type}', ${app.debit})" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 transition-all duration-200 shadow mt-1 xl:mt-0 ml-0 xl:ml-1">Disapprove</button>
             `;
 
             if (balanceAfter < 0 && !tType.includes('VL') && !tType.includes('VACATION') && !tType.includes('FORCE')) {
                 actionHtml += `
-                    <button onclick="chargeToVL('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all duration-200">Charge to VL</button>
+                    <button onclick="chargeToVL('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all duration-200 shadow mt-1 w-full">Charge to VL</button>
                 `;
             }
 
@@ -639,7 +680,7 @@
                     <td class="table-td font-bold text-blue-600">${creditableDays.toFixed(3)}</td>
                     <td class="table-td font-bold ${balanceAfter < 0 ? 'text-red-600' : 'text-green-600'}">${balanceAfter.toFixed(3)}</td>
                     <td class="table-td text-center">
-                        <div class="flex justify-center gap-2 flex-wrap">
+                        <div class="flex flex-col justify-center items-center gap-1 xl:flex-row flex-wrap">
                             ${actionHtml}
                         </div>
                     </td>
@@ -889,6 +930,94 @@
             list.innerHTML = `<tr><td colspan="8" class="table-td text-center text-red-500">Error loading monitor: ${e.message}</td></tr>`;
         }
     }
+
+    // --- TAB: SUMMARY OF LEAVE CREDITS ---
+    async function loadLeaveSummary() {
+        const monthVal = document.getElementById('summaryMonth').value;
+        if(!monthVal) return alert("Select a month");
+        
+        const list = document.getElementById('summary-list');
+        list.innerHTML = `<tr><td colspan="23" class="table-td text-center">Generating summary...</td></tr>`;
+        
+        try {
+            await loadEmployeeMaps();
+            const emps = Object.values(empDataMap);
+            
+            const { data: allData, error } = await supabaseClient.from('leave_ledger')
+                .select('*')
+                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'DISAPPROVED', 'FORFEITURE']);
+            
+            if(error) throw error;
+            
+            const startOfMonth = new Date(`${monthVal}-01T00:00:00`);
+            const parts = monthVal.split('-');
+            const y = parseInt(parts[0]);
+            const m = parseInt(parts[1]);
+            const endOfMonth = new Date(y, m, 0, 23, 59, 59);
+            
+            let html = '';
+            
+            emps.forEach(emp => {
+                let base = {
+                    VL: parseFloat(emp.vl_balance || 0),
+                    SL: parseFloat(emp.sl_balance || 0),
+                    SPL: parseFloat(emp.spl_balance || 0),
+                    WL: parseFloat(emp.wl_balance || 0),
+                    CTO: parseFloat(emp.cto_balance || 0)
+                };
+                
+                let beg = { VL: base.VL, SL: base.SL, SPL: base.SPL, WL: base.WL, CTO: base.CTO };
+                let cred = { VL: 0, SL: 0, SPL: 0, WL: 0, CTO: 0 };
+                let used = { VL: 0, SL: 0, SPL: 0, WL: 0, CTO: 0 };
+                
+                const empTx = (allData || []).filter(t => t.emp_id === emp.emp_id && t.transaction_type !== 'DISAPPROVED');
+                
+                empTx.forEach(t => {
+                    const cat = getLeaveCategory(t.type);
+                    if(!cat) return;
+                    
+                    const tDate = new Date(t.created_at || t.start_date);
+                    const c = parseFloat(t.credit || 0);
+                    const d = parseFloat(t.debit || 0);
+                    
+                    if(tDate < startOfMonth) {
+                        beg[cat] += c;
+                        beg[cat] -= d;
+                    } else if(tDate >= startOfMonth && tDate <= endOfMonth) {
+                        cred[cat] += c;
+                        used[cat] += d;
+                    }
+                });
+                
+                let end = {
+                    VL: beg.VL + cred.VL - used.VL,
+                    SL: beg.SL + cred.SL - used.SL,
+                    SPL: beg.SPL + cred.SPL - used.SPL,
+                    WL: beg.WL + cred.WL - used.WL,
+                    CTO: beg.CTO + cred.CTO - used.CTO
+                };
+                
+                html += `
+                    <tr class="hover:bg-gray-100 border-b">
+                        <td class="p-2 border-r font-bold">${emp.emp_id}</td>
+                        <td class="p-2 border-r whitespace-nowrap font-bold">${emp.full_name ? emp.full_name.toUpperCase() : ''}</td>
+                        <td class="p-2 border-r whitespace-nowrap text-gray-600">${(emp.station || emp.division || '').toUpperCase()}</td>
+                        
+                        <td class="p-2 border-r bg-blue-50/30">${beg.VL.toFixed(3)}</td><td class="p-2 border-r bg-blue-50/30 text-green-600">${cred.VL.toFixed(3)}</td><td class="p-2 border-r bg-blue-50/30 text-red-600">${used.VL.toFixed(3)}</td><td class="p-2 border-r bg-blue-50/30 font-bold">${end.VL.toFixed(3)}</td>
+                        <td class="p-2 border-r bg-red-50/30">${beg.SL.toFixed(3)}</td><td class="p-2 border-r bg-red-50/30 text-green-600">${cred.SL.toFixed(3)}</td><td class="p-2 border-r bg-red-50/30 text-red-600">${used.SL.toFixed(3)}</td><td class="p-2 border-r bg-red-50/30 font-bold">${end.SL.toFixed(3)}</td>
+                        <td class="p-2 border-r bg-yellow-50/30">${beg.SPL.toFixed(3)}</td><td class="p-2 border-r bg-yellow-50/30 text-green-600">${cred.SPL.toFixed(3)}</td><td class="p-2 border-r bg-yellow-50/30 text-red-600">${used.SPL.toFixed(3)}</td><td class="p-2 border-r bg-yellow-50/30 font-bold">${end.SPL.toFixed(3)}</td>
+                        <td class="p-2 border-r bg-green-50/30">${beg.WL.toFixed(3)}</td><td class="p-2 border-r bg-green-50/30 text-green-600">${cred.WL.toFixed(3)}</td><td class="p-2 border-r bg-green-50/30 text-red-600">${used.WL.toFixed(3)}</td><td class="p-2 border-r bg-green-50/30 font-bold">${end.WL.toFixed(3)}</td>
+                        <td class="p-2 border-r bg-purple-50/30">${beg.CTO.toFixed(3)}</td><td class="p-2 border-r bg-purple-50/30 text-green-600">${cred.CTO.toFixed(3)}</td><td class="p-2 border-r bg-purple-50/30 text-red-600">${used.CTO.toFixed(3)}</td><td class="p-2 bg-purple-50/30 font-bold">${end.CTO.toFixed(3)}</td>
+                    </tr>
+                `;
+            });
+            
+            list.innerHTML = html;
+        } catch(e) {
+            list.innerHTML = `<tr><td colspan="23" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+        }
+    }
+
 
     async function printLackingForceLeave() {
         try {
@@ -1597,6 +1726,7 @@
             if (error) throw error;
 
             let relevantData = (allData || []).filter(t => {
+                if ((t.type || '').toUpperCase() === 'MANUAL INPUT') return false; // Hide Manual Input from detailed ledger
                 const cat = getLeaveCategory(t.type);
                 if (ledgType === 'ALL') return true;
                 return cat === ledgType;
@@ -1609,8 +1739,6 @@
             const dtStart = new Date(`${startDate}T00:00:00`);
 
             // Initialize tracker for all balances from Employees table
-            // In this specific implementation, employees table represents INITIAL/BASE values 
-            // from which the ledger dynamically computes the running balances forwards.
             let balances = {
                 VL: parseFloat(emp.vl_balance || 0),
                 SL: parseFloat(emp.sl_balance || 0),
