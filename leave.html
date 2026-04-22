@@ -617,6 +617,17 @@
             const creditableDays = baseDays * multiplier;
             const balanceAfter = currentBal - creditableDays;
 
+            let actionHtml = `
+                <button onclick="approveLeave('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500 transition-all duration-200">Approve</button>
+                <button onclick="disapproveLeave('${app.id}', '${app.emp_id}', '${app.type}', ${app.debit})" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 transition-all duration-200">Disapprove</button>
+            `;
+
+            if (balanceAfter < 0 && !tType.includes('VL') && !tType.includes('VACATION') && !tType.includes('FORCE')) {
+                actionHtml += `
+                    <button onclick="chargeToVL('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all duration-200">Charge to VL</button>
+                `;
+            }
+
             html += `
                 <tr>
                     <td class="table-td font-mono font-bold text-xs">${app.emp_id}</td>
@@ -628,8 +639,9 @@
                     <td class="table-td font-bold text-blue-600">${creditableDays.toFixed(3)}</td>
                     <td class="table-td font-bold ${balanceAfter < 0 ? 'text-red-600' : 'text-green-600'}">${balanceAfter.toFixed(3)}</td>
                     <td class="table-td text-center">
-                        <button onclick="approveLeave('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700 mr-2 shadow">Approve</button>
-                        <button onclick="disapproveLeave('${app.id}', '${app.emp_id}', '${app.type}', ${app.debit})" class="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 shadow">Disapprove</button>
+                        <div class="flex justify-center gap-2 flex-wrap">
+                            ${actionHtml}
+                        </div>
                     </td>
                 </tr>
             `;
@@ -672,6 +684,78 @@
         }
     }
 
+    async function chargeToVL(id, emp_id, start_date, end_date, base_debit, type) {
+        if(!confirm(`This will zero out the available ${type} and charge the remaining to Vacation Leave. Proceed?`)) return;
+
+        try {
+            let multiplier = 1;
+            const sDate = start_date;
+            const eDate = end_date || start_date;
+            const tType = type.toUpperCase();
+
+            const { data: over } = await supabaseClient.from('schedule_overrides')
+                .select('*')
+                .eq('emp_id', emp_id)
+                .lte('start_date', eDate)
+                .gte('end_date', sDate);
+
+            if(over && over.length > 0) {
+                const activeOverride = over[0];
+                if (activeOverride.working_days) {
+                    const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
+                    if (wDays.length === 4) {
+                        if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK') || tType.includes('CTO') || tType.includes('COMPENSATORY')) {
+                            multiplier = 1.25;
+                        }
+                    }
+                }
+            }
+
+            const final_debit = base_debit * multiplier;
+
+            const empData = empDataMap[emp_id];
+            if (!empData) throw new Error("Employee not found in registry (Ensure type=REGULAR).");
+
+            let updates = {};
+            let remarks = multiplier > 1 ? `Approved (Multiplier ${multiplier}x applied)` : 'Approved';
+
+            let current_bal = 0;
+            let field_to_zero = '';
+
+            if(tType.includes('SL') || tType.includes('SICK')) { current_bal = parseFloat(empData.sl_balance || 0); field_to_zero = 'sl_balance'; }
+            else if(tType.includes('SPL') || tType.includes('SPECIAL')) { current_bal = parseFloat(empData.spl_balance || 0); field_to_zero = 'spl_balance'; }
+            else if(tType.includes('WL') || tType.includes('WELLNESS')) { current_bal = parseFloat(empData.wl_balance || 0); field_to_zero = 'wl_balance'; }
+            else if(tType.includes('CTO') || tType.includes('COMPENSATORY')) { current_bal = parseFloat(empData.cto_balance || 0); field_to_zero = 'cto_balance'; }
+
+            if(current_bal < 0) current_bal = 0; 
+            
+            let rem = final_debit - current_bal;
+
+            updates[field_to_zero] = (0).toFixed(3);
+            updates.vl_balance = (parseFloat(empData.vl_balance || 0) - rem).toFixed(3);
+            remarks += ` - Insufficient balance. ${rem.toFixed(3)} days charged to VL.`;
+
+            if(Object.keys(updates).length > 0) {
+                await supabaseClient.from('employees').update(updates).eq('emp_id', emp_id);
+            }
+
+            await supabaseClient.from('leave_ledger')
+                .update({ 
+                    transaction_type: 'APPROVED', 
+                    debit: final_debit, 
+                    remarks: remarks 
+                })
+                .eq('id', id);
+            
+            alert(`Leave Approved. Deducted ${current_bal.toFixed(3)} from ${type} and ${rem.toFixed(3)} from VL.`);
+            await loadEmployeeMaps(); 
+            loadApplications();
+            loadApprovedLeavesToday();
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
+    }
+
     async function approveLeave(id, emp_id, start_date, end_date, base_debit, type) {
         if(!confirm("Are you sure you want to approve this leave?")) return;
         
@@ -709,16 +793,7 @@
             else if(tType.includes('SL') || tType.includes('SICK')) updates.sl_balance = (parseFloat(empData.sl_balance || 0) - final_debit).toFixed(3);
             else if(tType.includes('SPL') || tType.includes('SPECIAL') || tType.includes('PRIVILEGE') || tType.includes('PREVELEGE')) updates.spl_balance = (parseFloat(empData.spl_balance || 0) - final_debit).toFixed(3);
             else if(tType.includes('WL') || tType.includes('WELLNESS')) updates.wl_balance = (parseFloat(empData.wl_balance || 0) - final_debit).toFixed(3);
-            else if(tType.includes('CTO') || tType.includes('COMPENSATORY')) {
-                let current_cto = parseFloat(empData.cto_balance || 0);
-                if (current_cto >= final_debit) {
-                    updates.cto_balance = (current_cto - final_debit).toFixed(3);
-                } else {
-                    let remaining = final_debit - current_cto;
-                    updates.cto_balance = (0).toFixed(3);
-                    updates.vl_balance = (parseFloat(empData.vl_balance || 0) - remaining).toFixed(3);
-                }
-            }
+            else if(tType.includes('CTO') || tType.includes('COMPENSATORY')) updates.cto_balance = (parseFloat(empData.cto_balance || 0) - final_debit).toFixed(3);
 
             if(Object.keys(updates).length > 0) {
                 await supabaseClient.from('employees').update(updates).eq('emp_id', emp_id);
