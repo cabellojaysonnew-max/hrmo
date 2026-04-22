@@ -151,8 +151,8 @@
                         </div>
                         <button onclick="loadLeaveSummary()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-4 rounded shadow">Generate Summary</button>
                     </div>
-                    <div class="overflow-x-auto max-h-[70vh]">
-                        <table class="w-full text-left border-collapse text-[11px]">
+                    <div class="overflow-auto w-full" style="max-height: calc(100vh - 260px);">
+                        <table class="w-full min-w-max text-left border-collapse text-[11px]">
                             <thead class="sticky top-0 bg-[#f9fafb] z-10 shadow-sm">
                                 <tr>
                                     <th class="table-th border-r border-b" rowspan="2">Emp No.</th>
@@ -942,6 +942,17 @@
         try {
             await loadEmployeeMaps();
             const emps = Object.values(empDataMap);
+
+            // Sort per station (division), then name
+            emps.sort((a, b) => {
+                let statA = (a.station || a.division || 'ZZZ').toUpperCase();
+                let statB = (b.station || b.division || 'ZZZ').toUpperCase();
+                if (statA < statB) return -1;
+                if (statA > statB) return 1;
+                let nameA = (a.full_name || '').toUpperCase();
+                let nameB = (b.full_name || '').toUpperCase();
+                return nameA.localeCompare(nameB);
+            });
             
             const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
