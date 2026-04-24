@@ -482,7 +482,7 @@
             <div class="p-6 flex flex-col h-full overflow-hidden bg-gray-50">
                 <div id="soListContainer" class="flex flex-col h-full">
                     <div class="flex gap-2 mb-4 shrink-0">
-                        <input type="text" id="filterSoInput" onkeyup="if(event.key === 'Enter') searchDBForPSO(); else filterSOList(this.value);" placeholder="Search SO Number or Subject locally..." class="flex-grow p-3 border border-gray-300 rounded text-sm font-bold outline-none focus:border-[#003811] shadow-sm">
+                        <input type="text" id="filterSoInput" onkeyup="if(event.key === 'Enter') searchDBForPSO(); else filterSOList(this.value);" placeholder="Search SO Number, QR Draft ID, or Subject..." class="flex-grow p-3 border border-gray-300 rounded text-sm font-bold outline-none focus:border-[#003811] shadow-sm">
                         <button onclick="searchDBForPSO()" class="bg-[#003811] text-white px-6 py-3 rounded text-sm font-bold tracking-widest hover:bg-[#002200] transition shadow-sm uppercase whitespace-nowrap">Search DB</button>
                     </div>
                     <div id="allSoList" class="flex-grow overflow-y-auto space-y-3 pr-2 pb-6"></div>
@@ -1041,9 +1041,6 @@
             let finalBody = contentHTML + `<p style="margin-top:15px; text-align: justify;"><strong>Schedule Date/s: ${datesArr.join(', ')}</strong></p>`;
             document.getElementById('printBodyHTML').innerHTML = finalBody;
             
-            const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-            document.getElementById('printDateGenerated').innerText = today;
-            
             let sortedRoster = [...rosterArr].sort((a, b) => {
                 if (a.isGuest && !b.isGuest) return 1;
                 if (!a.isGuest && b.isGuest) return -1;
@@ -1268,7 +1265,7 @@
                         isDraft: true,
                         draftData: d
                     };
-                } else if (soMap[d.pso_no]) {
+                } else if (d.status !== 'LINKED' && soMap[d.pso_no]) {
                     // Attach metadata to posted orders for reprints
                     soMap[d.pso_no].draftData = d; 
                 }
@@ -1311,6 +1308,26 @@
                 return; 
             }
 
+            // --- REDIRECT LOGIC FOR SCANNED DRAFT QR CODES ---
+            let linkedTargetNos = [];
+            metaRes.data.forEach(d => {
+                if (d.status === 'LINKED') {
+                    // Because DRAFT was searched, it triggers this redirect pointer
+                    linkedTargetNos.push(d.body_content); 
+                }
+            });
+
+            if (linkedTargetNos.length > 0) {
+                // Fetch the actual finalized records that the QR code points to
+                const [linkedRecs, linkedMeta] = await Promise.all([
+                    supabaseClient.from('pso_records').select('*').in('pso_no', linkedTargetNos),
+                    supabaseClient.from('pso_metadata').select('*').in('pso_no', linkedTargetNos)
+                ]);
+                if (linkedRecs.data) recordsRes.data.push(...linkedRecs.data);
+                if (linkedMeta.data) metaRes.data.push(...linkedMeta.data);
+            }
+            // --------------------------------------------------
+
             const soMap = {};
             
             recordsRes.data.forEach(d => {
@@ -1326,7 +1343,9 @@
                         pso_no: d.pso_no, subject: d.subject || 'No Subject', datesArr: draftDates.sort(),
                         dateCount: draftDates.length, empCount: draftEmps.length, isDraft: true, draftData: d 
                     };
-                } else if (soMap[d.pso_no]) { soMap[d.pso_no].draftData = d; }
+                } else if (d.status !== 'LINKED' && soMap[d.pso_no]) { 
+                    soMap[d.pso_no].draftData = d; 
+                }
             });
 
             allActiveSOs = Object.values(soMap).map(so => {
@@ -1532,8 +1551,13 @@
                 duration: draft.duration, body_content: draft.body_content, dates_json: dates, participants_json: emps, status: 'POSTED'
             });
 
-            // 3. Delete the old draft
-            await supabaseClient.from('pso_metadata').delete().eq('pso_no', psoNo);
+            // 3. Convert the old draft into a pointer link instead of deleting it!
+            // This ensures when the physical paper QR code is scanned, it redirects here.
+            await supabaseClient.from('pso_metadata').update({
+                status: 'LINKED',
+                body_content: officialPsoNo, // Store the pointer
+                subject: `[POSTED] ` + draft.subject
+            }).eq('pso_no', psoNo);
 
             alert("Success! The order is now live on employee schedules.");
             loadAllActiveSOs();
