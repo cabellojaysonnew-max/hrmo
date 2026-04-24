@@ -67,11 +67,21 @@
             
             #printBodyHTML, #printBodyHTML * { text-align: justify !important; }
             
-            /* Intelligent Paging Footer */
+            /* Smart Paging Core Logic to prevent awkward cuts */
+            h2, h3, hr, p { page-break-inside: avoid; break-inside: avoid; }
+            .print-item { page-break-inside: avoid; break-inside: avoid; }
+            
+            /* Standard CSS Paging Fallback */
+            body { counter-reset: page; }
             #printFooter { position: fixed; bottom: 15px; right: 40px; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; }
             #printFooter::after { content: "Page " counter(page) " of " counter(pages); }
         }
-        @page { margin: 15mm; }
+        
+        /* Strict 8.5 x 13 Long Bond / Folio Paper Size */
+        @page { 
+            size: 8.5in 13in; 
+            margin: 15mm; 
+        }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
@@ -446,23 +456,23 @@
             <h2 style="text-align: left; font-weight: bold; font-size: 13pt; margin-bottom: 2px;">PROVINCIAL SPECIAL ORDER No. <span id="printPsoNoOnly"></span></h2>
             <h3 style="text-align: left; font-size: 11pt; margin-bottom: 25px; font-weight: bold;">Series of <span id="printSeriesYear"></span></h3>
             
-            <div style="margin-bottom: 10px; display: flex; font-size: 11pt; align-items: flex-start;">
+            <div style="margin-bottom: 10px; display: flex; font-size: 11pt; align-items: flex-start; page-break-inside: avoid; break-inside: avoid;">
                 <div style="width: 80px; font-weight: bold;">SUBJECT</div>
                 <div style="width: 20px; font-weight: bold;">:</div>
                 <div style="flex: 1; font-weight: bold; text-transform: uppercase;" id="printSubject"></div>
             </div>
             
-            <hr style="border: 0; border-top: 2px solid black; margin-bottom: 20px;">
+            <hr style="border: 0; border-top: 2px solid black; margin-bottom: 20px; page-break-after: avoid; break-after: avoid;">
 
             <div id="printBodyHTML" style="font-size: 11pt; margin-bottom: 20px;"></div>
             
             <div id="printParticipantsList" style="font-size: 10.5pt; margin-bottom: 30px; line-height: 1.4; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;"></div>
 
-            <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify;">Attendance shall be considered official time. All concerned personnel are hereby directed to comply with this Order.</p>
-            <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify;">This Order shall serve as Travel Order and shall remain in force unless sooner revoked or amended.</p>
-            <p style="font-size: 10.5pt; margin-bottom: 40px; text-align: justify;">_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, Building, Carnation Street, Triangulo, City of Naga.</p>
+            <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify; page-break-inside: avoid; break-inside: avoid;">Attendance shall be considered official time. All concerned personnel are hereby directed to comply with this Order.</p>
+            <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify; page-break-inside: avoid; break-inside: avoid;">This Order shall serve as Travel Order and shall remain in force unless sooner revoked or amended.</p>
+            <p style="font-size: 10.5pt; margin-bottom: 40px; text-align: justify; page-break-inside: avoid; break-inside: avoid;">_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, Building, Carnation Street, Triangulo, City of Naga.</p>
             
-            <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; page-break-inside: avoid; break-inside: avoid; margin-top: 40px;">
                 <div>
                     <p style="font-weight: bold; font-size: 11.5pt; text-decoration: underline; margin-bottom: 2px;">RICARDO C. GARCIA</p>
                     <p style="font-size: 10.5pt;">PARPO II</p>
@@ -1038,8 +1048,8 @@
             document.getElementById('printSeriesYear').innerText = yr;
             document.getElementById('printSubject').innerText = subj.toUpperCase();
             
-            let finalBody = contentHTML + `<p style="margin-top:15px; text-align: justify;"><strong>Schedule Date/s: ${datesArr.join(', ')}</strong></p>`;
-            document.getElementById('printBodyHTML').innerHTML = finalBody;
+            // Replaced the auto-appended dates here so the author's input decides the layout completely.
+            document.getElementById('printBodyHTML').innerHTML = contentHTML;
             
             let sortedRoster = [...rosterArr].sort((a, b) => {
                 if (a.isGuest && !b.isGuest) return 1;
@@ -1053,11 +1063,11 @@
                 if(emp.isGuest) {
                     let end = count + parseInt(emp.guestCount) - 1;
                     let numStr = emp.guestCount > 1 ? `${count}-${end}.` : `${count}.`;
-                    pHTML += `<div style="margin-bottom: 4px; font-size: 10.5pt;">${numStr} GUEST/S</div>`;
+                    pHTML += `<div style="margin-bottom: 4px; font-size: 10.5pt; page-break-inside: avoid; break-inside: avoid;">${numStr} <strong style="text-transform:uppercase; font-size: 10.5pt;">GUEST/S</strong></div>`;
                     count = end + 1;
                 } else {
-                    let pos = emp.position ? `, <span style="text-transform:capitalize; font-size: 9.5pt;">${emp.position.toLowerCase()}</span>` : '';
-                    pHTML += `<div style="margin-bottom: 4px; font-size: 10.5pt;">${count}. <strong style="text-transform:uppercase; font-size: 10.5pt;">${emp.full_name}</strong>${pos}</div>`;
+                    let pos = emp.position ? `, <span style="text-transform:uppercase; font-size: 8pt; color: #333;">${emp.position}</span>` : '';
+                    pHTML += `<div style="margin-bottom: 4px; font-size: 10.5pt; page-break-inside: avoid; break-inside: avoid;" class="print-item">${count}. <strong style="text-transform:uppercase; font-size: 10.5pt;">${emp.full_name}</strong>${pos}</div>`;
                     count++;
                 }
             });
