@@ -849,7 +849,7 @@
                 document.getElementById('soNumber').value = ""; 
                 document.getElementById('soSubject').value = "";
                 renderMatches([]); 
-                document.getElementById('computedDatesLabel').innerHTML = "NO DATES COMPUTED YET.";
+                document.getElementById('computedDatesLabel').innerHTML = "No dates computed yet.";
             }
         }
 
@@ -962,7 +962,7 @@
                 document.getElementById('b_manualPos').value = '';
             } 
             else if (mode === 'PROVINCE') {
-                const typeFilter = document.getElementById('b_empTypeFilter').value; 
+                const typeFilter = document.getElementById('b_empTypeFilter').value; // ALL, REGULAR, SPLIT
                 if(typeFilter === 'ALL') {
                     empsToAdd = [...activeEmps];
                 } else {
@@ -1032,11 +1032,11 @@
         }
 
         // Dedicated Print Processing Function
-        async function triggerPrint(psoNoText, yr, subj, datesArr, contentHTML, rosterArr, qrText) {
+        function triggerPrint(psoNoText, yr, subj, datesArr, contentHTML, rosterArr, qrText) {
             
-            document.getElementById('printPsoNoOnly').innerText = psoNoText || '_______';
-            document.getElementById('printSeriesYear').innerText = yr || new Date().getFullYear();
-            document.getElementById('printSubject').innerText = (subj || '').toUpperCase();
+            document.getElementById('printPsoNoOnly').innerText = psoNoText;
+            document.getElementById('printSeriesYear').innerText = yr;
+            document.getElementById('printSubject').innerText = subj.toUpperCase();
             
             let finalBody = contentHTML + `<p style="margin-top:15px; text-align: justify;"><strong>Schedule Date/s: ${datesArr.join(', ')}</strong></p>`;
             document.getElementById('printBodyHTML').innerHTML = finalBody;
@@ -1072,16 +1072,15 @@
                 new QRCode(qrContainer, { text: String(qrText), width: 80, height: 80 });
             }
 
-            const printArea = document.getElementById('printArea');
-            const bgBase64 = await getBgMemo();
-            if (bgBase64) {
-                printArea.style.backgroundImage = `url(${bgBase64})`;
-                printArea.style.backgroundSize = '100% 100%';
-                printArea.style.backgroundPosition = 'top center';
-                printArea.style.backgroundRepeat = 'no-repeat';
-            }
-
-            setTimeout(() => { 
+            setTimeout(async () => { 
+                const printArea = document.getElementById('printArea');
+                const bgBase64 = await getBgMemo();
+                if (bgBase64) {
+                    printArea.style.backgroundImage = `url(${bgBase64})`;
+                    printArea.style.backgroundSize = '100% 100%';
+                    printArea.style.backgroundPosition = 'top center';
+                    printArea.style.backgroundRepeat = 'no-repeat';
+                }
                 window.print(); 
             }, 300);
         }
@@ -1115,7 +1114,7 @@
 
             if (metaErr) return alert("Failed to save draft: " + metaErr.message);
 
-            await triggerPrint(`_______`, yr, subj, b_computedDates, content, b_roster, draftId);
+            triggerPrint(`_______`, yr, subj, b_computedDates, content, b_roster, draftId);
 
             setTimeout(() => { 
                 alert(`Draft Saved! Pending Signature. Open Manage Active Orders to Post it once signed.`);
@@ -1123,8 +1122,8 @@
                 document.getElementById('b_soSubject').value = "";
                 quill.setText(""); 
                 b_renderRoster(); 
-                document.getElementById('b_computedDatesLabel').innerHTML = "NO DATES COMPUTED YET.";
-            }, 1000);
+                document.getElementById('b_computedDatesLabel').innerHTML = "No dates computed yet.";
+            }, 800);
         }
 
         // ==========================================
