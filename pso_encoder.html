@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SO Encoder - DAR HRMO</title>
     
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -49,9 +51,9 @@
         input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
         input[type="checkbox"] { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; margin-top: 0.1rem; }
 
-        /* Quill Adjustments */
+        /* Quill Adjustments - Font changed to Roboto */
         .ql-toolbar.ql-snow { border: 1px solid #D1D5DB; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem; background: #f9fafb; padding: 4px; }
-        .ql-container.ql-snow { border: 1px solid #D1D5DB; border-bottom-left-radius: 0.375rem; border-bottom-right-radius: 0.375rem; background: white; font-family: 'Segoe UI', sans-serif; font-size: 0.875rem; }
+        .ql-container.ql-snow { border: 1px solid #D1D5DB; border-bottom-left-radius: 0.375rem; border-bottom-right-radius: 0.375rem; background: white; font-family: 'Roboto', sans-serif; font-size: 0.875rem; }
         .ql-editor { min-height: 150px; }
 
         /* Print Styles */
@@ -71,8 +73,8 @@
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold">SO ENCODER</p>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
-            <button onclick="switchTab('encoder')" id="tabEncoder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors">SO ENCODER</button>
-            <button onclick="switchTab('builder')" id="tabBuilder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-transparent border-l-4 border-transparent hover:bg-black/10 transition-colors">PSO BUILDER</button>
+            <button onclick="switchTab('encoder')" id="tabEncoder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-transparent border-l-4 border-transparent hover:bg-black/10 transition-colors">SO ENCODER</button>
+            <button onclick="switchTab('builder')" id="tabBuilder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors">PSO BUILDER</button>
         </div>
         <div class="p-4 bg-black/20">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
@@ -83,14 +85,14 @@
     <main class="flex-1 flex flex-col h-full bg-[#F3F4F6] relative no-print">
         
         <div class="p-8 pb-4 flex justify-between items-center border-b border-gray-200 bg-white shrink-0 shadow-sm">
-            <h2 id="pageTitle" class="text-3xl font-bold text-[#003811] uppercase tracking-wide">SO ENCODER</h2>
+            <h2 id="pageTitle" class="text-3xl font-bold text-[#003811] uppercase tracking-wide">PSO BUILDER</h2>
             <button onclick="openManageModal()" class="bg-white border border-gray-300 text-[#003811] hover:bg-gray-50 px-4 py-2 font-bold rounded uppercase text-xs flex items-center gap-2 transition shadow-sm">
                 ⚙️ MANAGE ACTIVE ORDERS
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-8">
-            <div id="encoderTab" class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto">
+            <div id="encoderTab" class="grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: none;">
                 <div class="flex flex-col gap-6">
                     <div class="card p-6 border-t-2 border-t-gray-200">
                         <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">1. Document Details</h2>
@@ -217,7 +219,7 @@
                 </div>
             </div>
 
-            <div id="builderTab" class="hidden grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto">
+            <div id="builderTab" class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: grid;">
                 
                 <div class="flex flex-col gap-6">
                     <div class="card p-6 border-t-2 border-t-gray-200">
@@ -398,7 +400,7 @@
     </main>
 
     <div id="printArea" class="hidden">
-        <div style="font-family: 'Arial', sans-serif; color: black; max-width: 800px; margin: 0 auto;">
+        <div style="font-family: 'Roboto', sans-serif; color: black; max-width: 800px; margin: 0 auto;">
             <h2 style="text-align: center; font-weight: bold; font-size: 1.25rem; text-decoration: underline;">PROVINCIAL SPECIAL ORDER</h2>
             <h3 style="text-align: center; font-weight: bold; font-size: 1rem; margin-bottom: 30px;" id="printPsoNo"></h3>
             
