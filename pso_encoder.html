@@ -11,6 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <script src="supabase-config.js"></script>
     
@@ -45,17 +46,26 @@
         
         input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
         input[type="checkbox"] { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; margin-top: 0.1rem; }
+
+        /* Print Styles */
+        @media print {
+            body * { visibility: hidden; }
+            #printArea, #printArea * { visibility: visible; }
+            #printArea { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; background: white; z-index: 9999; display: block !important; }
+            .no-print { display: none !important; }
+        }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <nav class="bg-[#003811] w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+    <nav class="bg-[#003811] w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20 no-print">
         <div class="p-6 border-b border-[#006400]">
             <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold">SO ENCODER</p>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
-            <a href="pso_encoder.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors">SO ENCODER</a>
+            <button onclick="switchTab('encoder')" id="tabEncoder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors">SO ENCODER</button>
+            <button onclick="switchTab('builder')" id="tabBuilder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-transparent border-l-4 border-transparent hover:bg-black/10 transition-colors">PSO BUILDER</button>
         </div>
         <div class="p-4 bg-black/20">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
@@ -63,28 +73,24 @@
         </div>
     </nav>
 
-    <main class="flex-1 flex flex-col h-full bg-[#F3F4F6] relative">
+    <main class="flex-1 flex flex-col h-full bg-[#F3F4F6] relative no-print">
         
         <div class="p-8 pb-4 flex justify-between items-center border-b border-gray-200 bg-white shrink-0 shadow-sm">
-            <h2 class="text-3xl font-bold text-[#003811] uppercase tracking-wide">SO ENCODER</h2>
+            <h2 id="pageTitle" class="text-3xl font-bold text-[#003811] uppercase tracking-wide">SO ENCODER</h2>
             <button onclick="openManageModal()" class="bg-white border border-gray-300 text-[#003811] hover:bg-gray-50 px-4 py-2 font-bold rounded uppercase text-xs flex items-center gap-2 transition shadow-sm">
                 ⚙️ MANAGE ACTIVE ORDERS
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-8">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto">
-                
+            <div id="encoderTab" class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto">
                 <div class="flex flex-col gap-6">
-                    
                     <div class="card p-6 border-t-2 border-t-gray-200">
                         <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">1. Document Details</h2>
-                        
                         <div class="mb-4">
                             <label class="form-label text-[#003811]">Subject / Purpose</label>
                             <input type="text" id="soSubject" placeholder="e.g., QMS Audit Deployment" class="form-input text-gray-600 font-bold">
                         </div>
-                        
                         <div class="grid grid-cols-2 gap-4 mb-4">
                             <div>
                                 <label class="form-label text-[#003811]">Type</label>
@@ -99,7 +105,6 @@
                                 <input type="number" id="soNumber" placeholder="e.g., 220" class="form-input font-bold text-gray-800">
                             </div>
                         </div>
-                        
                         <div>
                             <label class="form-label text-[#003811]">Series Year</label>
                             <input type="number" id="soYear" class="form-input font-bold text-gray-800">
@@ -108,7 +113,6 @@
 
                     <div class="card p-6 border-t-2 border-t-gray-200 flex-grow">
                         <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">2. Schedule Engine</h2>
-                        
                         <div class="mb-4">
                             <label class="form-label text-[#003811]">Duration</label>
                             <select id="soDuration" class="form-input font-bold text-gray-800">
@@ -117,8 +121,7 @@
                                 <option value="Half Day - Afternoon">Half Day - Afternoon</option>
                             </select>
                         </div>
-                        
-                        <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold text-sm mb-4 text-gray-800">
+                        <select id="scheduleType" onchange="toggleScheduleUI('scheduleType', 'sched-ui')" class="form-input font-bold text-sm mb-4 text-gray-800">
                             <option value="single">One Day Only</option>
                             <option value="range">Range</option>
                             <option value="repetitive">Repeatitive</option>
@@ -136,11 +139,7 @@
                         </div>
 
                         <div id="ui-repetitive" class="sched-ui space-y-4 hidden">
-                            <div>
-                                <label class="form-label text-[#003811]">Start Date</label>
-                                <input type="date" id="repStart" class="form-input">
-                            </div>
-                            
+                            <div><label class="form-label text-[#003811]">Start Date</label><input type="date" id="repStart" class="form-input"></div>
                             <div>
                                 <label class="form-label text-[#003811] mb-2">Week/s</label>
                                 <div class="grid grid-cols-5 gap-2 mb-4">
@@ -150,7 +149,6 @@
                                     <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="rep-week"> 4th</label>
                                     <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="rep-week"> 5th</label>
                                 </div>
-                                
                                 <label class="form-label text-[#003811] mb-2">Day/s</label>
                                 <div class="grid grid-cols-5 gap-2">
                                     <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="rep-day"> M</label>
@@ -160,46 +158,32 @@
                                     <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="rep-day"> F</label>
                                 </div>
                             </div>
-                            <p class="text-[10px] text-gray-400 italic mt-2">* Generates 1 year ahead. Ends only upon cancellation.</p>
                         </div>
 
                         <button onclick="generateDates()" class="btn-dark w-full mt-6 py-3">COMPUTE DATES</button>
-                        
-                        <div id="computedDatesLabel" class="mt-4 text-xs font-bold text-gray-500 uppercase h-16 overflow-y-auto">
-                            NO DATES COMPUTED YET.
-                        </div>
+                        <div id="computedDatesLabel" class="mt-4 text-xs font-bold text-gray-500 uppercase h-16 overflow-y-auto">NO DATES COMPUTED YET.</div>
                     </div>
                 </div>
 
                 <div class="flex flex-col h-full">
                     <div class="card p-6 flex flex-col h-[calc(100vh-140px)] border-t-2 border-t-gray-200">
                         <h2 class="form-label border-b border-gray-100 pb-2 mb-4 shrink-0 text-gray-500">3. Personnel Extractor</h2>
-                        
                         <div class="mb-4 shrink-0 bg-[#f8faf9] p-4 border border-[#e5e7e6] rounded">
                             <label class="form-label text-[#003811]">Upload PDF/Image or Paste</label>
-                            <p class="text-[10px] text-gray-500 mb-3">You can select multiple files or press <b>Ctrl+V</b> repeatedly to add to the list.</p>
-                            
+                            <p class="text-[10px] text-gray-500 mb-3">You can select multiple files or press <b>Ctrl+V</b> repeatedly.</p>
                             <input type="file" id="fileUpload" accept="image/*,application/pdf" multiple class="w-full text-xs mb-3 bg-white border border-gray-300 p-2 rounded cursor-pointer">
-                            <button id="extractBtn" onclick="runExtraction()" class="w-full bg-white border border-[#003811] text-[#003811] py-2 rounded text-xs font-bold uppercase hover:bg-gray-50 transition disabled:opacity-50">
-                                Extract Text
-                            </button>
+                            <button id="extractBtn" onclick="runExtraction()" class="w-full bg-white border border-[#003811] text-[#003811] py-2 rounded text-xs font-bold uppercase hover:bg-gray-50 transition disabled:opacity-50">Extract Text</button>
                             <p id="extractStatus" class="text-[10px] text-center mt-2 font-bold text-[#003811]"></p>
                         </div>
-
                         <div class="flex-grow flex flex-col min-h-0">
                             <label class="form-label flex justify-between items-end text-[#003811]">
                                 <span>Raw Text Data</span>
                                 <span class="text-gray-400 font-normal normal-case text-[10px]">(Review & Edit before matching)</span>
                             </label>
                             <textarea id="rawText" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs font-mono bg-white outline-none focus:border-[#003811] resize-none mb-4" placeholder="Text will appear here..."></textarea>
-                            
                             <div class="flex gap-2 shrink-0">
-                                <button onclick="matchPersonnel(true)" class="w-1/2 bg-gray-200 text-gray-800 py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-gray-300 transition">
-                                    Match & Replace
-                                </button>
-                                <button onclick="matchPersonnel(false)" class="w-1/2 bg-[#003811] text-white py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-[#002200] transition shadow-md">
-                                    Match & Append
-                                </button>
+                                <button onclick="matchPersonnel(true)" class="w-1/2 bg-gray-200 text-gray-800 py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-gray-300 transition">Match & Replace</button>
+                                <button onclick="matchPersonnel(false)" class="w-1/2 bg-[#003811] text-white py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-[#002200] transition shadow-md">Match & Append</button>
                             </div>
                         </div>
                     </div>
@@ -211,56 +195,225 @@
                             <h2 class="form-label text-gray-500 mb-0">4. Personnel</h2>
                             <span id="matchCount" class="bg-gray-100 text-[#003811] text-xs font-bold px-2 py-1 rounded border border-gray-200">0 MATCHED</span>
                         </div>
-                        
                         <div class="flex-grow overflow-y-auto space-y-2 mb-4" id="matchedList">
                             <div class="h-full flex flex-col items-center justify-center opacity-40 text-gray-500">
                                 <span class="text-4xl mb-2">📋</span>
                                 <p class="text-xs font-bold uppercase text-center">Run matcher to see<br>identified personnel.</p>
                             </div>
                         </div>
-
                         <div id="unmatchedAlert" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded text-xs font-bold text-red-700 h-32 overflow-y-auto shrink-0">
                             <span class="block uppercase border-b border-red-200 pb-1 mb-1">⚠️ Unrecognized Text:</span>
                             <div id="unmatchedList" class="space-y-1 font-mono text-[10px]"></div>
                         </div>
+                        <button onclick="commitToDatabase()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shrink-0 mt-auto shadow">ENCODE SPECIAL ORDER</button>
+                    </div>
+                </div>
+            </div>
 
-                        <button onclick="commitToDatabase()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shrink-0 mt-auto shadow">
-                            ENCODE SPECIAL ORDER
+            <div id="builderTab" class="hidden grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto">
+                
+                <div class="flex flex-col gap-6">
+                    <div class="card p-6 border-t-2 border-t-gray-200">
+                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">1. Document Details</h2>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="form-label text-[#003811]">Type</label>
+                                <select id="b_soType" class="form-input font-bold text-gray-800">
+                                    <option value="PSO" selected>PSO</option>
+                                    <option value="RSO">RSO</option>
+                                    <option value="SO">SO</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label text-[#003811]">Control Number</label>
+                                <input type="number" id="b_soNumber" placeholder="e.g., 220" class="form-input font-bold text-gray-800">
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-[#003811]">Series Year</label>
+                            <input type="number" id="b_soYear" class="form-input font-bold text-gray-800">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-[#003811]">Subject / Purpose</label>
+                            <input type="text" id="b_soSubject" placeholder="Title of the memo..." class="form-input text-gray-600 font-bold">
+                        </div>
+                    </div>
+
+                    <div class="card p-6 border-t-2 border-t-gray-200 flex-grow">
+                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">2. Schedule Engine</h2>
+                        <div class="mb-4">
+                            <label class="form-label text-[#003811]">Duration</label>
+                            <select id="b_soDuration" class="form-input font-bold text-gray-800">
+                                <option value="Whole Day" selected>Whole Day</option>
+                                <option value="Half Day - Morning">Half Day - Morning</option>
+                                <option value="Half Day - Afternoon">Half Day - Afternoon</option>
+                            </select>
+                        </div>
+                        <select id="b_scheduleType" onchange="toggleScheduleUI('b_scheduleType', 'b-sched-ui')" class="form-input font-bold text-sm mb-4 text-gray-800">
+                            <option value="single">One Day Only</option>
+                            <option value="range">Range</option>
+                            <option value="repetitive">Repeatitive</option>
+                        </select>
+
+                        <div id="b_ui-single" class="b-sched-ui space-y-4">
+                            <div><label class="form-label text-[#003811]">Select Date</label><input type="date" id="b_dSingle" class="form-input"></div>
+                        </div>
+
+                        <div id="b_ui-range" class="b-sched-ui space-y-4 hidden">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="form-label text-[#003811]">Start Date</label><input type="date" id="b_dStart" class="form-input"></div>
+                                <div><label class="form-label text-[#003811]">End Date</label><input type="date" id="b_dEnd" class="form-input"></div>
+                            </div>
+                        </div>
+
+                        <div id="b_ui-repetitive" class="b-sched-ui space-y-4 hidden">
+                            <div><label class="form-label text-[#003811]">Start Date</label><input type="date" id="b_repStart" class="form-input"></div>
+                            <div>
+                                <label class="form-label text-[#003811] mb-2">Week/s</label>
+                                <div class="grid grid-cols-5 gap-2 mb-4">
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="b-rep-week"> 1st</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="b-rep-week"> 2nd</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="b-rep-week"> 3rd</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="b-rep-week"> 4th</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="b-rep-week"> 5th</label>
+                                </div>
+                                <label class="form-label text-[#003811] mb-2">Day/s</label>
+                                <div class="grid grid-cols-5 gap-2">
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="1" class="b-rep-day"> M</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="2" class="b-rep-day"> T</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="3" class="b-rep-day"> W</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="4" class="b-rep-day"> Th</label>
+                                    <label class="flex items-start gap-1 text-xs font-bold text-gray-700"><input type="checkbox" value="5" class="b-rep-day"> F</label>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="b_generateDates()" class="btn-dark w-full mt-6 py-3">COMPUTE DATES</button>
+                        <div id="b_computedDatesLabel" class="mt-4 text-xs font-bold text-gray-500 uppercase h-16 overflow-y-auto">NO DATES COMPUTED YET.</div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col h-full gap-6">
+                    <div class="card p-6 flex flex-col h-1/2 border-t-2 border-t-gray-200">
+                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 shrink-0 text-gray-500">3. Body Content</h2>
+                        <textarea id="b_psoContent" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs bg-white outline-none focus:border-[#003811] resize-none" placeholder="Enter the exact body paragraphs of the PSO here..."></textarea>
+                    </div>
+
+                    <div class="card p-6 flex flex-col h-1/2 border-t-2 border-t-gray-200">
+                        <h2 class="form-label border-b border-gray-100 pb-2 mb-4 shrink-0 text-gray-500">4. Group Selector</h2>
+                        
+                        <div class="mb-4">
+                            <label class="form-label text-[#003811]">Selection Mode</label>
+                            <select id="b_selMode" onchange="b_toggleSelectionMode()" class="form-input font-bold text-gray-800">
+                                <option value="PROVINCE" selected>Entire Province</option>
+                                <option value="DIVISION">Specific Division / Position</option>
+                            </select>
+                        </div>
+
+                        <div id="b_modeProvince" class="space-y-4">
+                            <div>
+                                <label class="form-label text-[#003811]">Employee Filter</label>
+                                <select id="b_empTypeFilter" class="form-input text-gray-800">
+                                    <option value="ALL">All Active Employees</option>
+                                    <option value="REGULAR">Regular Status Only</option>
+                                    <option value="SPLIT">Split Status Only</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="b_modeDivision" class="space-y-4 hidden">
+                            <div>
+                                <label class="form-label text-[#003811]">Division</label>
+                                <select id="b_divFilter" onchange="b_populatePositions()" class="form-input text-gray-800">
+                                    </select>
+                            </div>
+                            <div>
+                                <label class="form-label text-[#003811]">Position (Optional)</label>
+                                <select id="b_posFilter" class="form-input text-gray-800">
+                                    <option value="ALL">All Positions in Division</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button onclick="b_addParticipants()" class="w-full bg-[#003811] text-white py-3 mt-auto rounded text-xs font-bold uppercase tracking-widest hover:bg-[#002200] transition shadow-md">
+                            + ADD TO LIST
                         </button>
                     </div>
                 </div>
 
+                <div class="flex flex-col h-full">
+                    <div class="card p-6 flex flex-col h-[calc(100vh-140px)] border-t-2 border-t-gray-200">
+                        <div class="flex justify-between items-center border-b border-gray-100 pb-2 mb-4 shrink-0">
+                            <h2 class="form-label text-gray-500 mb-0">5. Participant Roster</h2>
+                            <button onclick="b_clearRoster()" class="text-[10px] text-red-500 font-bold hover:underline">CLEAR ALL</button>
+                        </div>
+                        
+                        <div class="flex-grow overflow-y-auto space-y-2 mb-4" id="b_rosterList">
+                            <div class="h-full flex flex-col items-center justify-center opacity-40 text-gray-500">
+                                <span class="text-4xl mb-2">👥</span>
+                                <p class="text-xs font-bold uppercase text-center">Add groups to build roster.</p>
+                            </div>
+                        </div>
+
+                        <div class="shrink-0 pt-4 border-t border-gray-200 flex flex-col gap-2 mt-auto">
+                            <div class="flex justify-between items-center px-1 mb-2">
+                                <span class="text-xs font-bold text-gray-500 uppercase">Total Selected:</span>
+                                <span id="b_rosterCount" class="text-lg font-black text-[#003811]">0</span>
+                            </div>
+                            
+                            <button onclick="saveDraftAndPrint()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">
+                                SAVE DRAFT & PRINT (W/ QR)
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
+
         </div>
     </main>
 
-    <div id="manageModal" class="hidden modal-overlay">
-        <div class="modal-box bg-[#F3F4F6] w-full max-w-5xl h-[85vh]">
+    <div id="printArea" class="hidden">
+        <div style="font-family: 'Arial', sans-serif; color: black; max-width: 800px; margin: 0 auto;">
+            <h2 style="text-align: center; font-weight: bold; font-size: 1.25rem; text-decoration: underline;">PROVINCIAL SPECIAL ORDER</h2>
+            <h3 style="text-align: center; font-weight: bold; font-size: 1rem; margin-bottom: 30px;" id="printPsoNo"></h3>
             
+            <p style="margin-bottom: 10px; font-size: 0.9rem;"><strong>SUBJECT:</strong> <span id="printSubject"></span></p>
+            <p style="margin-bottom: 25px; font-size: 0.9rem;"><strong>DATE/S:</strong> <span id="printDates"></span></p>
+            
+            <div id="printContent" style="white-space: pre-wrap; margin-bottom: 25px; font-size: 0.95rem; text-align: justify;"></div>
+            
+            <p style="margin-bottom: 10px; font-size: 0.9rem;"><strong>PARTICIPANTS:</strong></p>
+            <div id="printParticipants" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; font-size: 0.85rem; margin-bottom: 40px;"></div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <p style="margin-bottom: 30px; font-size: 0.9rem;">Approved by:</p>
+                    <p style="font-weight: bold; font-size: 0.95rem; text-decoration: underline;">PARPO II</p>
+                </div>
+                <div id="qrcode"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="manageModal" class="hidden modal-overlay no-print">
+        <div class="modal-box bg-[#F3F4F6] w-full max-w-5xl h-[85vh]">
             <div class="px-6 py-4 border-b flex justify-between items-center bg-white shrink-0">
-                <h2 class="font-bold text-lg text-[#003811] tracking-widest uppercase">⚙️ Manage Active Orders</h2>
+                <h2 class="font-bold text-lg text-[#003811] tracking-widest uppercase">⚙️ Manage Active & Pending Orders</h2>
                 <button onclick="closeManageModal()" class="text-gray-400 hover:text-red-500 text-2xl font-light leading-none transition">✕</button>
             </div>
-            
             <div class="p-6 flex flex-col h-full overflow-hidden bg-gray-50">
-                
                 <div id="soListContainer" class="flex flex-col h-full">
                     <div class="flex gap-2 mb-4 shrink-0">
                         <input type="text" id="filterSoInput" onkeyup="if(event.key === 'Enter') searchDBForPSO(); else filterSOList(this.value);" placeholder="Search SO Number or Subject locally..." class="flex-grow p-3 border border-gray-300 rounded text-sm font-bold outline-none focus:border-[#003811] shadow-sm">
                         <button onclick="searchDBForPSO()" class="bg-[#003811] text-white px-6 py-3 rounded text-sm font-bold tracking-widest hover:bg-[#002200] transition shadow-sm uppercase whitespace-nowrap">Search DB</button>
                     </div>
-                    <div id="allSoList" class="flex-grow overflow-y-auto space-y-3 pr-2 pb-6">
-                        </div>
+                    <div id="allSoList" class="flex-grow overflow-y-auto space-y-3 pr-2 pb-6"></div>
                 </div>
-
                 <div id="soDetailContainer" class="hidden flex-col h-full">
                     <button onclick="backToSoList()" class="mb-4 text-[#003811] font-bold text-xs uppercase tracking-widest flex items-center gap-1 hover:underline w-max">
                         ← Back to List
                     </button>
-                    <div id="soSearchResults" class="flex-grow bg-white rounded border border-gray-200 overflow-hidden flex flex-col shadow-sm">
-                        </div>
+                    <div id="soSearchResults" class="flex-grow bg-white rounded border border-gray-200 overflow-hidden flex flex-col shadow-sm"></div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -272,16 +425,12 @@
             window.location.href = 'index.html'; 
         } else {
             const user = JSON.parse(userStr);
-            
-            // STRICT REDIRECT: Ensure user has PSO ENCODER privileges
             if (!user.role || !user.role.toUpperCase().includes('PSO ENCODER')) {
-                // If they are not an Admin/Chief, boot them to dashboard/index
                 if (!user.role.toUpperCase().includes('ADMIN') && !user.role.toUpperCase().includes('CHIEF')) {
                     alert("Unauthorized access. Redirecting...");
                     window.location.href = 'dashboard.html';
                 }
             }
-            
             document.getElementById('activeUser').innerText = `User: ${user.full_name ? user.full_name.toUpperCase() : user.username}`;
         }
 
@@ -292,21 +441,51 @@
 
         // --- Setup ---
         let employees = [];
-        let computedDates = [];
-        let matchedPersonnel = [];
+        let uniqueDivisions = [];
+        
+        let computedDates = []; // For Encoder
+        let b_computedDates = []; // For Builder
+        
+        let matchedPersonnel = []; // For Encoder
+        let b_roster = []; // For Builder
+
         let activeManageSO = ""; 
-        let allActiveSOs = []; // Holds grouped active SOs for the list view
+        let allActiveSOs = []; 
 
         document.getElementById('soYear').value = new Date().getFullYear();
+        document.getElementById('b_soYear').value = new Date().getFullYear();
 
         async function fetchEmployees() {
-            const { data, error } = await supabaseClient.from('employees').select('emp_id, full_name, unit, division, position').order('full_name');
-            if (!error && data) employees = data;
+            const { data, error } = await supabaseClient.from('employees').select('emp_id, full_name, unit, division, position, type, status').order('full_name');
+            if (!error && data) {
+                employees = data;
+                const activeEmps = employees.filter(e => !e.status || e.status.toUpperCase() === 'ACTIVE');
+                uniqueDivisions = [...new Set(activeEmps.map(e => e.division).filter(d => d))].sort();
+                populateBuilderDivisions();
+            }
         }
         fetchEmployees();
 
-        // --- Global Paste Listener for Images ---
+        // --- TAB NAVIGATION LOGIC ---
+        function switchTab(tabId) {
+            if (tabId === 'encoder') {
+                document.getElementById('encoderTab').style.display = 'grid';
+                document.getElementById('builderTab').style.display = 'none';
+                document.getElementById('tabEncoder').className = "block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors";
+                document.getElementById('tabBuilder').className = "block w-full text-left px-6 py-4 text-sm font-bold bg-transparent border-l-4 border-transparent hover:bg-black/10 transition-colors";
+                document.getElementById('pageTitle').innerText = "SO ENCODER";
+            } else {
+                document.getElementById('encoderTab').style.display = 'none';
+                document.getElementById('builderTab').style.display = 'grid';
+                document.getElementById('tabBuilder').className = "block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors";
+                document.getElementById('tabEncoder').className = "block w-full text-left px-6 py-4 text-sm font-bold bg-transparent border-l-4 border-transparent hover:bg-black/10 transition-colors";
+                document.getElementById('pageTitle').innerText = "PSO BUILDER";
+            }
+        }
+
+        // --- Global Paste Listener for Images (ENCODER ONLY) ---
         document.addEventListener('paste', function(e) {
+            if(document.getElementById('encoderTab').style.display === 'none') return;
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (let index in items) {
                 const item = items[index];
@@ -320,62 +499,56 @@
             }
         });
 
-        // --- Schedule Engine ---
-        function toggleScheduleUI() {
-            document.querySelectorAll('.sched-ui').forEach(el => el.classList.add('hidden'));
-            document.getElementById('ui-' + document.getElementById('scheduleType').value).classList.remove('hidden');
+        // --- Reusable Schedule Engine Logic ---
+        function toggleScheduleUI(selectId, classTarget) {
+            const prefix = selectId.startsWith('b_') ? 'b_' : '';
+            document.querySelectorAll('.' + classTarget).forEach(el => el.classList.add('hidden'));
+            document.getElementById(prefix + 'ui-' + document.getElementById(selectId).value).classList.remove('hidden');
         }
 
-        function generateDates() {
-            const type = document.getElementById('scheduleType').value;
-            computedDates = [];
+        function calculateDatesArray(typeId, singleId, startId, endId, repStartId, weekClass, dayClass) {
+            const type = document.getElementById(typeId).value;
+            let tempDates = [];
 
             if (type === 'single') {
-                const d = document.getElementById('dSingle').value;
-                if(d) computedDates.push(d);
+                const d = document.getElementById(singleId).value;
+                if(d) tempDates.push(d);
             } 
             else if (type === 'range') {
-                let st = new Date(document.getElementById('dStart').value);
-                let en = new Date(document.getElementById('dEnd').value);
+                let st = new Date(document.getElementById(startId).value);
+                let en = new Date(document.getElementById(endId).value);
                 if(st && en && st <= en) {
                     while (st <= en) {
-                        computedDates.push(st.toISOString().split('T')[0]);
+                        tempDates.push(st.toISOString().split('T')[0]);
                         st.setDate(st.getDate() + 1);
                     }
                 }
             } 
             else if (type === 'repetitive') {
-                const stStr = document.getElementById('repStart').value;
-                const checkedWeeks = Array.from(document.querySelectorAll('.rep-week:checked')).map(cb => parseInt(cb.value));
-                const checkedDays = Array.from(document.querySelectorAll('.rep-day:checked')).map(cb => parseInt(cb.value));
+                const stStr = document.getElementById(repStartId).value;
+                const checkedWeeks = Array.from(document.querySelectorAll('.' + weekClass + ':checked')).map(cb => parseInt(cb.value));
+                const checkedDays = Array.from(document.querySelectorAll('.' + dayClass + ':checked')).map(cb => parseInt(cb.value));
 
                 if (stStr && checkedWeeks.length > 0 && checkedDays.length > 0) {
                     let st = new Date(stStr);
-                    // Project 1 year into the future
                     let en = new Date(st);
                     en.setFullYear(en.getFullYear() + 1);
-                    
                     let current = new Date(st.getFullYear(), st.getMonth(), 1);
                     
                     while (current <= en) {
                         const year = current.getFullYear();
                         const month = current.getMonth();
                         const daysInMonth = new Date(year, month + 1, 0).getDate();
-                        
-                        // Counts occurrence of a specific weekday in the current month
                         let dayCounts = { 1:0, 2:0, 3:0, 4:0, 5:0 };
 
                         for (let d = 1; d <= daysInMonth; d++) {
                             let iterDate = new Date(year, month, d);
                             let dayOfWeek = iterDate.getDay();
-                            
-                            // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri
                             if (checkedDays.includes(dayOfWeek)) {
                                 dayCounts[dayOfWeek]++;
-                                // Check if current occurrence is selected in weeks
                                 if (checkedWeeks.includes(dayCounts[dayOfWeek])) {
                                     if (iterDate >= st && iterDate <= en) {
-                                        computedDates.push(iterDate.toISOString().split('T')[0]);
+                                        tempDates.push(iterDate.toISOString().split('T')[0]);
                                     }
                                 }
                             }
@@ -384,16 +557,31 @@
                     }
                 }
             }
+            return tempDates;
+        }
 
-            const label = document.getElementById('computedDatesLabel');
-            if(computedDates.length === 0) {
+        function generateDates() {
+            computedDates = calculateDatesArray('scheduleType', 'dSingle', 'dStart', 'dEnd', 'repStart', 'rep-week', 'rep-day');
+            updateDateLabel('computedDatesLabel', computedDates);
+        }
+
+        function b_generateDates() {
+            b_computedDates = calculateDatesArray('b_scheduleType', 'b_dSingle', 'b_dStart', 'b_dEnd', 'b_repStart', 'b-rep-week', 'b-rep-day');
+            updateDateLabel('b_computedDatesLabel', b_computedDates);
+        }
+
+        function updateDateLabel(labelId, arr) {
+            const label = document.getElementById(labelId);
+            if(arr.length === 0) {
                 label.innerHTML = "<span class='text-red-500'>Missing parameters or invalid selection.</span>";
             } else {
-                label.innerHTML = `<span class="text-[#003811]">${computedDates.length} DATES COMPUTED:</span><br><span class="font-normal text-gray-700 leading-tight">${computedDates.join(', ')}</span>`;
+                label.innerHTML = `<span class="text-[#003811]">${arr.length} DATES COMPUTED:</span><br><span class="font-normal text-gray-700 leading-tight">${arr.join(', ')}</span>`;
             }
         }
 
-        // --- Robust PDF/Image Extraction ---
+        // ==========================================
+        //         ENCODER SPECIFIC LOGIC
+        // ==========================================
         async function runExtraction(pastedFile = null) {
             const fileInput = document.getElementById('fileUpload');
             const btn = document.getElementById('extractBtn');
@@ -417,8 +605,6 @@
                     if (file.type === "application/pdf") {
                         status.innerText = `Reading PDF (${file.name})...`;
                         text = await extractNativePDFText(file);
-                        
-                        // Fallback to OCR if PDF has no digital text (scanned image)
                         if (text.trim().length < 50) {
                             status.innerText = `Scanned PDF detected. Running OCR...`;
                             text = await extractOCRFromPDF(file);
@@ -430,19 +616,16 @@
                         await worker.terminate();
                         text = ret.data.text;
                     } else {
-                        console.warn("Unsupported format:", file.type);
                         continue;
                     }
                     textArea.value = textArea.value + (textArea.value ? "\n\n" : "") + text;
                 }
                 status.innerText = "Extraction complete! You can upload/paste more to add to the list.";
             } catch (err) {
-                console.error(err);
                 status.innerText = "Extraction Failed.";
                 alert("Extraction Error: Make sure your files are clear images or readable PDFs.");
             } finally {
                 btn.disabled = false;
-                // Reset file input so same file can be selected again if needed
                 if(!pastedFile) fileInput.value = '';
             }
         }
@@ -464,14 +647,12 @@
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let fullText = '';
             const worker = await Tesseract.createWorker('eng');
-            
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
-                const viewport = page.getViewport({ scale: 1.5 }); // Adjusted scale to prevent memory crash
+                const viewport = page.getViewport({ scale: 1.5 });
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 canvas.height = viewport.height; canvas.width = viewport.width;
-                
                 await page.render({ canvasContext: ctx, viewport: viewport }).promise;
                 const ret = await worker.recognize(canvas.toDataURL('image/png'));
                 fullText += ret.data.text + '\n';
@@ -480,45 +661,26 @@
             return fullText;
         }
 
-        // --- Personnel Matching (Replace vs Append) ---
         function matchPersonnel(isReplace) {
             const text = document.getElementById('rawText').value;
             if(!text.trim()) return alert("No raw text to process.");
-
-            // Chunking: newlines, commas, double spaces
             let chunks = text.split(/[\n,;]+|\s{2,}/).map(f => f.trim().replace(/[^a-zA-ZÑñ. -]/g, '')).filter(f => f.length > 4);
-
-            const fuse = new Fuse(employees, {
-                keys: ['full_name'],
-                includeScore: true,
-                threshold: 0.35, 
-                ignoreLocation: true
-            });
-
-            if (isReplace) {
-                matchedPersonnel = [];
-            }
+            const fuse = new Fuse(employees, { keys: ['full_name'], includeScore: true, threshold: 0.35, ignoreLocation: true });
+            if (isReplace) matchedPersonnel = [];
             let unmatchedFragments = [];
 
             chunks.forEach(frag => {
                 const lower = frag.toLowerCase();
                 if (lower.includes("special order") || lower.includes("republic") || lower.includes("department")) return; 
-                
                 const results = fuse.search(frag);
                 if (results.length > 0 && results[0].score < 0.4) {
                     const emp = results[0].item;
-                    if (!matchedPersonnel.some(m => m.emp_id === emp.emp_id)) {
-                        matchedPersonnel.push(emp);
-                    }
-                } else {
-                    unmatchedFragments.push(frag);
-                }
+                    if (!matchedPersonnel.some(m => m.emp_id === emp.emp_id)) matchedPersonnel.push(emp);
+                } else { unmatchedFragments.push(frag); }
             });
 
             unmatchedFragments = [...new Set(unmatchedFragments)];
             renderMatches(unmatchedFragments);
-            
-            // Clear the text box automatically to prepare for the next batch/paste
             document.getElementById('rawText').value = '';
             document.getElementById('extractStatus').innerText = "Text cleared for next batch.";
         }
@@ -526,7 +688,6 @@
         function renderMatches(unmatched) {
             document.getElementById('matchCount').innerText = `${matchedPersonnel.length} MATCHED`;
             const listUI = document.getElementById('matchedList');
-            
             if (matchedPersonnel.length === 0) {
                 listUI.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded text-xs font-bold text-center border border-red-200">No matches found. Clean up text or encode manually.</div>`;
             } else {
@@ -540,14 +701,11 @@
                     </div>
                 `).join('');
             }
-
             const errUI = document.getElementById('unmatchedAlert');
             if (unmatched.length > 0) {
                 document.getElementById('unmatchedList').innerHTML = unmatched.map(u => `<div class="truncate">• ${u}</div>`).join('');
                 errUI.classList.remove('hidden');
-            } else {
-                errUI.classList.add('hidden');
-            }
+            } else { errUI.classList.add('hidden'); }
         }
 
         function removeMatch(id) {
@@ -555,7 +713,6 @@
             renderMatches([]); 
         }
 
-        // --- Database Encode ---
         async function commitToDatabase() {
             const type = document.getElementById('soType').value;
             const no = document.getElementById('soNumber').value;
@@ -574,24 +731,15 @@
             for (const emp of matchedPersonnel) {
                 for (const date of computedDates) {
                     payload.push({
-                        pso_no: fullSoNumber,
-                        subject: subj,
-                        emp_id: emp.emp_id,
-                        full_name: emp.full_name,
-                        division: emp.division || emp.unit,
-                        start_date: date, 
-                        end_date: date,   
-                        duration: dur
+                        pso_no: fullSoNumber, subject: subj, emp_id: emp.emp_id, full_name: emp.full_name,
+                        division: emp.division || emp.unit, start_date: date, end_date: date, duration: dur
                     });
                 }
             }
-
             const { error } = await supabaseClient.from('pso_records').insert(payload);
-            
             if (error) alert("Database Error: " + error.message);
             else {
                 alert(`Successfully Encoded ${fullSoNumber}!`);
-                document.getElementById('rawText').value = "";
                 matchedPersonnel = []; computedDates = [];
                 document.getElementById('soNumber').value = ""; 
                 document.getElementById('soSubject').value = "";
@@ -600,6 +748,165 @@
             }
         }
 
+        // ==========================================
+        //         BUILDER SPECIFIC LOGIC
+        // ==========================================
+        
+        function populateBuilderDivisions() {
+            const divSel = document.getElementById('b_divFilter');
+            divSel.innerHTML = '<option value="" disabled selected>Select a Division...</option>' + 
+                               uniqueDivisions.map(d => `<option value="${d}">${d}</option>`).join('');
+        }
+
+        function b_toggleSelectionMode() {
+            const mode = document.getElementById('b_selMode').value;
+            if(mode === 'PROVINCE') {
+                document.getElementById('b_modeProvince').classList.remove('hidden');
+                document.getElementById('b_modeDivision').classList.add('hidden');
+            } else {
+                document.getElementById('b_modeProvince').classList.add('hidden');
+                document.getElementById('b_modeDivision').classList.remove('hidden');
+            }
+        }
+
+        function b_populatePositions() {
+            const selectedDiv = document.getElementById('b_divFilter').value;
+            const posSel = document.getElementById('b_posFilter');
+            
+            const activeEmps = employees.filter(e => !e.status || e.status.toUpperCase() === 'ACTIVE');
+            let posInDiv = [...new Set(activeEmps.filter(e => e.division === selectedDiv).map(e => e.position).filter(p => p))].sort();
+            
+            posSel.innerHTML = '<option value="ALL">All Positions in Division</option>' + 
+                               posInDiv.map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+
+        function b_addParticipants() {
+            const mode = document.getElementById('b_selMode').value;
+            let empsToAdd = [];
+            const activeEmps = employees.filter(e => !e.status || e.status.toUpperCase() === 'ACTIVE');
+
+            if (mode === 'PROVINCE') {
+                const typeFilter = document.getElementById('b_empTypeFilter').value; // ALL, REGULAR, SPLIT
+                if(typeFilter === 'ALL') {
+                    empsToAdd = [...activeEmps];
+                } else {
+                    empsToAdd = activeEmps.filter(e => e.type && e.type.toUpperCase() === typeFilter);
+                }
+            } else {
+                const divFilter = document.getElementById('b_divFilter').value;
+                const posFilter = document.getElementById('b_posFilter').value;
+                if(!divFilter) return alert("Please select a Division first.");
+                
+                empsToAdd = activeEmps.filter(e => e.division === divFilter);
+                if(posFilter !== 'ALL') {
+                    empsToAdd = empsToAdd.filter(e => e.position === posFilter);
+                }
+            }
+
+            let addedCount = 0;
+            empsToAdd.forEach(emp => {
+                if (!b_roster.some(m => m.emp_id === emp.emp_id)) {
+                    b_roster.push(emp);
+                    addedCount++;
+                }
+            });
+
+            if(addedCount === 0) {
+                alert("No new personnel matched your filters (or they are already added).");
+            } else {
+                b_renderRoster();
+            }
+        }
+
+        function b_removeParticipant(id) {
+            b_roster = b_roster.filter(m => m.emp_id !== id);
+            b_renderRoster();
+        }
+
+        function b_clearRoster() {
+            if(!confirm("Clear all selected personnel?")) return;
+            b_roster = [];
+            b_renderRoster();
+        }
+
+        function b_renderRoster() {
+            document.getElementById('b_rosterCount').innerText = b_roster.length;
+            const listUI = document.getElementById('b_rosterList');
+            
+            if (b_roster.length === 0) {
+                listUI.innerHTML = `
+                    <div class="h-full flex flex-col items-center justify-center opacity-40 text-gray-500">
+                        <span class="text-4xl mb-2">👥</span>
+                        <p class="text-xs font-bold uppercase text-center">Add groups to build roster.</p>
+                    </div>`;
+            } else {
+                listUI.innerHTML = b_roster.map(emp => `
+                    <div class="flex justify-between items-center bg-white p-2 rounded border border-gray-200 mb-1 shadow-sm">
+                        <div class="truncate mr-2">
+                            <p class="text-[11px] font-bold text-[#003811] leading-tight uppercase truncate">${emp.full_name}</p>
+                            <p class="text-[9px] text-gray-500 font-bold uppercase truncate">${emp.position || 'STAFF'} | ${emp.division || emp.unit || 'DAR'}</p>
+                        </div>
+                        <button onclick="b_removeParticipant('${emp.emp_id}')" class="text-red-400 hover:text-red-600 font-bold px-2 text-sm shrink-0">✕</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        async function saveDraftAndPrint() {
+            const type = document.getElementById('b_soType').value;
+            const no = document.getElementById('b_soNumber').value;
+            const yr = document.getElementById('b_soYear').value;
+            const subj = document.getElementById('b_soSubject').value.trim();
+            const content = document.getElementById('b_psoContent').value.trim();
+            const dur = document.getElementById('b_soDuration').value;
+
+            if(!no || !yr || !subj || !content) return alert("Type, Number, Year, Subject, and Body Content are required.");
+            if(b_computedDates.length === 0) return alert("Compute Schedule Dates first.");
+            if(b_roster.length === 0) return alert("Add at least one participant to the roster.");
+
+            const fullSoNumber = `${type} ${no} series of ${yr}`;
+
+            // Save JSON to pso_metadata as a DRAFT. DO NOT INSERT TO pso_records.
+            const { error: metaErr } = await supabaseClient.from('pso_metadata').upsert({
+                pso_no: fullSoNumber,
+                type: type,
+                series_year: yr,
+                subject: subj,
+                duration: dur,
+                body_content: content,
+                dates_json: b_computedDates,
+                participants_json: b_roster,
+                status: 'DRAFT'
+            }, { onConflict: 'pso_no' });
+
+            if (metaErr) return alert("Failed to save draft: " + metaErr.message);
+
+            // Populate Print Area
+            document.getElementById('printPsoNo').innerText = fullSoNumber;
+            document.getElementById('printSubject').innerText = subj;
+            document.getElementById('printDates').innerText = b_computedDates.join(', ');
+            document.getElementById('printContent').innerText = content;
+            document.getElementById('printParticipants').innerHTML = b_roster.map(emp => 
+                `<div>• ${emp.full_name} <span style="color:gray; font-size:0.8em">(${emp.position || ''})</span></div>`
+            ).join('');
+
+            const qrContainer = document.getElementById("qrcode");
+            qrContainer.innerHTML = ""; 
+            new QRCode(qrContainer, { text: fullSoNumber, width: 90, height: 90 });
+
+            // Allow rendering then print
+            setTimeout(() => { 
+                window.print(); 
+                alert(`Draft Saved! Pending Signature for ${fullSoNumber}. Open Manage Active Orders to Post it once signed.`);
+                // Clear Form automatically
+                b_roster = []; b_computedDates = [];
+                document.getElementById('b_soNumber').value = ""; 
+                document.getElementById('b_soSubject').value = "";
+                document.getElementById('b_psoContent').value = "";
+                b_renderRoster(); 
+                document.getElementById('b_computedDatesLabel').innerHTML = "No dates computed yet.";
+            }, 400);
+        }
 
         // ==========================================
         // --- MANAGE / CANCEL / RESCHEDULE LOGIC ---
@@ -623,45 +930,56 @@
             renderSOList(allActiveSOs);
         }
 
-        // Fetch and display all active SOs
         async function loadAllActiveSOs() {
             const listDiv = document.getElementById('allSoList');
-            listDiv.innerHTML = `<div class="flex items-center justify-center h-full mt-10"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading Active Orders...</span></div>`;
-            
-            // Get today to only show "active" meaning they have dates today or in the future
+            listDiv.innerHTML = `<div class="flex items-center justify-center h-full mt-10"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading Orders...</span></div>`;
             const today = new Date().toISOString().split('T')[0];
             
-            const { data, error } = await supabaseClient.from('pso_records')
-                .select('*')
-                .gte('start_date', today) // Only show ones that are currently active/future
-                .order('start_date', { ascending: true });
+            // Fetch both Active Records AND Pending Drafts
+            const [recordsRes, draftsRes] = await Promise.all([
+                supabaseClient.from('pso_records').select('*').gte('start_date', today).order('start_date', { ascending: true }),
+                supabaseClient.from('pso_metadata').select('*').eq('status', 'DRAFT')
+            ]);
             
-            if (error) {
-                listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error: ${error.message}</div>`;
-                return;
+            if (recordsRes.error || draftsRes.error) { 
+                listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error fetching orders.</div>`; 
+                return; 
             }
 
-            // Group by PSO No
             const soMap = {};
-            data.forEach(d => {
-                if (!soMap[d.pso_no]) {
-                    soMap[d.pso_no] = {
-                        pso_no: d.pso_no,
-                        subject: d.subject || 'No Subject',
-                        dates: new Set(),
-                        emps: new Set()
-                    };
-                }
+            
+            // 1. Group active records normally
+            recordsRes.data.forEach(d => {
+                if (!soMap[d.pso_no]) soMap[d.pso_no] = { pso_no: d.pso_no, subject: d.subject || 'No Subject', dates: new Set(), emps: new Set(), isDraft: false };
                 soMap[d.pso_no].dates.add(d.start_date);
                 soMap[d.pso_no].emps.add(d.emp_id);
             });
 
-            allActiveSOs = Object.values(soMap).map(so => ({
-                ...so,
-                dateCount: so.dates.size,
-                empCount: so.emps.size,
-                datesArr: Array.from(so.dates).sort()
-            })).sort((a,b) => b.datesArr[0]?.localeCompare(a.datesArr[0])); // Sort by recent dates
+            // 2. Format Drafts
+            draftsRes.data.forEach(d => {
+                const draftDates = d.dates_json || [];
+                const draftEmps = d.participants_json || [];
+                
+                soMap[d.pso_no] = { 
+                    pso_no: d.pso_no, 
+                    subject: d.subject || 'No Subject', 
+                    datesArr: draftDates.sort(),
+                    dateCount: draftDates.length,
+                    empCount: draftEmps.length,
+                    isDraft: true,
+                    draftData: d // Keep original data for posting later
+                };
+            });
+
+            // Merge and map
+            allActiveSOs = Object.values(soMap).map(so => {
+                if(!so.isDraft) {
+                    so.dateCount = so.dates.size;
+                    so.empCount = so.emps.size;
+                    so.datesArr = Array.from(so.dates).sort();
+                }
+                return so;
+            }).sort((a,b) => b.datesArr[0]?.localeCompare(a.datesArr[0]));
 
             renderSOList(allActiveSOs);
         }
@@ -671,44 +989,51 @@
             const listDiv = document.getElementById('allSoList');
             listDiv.innerHTML = `<div class="flex items-center justify-center h-full mt-10"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Searching Database...</span></div>`;
             
-            let req = supabaseClient.from('pso_records').select('*');
-            
+            let recReq = supabaseClient.from('pso_records').select('*');
+            let metaReq = supabaseClient.from('pso_metadata').select('*').eq('status', 'DRAFT');
+
             if (query) {
-                req = req.or(`pso_no.ilike.%${query}%,subject.ilike.%${query}%`);
+                recReq = recReq.or(`pso_no.ilike.%${query}%,subject.ilike.%${query}%`);
+                metaReq = metaReq.or(`pso_no.ilike.%${query}%,subject.ilike.%${query}%`);
             } else {
-                const today = new Date().toISOString().split('T')[0];
-                req = req.gte('start_date', today);
+                recReq = recReq.gte('start_date', new Date().toISOString().split('T')[0]);
             }
             
-            req = req.order('start_date', { ascending: true });
+            const [recordsRes, draftsRes] = await Promise.all([
+                recReq.order('start_date', { ascending: true }),
+                metaReq
+            ]);
             
-            const { data, error } = await req;
-            
-            if (error) {
-                listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error: ${error.message}</div>`;
-                return;
+            if (recordsRes.error || draftsRes.error) { 
+                listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error searching orders.</div>`; 
+                return; 
             }
 
             const soMap = {};
-            data.forEach(d => {
-                if (!soMap[d.pso_no]) {
-                    soMap[d.pso_no] = {
-                        pso_no: d.pso_no,
-                        subject: d.subject || 'No Subject',
-                        dates: new Set(),
-                        emps: new Set()
-                    };
-                }
+            
+            recordsRes.data.forEach(d => {
+                if (!soMap[d.pso_no]) soMap[d.pso_no] = { pso_no: d.pso_no, subject: d.subject || 'No Subject', dates: new Set(), emps: new Set(), isDraft: false };
                 soMap[d.pso_no].dates.add(d.start_date);
                 soMap[d.pso_no].emps.add(d.emp_id);
             });
 
-            allActiveSOs = Object.values(soMap).map(so => ({
-                ...so,
-                dateCount: so.dates.size,
-                empCount: so.emps.size,
-                datesArr: Array.from(so.dates).sort()
-            })).sort((a,b) => b.datesArr[0]?.localeCompare(a.datesArr[0]));
+            draftsRes.data.forEach(d => {
+                const draftDates = d.dates_json || [];
+                const draftEmps = d.participants_json || [];
+                soMap[d.pso_no] = { 
+                    pso_no: d.pso_no, subject: d.subject || 'No Subject', datesArr: draftDates.sort(),
+                    dateCount: draftDates.length, empCount: draftEmps.length, isDraft: true, draftData: d 
+                };
+            });
+
+            allActiveSOs = Object.values(soMap).map(so => {
+                if(!so.isDraft) {
+                    so.dateCount = so.dates.size;
+                    so.empCount = so.emps.size;
+                    so.datesArr = Array.from(so.dates).sort();
+                }
+                return so;
+            }).sort((a,b) => b.datesArr[0]?.localeCompare(a.datesArr[0]));
 
             renderSOList(allActiveSOs);
         }
@@ -719,15 +1044,17 @@
                 listDiv.innerHTML = `<div class="text-gray-500 font-bold p-8 text-center text-sm uppercase mt-10">No Orders Found.</div>`;
                 return;
             }
-
             listDiv.innerHTML = soArray.map(so => `
                 <div class="bg-white p-5 rounded border border-gray-200 shadow-sm flex justify-between items-center hover:border-[#003811] cursor-pointer transition group" onclick="viewSODetails('${so.pso_no}')">
                     <div>
-                        <h3 class="font-black text-[#003811] text-lg uppercase">${so.pso_no}</h3>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-black text-[#003811] text-lg uppercase">${so.pso_no}</h3>
+                            ${so.isDraft ? '<span class="bg-yellow-100 text-yellow-800 text-[10px] font-black px-2 py-0.5 rounded border border-yellow-300">🟡 PENDING SIGNATURE</span>' : ''}
+                        </div>
                         <p class="text-xs text-gray-500 font-bold mb-3">${so.subject}</p>
                         <div class="flex gap-3 text-[10px] font-bold text-gray-500 uppercase">
                             <span class="bg-gray-100 border border-gray-200 px-2 py-1 rounded">👥 ${so.empCount} Personnel</span>
-                            <span class="bg-gray-100 border border-gray-200 px-2 py-1 rounded">📅 ${so.dateCount} Active Dates</span>
+                            <span class="bg-gray-100 border border-gray-200 px-2 py-1 rounded">📅 ${so.dateCount} Dates</span>
                         </div>
                     </div>
                     <div class="text-gray-300 text-3xl font-light px-4 group-hover:text-[#D4AF37] transition transform group-hover:translate-x-1">→</div>
@@ -737,11 +1064,9 @@
 
         function filterSOList(query) {
             const q = query.toLowerCase();
-            const filtered = allActiveSOs.filter(so => so.pso_no.toLowerCase().includes(q) || so.subject.toLowerCase().includes(q));
-            renderSOList(filtered);
+            renderSOList(allActiveSOs.filter(so => so.pso_no.toLowerCase().includes(q) || so.subject.toLowerCase().includes(q)));
         }
 
-        // Detail View Logic
         async function viewSODetails(query) {
             activeManageSO = query;
             document.getElementById('soListContainer').classList.add('hidden');
@@ -749,16 +1074,39 @@
             document.getElementById('soDetailContainer').classList.add('flex');
 
             const resArea = document.getElementById('soSearchResults');
+            const soRecord = allActiveSOs.find(so => so.pso_no === query);
+
+            // --- Render DRAFT View ---
+            if (soRecord && soRecord.isDraft) {
+                resArea.innerHTML = `
+                    <div class="bg-yellow-50 p-6 border-b border-yellow-200 flex flex-col items-center justify-center text-center shrink-0 h-full">
+                        <div class="text-5xl mb-4">✍️</div>
+                        <h3 class="font-black text-[#003811] text-2xl uppercase mb-2">${query}</h3>
+                        <p class="text-sm text-gray-600 font-bold mb-8 max-w-lg">This Special Order has been drafted and printed, but it is waiting for the physical signature. <br><br>Once signed, post it to the system schedule to finalize it.</p>
+                        
+                        <div class="flex gap-4 w-full max-w-md">
+                            <button onclick="postDraftToRecords('${query}')" class="flex-1 bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">
+                                Mark Signed & Post
+                            </button>
+                            <button onclick="deleteDraft('${query}')" class="bg-red-100 text-red-700 hover:bg-red-200 py-4 px-6 rounded text-sm font-black uppercase tracking-widest active:scale-95 transition border border-red-200">
+                                Delete Draft
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // --- Render ACTIVE View (Existing code) ---
             resArea.innerHTML = `<div class="h-full flex items-center justify-center"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading Details...</span></div>`;
 
             const { data, error } = await supabaseClient.from('pso_records').select('*').eq('pso_no', query).order('start_date', { ascending: true });
-            
             if (error) { resArea.innerHTML = `<div class="p-8 text-red-600 font-bold text-center">Error: ${error.message}</div>`; return; }
             if (!data || data.length === 0) { resArea.innerHTML = `<div class="p-8 text-gray-500 font-bold text-center uppercase tracking-widest">No records found for<br><span class="text-[#003811] text-lg">${query}</span></div>`; return; }
 
             const subject = data[0].subject || '';
             const empMap = {};
-            const dateMap = {}; // Maps start_date to duration
+            const dateMap = {}; 
 
             data.forEach(d => {
                 if(!empMap[d.emp_id]) empMap[d.emp_id] = { name: d.full_name, division: d.division };
@@ -844,6 +1192,56 @@
             `;
         }
 
+        // Action: Post Draft to Live
+        async function postDraftToRecords(psoNo) {
+            const soRecord = allActiveSOs.find(so => so.pso_no === psoNo);
+            if(!soRecord || !soRecord.draftData) return alert("Draft data lost. Refresh and try again.");
+            
+            if(!confirm(`Are you sure the document is signed? This will post ${psoNo} to the live employee schedules.`)) return;
+
+            const draft = soRecord.draftData;
+            const dates = draft.dates_json || [];
+            const emps = draft.participants_json || [];
+            const payload = [];
+
+            emps.forEach(emp => {
+                dates.forEach(date => {
+                    payload.push({
+                        pso_no: psoNo,
+                        subject: draft.subject,
+                        emp_id: emp.emp_id,
+                        full_name: emp.full_name,
+                        division: emp.division || emp.unit,
+                        start_date: date,
+                        end_date: date,
+                        duration: draft.duration
+                    });
+                });
+            });
+
+            // 1. Insert to Records
+            const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
+            if (insErr) return alert("Database Error inserting records: " + insErr.message);
+
+            // 2. Update Metadata status
+            const { error: updErr } = await supabaseClient.from('pso_metadata').update({ status: 'POSTED' }).eq('pso_no', psoNo);
+            if (updErr) alert("Warning: Records added but draft status not updated. " + updErr.message);
+            else alert("Success! The order is now live on employee schedules.");
+
+            loadAllActiveSOs();
+            backToSoList();
+        }
+
+        // Action: Delete Draft
+        async function deleteDraft(psoNo) {
+            if(!confirm(`Permanently delete the draft for ${psoNo}? This cannot be undone.`)) return;
+            
+            const { error } = await supabaseClient.from('pso_metadata').delete().eq('pso_no', psoNo);
+            if (error) alert("Error: " + error.message);
+            else { alert("Draft deleted."); loadAllActiveSOs(); backToSoList(); }
+        }
+
+
         // Manage Modal Intelligent Search Logic
         function mngSearchEmp(query) {
             const resDiv = document.getElementById('mngEmpResults');
@@ -875,7 +1273,7 @@
             document.getElementById('mngEmpResults').classList.add('hidden');
         }
 
-        // Action Functions
+        // Active Order Management Functions
         async function cancelEntireSO() {
             if(!confirm(`WARNING: This will permanently cancel ALL dates and personnel for ${activeManageSO}. Continue?`)) return;
             const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO);
