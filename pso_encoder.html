@@ -65,7 +65,7 @@
             nav, main, .modal-overlay { display: none !important; }
             
             #printArea, #printArea * { visibility: visible; }
-            #printArea { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            #printArea { position: absolute; left: 0; top: 0; width: 100%; display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
             #printBodyHTML, #printBodyHTML * { text-align: justify !important; }
             
@@ -74,14 +74,14 @@
             .print-item { page-break-inside: avoid; break-inside: avoid; }
             
             body { counter-reset: page; }
-            #printFooter { position: fixed; bottom: 15px; right: 40px; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; }
+            #printFooter { position: fixed; bottom: 15px; right: 40px; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; z-index: 10; }
             #printFooter::after { content: "Page " counter(page) " of " counter(pages); }
         }
         
-        /* Strict 8.5 x 13 Long Bond / Folio Paper Size */
+        /* Strict 8.5 x 13 Long Bond / Folio Paper Size with NO page margin to allow full-bleed background image */
         @page { 
             size: 8.5in 13in; 
-            margin: 15mm; 
+            margin: 0 !important; 
         }
     </style>
 </head>
@@ -441,7 +441,7 @@
                                 <span id="b_rosterCount" class="text-lg font-black text-[#003811]">0</span>
                             </div>
                             <button onclick="saveDraftAndPrint()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">
-                                SAVE DRAFT & GENERATE PDF
+                                SAVE DRAFT & PRINT
                             </button>
                         </div>
                     </div>
@@ -452,7 +452,9 @@
     </main>
 
     <div id="printArea" class="hidden relative z-[9999] bg-white">
-        <div id="printContentWrapper" style="font-family: 'Roboto', sans-serif; color: black; max-width: 816px; margin: 0 auto; box-sizing: border-box; min-height: 100vh;">
+        <img id="printBgImg" src="" alt="" style="display:none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; object-fit: cover;">
+        
+        <div id="printContentWrapper" style="position: relative; z-index: 1; font-family: 'Roboto', sans-serif; color: black; max-width: 816px; margin: 0 auto; padding: 1.5in 1in 1.5in 1in; box-sizing: border-box; min-height: 100vh;">
             
             <h2 style="text-align: left; font-weight: bold; font-size: 13pt; margin-bottom: 2px;">PROVINCIAL SPECIAL ORDER No. <span id="printPsoNoOnly"></span></h2>
             <h3 style="text-align: left; font-size: 11pt; margin-bottom: 25px; font-weight: bold;">Series of <span id="printSeriesYear"></span></h3>
@@ -534,7 +536,8 @@
         async function getBgMemo() {
             if (cachedBgMemo) return cachedBgMemo;
             try {
-                const { data } = await supabaseClient.storage.from('e-sign').download('bg_memo.jpg');
+                // Fetching the exact image uploaded by user
+                const { data } = await supabaseClient.storage.from('e-sign').download('image_bee43c.png');
                 if (data) {
                     return new Promise((resolve) => {
                         const reader = new FileReader();
@@ -545,7 +548,7 @@
                         reader.readAsDataURL(data);
                     });
                 }
-            } catch(e) { console.error("Error downloading bg_memo.jpg", e); }
+            } catch(e) { console.error("Error downloading background image", e); }
             return null;
         }
 
@@ -1042,7 +1045,7 @@
             }
         }
 
-        // Dedicated Clean PDF Output Function
+        // Dedicated Clean Print Output Function using the native browser printer 
         function triggerPrint(psoNoText, yr, subj, datesArr, contentHTML, rosterArr, qrText) {
             
             document.getElementById('printPsoNoOnly').innerText = psoNoText;
@@ -1080,32 +1083,24 @@
                 new QRCode(qrContainer, { text: String(qrText), width: 80, height: 80 });
             }
 
-            // Show the print area just to generate the layout
+            // Unhide print area
             const printArea = document.getElementById('printArea');
             printArea.classList.remove('hidden');
             
             setTimeout(async () => { 
                 const bgBase64 = await getBgMemo();
                 if (bgBase64) {
-                    const wrapper = document.getElementById('printContentWrapper');
-                    wrapper.style.backgroundImage = `url(${bgBase64})`;
-                    wrapper.style.backgroundSize = '100% 100%';
-                    wrapper.style.backgroundPosition = 'top center';
-                    wrapper.style.backgroundRepeat = 'no-repeat';
+                    // Apply image to the separate physical img tag to prevent downsampling
+                    const bgImg = document.getElementById('printBgImg');
+                    bgImg.src = bgBase64;
+                    bgImg.style.display = 'block';
                 }
 
-                var opt = {
-                  margin:       [1.5, 1, 1.5, 1], // Top, Right, Bottom, Left margins in inches
-                  filename:     `${psoNoText}_PSO.pdf`,
-                  image:        { type: 'jpeg', quality: 1 },
-                  html2canvas:  { scale: 4, useCORS: true }, // Scale 4 = ultra high quality
-                  jsPDF:        { unit: 'in', format: [8.5, 13], orientation: 'portrait' }
-                };
-
-                html2pdf().set(opt).from(printArea).save().then(() => {
-                    printArea.style.display = '';
-                    printArea.classList.add('hidden');
-                });
+                window.print(); 
+                
+                // Hide after dialog closes
+                printArea.classList.add('hidden');
+                document.getElementById('printBgImg').style.display = 'none';
             }, 300);
         }
 
@@ -1472,7 +1467,7 @@
             
             let reprintBtnHTML = '';
             if (soRecord && soRecord.draftData) {
-                reprintBtnHTML = `<button onclick="reprintPSO('${query}')" class="bg-[#003811] text-white hover:bg-[#002200] font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow mr-2">GENERATE PDF</button>`;
+                reprintBtnHTML = `<button onclick="reprintPSO('${query}')" class="bg-[#003811] text-white hover:bg-[#002200] font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow mr-2">PRINT PSO</button>`;
             }
 
             resArea.innerHTML = `
@@ -1651,7 +1646,7 @@
                 rawNo = rawNo.replace(meta.type, '').trim();
             }
             
-            triggerPrint(rawNo, meta.series_year, meta.subject, meta.dates_json || [], meta.body_content, meta.participants_json || []);
+            triggerPrint(rawNo, meta.series_year, meta.subject, meta.dates_json || [], meta.body_content, meta.participants_json || [], psoNo);
         }
 
         // Active Order Management Functions (Manage Modal inputs)
