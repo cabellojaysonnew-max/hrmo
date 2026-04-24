@@ -296,6 +296,14 @@
                     <div class="card p-6 flex flex-col h-1/2 border-t-2 border-t-gray-200">
                         <h2 class="form-label border-b border-gray-100 pb-2 mb-4 shrink-0 text-gray-500">3. Body Content</h2>
                         <textarea id="b_psoContent" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs bg-white outline-none focus:border-[#003811] resize-none" placeholder="Enter the exact body paragraphs of the PSO here..."></textarea>
+                        
+                        <div class="flex justify-between items-center mt-2 shrink-0">
+                            <button onclick="checkGrammar()" id="grammarBtn" class="bg-gray-100 border border-gray-300 text-[#003811] px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-gray-200 transition flex items-center gap-1 shadow-sm">
+                                ✨ AI Grammar Check
+                            </button>
+                            <span id="grammarStatus" class="text-[10px] text-gray-500 font-bold"></span>
+                        </div>
+                        <div id="grammarResults" class="hidden flex-col gap-2 mt-2 overflow-y-auto shrink-0 border border-gray-200 rounded p-2 bg-gray-50 text-xs shadow-inner h-32"></div>
                     </div>
 
                     <div class="card p-6 flex flex-col h-1/2 border-t-2 border-t-gray-200">
@@ -359,7 +367,6 @@
                                 <span class="text-xs font-bold text-gray-500 uppercase">Total Selected:</span>
                                 <span id="b_rosterCount" class="text-lg font-black text-[#003811]">0</span>
                             </div>
-                            
                             <button onclick="saveDraftAndPrint()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">
                                 SAVE DRAFT & PRINT (W/ QR)
                             </button>
@@ -1384,6 +1391,90 @@
 
             if(error) alert("Error modifying: " + error.message);
             else { alert("Schedule successfully updated!"); viewSODetails(activeManageSO); }
+        }
+
+        // ==========================================
+        // --- AI GRAMMAR CHECKER ---
+        // ==========================================
+        async function checkGrammar() {
+            const contentArea = document.getElementById('b_psoContent');
+            const text = contentArea.value.trim();
+            const status = document.getElementById('grammarStatus');
+            const resultsDiv = document.getElementById('grammarResults');
+            const btn = document.getElementById('grammarBtn');
+
+            if (!text) {
+                status.innerText = "No text to check.";
+                return;
+            }
+
+            btn.disabled = true;
+            status.innerText = "Checking grammar...";
+            resultsDiv.innerHTML = "";
+            resultsDiv.classList.add('hidden');
+
+            try {
+                const params = new URLSearchParams();
+                params.append('text', text);
+                params.append('language', 'en-US');
+
+                const response = await fetch('https://api.languagetoolplus.com/v2/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params
+                });
+
+                const data = await response.json();
+                
+                if (data.matches && data.matches.length > 0) {
+                    status.innerText = `Found ${data.matches.length} suggestions.`;
+                    resultsDiv.classList.remove('hidden');
+                    
+                    data.matches.forEach(match => {
+                        if(match.replacements && match.replacements.length > 0) {
+                            const suggestion = match.replacements[0].value;
+                            const errorText = text.substring(match.offset, match.offset + match.length);
+                            
+                            const item = document.createElement('div');
+                            item.className = "flex justify-between items-center bg-white p-2 border border-gray-200 rounded shadow-sm";
+                            item.innerHTML = `
+                                <div>
+                                    <p class="text-[10px] text-red-500 line-through">${errorText}</p>
+                                    <p class="text-[11px] font-bold text-green-700">${suggestion}</p>
+                                    <p class="text-[9px] text-gray-500">${match.message}</p>
+                                </div>
+                                <button onclick="applyGrammarFix(this, '${errorText.replace(/'/g, "\\'")}', '${suggestion.replace(/'/g, "\\'")}')" class="bg-[#003811] text-white px-2 py-1 rounded text-[9px] font-bold hover:bg-[#002200] shrink-0 ml-2">FIX</button>
+                            `;
+                            resultsDiv.appendChild(item);
+                        }
+                    });
+                    
+                    if(resultsDiv.innerHTML === "") {
+                        status.innerText = "No fixable errors found.";
+                    }
+                } else {
+                    status.innerText = "✨ Text looks perfect!";
+                }
+            } catch (error) {
+                console.error(error);
+                status.innerText = "API Error. Try again later.";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function applyGrammarFix(btnElement, errorText, replacement) {
+            const contentArea = document.getElementById('b_psoContent');
+            contentArea.value = contentArea.value.replace(errorText, replacement);
+            btnElement.parentElement.style.display = 'none';
+            
+            const resultsDiv = document.getElementById('grammarResults');
+            if(resultsDiv.querySelectorAll('div[style=""]').length === 0 && resultsDiv.querySelectorAll('div:not([style*="none"])').length === 0) {
+                document.getElementById('grammarStatus').innerText = "✨ All fixes applied!";
+                resultsDiv.classList.add('hidden');
+            } else {
+                document.getElementById('grammarStatus').innerText = "Fix applied.";
+            }
         }
 
     </script>
