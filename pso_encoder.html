@@ -586,7 +586,7 @@
                 }
             }
 
-            const { error } = await supabaseClient.from('pso_encoder').insert(payload);
+            const { error } = await supabaseClient.from('pso_records').insert(payload);
             
             if (error) alert("Database Error: " + error.message);
             else {
@@ -631,7 +631,7 @@
             // Get today to only show "active" meaning they have dates today or in the future
             const today = new Date().toISOString().split('T')[0];
             
-            const { data, error } = await supabaseClient.from('pso_encoder')
+            const { data, error } = await supabaseClient.from('pso_records')
                 .select('*')
                 .gte('start_date', today) // Only show ones that are currently active/future
                 .order('start_date', { ascending: true });
@@ -671,7 +671,7 @@
             const listDiv = document.getElementById('allSoList');
             listDiv.innerHTML = `<div class="flex items-center justify-center h-full mt-10"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Searching Database...</span></div>`;
             
-            let req = supabaseClient.from('pso_encoder').select('*');
+            let req = supabaseClient.from('pso_records').select('*');
             
             if (query) {
                 req = req.or(`pso_no.ilike.%${query}%,subject.ilike.%${query}%`);
@@ -751,7 +751,7 @@
             const resArea = document.getElementById('soSearchResults');
             resArea.innerHTML = `<div class="h-full flex items-center justify-center"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading Details...</span></div>`;
 
-            const { data, error } = await supabaseClient.from('pso_encoder').select('*').eq('pso_no', query).order('start_date', { ascending: true });
+            const { data, error } = await supabaseClient.from('pso_records').select('*').eq('pso_no', query).order('start_date', { ascending: true });
             
             if (error) { resArea.innerHTML = `<div class="p-8 text-red-600 font-bold text-center">Error: ${error.message}</div>`; return; }
             if (!data || data.length === 0) { resArea.innerHTML = `<div class="p-8 text-gray-500 font-bold text-center uppercase tracking-widest">No records found for<br><span class="text-[#003811] text-lg">${query}</span></div>`; return; }
@@ -878,21 +878,21 @@
         // Action Functions
         async function cancelEntireSO() {
             if(!confirm(`WARNING: This will permanently cancel ALL dates and personnel for ${activeManageSO}. Continue?`)) return;
-            const { error } = await supabaseClient.from('pso_encoder').delete().eq('pso_no', activeManageSO);
+            const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO);
             if(error) alert("Error: " + error.message);
             else { alert("SO Cancelled completely."); loadAllActiveSOs(); backToSoList(); }
         }
 
         async function removeParticipantFromSO(empId, name) {
             if(!confirm(`Remove ${name} from ${activeManageSO} entirely?`)) return;
-            const { error } = await supabaseClient.from('pso_encoder').delete().eq('pso_no', activeManageSO).eq('emp_id', empId);
+            const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO).eq('emp_id', empId);
             if(error) alert("Error: " + error.message);
             else viewSODetails(activeManageSO);
         }
 
         async function cancelDateFromSO(dateStr) {
             if(!confirm(`Cancel the schedule on ${dateStr} for EVERYONE in ${activeManageSO}?`)) return;
-            const { error } = await supabaseClient.from('pso_encoder').delete().eq('pso_no', activeManageSO).eq('start_date', dateStr);
+            const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO).eq('start_date', dateStr);
             if(error) alert("Error: " + error.message);
             else viewSODetails(activeManageSO);
         }
@@ -900,7 +900,7 @@
         async function endPSOHere(dateStr) {
             if(!confirm(`Are you sure you want to END this PSO starting from ${dateStr}? This will delete the schedule on ${dateStr} and ALL FUTURE DATES for everyone.`)) return;
 
-            const { error } = await supabaseClient.from('pso_encoder')
+            const { error } = await supabaseClient.from('pso_records')
                 .delete()
                 .eq('pso_no', activeManageSO)
                 .gte('start_date', dateStr);
@@ -914,7 +914,7 @@
             const empName = document.getElementById('mngEmpAdd').value;
             if(!empId) return alert("Please search and select a valid employee first.");
 
-            const { data, error } = await supabaseClient.from('pso_encoder').select('start_date, duration, subject').eq('pso_no', activeManageSO);
+            const { data, error } = await supabaseClient.from('pso_records').select('start_date, duration, subject').eq('pso_no', activeManageSO);
             if(error || !data || data.length===0) return alert("Cannot add to an empty SO.");
             
             const dateMap = {};
@@ -936,7 +936,7 @@
 
             if(!confirm(`Add ${empName} to ${uniqueDates.length} existing dates of this SO?`)) return;
 
-            const { error: insErr } = await supabaseClient.from('pso_encoder').insert(payload);
+            const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
             if(insErr) alert("Error adding: " + insErr.message);
             else { alert("Participant added!"); viewSODetails(activeManageSO); }
         }
@@ -946,7 +946,7 @@
             const newDuration = document.getElementById('mngDurationAdd').value;
             if(!newDate) return alert("Select a new date to add.");
 
-            const { data, error } = await supabaseClient.from('pso_encoder').select('emp_id, full_name, division, subject').eq('pso_no', activeManageSO);
+            const { data, error } = await supabaseClient.from('pso_records').select('emp_id, full_name, division, subject').eq('pso_no', activeManageSO);
             if(error || !data || data.length===0) return alert("Cannot add date to empty SO.");
 
             const empMap = {};
@@ -967,7 +967,7 @@
 
             if(!confirm(`Add schedule on ${newDate} (${newDuration}) for all ${uniqueEmps.length} participants?`)) return;
 
-            const { error: insErr } = await supabaseClient.from('pso_encoder').insert(payload);
+            const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
             if(insErr) alert("Error adding date: " + insErr.message);
             else { alert("Date added to schedule!"); viewSODetails(activeManageSO); }
         }
@@ -979,7 +979,7 @@
             if(!newDate) return alert("Please specify the date.");
             if(!confirm(`Update schedule from ${oldDate} to ${newDate} (${newDuration})?`)) return;
 
-            const { error } = await supabaseClient.from('pso_encoder')
+            const { error } = await supabaseClient.from('pso_records')
                 .update({ start_date: newDate, end_date: newDate, duration: newDuration })
                 .eq('pso_no', activeManageSO)
                 .eq('start_date', oldDate);
