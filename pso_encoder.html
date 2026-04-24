@@ -109,6 +109,15 @@
                     <div class="card p-6 border-t-2 border-t-gray-200 flex-grow">
                         <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">2. Schedule Engine</h2>
                         
+                        <div class="mb-4">
+                            <label class="form-label text-[#003811]">Duration</label>
+                            <select id="soDuration" class="form-input font-bold text-gray-800">
+                                <option value="Whole Day" selected>Whole Day</option>
+                                <option value="Half Day - Morning">Half Day - Morning</option>
+                                <option value="Half Day - Afternoon">Half Day - Afternoon</option>
+                            </select>
+                        </div>
+                        
                         <select id="scheduleType" onchange="toggleScheduleUI()" class="form-input font-bold text-sm mb-4 text-gray-800">
                             <option value="single">One Day Only</option>
                             <option value="range">Range</option>
@@ -551,13 +560,14 @@
             const no = document.getElementById('soNumber').value;
             const yr = document.getElementById('soYear').value;
             const subj = document.getElementById('soSubject').value.trim();
+            const dur = document.getElementById('soDuration').value;
 
             if(!no || !yr || !subj) return alert("Type, Number, Year, and Subject are required.");
             if(computedDates.length === 0) return alert("Compute Schedule Dates first.");
             if(matchedPersonnel.length === 0) return alert("Match at least one participant.");
 
             const fullSoNumber = `${type} ${no} series of ${yr}`;
-            if(!confirm(`Encode ${fullSoNumber} for ${matchedPersonnel.length} personnel across ${computedDates.length} date(s)?`)) return;
+            if(!confirm(`Encode ${fullSoNumber} (${dur}) for ${matchedPersonnel.length} personnel across ${computedDates.length} date(s)?`)) return;
 
             const payload = [];
             for (const emp of matchedPersonnel) {
@@ -570,6 +580,7 @@
                         division: emp.division || emp.unit,
                         start_date: date, 
                         end_date: date,   
+                        duration: dur
                     });
                 }
             }
@@ -699,14 +710,14 @@
 
             const subject = data[0].subject || '';
             const empMap = {};
-            const dateSet = new Set();
+            const dateMap = {}; // Maps start_date to duration
 
             data.forEach(d => {
                 if(!empMap[d.emp_id]) empMap[d.emp_id] = { name: d.full_name, division: d.division };
-                dateSet.add(d.start_date);
+                if(!dateMap[d.start_date]) dateMap[d.start_date] = d.duration || 'Whole Day';
             });
             
-            const uniqueDates = Array.from(dateSet).sort();
+            const uniqueDates = Object.keys(dateMap).sort();
             const uniqueEmps = Object.entries(empMap);
 
             resArea.innerHTML = `
@@ -748,22 +759,35 @@
                         <div class="p-4 border-b border-gray-100 bg-gray-50 shrink-0">
                             <label class="text-[10px] font-bold text-[#003811] uppercase mb-2 block">Add New Date</label>
                             <div class="flex gap-2">
-                                <input type="date" id="mngDateAdd" class="w-full p-2 border border-gray-300 rounded text-xs outline-none focus:border-[#003811]">
+                                <input type="date" id="mngDateAdd" class="w-1/2 p-2 border border-gray-300 rounded text-xs outline-none focus:border-[#003811]">
+                                <select id="mngDurationAdd" class="w-1/2 p-2 border border-gray-300 rounded text-xs outline-none focus:border-[#003811]">
+                                    <option value="Whole Day">Whole Day</option>
+                                    <option value="Half Day - Morning">Morning</option>
+                                    <option value="Half Day - Afternoon">Afternoon</option>
+                                </select>
                                 <button onclick="addDateToSO()" class="bg-[#D4AF37] text-[#003811] px-4 rounded font-bold uppercase hover:brightness-110 transition">+</button>
                             </div>
                         </div>
                         <div class="flex-grow overflow-y-auto p-4 space-y-2">
                             <h4 class="text-xs font-bold text-gray-500 uppercase mb-3 border-b pb-1">Active Dates (${uniqueDates.length})</h4>
                             ${uniqueDates.map(dateStr => `
-                                <div class="flex justify-between items-center border-b border-gray-100 py-2">
+                                <div class="flex justify-between items-start border-b border-gray-100 py-2">
                                     <div class="flex flex-col gap-1 w-full mr-2">
-                                        <span class="text-xs font-bold text-gray-800">${dateStr}</span>
-                                        <div class="flex gap-1 mt-1">
-                                            <input type="date" id="resched_${dateStr}" class="p-1 border border-gray-300 rounded text-[10px] outline-none w-full">
-                                            <button onclick="rescheduleDate('${dateStr}')" title="Move to new date" class="bg-gray-100 text-gray-700 border border-gray-300 px-2 rounded text-[10px] font-bold hover:bg-gray-200 transition uppercase">Move</button>
+                                        <span class="text-xs font-bold text-gray-800">${dateStr} <span class="text-[10px] text-gray-500 font-normal">(${dateMap[dateStr]})</span></span>
+                                        <div class="flex gap-1 mt-1 items-center">
+                                            <input type="date" id="resched_${dateStr}" value="${dateStr}" class="p-1 border border-gray-300 rounded text-[10px] outline-none w-1/3">
+                                            <select id="resched_dur_${dateStr}" class="p-1 border border-gray-300 rounded text-[10px] outline-none w-1/3">
+                                                <option value="Whole Day" ${dateMap[dateStr]==='Whole Day'?'selected':''}>Whole Day</option>
+                                                <option value="Half Day - Morning" ${dateMap[dateStr]==='Half Day - Morning'?'selected':''}>Morning</option>
+                                                <option value="Half Day - Afternoon" ${dateMap[dateStr]==='Half Day - Afternoon'?'selected':''}>Afternoon</option>
+                                            </select>
+                                            <button onclick="modifyDate('${dateStr}')" title="Update date and duration" class="bg-[#003811] text-white border border-[#003811] px-2 py-1 rounded text-[10px] font-bold hover:bg-[#002200] transition uppercase">Update</button>
                                         </div>
                                     </div>
-                                    <button onclick="cancelDateFromSO('${dateStr}')" class="text-white bg-red-500 hover:bg-red-600 px-3 py-2 rounded text-xs font-bold transition shrink-0">✕</button>
+                                    <div class="flex flex-col gap-1 shrink-0">
+                                        <button onclick="cancelDateFromSO('${dateStr}')" class="text-red-500 bg-red-50 border border-red-100 hover:bg-red-100 px-2 py-1 rounded text-[10px] font-bold transition w-full text-center">Delete Date</button>
+                                        <button onclick="endPSOHere('${dateStr}')" class="text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 px-2 py-1 rounded text-[10px] font-bold transition w-full text-center" title="Delete this date and all future dates">End PSO Here</button>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
@@ -820,15 +844,29 @@
             else viewSODetails(activeManageSO);
         }
 
+        async function endPSOHere(dateStr) {
+            if(!confirm(`Are you sure you want to END this PSO starting from ${dateStr}? This will delete the schedule on ${dateStr} and ALL FUTURE DATES for everyone.`)) return;
+
+            const { error } = await supabaseClient.from('pso_records')
+                .delete()
+                .eq('pso_no', activeManageSO)
+                .gte('start_date', dateStr);
+
+            if(error) alert("Error ending PSO: " + error.message);
+            else { alert("PSO successfully ended."); viewSODetails(activeManageSO); }
+        }
+
         async function addParticipantToSO() {
             const empId = document.getElementById('mngEmpIdHdn').value;
             const empName = document.getElementById('mngEmpAdd').value;
             if(!empId) return alert("Please search and select a valid employee first.");
 
-            const { data, error } = await supabaseClient.from('pso_records').select('start_date, subject').eq('pso_no', activeManageSO);
+            const { data, error } = await supabaseClient.from('pso_records').select('start_date, duration, subject').eq('pso_no', activeManageSO);
             if(error || !data || data.length===0) return alert("Cannot add to an empty SO.");
             
-            const uniqueDates = Array.from(new Set(data.map(d => d.start_date)));
+            const dateMap = {};
+            data.forEach(d => dateMap[d.start_date] = d.duration || 'Whole Day');
+            const uniqueDates = Object.keys(dateMap);
             const subject = data[0].subject;
             const empInfo = employees.find(e => e.emp_id === empId);
 
@@ -839,7 +877,8 @@
                 full_name: empInfo.full_name,
                 division: empInfo.division || empInfo.unit,
                 start_date: date,
-                end_date: date
+                end_date: date,
+                duration: dateMap[date]
             }));
 
             if(!confirm(`Add ${empName} to ${uniqueDates.length} existing dates of this SO?`)) return;
@@ -851,6 +890,7 @@
 
         async function addDateToSO() {
             const newDate = document.getElementById('mngDateAdd').value;
+            const newDuration = document.getElementById('mngDurationAdd').value;
             if(!newDate) return alert("Select a new date to add.");
 
             const { data, error } = await supabaseClient.from('pso_records').select('emp_id, full_name, division, subject').eq('pso_no', activeManageSO);
@@ -868,30 +908,31 @@
                 full_name: emp.full_name,
                 division: emp.division,
                 start_date: newDate,
-                end_date: newDate
+                end_date: newDate,
+                duration: newDuration
             }));
 
-            if(!confirm(`Add schedule on ${newDate} for all ${uniqueEmps.length} participants?`)) return;
+            if(!confirm(`Add schedule on ${newDate} (${newDuration}) for all ${uniqueEmps.length} participants?`)) return;
 
             const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
             if(insErr) alert("Error adding date: " + insErr.message);
             else { alert("Date added to schedule!"); viewSODetails(activeManageSO); }
         }
 
-        async function rescheduleDate(oldDate) {
+        async function modifyDate(oldDate) {
             const newDate = document.getElementById(`resched_${oldDate}`).value;
-            if(!newDate) return alert("Please select the target date first.");
-            if(oldDate === newDate) return alert("Old and new dates are the same.");
-
-            if(!confirm(`Move all schedules on ${oldDate} to ${newDate}?`)) return;
+            const newDuration = document.getElementById(`resched_dur_${oldDate}`).value;
+            
+            if(!newDate) return alert("Please specify the date.");
+            if(!confirm(`Update schedule from ${oldDate} to ${newDate} (${newDuration})?`)) return;
 
             const { error } = await supabaseClient.from('pso_records')
-                .update({ start_date: newDate, end_date: newDate })
+                .update({ start_date: newDate, end_date: newDate, duration: newDuration })
                 .eq('pso_no', activeManageSO)
                 .eq('start_date', oldDate);
 
-            if(error) alert("Error rescheduling: " + error.message);
-            else { alert("Schedule successfully moved!"); viewSODetails(activeManageSO); }
+            if(error) alert("Error modifying: " + error.message);
+            else { alert("Schedule successfully updated!"); viewSODetails(activeManageSO); }
         }
 
     </script>
