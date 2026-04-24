@@ -15,6 +15,8 @@
     <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
 
@@ -56,7 +58,7 @@
         .ql-container.ql-snow { border: 1px solid #D1D5DB; border-bottom-left-radius: 0.375rem; border-bottom-right-radius: 0.375rem; background: white; font-family: 'Roboto', sans-serif; font-size: 0.875rem; }
         .ql-editor { min-height: 150px; }
 
-        /* Print Override Styles */
+        /* Print Override Styles (Now primarily used for PDF generation context) */
         @media print {
             body, html { width: 100%; height: 100%; background: white !important; margin: 0; padding: 0; }
             body * { visibility: hidden; }
@@ -67,11 +69,10 @@
             
             #printBodyHTML, #printBodyHTML * { text-align: justify !important; }
             
-            /* Smart Paging Core Logic to prevent awkward cuts */
+            /* Smart Paging Core Logic */
             h2, h3, hr, p { page-break-inside: avoid; break-inside: avoid; }
             .print-item { page-break-inside: avoid; break-inside: avoid; }
             
-            /* Standard CSS Paging Fallback */
             body { counter-reset: page; }
             #printFooter { position: fixed; bottom: 15px; right: 40px; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; }
             #printFooter::after { content: "Page " counter(page) " of " counter(pages); }
@@ -440,7 +441,7 @@
                                 <span id="b_rosterCount" class="text-lg font-black text-[#003811]">0</span>
                             </div>
                             <button onclick="saveDraftAndPrint()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">
-                                SAVE DRAFT & PRINT
+                                SAVE DRAFT & GENERATE PDF
                             </button>
                         </div>
                     </div>
@@ -450,7 +451,7 @@
         </div>
     </main>
 
-    <div id="printArea" class="hidden relative">
+    <div id="printArea" class="hidden relative z-[9999] bg-white">
         <div id="printContentWrapper" style="font-family: 'Roboto', sans-serif; color: black; max-width: 816px; margin: 0 auto; padding: 120px 40px 40px 40px; box-sizing: border-box; min-height: 100vh;">
             
             <h2 style="text-align: left; font-weight: bold; font-size: 13pt; margin-bottom: 2px;">PROVINCIAL SPECIAL ORDER No. <span id="printPsoNoOnly"></span></h2>
@@ -1041,14 +1042,13 @@
             }
         }
 
-        // Dedicated Print Processing Function
+        // Dedicated Clean PDF Output Function
         function triggerPrint(psoNoText, yr, subj, datesArr, contentHTML, rosterArr, qrText) {
             
             document.getElementById('printPsoNoOnly').innerText = psoNoText;
             document.getElementById('printSeriesYear').innerText = yr;
             document.getElementById('printSubject').innerText = subj.toUpperCase();
             
-            // Replaced the auto-appended dates here so the author's input decides the layout completely.
             document.getElementById('printBodyHTML').innerHTML = contentHTML;
             
             let sortedRoster = [...rosterArr].sort((a, b) => {
@@ -1081,14 +1081,30 @@
 
             setTimeout(async () => { 
                 const printArea = document.getElementById('printArea');
+                printArea.classList.remove('hidden');
+                printArea.style.display = 'block';
+
                 const bgBase64 = await getBgMemo();
                 if (bgBase64) {
-                    printArea.style.backgroundImage = `url(${bgBase64})`;
-                    printArea.style.backgroundSize = '100% 100%';
-                    printArea.style.backgroundPosition = 'top center';
-                    printArea.style.backgroundRepeat = 'no-repeat';
+                    const wrapper = document.getElementById('printContentWrapper');
+                    wrapper.style.backgroundImage = `url(${bgBase64})`;
+                    wrapper.style.backgroundSize = '100% 100%';
+                    wrapper.style.backgroundPosition = 'top center';
+                    wrapper.style.backgroundRepeat = 'no-repeat';
                 }
-                window.print(); 
+
+                var opt = {
+                  margin:       0,
+                  filename:     `${psoNoText}_PSO.pdf`,
+                  image:        { type: 'jpeg', quality: 0.98 },
+                  html2canvas:  { scale: 2, useCORS: true },
+                  jsPDF:        { unit: 'in', format: [8.5, 13], orientation: 'portrait' }
+                };
+
+                html2pdf().set(opt).from(printArea).save().then(() => {
+                    printArea.style.display = '';
+                    printArea.classList.add('hidden');
+                });
             }, 300);
         }
 
@@ -1105,7 +1121,10 @@
             if(b_computedDates.length === 0) return alert("Compute Schedule Dates first.");
             if(b_roster.length === 0) return alert("Add at least one participant to the roster.");
 
-            const draftId = `DRAFT-${Date.now()}`;
+            let draftId = document.getElementById('b_soNumber').value;
+            if (!draftId || draftId === "ASSIGNED UPON POSTING") {
+                draftId = `DRAFT-${Date.now()}`;
+            }
 
             const { error: metaErr } = await supabaseClient.from('pso_metadata').upsert({
                 pso_no: draftId,
@@ -1124,9 +1143,10 @@
             triggerPrint(`_______`, yr, subj, b_computedDates, content, b_roster, draftId);
 
             setTimeout(() => { 
-                alert(`Draft Saved! Pending Signature. Open Manage Active Orders to Post it once signed.`);
+                alert(`Draft Saved & PDF Generated! Pending Signature. Open Manage Active Orders to Post or Edit it.`);
                 b_roster = []; b_computedDates = [];
                 document.getElementById('b_soSubject').value = "";
+                document.getElementById('b_soNumber').value = "ASSIGNED UPON POSTING";
                 quill.setText(""); 
                 b_renderRoster(); 
                 document.getElementById('b_computedDatesLabel').innerHTML = "No dates computed yet.";
@@ -1218,7 +1238,7 @@
         }
 
         // ==========================================
-        // --- MANAGE / CANCEL / RESCHEDULE LOGIC ---
+        // --- MANAGE / CANCEL / RESCHEDULE / EDIT LOGIC ---
         // ==========================================
         
         function openManageModal() { 
@@ -1413,11 +1433,14 @@
                     <div class="bg-yellow-50 p-6 border-b border-yellow-200 flex flex-col items-center justify-center text-center shrink-0 h-full">
                         <div class="text-5xl mb-4">✍️</div>
                         <h3 class="font-black text-[#003811] text-2xl uppercase mb-2">${query}</h3>
-                        <p class="text-sm text-gray-600 font-bold mb-8 max-w-lg">This Special Order has been drafted and printed, but it is waiting for the physical signature. <br><br>Once signed, post it to the system schedule to finalize it.</p>
+                        <p class="text-sm text-gray-600 font-bold mb-8 max-w-lg">This Special Order has been drafted, but it is waiting for the physical signature. <br><br>Once signed, post it to the system schedule to finalize it.</p>
                         
                         <div class="flex gap-4 w-full max-w-md">
                             <button onclick="postDraftToRecords('${query}')" class="flex-1 bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">
                                 Mark Signed & Post
+                            </button>
+                            <button onclick="editDraft('${query}')" class="bg-blue-100 text-blue-700 hover:bg-blue-200 py-4 px-6 rounded text-sm font-black uppercase tracking-widest active:scale-95 transition border border-blue-200">
+                                Edit Draft
                             </button>
                             <button onclick="deleteDraft('${query}')" class="bg-red-100 text-red-700 hover:bg-red-200 py-4 px-6 rounded text-sm font-black uppercase tracking-widest active:scale-95 transition border border-red-200">
                                 Delete Draft
@@ -1448,7 +1471,7 @@
             
             let reprintBtnHTML = '';
             if (soRecord && soRecord.draftData) {
-                reprintBtnHTML = `<button onclick="reprintPSO('${query}')" class="bg-[#003811] text-white hover:bg-[#002200] font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow mr-2">REPRINT PSO</button>`;
+                reprintBtnHTML = `<button onclick="reprintPSO('${query}')" class="bg-[#003811] text-white hover:bg-[#002200] font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow mr-2">GENERATE PDF</button>`;
             }
 
             resArea.innerHTML = `
@@ -1524,6 +1547,39 @@
                     </div>
                 </div>
             `;
+        }
+
+        function editDraft(psoNo) {
+            const soRecord = allActiveSOs.find(so => so.pso_no === psoNo);
+            if(!soRecord || !soRecord.draftData) return alert("Draft data lost.");
+
+            const draft = soRecord.draftData;
+
+            // Switch to Builder Tab
+            switchTab('builder');
+
+            // Populate Fields
+            document.getElementById('b_soType').value = draft.type;
+            document.getElementById('b_soYear').value = draft.series_year;
+            document.getElementById('b_soSubject').value = draft.subject;
+            document.getElementById('b_soDuration').value = draft.duration;
+
+            // Set Quill content
+            quill.clipboard.dangerouslyPasteHTML(draft.body_content);
+
+            // Set Roster
+            b_roster = draft.participants_json || [];
+            b_renderRoster();
+
+            // Set Dates
+            b_computedDates = draft.dates_json || [];
+            updateDateLabel('b_computedDatesLabel', b_computedDates);
+
+            // Set current draft ID for updating
+            document.getElementById('b_soNumber').value = psoNo;
+
+            // Close Modal
+            closeManageModal();
         }
 
         async function postDraftToRecords(psoNo) {
