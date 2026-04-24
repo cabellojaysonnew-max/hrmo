@@ -15,8 +15,6 @@
     <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
 
@@ -58,7 +56,7 @@
         .ql-container.ql-snow { border: 1px solid #D1D5DB; border-bottom-left-radius: 0.375rem; border-bottom-right-radius: 0.375rem; background: white; font-family: 'Roboto', sans-serif; font-size: 0.875rem; }
         .ql-editor { min-height: 150px; }
 
-        /* Print Override Styles (Now primarily used for PDF generation context) */
+        /* Print Override Styles */
         @media print {
             body, html { width: 100%; height: 100%; background: white !important; margin: 0; padding: 0; }
             body * { visibility: hidden; }
@@ -69,22 +67,22 @@
             
             #printBodyHTML, #printBodyHTML * { text-align: justify !important; }
             
+            #printBgImg { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: -1 !important; object-fit: fill !important; display: block !important; }
+            #printContentWrapper { position: relative; z-index: 1; }
+
             /* Smart Paging Core Logic */
             h2, h3, hr, p { page-break-inside: avoid; break-inside: avoid; }
             .print-item { page-break-inside: avoid; break-inside: avoid; }
             
             body { counter-reset: page; }
-            #printFooter { position: fixed; bottom: 0; right: 0; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; }
+            #printFooter { position: fixed; bottom: 15px; right: 40px; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; z-index: 10; }
             #printFooter::after { content: "Page " counter(page) " of " counter(pages); }
         }
         
-        /* Strict 8.5 x 13 Long Bond / Folio Paper Size with requested margins */
+        /* Strict 8.5 x 13 Long Bond / Folio Paper Size with NO page margin to allow full-bleed background image */
         @page { 
             size: 8.5in 13in; 
-            margin-top: 1.5in;
-            margin-bottom: 1.5in;
-            margin-left: 1in;
-            margin-right: 1in;
+            margin: 0 !important; 
         }
     </style>
 </head>
@@ -455,7 +453,7 @@
     </main>
 
     <div id="printArea" class="hidden relative z-[9999] bg-white">
-        <img id="printBgImg" src="" alt="" style="display:none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; object-fit: cover;">
+        <img id="printBgImg" src="" alt="" style="display:none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; object-fit: fill;">
         
         <div id="printContentWrapper" style="position: relative; z-index: 1; font-family: 'Roboto', sans-serif; color: black; max-width: 816px; margin: 0 auto; padding: 1.5in 1in 1.5in 1in; box-sizing: border-box; min-height: 100vh;">
             
@@ -1470,7 +1468,7 @@
             
             let reprintBtnHTML = '';
             if (soRecord && soRecord.draftData) {
-                reprintBtnHTML = `<button onclick="reprintPSO('${query}')" class="bg-[#003811] text-white hover:bg-[#002200] font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow mr-2">REPRINT PSO</button>`;
+                reprintBtnHTML = `<button onclick="reprintPSO('${query}')" class="bg-[#003811] text-white hover:bg-[#002200] font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow mr-2">PRINT PSO</button>`;
             }
 
             resArea.innerHTML = `
