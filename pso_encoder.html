@@ -452,7 +452,7 @@
     </main>
 
     <div id="printArea" class="hidden relative z-[9999] bg-white">
-        <div id="printContentWrapper" style="font-family: 'Roboto', sans-serif; color: black; max-width: 816px; margin: 0 auto; padding: 120px 40px 40px 40px; box-sizing: border-box; min-height: 100vh;">
+        <div id="printContentWrapper" style="font-family: 'Roboto', sans-serif; color: black; max-width: 816px; margin: 0 auto; box-sizing: border-box; min-height: 100vh;">
             
             <h2 style="text-align: left; font-weight: bold; font-size: 13pt; margin-bottom: 2px;">PROVINCIAL SPECIAL ORDER No. <span id="printPsoNoOnly"></span></h2>
             <h3 style="text-align: left; font-size: 11pt; margin-bottom: 25px; font-weight: bold;">Series of <span id="printSeriesYear"></span></h3>
@@ -973,7 +973,7 @@
                 document.getElementById('b_manualPos').value = '';
             } 
             else if (mode === 'PROVINCE') {
-                const typeFilter = document.getElementById('b_empTypeFilter').value; // ALL, REGULAR, SPLIT
+                const typeFilter = document.getElementById('b_empTypeFilter').value; 
                 if(typeFilter === 'ALL') {
                     empsToAdd = [...activeEmps];
                 } else {
@@ -1049,7 +1049,8 @@
             document.getElementById('printSeriesYear').innerText = yr;
             document.getElementById('printSubject').innerText = subj.toUpperCase();
             
-            document.getElementById('printBodyHTML').innerHTML = contentHTML;
+            let finalBody = contentHTML + `<p style="margin-top:15px; text-align: justify;"><strong>Schedule Date/s: ${datesArr.join(', ')}</strong></p>`;
+            document.getElementById('printBodyHTML').innerHTML = finalBody;
             
             let sortedRoster = [...rosterArr].sort((a, b) => {
                 if (a.isGuest && !b.isGuest) return 1;
@@ -1079,11 +1080,11 @@
                 new QRCode(qrContainer, { text: String(qrText), width: 80, height: 80 });
             }
 
+            // Show the print area just to generate the layout
+            const printArea = document.getElementById('printArea');
+            printArea.classList.remove('hidden');
+            
             setTimeout(async () => { 
-                const printArea = document.getElementById('printArea');
-                printArea.classList.remove('hidden');
-                printArea.style.display = 'block';
-
                 const bgBase64 = await getBgMemo();
                 if (bgBase64) {
                     const wrapper = document.getElementById('printContentWrapper');
@@ -1094,10 +1095,10 @@
                 }
 
                 var opt = {
-                  margin:       0,
+                  margin:       [1.5, 1, 1.5, 1], // Top, Right, Bottom, Left margins in inches
                   filename:     `${psoNoText}_PSO.pdf`,
-                  image:        { type: 'jpeg', quality: 0.98 },
-                  html2canvas:  { scale: 2, useCORS: true },
+                  image:        { type: 'jpeg', quality: 1 },
+                  html2canvas:  { scale: 4, useCORS: true }, // Scale 4 = ultra high quality
                   jsPDF:        { unit: 'in', format: [8.5, 13], orientation: 'portrait' }
                 };
 
@@ -1143,14 +1144,14 @@
             triggerPrint(`_______`, yr, subj, b_computedDates, content, b_roster, draftId);
 
             setTimeout(() => { 
-                alert(`Draft Saved & PDF Generated! Pending Signature. Open Manage Active Orders to Post or Edit it.`);
+                alert(`Draft Saved & Prepared for Printing! Pending Signature.`);
                 b_roster = []; b_computedDates = [];
                 document.getElementById('b_soSubject').value = "";
                 document.getElementById('b_soNumber').value = "ASSIGNED UPON POSTING";
                 quill.setText(""); 
                 b_renderRoster(); 
                 document.getElementById('b_computedDatesLabel').innerHTML = "No dates computed yet.";
-            }, 800);
+            }, 1000); // Allow time for window.print to trigger before clearing the form
         }
 
         // ==========================================
@@ -1650,7 +1651,7 @@
                 rawNo = rawNo.replace(meta.type, '').trim();
             }
             
-            triggerPrint(rawNo, meta.series_year, meta.subject, meta.dates_json || [], meta.body_content, meta.participants_json || [], psoNo);
+            triggerPrint(rawNo, meta.series_year, meta.subject, meta.dates_json || [], meta.body_content, meta.participants_json || []);
         }
 
         // Active Order Management Functions (Manage Modal inputs)
