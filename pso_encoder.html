@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SO Encoder - DAR HRMO</title>
     
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -51,14 +53,14 @@
 
         /* Quill Adjustments */
         .ql-toolbar.ql-snow { border: 1px solid #D1D5DB; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem; background: #f9fafb; padding: 4px; }
-        .ql-container.ql-snow { border: 1px solid #D1D5DB; border-bottom-left-radius: 0.375rem; border-bottom-right-radius: 0.375rem; background: white; font-family: 'Segoe UI', sans-serif; font-size: 0.875rem; }
+        .ql-container.ql-snow { border: 1px solid #D1D5DB; border-bottom-left-radius: 0.375rem; border-bottom-right-radius: 0.375rem; background: white; font-family: 'Roboto', sans-serif; font-size: 0.875rem; }
         .ql-editor { min-height: 150px; }
 
-        /* Print Styles */
+        /* Print Styles Updated for Background Image/Colors */
         @media print {
             body * { visibility: hidden; }
             #printArea, #printArea * { visibility: visible; }
-            #printArea { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; background: white; z-index: 9999; display: block !important; }
+            #printArea { position: absolute; left: 0; top: 0; width: 100%; min-height: 100vh; background-color: white; z-index: 9999; display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-print { display: none !important; }
         }
     </style>
@@ -71,8 +73,8 @@
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold">SO ENCODER</p>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
-            <button onclick="switchTab('encoder')" id="tabEncoder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors">SO ENCODER</button>
-            <button onclick="switchTab('builder')" id="tabBuilder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-transparent border-l-4 border-transparent hover:bg-black/10 transition-colors">PSO BUILDER</button>
+            <button onclick="switchTab('encoder')" id="tabEncoder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-transparent border-l-4 border-transparent hover:bg-black/10 transition-colors">SO ENCODER</button>
+            <button onclick="switchTab('builder')" id="tabBuilder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors">PSO BUILDER</button>
         </div>
         <div class="p-4 bg-black/20">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
@@ -83,14 +85,14 @@
     <main class="flex-1 flex flex-col h-full bg-[#F3F4F6] relative no-print">
         
         <div class="p-8 pb-4 flex justify-between items-center border-b border-gray-200 bg-white shrink-0 shadow-sm">
-            <h2 id="pageTitle" class="text-3xl font-bold text-[#003811] uppercase tracking-wide">SO ENCODER</h2>
+            <h2 id="pageTitle" class="text-3xl font-bold text-[#003811] uppercase tracking-wide">PSO BUILDER</h2>
             <button onclick="openManageModal()" class="bg-white border border-gray-300 text-[#003811] hover:bg-gray-50 px-4 py-2 font-bold rounded uppercase text-xs flex items-center gap-2 transition shadow-sm">
                 ⚙️ MANAGE ACTIVE ORDERS
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-8">
-            <div id="encoderTab" class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: grid;">
+            <div id="encoderTab" class="grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: none;">
                 <div class="flex flex-col gap-6">
                     <div class="card p-6 border-t-2 border-t-gray-200">
                         <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">1. Document Details</h2>
@@ -217,7 +219,7 @@
                 </div>
             </div>
 
-            <div id="builderTab" class="grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: none;">
+            <div id="builderTab" class="grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: grid;">
                 
                 <div class="flex flex-col gap-6">
                     <div class="card p-6 border-t-2 border-t-gray-200">
@@ -333,6 +335,7 @@
                             <select id="b_selMode" onchange="b_toggleSelectionMode()" class="form-input font-bold text-gray-800">
                                 <option value="PROVINCE" selected>Entire Province</option>
                                 <option value="DIVISION">Specific Division / Position</option>
+                                <option value="MANUAL">Manual / External Participant</option>
                             </select>
                         </div>
 
@@ -358,6 +361,17 @@
                                 <select id="b_posFilter" class="form-input text-gray-800">
                                     <option value="ALL">All Positions in Division</option>
                                 </select>
+                            </div>
+                        </div>
+                        
+                        <div id="b_modeManual" class="space-y-4 hidden">
+                            <div>
+                                <label class="form-label text-[#003811]">Full Name</label>
+                                <input type="text" id="b_manualName" placeholder="e.g., Juan Dela Cruz" class="form-input text-gray-800">
+                            </div>
+                            <div>
+                                <label class="form-label text-[#003811]">Position / Office</label>
+                                <input type="text" id="b_manualPos" placeholder="e.g., Regional Director" class="form-input text-gray-800">
                             </div>
                         </div>
 
@@ -397,23 +411,48 @@
         </div>
     </main>
 
-    <div id="printArea" class="hidden">
-        <div style="font-family: 'Arial', sans-serif; color: black; max-width: 800px; margin: 0 auto;">
-            <h2 style="text-align: center; font-weight: bold; font-size: 1.25rem; text-decoration: underline;">PROVINCIAL SPECIAL ORDER</h2>
-            <h3 style="text-align: center; font-weight: bold; font-size: 1rem; margin-bottom: 30px;" id="printPsoNo"></h3>
+    <div id="printArea" class="hidden relative">
+        <div style="font-family: 'Roboto', 'Arial', sans-serif; color: black; max-width: 816px; margin: 0 auto; padding: 120px 40px 40px 40px; min-height: 100vh; box-sizing: border-box;">
             
-            <p style="margin-bottom: 10px; font-size: 0.9rem;"><strong>SUBJECT:</strong> <span id="printSubject"></span></p>
-            <p style="margin-bottom: 25px; font-size: 0.9rem;"><strong>DATE/S:</strong> <span id="printDates"></span></p>
+            <h2 style="text-align: center; font-weight: bold; font-size: 14pt; letter-spacing: 1px; margin-bottom: 2px;">PROVINCIAL SPECIAL ORDER NO. <span id="printPsoNoOnly"></span></h2>
+            <h3 style="text-align: center; font-size: 12pt; margin-bottom: 20px;">Series of <span id="printSeriesYear"></span></h3>
             
-            <div id="printContent" style="margin-bottom: 25px; font-size: 0.95rem; text-align: justify; line-height: 1.5;"></div>
+            <table style="width: 100%; font-size: 11pt; margin-bottom: 15px; border-collapse: collapse; line-height: 1.5;">
+                <tr>
+                    <td style="width: 80px; vertical-align: top; font-weight: bold;">TO</td>
+                    <td style="width: 20px; vertical-align: top;">:</td>
+                    <td style="vertical-align: top; font-weight: bold;" id="printParticipants"></td>
+                </tr>
+                <tr>
+                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;">FROM</td>
+                    <td style="vertical-align: top; padding-top: 8px;">:</td>
+                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;">THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II</td>
+                </tr>
+                <tr>
+                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;">DATE</td>
+                    <td style="vertical-align: top; padding-top: 8px;">:</td>
+                    <td style="vertical-align: top; padding-top: 8px;" id="printDateGenerated"></td>
+                </tr>
+                <tr>
+                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;">SUBJECT</td>
+                    <td style="vertical-align: top; padding-top: 8px;">:</td>
+                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;" id="printSubject"></td>
+                </tr>
+            </table>
+
+            <hr style="border: 1px solid black; margin-bottom: 20px;" />
             
-            <p style="margin-bottom: 10px; font-size: 0.9rem;"><strong>PARTICIPANTS:</strong></p>
-            <div id="printParticipants" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; font-size: 0.85rem; margin-bottom: 40px;"></div>
+            <p style="margin-bottom: 15px; font-size: 11pt;"><strong>SCHEDULE DATE/S:</strong> <span id="printDates"></span></p>
+
+            <div id="printContent" style="margin-bottom: 25px; font-size: 11pt; text-align: justify; line-height: 1.5;"></div>
+            
+            <p style="font-size: 11pt; text-align: justify; margin-bottom: 15px;">All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.</p>
+            <p style="font-size: 11pt; text-align: justify; margin-bottom: 40px;">_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.</p>
             
             <div style="display: flex; justify-content: space-between; align-items: flex-end;">
                 <div>
-                    <p style="margin-bottom: 30px; font-size: 0.9rem;">Approved by:</p>
-                    <p style="font-weight: bold; font-size: 0.95rem; text-decoration: underline;">PARPO II</p>
+                    <p style="font-weight: bold; font-size: 12pt; text-decoration: underline; margin-bottom: 2px;">RICARDO C. GARCIA</p>
+                    <p style="font-size: 11pt;">Provincial Agrarian Reform Program Officer II</p>
                 </div>
                 <div id="qrcode"></div>
             </div>
@@ -463,6 +502,26 @@
         function logout() {
             sessionStorage.removeItem('currentUser');
             window.location.href = 'index.html';
+        }
+
+        // --- Fetch Background Memo Image for Print ---
+        let cachedBgMemo = null;
+        async function getBgMemo() {
+            if (cachedBgMemo) return cachedBgMemo;
+            try {
+                const { data } = await supabaseClient.storage.from('e-sign').download('bg_memo.jpg');
+                if (data) {
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            cachedBgMemo = reader.result;
+                            resolve(cachedBgMemo);
+                        };
+                        reader.readAsDataURL(data);
+                    });
+                }
+            } catch(e) { console.error("Error downloading bg_memo.jpg", e); }
+            return null;
         }
 
         // --- Setup ---
@@ -792,12 +851,16 @@
 
         function b_toggleSelectionMode() {
             const mode = document.getElementById('b_selMode').value;
+            document.getElementById('b_modeProvince').classList.add('hidden');
+            document.getElementById('b_modeDivision').classList.add('hidden');
+            document.getElementById('b_modeManual').classList.add('hidden');
+
             if(mode === 'PROVINCE') {
                 document.getElementById('b_modeProvince').classList.remove('hidden');
-                document.getElementById('b_modeDivision').classList.add('hidden');
-            } else {
-                document.getElementById('b_modeProvince').classList.add('hidden');
+            } else if (mode === 'DIVISION') {
                 document.getElementById('b_modeDivision').classList.remove('hidden');
+            } else if (mode === 'MANUAL') {
+                document.getElementById('b_modeManual').classList.remove('hidden');
             }
         }
 
@@ -817,7 +880,22 @@
             let empsToAdd = [];
             const activeEmps = employees.filter(e => !e.status || e.status.toUpperCase() === 'ACTIVE');
 
-            if (mode === 'PROVINCE') {
+            if (mode === 'MANUAL') {
+                const name = document.getElementById('b_manualName').value.trim();
+                const pos = document.getElementById('b_manualPos').value.trim() || 'EXTERNAL';
+                if (!name) return alert("Please enter the participant's name.");
+                
+                empsToAdd.push({
+                    emp_id: 'EXT-' + Date.now() + Math.floor(Math.random() * 1000),
+                    full_name: name.toUpperCase(),
+                    position: pos.toUpperCase(),
+                    division: 'EXTERNAL',
+                    unit: ''
+                });
+                
+                document.getElementById('b_manualName').value = '';
+                document.getElementById('b_manualPos').value = '';
+            } else if (mode === 'PROVINCE') {
                 const typeFilter = document.getElementById('b_empTypeFilter').value; // ALL, REGULAR, SPLIT
                 if(typeFilter === 'ALL') {
                     empsToAdd = [...activeEmps];
@@ -914,15 +992,27 @@
 
             if (metaErr) return alert("Failed to save draft: " + metaErr.message);
 
-            document.getElementById('printPsoNo').innerText = `${type} NO. _______ series of ${yr}`;
-            document.getElementById('printSubject').innerText = subj;
-            document.getElementById('printDates').innerText = b_computedDates.join(', ');
+            // Setup Print Layout
+            const printArea = document.getElementById('printArea');
+            const bgBase64 = await getBgMemo();
+            if (bgBase64) {
+                printArea.style.backgroundImage = `url(${bgBase64})`;
+                printArea.style.backgroundSize = '100% 100%';
+                printArea.style.backgroundPosition = 'top center';
+                printArea.style.backgroundRepeat = 'no-repeat';
+            }
+
+            document.getElementById('printPsoNoOnly').innerText = `_______`;
+            document.getElementById('printSeriesYear').innerText = yr;
+            document.getElementById('printSubject').innerText = subj.toUpperCase();
             
+            const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            document.getElementById('printDateGenerated').innerText = today;
+            
+            document.getElementById('printDates').innerText = b_computedDates.join(', ');
             document.getElementById('printContent').innerHTML = content;
             
-            document.getElementById('printParticipants').innerHTML = b_roster.map(emp => 
-                `<div>• ${emp.full_name} <span style="color:gray; font-size:0.8em">(${emp.position || ''})</span></div>`
-            ).join('');
+            document.getElementById('printParticipants').innerHTML = b_roster.map(emp => emp.full_name).join(', ');
 
             const qrContainer = document.getElementById("qrcode");
             qrContainer.innerHTML = ""; 
@@ -936,7 +1026,7 @@
                 quill.setText(""); 
                 b_renderRoster(); 
                 document.getElementById('b_computedDatesLabel').innerHTML = "No dates computed yet.";
-            }, 400);
+            }, 500); // Small delay to let BG Image & QR Code load
         }
 
         // ==========================================
