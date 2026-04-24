@@ -74,14 +74,17 @@
             .print-item { page-break-inside: avoid; break-inside: avoid; }
             
             body { counter-reset: page; }
-            #printFooter { position: fixed; bottom: 15px; right: 40px; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; z-index: 10; }
+            #printFooter { position: fixed; bottom: 0; right: 0; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; }
             #printFooter::after { content: "Page " counter(page) " of " counter(pages); }
         }
         
-        /* Strict 8.5 x 13 Long Bond / Folio Paper Size with NO page margin to allow full-bleed background image */
+        /* Strict 8.5 x 13 Long Bond / Folio Paper Size with requested margins */
         @page { 
             size: 8.5in 13in; 
-            margin: 0 !important; 
+            margin-top: 1.5in;
+            margin-bottom: 1.5in;
+            margin-left: 1in;
+            margin-right: 1in;
         }
     </style>
 </head>
@@ -536,8 +539,8 @@
         async function getBgMemo() {
             if (cachedBgMemo) return cachedBgMemo;
             try {
-                // Fetching the exact image uploaded by user
-                const { data } = await supabaseClient.storage.from('e-sign').download('image_bee43c.png');
+                // Fetching the correct background file
+                const { data } = await supabaseClient.storage.from('e-sign').download('bg_memo.jpg');
                 if (data) {
                     return new Promise((resolve) => {
                         const reader = new FileReader();
@@ -548,7 +551,7 @@
                         reader.readAsDataURL(data);
                     });
                 }
-            } catch(e) { console.error("Error downloading background image", e); }
+            } catch(e) { console.error("Error downloading bg_memo.jpg", e); }
             return null;
         }
 
@@ -1467,7 +1470,7 @@
             
             let reprintBtnHTML = '';
             if (soRecord && soRecord.draftData) {
-                reprintBtnHTML = `<button onclick="reprintPSO('${query}')" class="bg-[#003811] text-white hover:bg-[#002200] font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow mr-2">PRINT PSO</button>`;
+                reprintBtnHTML = `<button onclick="reprintPSO('${query}')" class="bg-[#003811] text-white hover:bg-[#002200] font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow mr-2">REPRINT PSO</button>`;
             }
 
             resArea.innerHTML = `
