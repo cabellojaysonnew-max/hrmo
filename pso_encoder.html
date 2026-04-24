@@ -233,7 +233,7 @@
                             </div>
                             <div>
                                 <label class="form-label text-[#003811]">Control Number</label>
-                                <input type="number" id="b_soNumber" placeholder="e.g., 220" class="form-input font-bold text-gray-800">
+                                <input type="text" id="b_soNumber" value="ASSIGNED UPON POSTING" disabled class="form-input font-bold text-gray-400 bg-gray-100 cursor-not-allowed border-dashed">
                             </div>
                         </div>
                         <div class="mb-4">
@@ -886,23 +886,22 @@
 
         async function saveDraftAndPrint() {
             const type = document.getElementById('b_soType').value;
-            const no = document.getElementById('b_soNumber').value;
             const yr = document.getElementById('b_soYear').value;
             const subj = document.getElementById('b_soSubject').value.trim();
             const dur = document.getElementById('b_soDuration').value;
             
-            // Extract HTML from Quill editor instead of a textarea value
             const content = quill.root.innerHTML.trim();
             const plainTextCheck = quill.getText().trim();
 
-            if(!no || !yr || !subj || plainTextCheck === "") return alert("Type, Number, Year, Subject, and Body Content are required.");
+            if(!yr || !subj || plainTextCheck === "") return alert("Year, Subject, and Body Content are required.");
             if(b_computedDates.length === 0) return alert("Compute Schedule Dates first.");
             if(b_roster.length === 0) return alert("Add at least one participant to the roster.");
 
-            const fullSoNumber = `${type} ${no} series of ${yr}`;
+            // Generate a Temporary Draft ID
+            const draftId = `DRAFT-${Date.now()}`;
 
             const { error: metaErr } = await supabaseClient.from('pso_metadata').upsert({
-                pso_no: fullSoNumber,
+                pso_no: draftId,
                 type: type,
                 series_year: yr,
                 subject: subj,
@@ -915,11 +914,10 @@
 
             if (metaErr) return alert("Failed to save draft: " + metaErr.message);
 
-            document.getElementById('printPsoNo').innerText = fullSoNumber;
+            document.getElementById('printPsoNo').innerText = `${type} NO. _______ series of ${yr}`;
             document.getElementById('printSubject').innerText = subj;
             document.getElementById('printDates').innerText = b_computedDates.join(', ');
             
-            // Injecting HTML directly into the print view to retain bold, lists, etc.
             document.getElementById('printContent').innerHTML = content;
             
             document.getElementById('printParticipants').innerHTML = b_roster.map(emp => 
@@ -928,15 +926,14 @@
 
             const qrContainer = document.getElementById("qrcode");
             qrContainer.innerHTML = ""; 
-            new QRCode(qrContainer, { text: fullSoNumber, width: 90, height: 90 });
+            new QRCode(qrContainer, { text: draftId, width: 90, height: 90 });
 
             setTimeout(() => { 
                 window.print(); 
-                alert(`Draft Saved! Pending Signature for ${fullSoNumber}. Open Manage Active Orders to Post it once signed.`);
+                alert(`Draft Saved! Pending Signature. Open Manage Active Orders to Post it once signed.`);
                 b_roster = []; b_computedDates = [];
-                document.getElementById('b_soNumber').value = ""; 
                 document.getElementById('b_soSubject').value = "";
-                quill.setText(""); // Reset Editor
+                quill.setText(""); 
                 b_renderRoster(); 
                 document.getElementById('b_computedDatesLabel').innerHTML = "No dates computed yet.";
             }, 400);
@@ -946,7 +943,6 @@
         // --- AI GRAMMAR CHECKER ---
         // ==========================================
         async function checkGrammar() {
-            // Check grammar based on plain text, to avoid corrupting HTML nodes
             const text = quill.getText().trim();
             const status = document.getElementById('grammarStatus');
             const resultsDiv = document.getElementById('grammarResults');
@@ -1013,7 +1009,6 @@
         }
 
         function applyGrammarFix(btnElement, errorText, replacement) {
-            // Apply fix directly to the HTML string underlying the editor
             let currentHTML = quill.root.innerHTML;
             quill.root.innerHTML = currentHTML.replace(errorText, replacement);
             
@@ -1310,9 +1305,14 @@
             const soRecord = allActiveSOs.find(so => so.pso_no === psoNo);
             if(!soRecord || !soRecord.draftData) return alert("Draft data lost. Refresh and try again.");
             
-            if(!confirm(`Are you sure the document is signed? This will post ${psoNo} to the live employee schedules.`)) return;
+            const assignedNo = prompt("Please enter the Official Control Number to post this order:");
+            if (!assignedNo) return alert("Posting cancelled. A Control Number is required.");
 
             const draft = soRecord.draftData;
+            const officialPsoNo = `${draft.type} ${assignedNo} series of ${draft.series_year}`;
+
+            if(!confirm(`Post this order to the live schedule as:\n${officialPsoNo}?`)) return;
+
             const dates = draft.dates_json || [];
             const emps = draft.participants_json || [];
             const payload = [];
@@ -1320,7 +1320,7 @@
             emps.forEach(emp => {
                 dates.forEach(date => {
                     payload.push({
-                        pso_no: psoNo,
+                        pso_no: officialPsoNo,
                         subject: draft.subject,
                         emp_id: emp.emp_id,
                         full_name: emp.full_name,
@@ -1332,13 +1332,27 @@
                 });
             });
 
+            // 1. Insert to Records
             const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
             if (insErr) return alert("Database Error inserting records: " + insErr.message);
 
-            const { error: updErr } = await supabaseClient.from('pso_metadata').update({ status: 'POSTED' }).eq('pso_no', psoNo);
-            if (updErr) alert("Warning: Records added but draft status not updated. " + updErr.message);
-            else alert("Success! The order is now live on employee schedules.");
+            // 2. Create official metadata record
+            await supabaseClient.from('pso_metadata').insert({
+                pso_no: officialPsoNo,
+                type: draft.type,
+                series_year: draft.series_year,
+                subject: draft.subject,
+                duration: draft.duration,
+                body_content: draft.body_content,
+                dates_json: dates,
+                participants_json: emps,
+                status: 'POSTED'
+            });
 
+            // 3. Delete the old draft
+            await supabaseClient.from('pso_metadata').delete().eq('pso_no', psoNo);
+
+            alert("Success! The order is now live on employee schedules.");
             loadAllActiveSOs();
             backToSoList();
         }
