@@ -466,7 +466,7 @@
 
             <div id="printBodyHTML" style="font-size: 11pt; margin-bottom: 20px; text-align: justify;"></div>
             
-            <div id="printParticipantsList" style="font-size: 10.5pt; margin-bottom: 30px; line-height: 1.4; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;"></div>
+            <div id="printParticipantsList" style="margin-bottom: 30px;"></div>
 
             <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify; page-break-inside: avoid; break-inside: avoid;">Attendance shall be considered official time. All concerned personnel are hereby directed to comply with this Order.</p>
             <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify; page-break-inside: avoid; break-inside: avoid;">This Order shall serve as Travel Order and shall remain in force unless sooner revoked or amended.</p>
@@ -532,6 +532,7 @@
         async function getBgMemo() {
             if (cachedBgMemo) return cachedBgMemo;
             try {
+                // Fetching exactly bg_memo.jpg as requested
                 const { data } = await supabaseClient.storage.from('e-sign').download('bg_memo.jpg');
                 if (data) {
                     return new Promise((resolve) => {
@@ -1050,7 +1051,7 @@
             // 2. Hierarchy mapping
             if (pos.includes('PARPO II')) return 10;
             if (pos.includes('PARPO I') && !pos.includes('PARPO II')) return 11;
-            if (pos.includes('CHIEF LEGAL') || pos.includes('ATTORNEY')) return 12;
+            if (pos.includes('CHIEF LEGAL') || pos.includes('ATTORNEY V')) return 12;
             if (pos.includes('CARPO LTSP') || pos.includes('LTSP')) return 13;
             if (pos.includes('CAO')) return 14;
             if (pos.includes('CARPO PBDD') || pos.includes('CARPO-PBDD')) return 15;
@@ -1086,20 +1087,49 @@
                 return String(a.full_name || '').localeCompare(String(b.full_name || ''));
             });
 
+            // Rebuilt Participants List into a strict 2-column TABLE for perfect alignment
+            let pHTML = '<table style="width: 100%; border-collapse: collapse; font-size: 10.5pt; margin-bottom: 30px;">';
             let count = 1;
-            let pHTML = '';
-            sortedRoster.forEach(emp => {
-                if(emp.isGuest) {
-                    let end = count + parseInt(emp.guestCount) - 1;
-                    let numStr = emp.guestCount > 1 ? `${count}-${end}.` : `${count}.`;
-                    pHTML += `<div style="margin-bottom: 8px; font-size: 10.5pt; page-break-inside: avoid; break-inside: avoid;" class="print-item">${numStr} <strong style="text-transform:uppercase; font-size: 10.5pt;">GUEST/S</strong></div>`;
+            for (let i = 0; i < sortedRoster.length; i += 2) {
+                let emp1 = sortedRoster[i];
+                let emp2 = sortedRoster[i+1];
+                
+                let text1 = '';
+                if (emp1.isGuest) {
+                    let end = count + parseInt(emp1.guestCount) - 1;
+                    emp1._numStr = emp1.guestCount > 1 ? `${count}-${end}.` : `${count}.`;
+                    text1 = `<strong style="text-transform:uppercase;">GUEST/S</strong>`;
                     count = end + 1;
                 } else {
-                    let pos = emp.position ? `, <span style="text-transform:uppercase; font-size: 8.5pt; color: #4b5563;">${emp.position}</span>` : '';
-                    pHTML += `<div style="margin-bottom: 8px; font-size: 10.5pt; page-break-inside: avoid; break-inside: avoid;" class="print-item">${count}. <strong style="text-transform:uppercase; font-size: 10.5pt;">${emp.full_name}</strong>${pos}</div>`;
+                    let pos = emp1.position ? `, <span style="text-transform:uppercase; font-size: 8.5pt; color: #4b5563;">${emp1.position}</span>` : '';
+                    text1 = `<strong style="text-transform:uppercase;">${emp1.full_name}</strong>${pos}`;
+                    emp1._numStr = `${count}.`;
                     count++;
                 }
-            });
+                
+                let text2 = '';
+                if (emp2) {
+                    if (emp2.isGuest) {
+                        let end = count + parseInt(emp2.guestCount) - 1;
+                        emp2._numStr = emp2.guestCount > 1 ? `${count}-${end}.` : `${count}.`;
+                        text2 = `<strong style="text-transform:uppercase;">GUEST/S</strong>`;
+                        count = end + 1;
+                    } else {
+                        let pos = emp2.position ? `, <span style="text-transform:uppercase; font-size: 8.5pt; color: #4b5563;">${emp2.position}</span>` : '';
+                        text2 = `<strong style="text-transform:uppercase;">${emp2.full_name}</strong>${pos}`;
+                        emp2._numStr = `${count}.`;
+                        count++;
+                    }
+                }
+                
+                pHTML += `<tr style="page-break-inside: avoid;">
+                    <td style="width: 4%; vertical-align: top; padding-bottom: 12px; font-weight: normal;">${emp1._numStr}</td>
+                    <td style="width: 46%; vertical-align: top; padding-bottom: 12px; padding-right: 15px;">${text1}</td>
+                    <td style="width: 4%; vertical-align: top; padding-bottom: 12px; font-weight: normal;">${emp2 ? emp2._numStr : ''}</td>
+                    <td style="width: 46%; vertical-align: top; padding-bottom: 12px;">${text2}</td>
+                </tr>`;
+            }
+            pHTML += '</table>';
             document.getElementById('printParticipantsList').innerHTML = pHTML;
 
             const qrContainer = document.getElementById("qrcode");
@@ -1139,7 +1169,7 @@
                         pdf.setFontSize(9);
                         pdf.setTextColor(100);
                         // Stamping the page number mathematically at the bottom right corner (Inside margin visibility)
-                        pdf.text('Page ' + i + ' of ' + totalPages, 7.5, 12.75, { align: 'right' });
+                        pdf.text('Page ' + i + ' of ' + totalPages, 7.5, 12.85, { align: 'right' });
                     }
                 }).save().then(() => {
                     // Cleanup DOM so subsequent re-prints trigger perfectly
