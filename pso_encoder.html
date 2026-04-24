@@ -447,32 +447,34 @@
         </div>
     </main>
 
-    <div id="printArea" class="hidden z-[9999] bg-white" style="width: 8.5in; margin: 0 auto;">
+    <div id="printArea" class="hidden z-[9999] bg-white" style="width: 8.5in; margin: 0 auto; text-align: justify;">
         
-        <div id="printContentWrapper" style="position: relative; z-index: 1; font-family: 'Roboto', sans-serif; color: black; width: 8.5in; padding: 1.5in 1in 1.5in 1in; box-sizing: border-box; min-height: 13in;">
+        <div id="printContentWrapper" style="position: relative; z-index: 1; font-family: 'Roboto', sans-serif; color: black; width: 8.5in; padding: 1.25in 1in 1.5in 1in; box-sizing: border-box; min-height: 13in;">
             
             <h2 style="text-align: left; font-weight: bold; font-size: 13pt; margin-bottom: 2px;">PROVINCIAL SPECIAL ORDER No. <span id="printPsoNoOnly"></span></h2>
             <h3 style="text-align: left; font-size: 11pt; margin-bottom: 25px; font-weight: bold;">Series of <span id="printSeriesYear"></span></h3>
             
-            <div style="margin-bottom: 10px; display: flex; font-size: 11pt; align-items: flex-start; page-break-inside: avoid; break-inside: avoid;">
-                <div style="width: 80px; font-weight: bold;">SUBJECT</div>
-                <div style="width: 20px; font-weight: bold;">:</div>
-                <div style="flex: 1; font-weight: bold; text-transform: uppercase;" id="printSubject"></div>
-            </div>
+            <table style="width: 100%; font-size: 11pt; margin-bottom: 10px; font-weight: bold; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 80px; vertical-align: top;">SUBJECT</td>
+                    <td style="width: 20px; vertical-align: top; text-align: center;">:</td>
+                    <td style="vertical-align: top; text-transform: uppercase; text-align: justify;" id="printSubject"></td>
+                </tr>
+            </table>
             
             <hr style="border: 0; border-top: 2px solid black; margin-bottom: 20px; page-break-after: avoid; break-after: avoid;">
 
-            <div id="printBodyHTML" style="font-size: 11pt; margin-bottom: 20px;"></div>
+            <div id="printBodyHTML" style="font-size: 11pt; margin-bottom: 20px; text-align: justify;"></div>
             
             <div id="printParticipantsList" style="font-size: 10.5pt; margin-bottom: 30px; line-height: 1.4; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;"></div>
 
             <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify; page-break-inside: avoid; break-inside: avoid;">Attendance shall be considered official time. All concerned personnel are hereby directed to comply with this Order.</p>
             <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify; page-break-inside: avoid; break-inside: avoid;">This Order shall serve as Travel Order and shall remain in force unless sooner revoked or amended.</p>
-            <p style="font-size: 10.5pt; margin-bottom: 40px; text-align: justify; page-break-inside: avoid; break-inside: avoid;">_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, Building, Carnation Street, Triangulo, City of Naga.</p>
+            <p style="font-size: 10.5pt; margin-bottom: 40px; text-align: justify; page-break-inside: avoid; break-inside: avoid;">_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.</p>
             
             <div style="display: flex; justify-content: space-between; align-items: flex-end; page-break-inside: avoid; break-inside: avoid; margin-top: 40px;">
                 <div>
-                    <p style="font-weight: bold; font-size: 11.5pt; text-decoration: underline; margin-bottom: 2px;">RICARDO C. GARCIA</p>
+                    <p style="font-weight: bold; font-size: 11.5pt; margin-bottom: 2px;">RICARDO C. GARCIA</p>
                     <p style="font-size: 10.5pt;">PARPO II</p>
                 </div>
                 <div id="qrcode"></div>
@@ -530,7 +532,6 @@
         async function getBgMemo() {
             if (cachedBgMemo) return cachedBgMemo;
             try {
-                // Fetching exactly bg_memo.jpg as requested
                 const { data } = await supabaseClient.storage.from('e-sign').download('bg_memo.jpg');
                 if (data) {
                     return new Promise((resolve) => {
@@ -1039,6 +1040,34 @@
             }
         }
 
+        // --- Custom Ranker (Strictly orders based on user prompt criteria) ---
+        function getRank(emp) {
+            const pos = String(emp.position || '').toUpperCase();
+            
+            // 1. "always start with regulars and OUTSIDE GUESTS"
+            if (emp.isGuest || emp.division === 'EXTERNAL') return 1;
+            
+            // 2. Hierarchy mapping
+            if (pos.includes('PARPO II')) return 10;
+            if (pos.includes('PARPO I') && !pos.includes('PARPO II')) return 11;
+            if (pos.includes('CHIEF LEGAL') || pos.includes('ATTORNEY')) return 12;
+            if (pos.includes('CARPO LTSP') || pos.includes('LTSP')) return 13;
+            if (pos.includes('CAO')) return 14;
+            if (pos.includes('CARPO PBDD') || pos.includes('CARPO-PBDD')) return 15;
+            if (pos.includes('MARPO')) return 16;
+            if (pos.includes('SARPO')) return 17;
+            if (pos === 'AO' || pos.includes('ADMINISTRATIVE OFFICER') || pos.startsWith('AO ')) return 18;
+            if (pos.includes('ARPO II')) return 19;
+            if (pos.includes('ARPO I') && !pos.includes('ARPO II')) return 20;
+            if (pos.includes('ARPT')) return 21;
+            
+            // 3. "lastly, Drivers"
+            if (pos.includes('DRIVER')) return 100;
+            
+            // "Regulars" (Unidentified standard staff default to rank 2, falling right after Outside Guests and before Bosses)
+            return 2; 
+        }
+
         // Dedicated High-Quality PDF Generation Function
         function triggerPrint(psoNoText, yr, subj, datesArr, contentHTML, rosterArr, qrText) {
             
@@ -1046,13 +1075,15 @@
             document.getElementById('printSeriesYear').innerText = yr;
             document.getElementById('printSubject').innerText = subj.toUpperCase();
             
-            let finalBody = contentHTML + `<p style="margin-top:15px; text-align: justify;"><strong>Schedule Date/s: ${datesArr.join(', ')}</strong></p>`;
-            document.getElementById('printBodyHTML').innerHTML = finalBody;
+            // Removed automatic appended dates per instructions
+            document.getElementById('printBodyHTML').innerHTML = contentHTML;
             
             let sortedRoster = [...rosterArr].sort((a, b) => {
-                if (a.isGuest && !b.isGuest) return 1;
-                if (!a.isGuest && b.isGuest) return -1;
-                return 0;
+                let rankA = getRank(a);
+                let rankB = getRank(b);
+                if (rankA !== rankB) return rankA - rankB;
+                // Alphabetical tie-breaker for same-rank personnel
+                return String(a.full_name || '').localeCompare(String(b.full_name || ''));
             });
 
             let count = 1;
@@ -1061,11 +1092,11 @@
                 if(emp.isGuest) {
                     let end = count + parseInt(emp.guestCount) - 1;
                     let numStr = emp.guestCount > 1 ? `${count}-${end}.` : `${count}.`;
-                    pHTML += `<div style="margin-bottom: 4px; font-size: 10.5pt; page-break-inside: avoid; break-inside: avoid;">${numStr} <strong style="text-transform:uppercase; font-size: 10.5pt;">GUEST/S</strong></div>`;
+                    pHTML += `<div style="margin-bottom: 8px; font-size: 10.5pt; page-break-inside: avoid; break-inside: avoid;" class="print-item">${numStr} <strong style="text-transform:uppercase; font-size: 10.5pt;">GUEST/S</strong></div>`;
                     count = end + 1;
                 } else {
-                    let pos = emp.position ? `, <span style="text-transform:uppercase; font-size: 8pt; color: #333;">${emp.position}</span>` : '';
-                    pHTML += `<div style="margin-bottom: 4px; font-size: 10.5pt; page-break-inside: avoid; break-inside: avoid;" class="print-item">${count}. <strong style="text-transform:uppercase; font-size: 10.5pt;">${emp.full_name}</strong>${pos}</div>`;
+                    let pos = emp.position ? `, <span style="text-transform:uppercase; font-size: 8.5pt; color: #4b5563;">${emp.position}</span>` : '';
+                    pHTML += `<div style="margin-bottom: 8px; font-size: 10.5pt; page-break-inside: avoid; break-inside: avoid;" class="print-item">${count}. <strong style="text-transform:uppercase; font-size: 10.5pt;">${emp.full_name}</strong>${pos}</div>`;
                     count++;
                 }
             });
@@ -1096,21 +1127,22 @@
                     margin:       0, 
                     filename:     `${psoNoText}_PSO.pdf`,
                     image:        { type: 'jpeg', quality: 1 },
-                    html2canvas:  { scale: 4, useCORS: true },
+                    html2canvas:  { scale: 4, useCORS: true, letterRendering: true },
                     jsPDF:        { unit: 'in', format: [8.5, 13], orientation: 'portrait' }
                 };
 
-                html2pdf().set(opt).from(printArea).toPdf().get('pdf').then(function(pdf) {
-                    // Native jsPDF calculation for accurate Page numbers
-                    var totalPages = pdf.internal.getNumberOfPages();
+                // The .toContainer().toCanvas().toImg().toPdf() chain ensures rendering finishes BEFORE counting pages (fixes Page 0 of 0)
+                html2pdf().set(opt).from(printArea).toContainer().toCanvas().toImg().toPdf().get('pdf').then(function(pdf) {
+                    var totalPages = Math.max(1, pdf.internal.getNumberOfPages());
                     for (let i = 1; i <= totalPages; i++) {
                         pdf.setPage(i);
                         pdf.setFontSize(9);
                         pdf.setTextColor(100);
-                        // Stamping the page number mathematically at the bottom right corner (inside the 1.5/1.0 margins)
-                        pdf.text('Page ' + i + ' of ' + totalPages, 7.5, 12.5, { align: 'right' });
+                        // Stamping the page number mathematically at the bottom right corner (Inside margin visibility)
+                        pdf.text('Page ' + i + ' of ' + totalPages, 7.5, 12.75, { align: 'right' });
                     }
                 }).save().then(() => {
+                    // Cleanup DOM so subsequent re-prints trigger perfectly
                     printArea.style.display = 'none';
                     printArea.classList.add('hidden');
                     document.getElementById('printContentWrapper').style.backgroundImage = '';
