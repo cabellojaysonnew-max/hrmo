@@ -430,7 +430,7 @@
                                 <span id="b_rosterCount" class="text-lg font-black text-[#003811]">0</span>
                             </div>
                             <button onclick="saveDraftAndPrint()" class="w-full bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">
-                                SAVE DRAFT & PRINT (W/ QR)
+                                SAVE DRAFT & PRINT
                             </button>
                         </div>
                     </div>
@@ -1033,19 +1033,17 @@
 
         // Dedicated Print Processing Function
         function triggerPrint(psoNoText, yr, subj, datesArr, contentHTML, rosterArr, qrText) {
-            // Setup Print Layout
+            
             document.getElementById('printPsoNoOnly').innerText = psoNoText;
             document.getElementById('printSeriesYear').innerText = yr;
             document.getElementById('printSubject').innerText = subj.toUpperCase();
             
-            // Format Body & Schedule
             let finalBody = contentHTML + `<p style="margin-top:15px; text-align: justify;"><strong>Schedule Date/s: ${datesArr.join(', ')}</strong></p>`;
             document.getElementById('printBodyHTML').innerHTML = finalBody;
             
             const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
             document.getElementById('printDateGenerated').innerText = today;
             
-            // Format Participants Loop (Guests always at bottom)
             let sortedRoster = [...rosterArr].sort((a, b) => {
                 if (a.isGuest && !b.isGuest) return 1;
                 if (!a.isGuest && b.isGuest) return -1;
@@ -1258,9 +1256,15 @@
             metaRes.data.forEach(d => {
                 if (d.status === 'DRAFT') {
                     const draftDates = d.dates_json || []; const draftEmps = d.participants_json || [];
+                    
                     soMap[d.pso_no] = { 
-                        pso_no: d.pso_no, subject: d.subject || 'No Subject', datesArr: draftDates.sort(),
-                        dateCount: draftDates.length, empCount: draftEmps.length, isDraft: true, draftData: d
+                        pso_no: d.pso_no, 
+                        subject: d.subject || 'No Subject', 
+                        datesArr: draftDates.sort(),
+                        dateCount: draftDates.length,
+                        empCount: draftEmps.length,
+                        isDraft: true,
+                        draftData: d
                     };
                 } else if (soMap[d.pso_no]) {
                     // Attach metadata to posted orders for reprints
