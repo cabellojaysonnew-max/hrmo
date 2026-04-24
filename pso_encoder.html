@@ -13,10 +13,12 @@
     <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+
     <script src="supabase-config.js"></script>
     
     <script>
-        // Initialize PDF.js Worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 
@@ -46,6 +48,11 @@
         
         input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
         input[type="checkbox"] { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; margin-top: 0.1rem; }
+
+        /* Quill Adjustments */
+        .ql-toolbar.ql-snow { border: 1px solid #D1D5DB; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem; background: #f9fafb; padding: 4px; }
+        .ql-container.ql-snow { border: 1px solid #D1D5DB; border-bottom-left-radius: 0.375rem; border-bottom-right-radius: 0.375rem; background: white; font-family: 'Segoe UI', sans-serif; font-size: 0.875rem; }
+        .ql-editor { min-height: 150px; }
 
         /* Print Styles */
         @media print {
@@ -295,7 +302,19 @@
                 <div class="flex flex-col h-full gap-6">
                     <div class="card p-6 flex flex-col h-1/2 border-t-2 border-t-gray-200">
                         <h2 class="form-label border-b border-gray-100 pb-2 mb-4 shrink-0 text-gray-500">3. Body Content</h2>
-                        <textarea id="b_psoContent" class="w-full flex-grow p-3 border border-gray-300 rounded text-xs bg-white outline-none focus:border-[#003811] resize-none" placeholder="Enter the exact body paragraphs of the PSO here..."></textarea>
+                        
+                        <div class="border border-gray-300 rounded overflow-hidden flex flex-col flex-grow bg-white">
+                            <div id="quill-toolbar" class="bg-gray-50 border-b border-gray-300">
+                                <button class="ql-bold"></button>
+                                <button class="ql-italic"></button>
+                                <button class="ql-underline"></button>
+                                <button class="ql-list" value="ordered"></button>
+                                <button class="ql-list" value="bullet"></button>
+                                <button class="ql-indent" value="-1"></button>
+                                <button class="ql-indent" value="+1"></button>
+                            </div>
+                            <div id="b_psoContent" class="flex-grow overflow-y-auto"></div>
+                        </div>
                         
                         <div class="flex justify-between items-center mt-2 shrink-0">
                             <button onclick="checkGrammar()" id="grammarBtn" class="bg-gray-100 border border-gray-300 text-[#003811] px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-gray-200 transition flex items-center gap-1 shadow-sm">
@@ -386,7 +405,7 @@
             <p style="margin-bottom: 10px; font-size: 0.9rem;"><strong>SUBJECT:</strong> <span id="printSubject"></span></p>
             <p style="margin-bottom: 25px; font-size: 0.9rem;"><strong>DATE/S:</strong> <span id="printDates"></span></p>
             
-            <div id="printContent" style="white-space: pre-wrap; margin-bottom: 25px; font-size: 0.95rem; text-align: justify;"></div>
+            <div id="printContent" style="margin-bottom: 25px; font-size: 0.95rem; text-align: justify; line-height: 1.5;"></div>
             
             <p style="margin-bottom: 10px; font-size: 0.9rem;"><strong>PARTICIPANTS:</strong></p>
             <div id="printParticipants" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; font-size: 0.85rem; margin-bottom: 40px;"></div>
@@ -450,17 +469,24 @@
         let employees = [];
         let uniqueDivisions = [];
         
-        let computedDates = []; // For Encoder
-        let b_computedDates = []; // For Builder
+        let computedDates = []; 
+        let b_computedDates = []; 
         
-        let matchedPersonnel = []; // For Encoder
-        let b_roster = []; // For Builder
+        let matchedPersonnel = []; 
+        let b_roster = []; 
 
         let activeManageSO = ""; 
         let allActiveSOs = []; 
 
         document.getElementById('soYear').value = new Date().getFullYear();
         document.getElementById('b_soYear').value = new Date().getFullYear();
+
+        // Initialize Rich Text Editor
+        var quill = new Quill('#b_psoContent', {
+            theme: 'snow',
+            modules: { toolbar: '#quill-toolbar' },
+            placeholder: 'Enter the exact body paragraphs of the PSO here...'
+        });
 
         async function fetchEmployees() {
             const { data, error } = await supabaseClient.from('employees').select('emp_id, full_name, unit, division, position, type, status').order('full_name');
@@ -490,7 +516,6 @@
             }
         }
 
-        // --- Global Paste Listener for Images (ENCODER ONLY) ---
         document.addEventListener('paste', function(e) {
             if(document.getElementById('encoderTab').style.display === 'none') return;
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
@@ -864,16 +889,18 @@
             const no = document.getElementById('b_soNumber').value;
             const yr = document.getElementById('b_soYear').value;
             const subj = document.getElementById('b_soSubject').value.trim();
-            const content = document.getElementById('b_psoContent').value.trim();
             const dur = document.getElementById('b_soDuration').value;
+            
+            // Extract HTML from Quill editor instead of a textarea value
+            const content = quill.root.innerHTML.trim();
+            const plainTextCheck = quill.getText().trim();
 
-            if(!no || !yr || !subj || !content) return alert("Type, Number, Year, Subject, and Body Content are required.");
+            if(!no || !yr || !subj || plainTextCheck === "") return alert("Type, Number, Year, Subject, and Body Content are required.");
             if(b_computedDates.length === 0) return alert("Compute Schedule Dates first.");
             if(b_roster.length === 0) return alert("Add at least one participant to the roster.");
 
             const fullSoNumber = `${type} ${no} series of ${yr}`;
 
-            // Save JSON to pso_metadata as a DRAFT. DO NOT INSERT TO pso_records.
             const { error: metaErr } = await supabaseClient.from('pso_metadata').upsert({
                 pso_no: fullSoNumber,
                 type: type,
@@ -888,11 +915,13 @@
 
             if (metaErr) return alert("Failed to save draft: " + metaErr.message);
 
-            // Populate Print Area
             document.getElementById('printPsoNo').innerText = fullSoNumber;
             document.getElementById('printSubject').innerText = subj;
             document.getElementById('printDates').innerText = b_computedDates.join(', ');
-            document.getElementById('printContent').innerText = content;
+            
+            // Injecting HTML directly into the print view to retain bold, lists, etc.
+            document.getElementById('printContent').innerHTML = content;
+            
             document.getElementById('printParticipants').innerHTML = b_roster.map(emp => 
                 `<div>• ${emp.full_name} <span style="color:gray; font-size:0.8em">(${emp.position || ''})</span></div>`
             ).join('');
@@ -901,18 +930,102 @@
             qrContainer.innerHTML = ""; 
             new QRCode(qrContainer, { text: fullSoNumber, width: 90, height: 90 });
 
-            // Allow rendering then print
             setTimeout(() => { 
                 window.print(); 
                 alert(`Draft Saved! Pending Signature for ${fullSoNumber}. Open Manage Active Orders to Post it once signed.`);
-                // Clear Form automatically
                 b_roster = []; b_computedDates = [];
                 document.getElementById('b_soNumber').value = ""; 
                 document.getElementById('b_soSubject').value = "";
-                document.getElementById('b_psoContent').value = "";
+                quill.setText(""); // Reset Editor
                 b_renderRoster(); 
                 document.getElementById('b_computedDatesLabel').innerHTML = "No dates computed yet.";
             }, 400);
+        }
+
+        // ==========================================
+        // --- AI GRAMMAR CHECKER ---
+        // ==========================================
+        async function checkGrammar() {
+            // Check grammar based on plain text, to avoid corrupting HTML nodes
+            const text = quill.getText().trim();
+            const status = document.getElementById('grammarStatus');
+            const resultsDiv = document.getElementById('grammarResults');
+            const btn = document.getElementById('grammarBtn');
+
+            if (!text) {
+                status.innerText = "No text to check.";
+                return;
+            }
+
+            btn.disabled = true;
+            status.innerText = "Checking grammar...";
+            resultsDiv.innerHTML = "";
+            resultsDiv.classList.add('hidden');
+
+            try {
+                const params = new URLSearchParams();
+                params.append('text', text);
+                params.append('language', 'en-US');
+
+                const response = await fetch('https://api.languagetoolplus.com/v2/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params
+                });
+
+                const data = await response.json();
+                
+                if (data.matches && data.matches.length > 0) {
+                    status.innerText = `Found ${data.matches.length} suggestions.`;
+                    resultsDiv.classList.remove('hidden');
+                    
+                    data.matches.forEach(match => {
+                        if(match.replacements && match.replacements.length > 0) {
+                            const suggestion = match.replacements[0].value;
+                            const errorText = text.substring(match.offset, match.offset + match.length);
+                            
+                            const item = document.createElement('div');
+                            item.className = "flex justify-between items-center bg-white p-2 border border-gray-200 rounded shadow-sm";
+                            item.innerHTML = `
+                                <div>
+                                    <p class="text-[10px] text-red-500 line-through">${errorText}</p>
+                                    <p class="text-[11px] font-bold text-green-700">${suggestion}</p>
+                                    <p class="text-[9px] text-gray-500">${match.message}</p>
+                                </div>
+                                <button onclick="applyGrammarFix(this, '${errorText.replace(/'/g, "\\'")}', '${suggestion.replace(/'/g, "\\'")}')" class="bg-[#003811] text-white px-2 py-1 rounded text-[9px] font-bold hover:bg-[#002200] shrink-0 ml-2">FIX</button>
+                            `;
+                            resultsDiv.appendChild(item);
+                        }
+                    });
+                    
+                    if(resultsDiv.innerHTML === "") {
+                        status.innerText = "No fixable errors found.";
+                    }
+                } else {
+                    status.innerText = "✨ Text looks perfect!";
+                }
+            } catch (error) {
+                console.error(error);
+                status.innerText = "API Error. Try again later.";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function applyGrammarFix(btnElement, errorText, replacement) {
+            // Apply fix directly to the HTML string underlying the editor
+            let currentHTML = quill.root.innerHTML;
+            quill.root.innerHTML = currentHTML.replace(errorText, replacement);
+            
+            btnElement.parentElement.style.display = 'none';
+            
+            const resultsDiv = document.getElementById('grammarResults');
+            if(resultsDiv.querySelectorAll('div[style=""]').length === 0 && resultsDiv.querySelectorAll('div:not([style*="none"])').length === 0) {
+                document.getElementById('grammarStatus').innerText = "✨ All fixes applied!";
+                resultsDiv.classList.add('hidden');
+            } else {
+                document.getElementById('grammarStatus').innerText = "Fix applied.";
+            }
         }
 
         // ==========================================
@@ -942,7 +1055,6 @@
             listDiv.innerHTML = `<div class="flex items-center justify-center h-full mt-10"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading Orders...</span></div>`;
             const today = new Date().toISOString().split('T')[0];
             
-            // Fetch both Active Records AND Pending Drafts
             const [recordsRes, draftsRes] = await Promise.all([
                 supabaseClient.from('pso_records').select('*').gte('start_date', today).order('start_date', { ascending: true }),
                 supabaseClient.from('pso_metadata').select('*').eq('status', 'DRAFT')
@@ -955,14 +1067,12 @@
 
             const soMap = {};
             
-            // 1. Group active records normally
             recordsRes.data.forEach(d => {
                 if (!soMap[d.pso_no]) soMap[d.pso_no] = { pso_no: d.pso_no, subject: d.subject || 'No Subject', dates: new Set(), emps: new Set(), isDraft: false };
                 soMap[d.pso_no].dates.add(d.start_date);
                 soMap[d.pso_no].emps.add(d.emp_id);
             });
 
-            // 2. Format Drafts
             draftsRes.data.forEach(d => {
                 const draftDates = d.dates_json || [];
                 const draftEmps = d.participants_json || [];
@@ -974,11 +1084,10 @@
                     dateCount: draftDates.length,
                     empCount: draftEmps.length,
                     isDraft: true,
-                    draftData: d // Keep original data for posting later
+                    draftData: d
                 };
             });
 
-            // Merge and map
             allActiveSOs = Object.values(soMap).map(so => {
                 if(!so.isDraft) {
                     so.dateCount = so.dates.size;
@@ -1083,7 +1192,6 @@
             const resArea = document.getElementById('soSearchResults');
             const soRecord = allActiveSOs.find(so => so.pso_no === query);
 
-            // --- Render DRAFT View ---
             if (soRecord && soRecord.isDraft) {
                 resArea.innerHTML = `
                     <div class="bg-yellow-50 p-6 border-b border-yellow-200 flex flex-col items-center justify-center text-center shrink-0 h-full">
@@ -1104,7 +1212,6 @@
                 return;
             }
 
-            // --- Render ACTIVE View (Existing code) ---
             resArea.innerHTML = `<div class="h-full flex items-center justify-center"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading Details...</span></div>`;
 
             const { data, error } = await supabaseClient.from('pso_records').select('*').eq('pso_no', query).order('start_date', { ascending: true });
@@ -1199,7 +1306,6 @@
             `;
         }
 
-        // Action: Post Draft to Live
         async function postDraftToRecords(psoNo) {
             const soRecord = allActiveSOs.find(so => so.pso_no === psoNo);
             if(!soRecord || !soRecord.draftData) return alert("Draft data lost. Refresh and try again.");
@@ -1226,11 +1332,9 @@
                 });
             });
 
-            // 1. Insert to Records
             const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
             if (insErr) return alert("Database Error inserting records: " + insErr.message);
 
-            // 2. Update Metadata status
             const { error: updErr } = await supabaseClient.from('pso_metadata').update({ status: 'POSTED' }).eq('pso_no', psoNo);
             if (updErr) alert("Warning: Records added but draft status not updated. " + updErr.message);
             else alert("Success! The order is now live on employee schedules.");
@@ -1239,17 +1343,13 @@
             backToSoList();
         }
 
-        // Action: Delete Draft
         async function deleteDraft(psoNo) {
             if(!confirm(`Permanently delete the draft for ${psoNo}? This cannot be undone.`)) return;
-            
             const { error } = await supabaseClient.from('pso_metadata').delete().eq('pso_no', psoNo);
             if (error) alert("Error: " + error.message);
             else { alert("Draft deleted."); loadAllActiveSOs(); backToSoList(); }
         }
 
-
-        // Manage Modal Intelligent Search Logic
         function mngSearchEmp(query) {
             const resDiv = document.getElementById('mngEmpResults');
             document.getElementById('mngEmpIdHdn').value = ""; 
@@ -1280,7 +1380,6 @@
             document.getElementById('mngEmpResults').classList.add('hidden');
         }
 
-        // Active Order Management Functions
         async function cancelEntireSO() {
             if(!confirm(`WARNING: This will permanently cancel ALL dates and personnel for ${activeManageSO}. Continue?`)) return;
             const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO);
@@ -1391,90 +1490,6 @@
 
             if(error) alert("Error modifying: " + error.message);
             else { alert("Schedule successfully updated!"); viewSODetails(activeManageSO); }
-        }
-
-        // ==========================================
-        // --- AI GRAMMAR CHECKER ---
-        // ==========================================
-        async function checkGrammar() {
-            const contentArea = document.getElementById('b_psoContent');
-            const text = contentArea.value.trim();
-            const status = document.getElementById('grammarStatus');
-            const resultsDiv = document.getElementById('grammarResults');
-            const btn = document.getElementById('grammarBtn');
-
-            if (!text) {
-                status.innerText = "No text to check.";
-                return;
-            }
-
-            btn.disabled = true;
-            status.innerText = "Checking grammar...";
-            resultsDiv.innerHTML = "";
-            resultsDiv.classList.add('hidden');
-
-            try {
-                const params = new URLSearchParams();
-                params.append('text', text);
-                params.append('language', 'en-US');
-
-                const response = await fetch('https://api.languagetoolplus.com/v2/check', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: params
-                });
-
-                const data = await response.json();
-                
-                if (data.matches && data.matches.length > 0) {
-                    status.innerText = `Found ${data.matches.length} suggestions.`;
-                    resultsDiv.classList.remove('hidden');
-                    
-                    data.matches.forEach(match => {
-                        if(match.replacements && match.replacements.length > 0) {
-                            const suggestion = match.replacements[0].value;
-                            const errorText = text.substring(match.offset, match.offset + match.length);
-                            
-                            const item = document.createElement('div');
-                            item.className = "flex justify-between items-center bg-white p-2 border border-gray-200 rounded shadow-sm";
-                            item.innerHTML = `
-                                <div>
-                                    <p class="text-[10px] text-red-500 line-through">${errorText}</p>
-                                    <p class="text-[11px] font-bold text-green-700">${suggestion}</p>
-                                    <p class="text-[9px] text-gray-500">${match.message}</p>
-                                </div>
-                                <button onclick="applyGrammarFix(this, '${errorText.replace(/'/g, "\\'")}', '${suggestion.replace(/'/g, "\\'")}')" class="bg-[#003811] text-white px-2 py-1 rounded text-[9px] font-bold hover:bg-[#002200] shrink-0 ml-2">FIX</button>
-                            `;
-                            resultsDiv.appendChild(item);
-                        }
-                    });
-                    
-                    if(resultsDiv.innerHTML === "") {
-                        status.innerText = "No fixable errors found.";
-                    }
-                } else {
-                    status.innerText = "✨ Text looks perfect!";
-                }
-            } catch (error) {
-                console.error(error);
-                status.innerText = "API Error. Try again later.";
-            } finally {
-                btn.disabled = false;
-            }
-        }
-
-        function applyGrammarFix(btnElement, errorText, replacement) {
-            const contentArea = document.getElementById('b_psoContent');
-            contentArea.value = contentArea.value.replace(errorText, replacement);
-            btnElement.parentElement.style.display = 'none';
-            
-            const resultsDiv = document.getElementById('grammarResults');
-            if(resultsDiv.querySelectorAll('div[style=""]').length === 0 && resultsDiv.querySelectorAll('div:not([style*="none"])').length === 0) {
-                document.getElementById('grammarStatus').innerText = "✨ All fixes applied!";
-                resultsDiv.classList.add('hidden');
-            } else {
-                document.getElementById('grammarStatus').innerText = "Fix applied.";
-            }
         }
 
     </script>
