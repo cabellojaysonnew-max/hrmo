@@ -65,9 +65,11 @@
             #printArea, #printArea * { visibility: visible; }
             #printArea { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
+            #printBodyHTML, #printBodyHTML * { text-align: justify !important; }
+            
             /* Intelligent Paging Footer */
-            #printFooter { position: fixed; bottom: 10px; right: 40px; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; }
-            #printFooter::after { content: "Page " counter(page); }
+            #printFooter { position: fixed; bottom: 15px; right: 40px; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; }
+            #printFooter::after { content: "Page " counter(page) " of " counter(pages); }
         }
         @page { margin: 15mm; }
     </style>
@@ -362,7 +364,8 @@
                         <div id="b_modeDivision" class="space-y-4 hidden">
                             <div>
                                 <label class="form-label text-[#003811]">Division</label>
-                                <select id="b_divFilter" onchange="b_populatePositions()" class="form-input text-gray-800"></select>
+                                <select id="b_divFilter" onchange="b_populatePositions()" class="form-input text-gray-800">
+                                </select>
                             </div>
                             <div>
                                 <label class="form-label text-[#003811]">Position (Optional)</label>
@@ -451,7 +454,7 @@
             
             <hr style="border: 0; border-top: 2px solid black; margin-bottom: 20px;">
 
-            <div id="printBodyHTML" style="font-size: 11pt; text-align: justify; line-height: 1.5; margin-bottom: 20px;"></div>
+            <div id="printBodyHTML" style="font-size: 11pt; margin-bottom: 20px;"></div>
             
             <div id="printParticipantsList" style="font-size: 10.5pt; margin-bottom: 30px; line-height: 1.4; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;"></div>
 
@@ -878,9 +881,12 @@
         function b_populatePositions() {
             const selectedDiv = document.getElementById('b_divFilter').value;
             const posSel = document.getElementById('b_posFilter');
+            
             const activeEmps = employees.filter(e => !e.status || e.status.toUpperCase() === 'ACTIVE');
             let posInDiv = [...new Set(activeEmps.filter(e => e.division === selectedDiv).map(e => e.position).filter(p => p))].sort();
-            posSel.innerHTML = '<option value="ALL">All Positions in Division</option>' + posInDiv.map(p => `<option value="${p}">${p}</option>`).join('');
+            
+            posSel.innerHTML = '<option value="ALL">All Positions in Division</option>' + 
+                               posInDiv.map(p => `<option value="${p}">${p}</option>`).join('');
         }
 
         // Search logic for Individual selection
@@ -943,25 +949,34 @@
                 const name = document.getElementById('b_manualName').value.trim();
                 const pos = document.getElementById('b_manualPos').value.trim() || 'EXTERNAL';
                 if (!name) return alert("Please enter the participant's name.");
+                
                 empsToAdd.push({
                     emp_id: 'EXT-' + Date.now() + Math.floor(Math.random() * 1000),
-                    full_name: name.toUpperCase(), position: pos.toUpperCase(),
-                    division: 'EXTERNAL', unit: ''
+                    full_name: name.toUpperCase(),
+                    position: pos.toUpperCase(),
+                    division: 'EXTERNAL',
+                    unit: ''
                 });
+                
                 document.getElementById('b_manualName').value = '';
                 document.getElementById('b_manualPos').value = '';
             } 
             else if (mode === 'PROVINCE') {
-                const typeFilter = document.getElementById('b_empTypeFilter').value; 
-                if(typeFilter === 'ALL') empsToAdd = [...activeEmps];
-                else empsToAdd = activeEmps.filter(e => e.type && e.type.toUpperCase() === typeFilter);
-            } 
-            else if (mode === 'DIVISION') {
+                const typeFilter = document.getElementById('b_empTypeFilter').value; // ALL, REGULAR, SPLIT
+                if(typeFilter === 'ALL') {
+                    empsToAdd = [...activeEmps];
+                } else {
+                    empsToAdd = activeEmps.filter(e => e.type && e.type.toUpperCase() === typeFilter);
+                }
+            } else {
                 const divFilter = document.getElementById('b_divFilter').value;
                 const posFilter = document.getElementById('b_posFilter').value;
                 if(!divFilter) return alert("Please select a Division first.");
+                
                 empsToAdd = activeEmps.filter(e => e.division === divFilter);
-                if(posFilter !== 'ALL') empsToAdd = empsToAdd.filter(e => e.position === posFilter);
+                if(posFilter !== 'ALL') {
+                    empsToAdd = empsToAdd.filter(e => e.position === posFilter);
+                }
             }
 
             let addedCount = 0;
@@ -972,8 +987,11 @@
                 }
             });
 
-            if(addedCount === 0) alert("No new personnel matched your filters (or they are already added).");
-            else b_renderRoster();
+            if(addedCount === 0) {
+                alert("No new personnel matched your filters (or they are already added).");
+            } else {
+                b_renderRoster();
+            }
         }
 
         function b_removeParticipant(id) {
@@ -1013,6 +1031,7 @@
             }
         }
 
+        // Dedicated Print Processing Function
         function triggerPrint(psoNoText, yr, subj, datesArr, contentHTML, rosterArr, qrText) {
             // Setup Print Layout
             document.getElementById('printPsoNoOnly').innerText = psoNoText;
@@ -1020,24 +1039,30 @@
             document.getElementById('printSubject').innerText = subj.toUpperCase();
             
             // Format Body & Schedule
-            let finalBody = contentHTML + `<p style="margin-top:15px;"><strong>Schedule Date/s: ${datesArr.join(', ')}</strong></p>`;
+            let finalBody = contentHTML + `<p style="margin-top:15px; text-align: justify;"><strong>Schedule Date/s: ${datesArr.join(', ')}</strong></p>`;
             document.getElementById('printBodyHTML').innerHTML = finalBody;
             
             const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
             document.getElementById('printDateGenerated').innerText = today;
             
-            // Format Participants Loop (Numbering)
+            // Format Participants Loop (Guests always at bottom)
+            let sortedRoster = [...rosterArr].sort((a, b) => {
+                if (a.isGuest && !b.isGuest) return 1;
+                if (!a.isGuest && b.isGuest) return -1;
+                return 0;
+            });
+
             let count = 1;
             let pHTML = '';
-            rosterArr.forEach(emp => {
+            sortedRoster.forEach(emp => {
                 if(emp.isGuest) {
                     let end = count + parseInt(emp.guestCount) - 1;
                     let numStr = emp.guestCount > 1 ? `${count}-${end}.` : `${count}.`;
-                    pHTML += `<div>${numStr} GUEST/S</div>`;
+                    pHTML += `<div style="margin-bottom: 4px; font-size: 10.5pt;">${numStr} GUEST/S</div>`;
                     count = end + 1;
                 } else {
-                    let pos = emp.position ? `, <span style="text-transform:capitalize;">${emp.position.toLowerCase()}</span>` : '';
-                    pHTML += `<div>${count}. <span style="text-transform:uppercase;">${emp.full_name}</span>${pos}</div>`;
+                    let pos = emp.position ? `, <span style="text-transform:capitalize; font-size: 9.5pt;">${emp.position.toLowerCase()}</span>` : '';
+                    pHTML += `<div style="margin-bottom: 4px; font-size: 10.5pt;">${count}. <strong style="text-transform:uppercase; font-size: 10.5pt;">${emp.full_name}</strong>${pos}</div>`;
                     count++;
                 }
             });
@@ -1076,8 +1101,15 @@
             const draftId = `DRAFT-${Date.now()}`;
 
             const { error: metaErr } = await supabaseClient.from('pso_metadata').upsert({
-                pso_no: draftId, type: type, series_year: yr, subject: subj, duration: dur,
-                body_content: content, dates_json: b_computedDates, participants_json: b_roster, status: 'DRAFT'
+                pso_no: draftId,
+                type: type,
+                series_year: yr,
+                subject: subj,
+                duration: dur,
+                body_content: content,
+                dates_json: b_computedDates,
+                participants_json: b_roster,
+                status: 'DRAFT'
             }, { onConflict: 'pso_no' });
 
             if (metaErr) return alert("Failed to save draft: " + metaErr.message);
@@ -1103,24 +1135,38 @@
             const resultsDiv = document.getElementById('grammarResults');
             const btn = document.getElementById('grammarBtn');
 
-            if (!text) { status.innerText = "No text to check."; return; }
+            if (!text) {
+                status.innerText = "No text to check.";
+                return;
+            }
 
-            btn.disabled = true; status.innerText = "Checking grammar...";
-            resultsDiv.innerHTML = ""; resultsDiv.classList.add('hidden');
+            btn.disabled = true;
+            status.innerText = "Checking grammar...";
+            resultsDiv.innerHTML = "";
+            resultsDiv.classList.add('hidden');
 
             try {
                 const params = new URLSearchParams();
-                params.append('text', text); params.append('language', 'en-US');
-                const response = await fetch('https://api.languagetoolplus.com/v2/check', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params });
+                params.append('text', text);
+                params.append('language', 'en-US');
+
+                const response = await fetch('https://api.languagetoolplus.com/v2/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params
+                });
+
                 const data = await response.json();
                 
                 if (data.matches && data.matches.length > 0) {
                     status.innerText = `Found ${data.matches.length} suggestions.`;
                     resultsDiv.classList.remove('hidden');
+                    
                     data.matches.forEach(match => {
                         if(match.replacements && match.replacements.length > 0) {
                             const suggestion = match.replacements[0].value;
                             const errorText = text.substring(match.offset, match.offset + match.length);
+                            
                             const item = document.createElement('div');
                             item.className = "flex justify-between items-center bg-white p-2 border border-gray-200 rounded shadow-sm";
                             item.innerHTML = `
@@ -1134,27 +1180,49 @@
                             resultsDiv.appendChild(item);
                         }
                     });
-                    if(resultsDiv.innerHTML === "") status.innerText = "No fixable errors found.";
+                    
+                    if(resultsDiv.innerHTML === "") {
+                        status.innerText = "No fixable errors found.";
+                    }
                 } else {
                     status.innerText = "✨ Text looks perfect!";
                 }
-            } catch (error) { status.innerText = "API Error. Try again later."; } finally { btn.disabled = false; }
+            } catch (error) {
+                console.error(error);
+                status.innerText = "API Error. Try again later.";
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         function applyGrammarFix(btnElement, errorText, replacement) {
-            quill.root.innerHTML = quill.root.innerHTML.replace(errorText, replacement);
+            let currentHTML = quill.root.innerHTML;
+            quill.root.innerHTML = currentHTML.replace(errorText, replacement);
+            
             btnElement.parentElement.style.display = 'none';
+            
             const resultsDiv = document.getElementById('grammarResults');
             if(resultsDiv.querySelectorAll('div[style=""]').length === 0 && resultsDiv.querySelectorAll('div:not([style*="none"])').length === 0) {
-                document.getElementById('grammarStatus').innerText = "✨ All fixes applied!"; resultsDiv.classList.add('hidden');
-            } else { document.getElementById('grammarStatus').innerText = "Fix applied."; }
+                document.getElementById('grammarStatus').innerText = "✨ All fixes applied!";
+                resultsDiv.classList.add('hidden');
+            } else {
+                document.getElementById('grammarStatus').innerText = "Fix applied.";
+            }
         }
 
         // ==========================================
         // --- MANAGE / CANCEL / RESCHEDULE LOGIC ---
         // ==========================================
-        function openManageModal() { document.getElementById('manageModal').classList.remove('hidden'); loadAllActiveSOs(); }
-        function closeManageModal() { document.getElementById('manageModal').classList.add('hidden'); backToSoList(); }
+        
+        function openManageModal() { 
+            document.getElementById('manageModal').classList.remove('hidden'); 
+            loadAllActiveSOs();
+        }
+        
+        function closeManageModal() { 
+            document.getElementById('manageModal').classList.add('hidden'); 
+            backToSoList();
+        }
 
         function backToSoList() {
             document.getElementById('soListContainer').classList.remove('hidden');
@@ -1180,6 +1248,7 @@
             }
 
             const soMap = {};
+            
             recordsRes.data.forEach(d => {
                 if (!soMap[d.pso_no]) soMap[d.pso_no] = { pso_no: d.pso_no, subject: d.subject || 'No Subject', dates: new Set(), emps: new Set(), isDraft: false };
                 soMap[d.pso_no].dates.add(d.start_date);
@@ -1201,7 +1270,9 @@
 
             allActiveSOs = Object.values(soMap).map(so => {
                 if(!so.isDraft) {
-                    so.dateCount = so.dates.size; so.empCount = so.emps.size; so.datesArr = Array.from(so.dates).sort();
+                    so.dateCount = so.dates.size;
+                    so.empCount = so.emps.size;
+                    so.datesArr = Array.from(so.dates).sort();
                 }
                 return so;
             }).sort((a,b) => b.datesArr[0]?.localeCompare(a.datesArr[0]));
@@ -1224,14 +1295,22 @@
                 recReq = recReq.gte('start_date', new Date().toISOString().split('T')[0]);
             }
             
-            const [recordsRes, metaRes] = await Promise.all([ recReq.order('start_date', { ascending: true }), metaReq ]);
+            const [recordsRes, metaRes] = await Promise.all([
+                recReq.order('start_date', { ascending: true }),
+                metaReq
+            ]);
             
-            if (recordsRes.error || metaRes.error) { listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error searching orders.</div>`; return; }
+            if (recordsRes.error || metaRes.error) { 
+                listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error searching orders.</div>`; 
+                return; 
+            }
 
             const soMap = {};
+            
             recordsRes.data.forEach(d => {
                 if (!soMap[d.pso_no]) soMap[d.pso_no] = { pso_no: d.pso_no, subject: d.subject || 'No Subject', dates: new Set(), emps: new Set(), isDraft: false };
-                soMap[d.pso_no].dates.add(d.start_date); soMap[d.pso_no].emps.add(d.emp_id);
+                soMap[d.pso_no].dates.add(d.start_date);
+                soMap[d.pso_no].emps.add(d.emp_id);
             });
 
             metaRes.data.forEach(d => {
@@ -1245,7 +1324,11 @@
             });
 
             allActiveSOs = Object.values(soMap).map(so => {
-                if(!so.isDraft) { so.dateCount = so.dates.size; so.empCount = so.emps.size; so.datesArr = Array.from(so.dates).sort(); }
+                if(!so.isDraft) {
+                    so.dateCount = so.dates.size;
+                    so.empCount = so.emps.size;
+                    so.datesArr = Array.from(so.dates).sort();
+                }
                 return so;
             }).sort((a,b) => b.datesArr[0]?.localeCompare(a.datesArr[0]));
 
@@ -1254,7 +1337,10 @@
 
         function renderSOList(soArray) {
             const listDiv = document.getElementById('allSoList');
-            if (soArray.length === 0) { listDiv.innerHTML = `<div class="text-gray-500 font-bold p-8 text-center text-sm uppercase mt-10">No Orders Found.</div>`; return; }
+            if (soArray.length === 0) {
+                listDiv.innerHTML = `<div class="text-gray-500 font-bold p-8 text-center text-sm uppercase mt-10">No Orders Found.</div>`;
+                return;
+            }
             listDiv.innerHTML = soArray.map(so => `
                 <div class="bg-white p-5 rounded border border-gray-200 shadow-sm flex justify-between items-center hover:border-[#003811] cursor-pointer transition group" onclick="viewSODetails('${so.pso_no}')">
                     <div>
@@ -1274,7 +1360,8 @@
         }
 
         function filterSOList(query) {
-            const q = query.toLowerCase(); renderSOList(allActiveSOs.filter(so => so.pso_no.toLowerCase().includes(q) || so.subject.toLowerCase().includes(q)));
+            const q = query.toLowerCase();
+            renderSOList(allActiveSOs.filter(so => so.pso_no.toLowerCase().includes(q) || so.subject.toLowerCase().includes(q)));
         }
 
         async function viewSODetails(query) {
@@ -1292,9 +1379,14 @@
                         <div class="text-5xl mb-4">✍️</div>
                         <h3 class="font-black text-[#003811] text-2xl uppercase mb-2">${query}</h3>
                         <p class="text-sm text-gray-600 font-bold mb-8 max-w-lg">This Special Order has been drafted and printed, but it is waiting for the physical signature. <br><br>Once signed, post it to the system schedule to finalize it.</p>
+                        
                         <div class="flex gap-4 w-full max-w-md">
-                            <button onclick="postDraftToRecords('${query}')" class="flex-1 bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">Mark Signed & Post</button>
-                            <button onclick="deleteDraft('${query}')" class="bg-red-100 text-red-700 hover:bg-red-200 py-4 px-6 rounded text-sm font-black uppercase tracking-widest active:scale-95 transition border border-red-200">Delete Draft</button>
+                            <button onclick="postDraftToRecords('${query}')" class="flex-1 bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">
+                                Mark Signed & Post
+                            </button>
+                            <button onclick="deleteDraft('${query}')" class="bg-red-100 text-red-700 hover:bg-red-200 py-4 px-6 rounded text-sm font-black uppercase tracking-widest active:scale-95 transition border border-red-200">
+                                Delete Draft
+                            </button>
                         </div>
                     </div>
                 `;
@@ -1424,14 +1516,17 @@
                 });
             });
 
+            // 1. Insert to Records
             const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
             if (insErr) return alert("Database Error inserting records: " + insErr.message);
 
+            // 2. Create official metadata record
             await supabaseClient.from('pso_metadata').insert({
                 pso_no: officialPsoNo, type: draft.type, series_year: draft.series_year, subject: draft.subject,
                 duration: draft.duration, body_content: draft.body_content, dates_json: dates, participants_json: emps, status: 'POSTED'
             });
 
+            // 3. Delete the old draft
             await supabaseClient.from('pso_metadata').delete().eq('pso_no', psoNo);
 
             alert("Success! The order is now live on employee schedules.");
