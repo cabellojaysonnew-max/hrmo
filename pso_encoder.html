@@ -51,18 +51,25 @@
         input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
         input[type="checkbox"] { accent-color: var(--dar-green); width: 1rem; height: 1rem; cursor: pointer; margin-top: 0.1rem; }
 
-        /* Quill Adjustments */
+        /* Formatted Quill Editor */
         .ql-toolbar.ql-snow { border: 1px solid #D1D5DB; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem; background: #f9fafb; padding: 4px; }
         .ql-container.ql-snow { border: 1px solid #D1D5DB; border-bottom-left-radius: 0.375rem; border-bottom-right-radius: 0.375rem; background: white; font-family: 'Roboto', sans-serif; font-size: 0.875rem; }
         .ql-editor { min-height: 150px; }
 
-        /* Print Styles Updated for Background Image/Colors */
+        /* Print Override Styles */
         @media print {
+            body, html { width: 100%; height: 100%; background: white !important; margin: 0; padding: 0; }
             body * { visibility: hidden; }
+            nav, main, .modal-overlay { display: none !important; }
+            
             #printArea, #printArea * { visibility: visible; }
-            #printArea { position: absolute; left: 0; top: 0; width: 100%; min-height: 100vh; background-color: white; z-index: 9999; display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .no-print { display: none !important; }
+            #printArea { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            
+            /* Intelligent Paging Footer */
+            #printFooter { position: fixed; bottom: 10px; right: 40px; font-size: 9pt; font-family: 'Roboto', sans-serif; color: #555; }
+            #printFooter::after { content: "Page " counter(page); }
         }
+        @page { margin: 15mm; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
@@ -73,8 +80,8 @@
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold">SO ENCODER</p>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
-            <button onclick="switchTab('encoder')" id="tabEncoder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-transparent border-l-4 border-transparent hover:bg-black/10 transition-colors">SO ENCODER</button>
-            <button onclick="switchTab('builder')" id="tabBuilder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors">PSO BUILDER</button>
+            <button onclick="switchTab('encoder')" id="tabEncoder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37] transition-colors">SO ENCODER</button>
+            <button onclick="switchTab('builder')" id="tabBuilder" class="block w-full text-left px-6 py-4 text-sm font-bold bg-transparent border-l-4 border-transparent hover:bg-black/10 transition-colors">PSO BUILDER</button>
         </div>
         <div class="p-4 bg-black/20">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
@@ -85,14 +92,14 @@
     <main class="flex-1 flex flex-col h-full bg-[#F3F4F6] relative no-print">
         
         <div class="p-8 pb-4 flex justify-between items-center border-b border-gray-200 bg-white shrink-0 shadow-sm">
-            <h2 id="pageTitle" class="text-3xl font-bold text-[#003811] uppercase tracking-wide">PSO BUILDER</h2>
+            <h2 id="pageTitle" class="text-3xl font-bold text-[#003811] uppercase tracking-wide">SO ENCODER</h2>
             <button onclick="openManageModal()" class="bg-white border border-gray-300 text-[#003811] hover:bg-gray-50 px-4 py-2 font-bold rounded uppercase text-xs flex items-center gap-2 transition shadow-sm">
                 ⚙️ MANAGE ACTIVE ORDERS
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-8">
-            <div id="encoderTab" class="grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: none;">
+            <div id="encoderTab" class="grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: grid;">
                 <div class="flex flex-col gap-6">
                     <div class="card p-6 border-t-2 border-t-gray-200">
                         <h2 class="form-label border-b border-gray-100 pb-2 mb-4 text-gray-500">1. Document Details</h2>
@@ -219,7 +226,7 @@
                 </div>
             </div>
 
-            <div id="builderTab" class="grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: grid;">
+            <div id="builderTab" class="grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1600px] mx-auto" style="display: none;">
                 
                 <div class="flex flex-col gap-6">
                     <div class="card p-6 border-t-2 border-t-gray-200">
@@ -335,6 +342,8 @@
                             <select id="b_selMode" onchange="b_toggleSelectionMode()" class="form-input font-bold text-gray-800">
                                 <option value="PROVINCE" selected>Entire Province</option>
                                 <option value="DIVISION">Specific Division / Position</option>
+                                <option value="INDIVIDUAL">Individual Employee</option>
+                                <option value="GUEST">Guests (Quantity)</option>
                                 <option value="MANUAL">Manual / External Participant</option>
                             </select>
                         </div>
@@ -353,8 +362,7 @@
                         <div id="b_modeDivision" class="space-y-4 hidden">
                             <div>
                                 <label class="form-label text-[#003811]">Division</label>
-                                <select id="b_divFilter" onchange="b_populatePositions()" class="form-input text-gray-800">
-                                    </select>
+                                <select id="b_divFilter" onchange="b_populatePositions()" class="form-input text-gray-800"></select>
                             </div>
                             <div>
                                 <label class="form-label text-[#003811]">Position (Optional)</label>
@@ -364,6 +372,24 @@
                             </div>
                         </div>
                         
+                        <div id="b_modeIndividual" class="space-y-4 hidden">
+                            <div>
+                                <label class="form-label text-[#003811]">Search Employee</label>
+                                <div class="relative">
+                                    <input type="text" id="b_indivSearch" onkeyup="b_searchIndiv(this.value)" placeholder="Type name..." class="form-input text-gray-800">
+                                    <input type="hidden" id="b_indivId">
+                                    <div id="b_indivResults" class="absolute top-full left-0 w-full bg-white border border-gray-300 rounded shadow-lg mt-1 hidden max-h-40 overflow-y-auto z-50 text-xs"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="b_modeGuest" class="space-y-4 hidden">
+                            <div>
+                                <label class="form-label text-[#003811]">Number of Guests</label>
+                                <input type="number" id="b_guestCount" placeholder="e.g., 5" class="form-input text-gray-800" min="1">
+                            </div>
+                        </div>
+
                         <div id="b_modeManual" class="space-y-4 hidden">
                             <div>
                                 <label class="form-label text-[#003811]">Full Name</label>
@@ -412,51 +438,36 @@
     </main>
 
     <div id="printArea" class="hidden relative">
-        <div style="font-family: 'Roboto', 'Arial', sans-serif; color: black; max-width: 816px; margin: 0 auto; padding: 120px 40px 40px 40px; min-height: 100vh; box-sizing: border-box;">
+        <div id="printContentWrapper" style="font-family: 'Roboto', sans-serif; color: black; max-width: 816px; margin: 0 auto; padding: 120px 40px 40px 40px; box-sizing: border-box; min-height: 100vh;">
             
-            <h2 style="text-align: center; font-weight: bold; font-size: 14pt; letter-spacing: 1px; margin-bottom: 2px;">PROVINCIAL SPECIAL ORDER NO. <span id="printPsoNoOnly"></span></h2>
-            <h3 style="text-align: center; font-size: 12pt; margin-bottom: 20px;">Series of <span id="printSeriesYear"></span></h3>
+            <h2 style="text-align: left; font-weight: bold; font-size: 13pt; margin-bottom: 2px;">PROVINCIAL SPECIAL ORDER No. <span id="printPsoNoOnly"></span></h2>
+            <h3 style="text-align: left; font-size: 11pt; margin-bottom: 25px; font-weight: bold;">Series of <span id="printSeriesYear"></span></h3>
             
-            <table style="width: 100%; font-size: 11pt; margin-bottom: 15px; border-collapse: collapse; line-height: 1.5;">
-                <tr>
-                    <td style="width: 80px; vertical-align: top; font-weight: bold;">TO</td>
-                    <td style="width: 20px; vertical-align: top;">:</td>
-                    <td style="vertical-align: top; font-weight: bold;" id="printParticipants"></td>
-                </tr>
-                <tr>
-                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;">FROM</td>
-                    <td style="vertical-align: top; padding-top: 8px;">:</td>
-                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;">THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II</td>
-                </tr>
-                <tr>
-                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;">DATE</td>
-                    <td style="vertical-align: top; padding-top: 8px;">:</td>
-                    <td style="vertical-align: top; padding-top: 8px;" id="printDateGenerated"></td>
-                </tr>
-                <tr>
-                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;">SUBJECT</td>
-                    <td style="vertical-align: top; padding-top: 8px;">:</td>
-                    <td style="vertical-align: top; padding-top: 8px; font-weight: bold;" id="printSubject"></td>
-                </tr>
-            </table>
+            <div style="margin-bottom: 10px; display: flex; font-size: 11pt; align-items: flex-start;">
+                <div style="width: 80px; font-weight: bold;">SUBJECT</div>
+                <div style="width: 20px; font-weight: bold;">:</div>
+                <div style="flex: 1; font-weight: bold; text-transform: uppercase;" id="printSubject"></div>
+            </div>
+            
+            <hr style="border: 0; border-top: 2px solid black; margin-bottom: 20px;">
 
-            <hr style="border: 1px solid black; margin-bottom: 20px;" />
+            <div id="printBodyHTML" style="font-size: 11pt; text-align: justify; line-height: 1.5; margin-bottom: 20px;"></div>
             
-            <p style="margin-bottom: 15px; font-size: 11pt;"><strong>SCHEDULE DATE/S:</strong> <span id="printDates"></span></p>
+            <div id="printParticipantsList" style="font-size: 10.5pt; margin-bottom: 30px; line-height: 1.4; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;"></div>
 
-            <div id="printContent" style="margin-bottom: 25px; font-size: 11pt; text-align: justify; line-height: 1.5;"></div>
-            
-            <p style="font-size: 11pt; text-align: justify; margin-bottom: 15px;">All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.</p>
-            <p style="font-size: 11pt; text-align: justify; margin-bottom: 40px;">_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.</p>
+            <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify;">Attendance shall be considered official time. All concerned personnel are hereby directed to comply with this Order.</p>
+            <p style="font-size: 10.5pt; margin-bottom: 15px; text-align: justify;">This Order shall serve as Travel Order and shall remain in force unless sooner revoked or amended.</p>
+            <p style="font-size: 10.5pt; margin-bottom: 40px; text-align: justify;">_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, Building, Carnation Street, Triangulo, City of Naga.</p>
             
             <div style="display: flex; justify-content: space-between; align-items: flex-end;">
                 <div>
-                    <p style="font-weight: bold; font-size: 12pt; text-decoration: underline; margin-bottom: 2px;">RICARDO C. GARCIA</p>
-                    <p style="font-size: 11pt;">Provincial Agrarian Reform Program Officer II</p>
+                    <p style="font-weight: bold; font-size: 11.5pt; text-decoration: underline; margin-bottom: 2px;">RICARDO C. GARCIA</p>
+                    <p style="font-size: 10.5pt;">PARPO II</p>
                 </div>
                 <div id="qrcode"></div>
             </div>
         </div>
+        <div id="printFooter"></div>
     </div>
 
     <div id="manageModal" class="hidden modal-overlay no-print">
@@ -853,26 +864,55 @@
             const mode = document.getElementById('b_selMode').value;
             document.getElementById('b_modeProvince').classList.add('hidden');
             document.getElementById('b_modeDivision').classList.add('hidden');
+            document.getElementById('b_modeIndividual').classList.add('hidden');
+            document.getElementById('b_modeGuest').classList.add('hidden');
             document.getElementById('b_modeManual').classList.add('hidden');
 
-            if(mode === 'PROVINCE') {
-                document.getElementById('b_modeProvince').classList.remove('hidden');
-            } else if (mode === 'DIVISION') {
-                document.getElementById('b_modeDivision').classList.remove('hidden');
-            } else if (mode === 'MANUAL') {
-                document.getElementById('b_modeManual').classList.remove('hidden');
-            }
+            if(mode === 'PROVINCE') document.getElementById('b_modeProvince').classList.remove('hidden');
+            else if (mode === 'DIVISION') document.getElementById('b_modeDivision').classList.remove('hidden');
+            else if (mode === 'INDIVIDUAL') document.getElementById('b_modeIndividual').classList.remove('hidden');
+            else if (mode === 'GUEST') document.getElementById('b_modeGuest').classList.remove('hidden');
+            else if (mode === 'MANUAL') document.getElementById('b_modeManual').classList.remove('hidden');
         }
 
         function b_populatePositions() {
             const selectedDiv = document.getElementById('b_divFilter').value;
             const posSel = document.getElementById('b_posFilter');
-            
             const activeEmps = employees.filter(e => !e.status || e.status.toUpperCase() === 'ACTIVE');
             let posInDiv = [...new Set(activeEmps.filter(e => e.division === selectedDiv).map(e => e.position).filter(p => p))].sort();
+            posSel.innerHTML = '<option value="ALL">All Positions in Division</option>' + posInDiv.map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+
+        // Search logic for Individual selection
+        function b_searchIndiv(query) {
+            const resDiv = document.getElementById('b_indivResults');
+            document.getElementById('b_indivId').value = ""; 
+            if(!query || query.length < 2) { resDiv.classList.add('hidden'); return; }
             
-            posSel.innerHTML = '<option value="ALL">All Positions in Division</option>' + 
-                               posInDiv.map(p => `<option value="${p}">${p}</option>`).join('');
+            const activeEmps = employees.filter(e => !e.status || e.status.toUpperCase() === 'ACTIVE');
+            const fuse = new Fuse(activeEmps, { keys: ['full_name', 'emp_id'], threshold: 0.3 });
+            const results = fuse.search(query).map(r => r.item);
+            
+            if(results.length > 0) {
+                resDiv.innerHTML = results.slice(0,5).map(e => `
+                    <div class="p-2 hover:bg-gray-100 cursor-pointer font-bold text-[#003811] border-b border-gray-100 uppercase flex flex-col" 
+                         onclick="b_selectIndiv('${e.emp_id}')">
+                        <span>${e.full_name}</span>
+                        <span class="text-[10px] text-gray-500">${e.emp_id} | ${e.position || 'STAFF'}</span>
+                    </div>
+                `).join('');
+                resDiv.classList.remove('hidden');
+            } else {
+                resDiv.innerHTML = `<div class="p-2 text-gray-400 italic">No matches.</div>`;
+                resDiv.classList.remove('hidden');
+            }
+        }
+
+        function b_selectIndiv(id) {
+            const emp = employees.find(e => e.emp_id === id);
+            document.getElementById('b_indivSearch').value = emp.full_name;
+            document.getElementById('b_indivId').value = id;
+            document.getElementById('b_indivResults').classList.add('hidden');
         }
 
         function b_addParticipants() {
@@ -880,37 +920,48 @@
             let empsToAdd = [];
             const activeEmps = employees.filter(e => !e.status || e.status.toUpperCase() === 'ACTIVE');
 
-            if (mode === 'MANUAL') {
+            if (mode === 'GUEST') {
+                const count = parseInt(document.getElementById('b_guestCount').value);
+                if (!count || count < 1) return alert("Enter a valid number of guests.");
+                empsToAdd.push({
+                    emp_id: 'GUEST-' + Date.now(),
+                    full_name: 'GUESTS',
+                    isGuest: true,
+                    guestCount: count
+                });
+                document.getElementById('b_guestCount').value = '';
+            }
+            else if (mode === 'INDIVIDUAL') {
+                const id = document.getElementById('b_indivId').value;
+                if (!id) return alert("Please search and select an employee first.");
+                const emp = employees.find(e => e.emp_id === id);
+                empsToAdd.push(emp);
+                document.getElementById('b_indivSearch').value = '';
+                document.getElementById('b_indivId').value = '';
+            }
+            else if (mode === 'MANUAL') {
                 const name = document.getElementById('b_manualName').value.trim();
                 const pos = document.getElementById('b_manualPos').value.trim() || 'EXTERNAL';
                 if (!name) return alert("Please enter the participant's name.");
-                
                 empsToAdd.push({
                     emp_id: 'EXT-' + Date.now() + Math.floor(Math.random() * 1000),
-                    full_name: name.toUpperCase(),
-                    position: pos.toUpperCase(),
-                    division: 'EXTERNAL',
-                    unit: ''
+                    full_name: name.toUpperCase(), position: pos.toUpperCase(),
+                    division: 'EXTERNAL', unit: ''
                 });
-                
                 document.getElementById('b_manualName').value = '';
                 document.getElementById('b_manualPos').value = '';
-            } else if (mode === 'PROVINCE') {
-                const typeFilter = document.getElementById('b_empTypeFilter').value; // ALL, REGULAR, SPLIT
-                if(typeFilter === 'ALL') {
-                    empsToAdd = [...activeEmps];
-                } else {
-                    empsToAdd = activeEmps.filter(e => e.type && e.type.toUpperCase() === typeFilter);
-                }
-            } else {
+            } 
+            else if (mode === 'PROVINCE') {
+                const typeFilter = document.getElementById('b_empTypeFilter').value; 
+                if(typeFilter === 'ALL') empsToAdd = [...activeEmps];
+                else empsToAdd = activeEmps.filter(e => e.type && e.type.toUpperCase() === typeFilter);
+            } 
+            else if (mode === 'DIVISION') {
                 const divFilter = document.getElementById('b_divFilter').value;
                 const posFilter = document.getElementById('b_posFilter').value;
                 if(!divFilter) return alert("Please select a Division first.");
-                
                 empsToAdd = activeEmps.filter(e => e.division === divFilter);
-                if(posFilter !== 'ALL') {
-                    empsToAdd = empsToAdd.filter(e => e.position === posFilter);
-                }
+                if(posFilter !== 'ALL') empsToAdd = empsToAdd.filter(e => e.position === posFilter);
             }
 
             let addedCount = 0;
@@ -921,11 +972,8 @@
                 }
             });
 
-            if(addedCount === 0) {
-                alert("No new personnel matched your filters (or they are already added).");
-            } else {
-                b_renderRoster();
-            }
+            if(addedCount === 0) alert("No new personnel matched your filters (or they are already added).");
+            else b_renderRoster();
         }
 
         function b_removeParticipant(id) {
@@ -950,16 +998,66 @@
                         <p class="text-xs font-bold uppercase text-center">Add groups to build roster.</p>
                     </div>`;
             } else {
-                listUI.innerHTML = b_roster.map(emp => `
+                listUI.innerHTML = b_roster.map(emp => {
+                    let displayName = emp.isGuest ? `${emp.guestCount} GUEST/S` : emp.full_name;
+                    let displayPos = emp.isGuest ? 'EXTERNAL' : (emp.position || 'STAFF');
+                    return `
                     <div class="flex justify-between items-center bg-white p-2 rounded border border-gray-200 mb-1 shadow-sm">
                         <div class="truncate mr-2">
-                            <p class="text-[11px] font-bold text-[#003811] leading-tight uppercase truncate">${emp.full_name}</p>
-                            <p class="text-[9px] text-gray-500 font-bold uppercase truncate">${emp.position || 'STAFF'} | ${emp.division || emp.unit || 'DAR'}</p>
+                            <p class="text-[11px] font-bold text-[#003811] leading-tight uppercase truncate">${displayName}</p>
+                            <p class="text-[9px] text-gray-500 font-bold uppercase truncate">${displayPos}</p>
                         </div>
                         <button onclick="b_removeParticipant('${emp.emp_id}')" class="text-red-400 hover:text-red-600 font-bold px-2 text-sm shrink-0">✕</button>
-                    </div>
-                `).join('');
+                    </div>`
+                }).join('');
             }
+        }
+
+        function triggerPrint(psoNoText, yr, subj, datesArr, contentHTML, rosterArr, qrText) {
+            // Setup Print Layout
+            document.getElementById('printPsoNoOnly').innerText = psoNoText;
+            document.getElementById('printSeriesYear').innerText = yr;
+            document.getElementById('printSubject').innerText = subj.toUpperCase();
+            
+            // Format Body & Schedule
+            let finalBody = contentHTML + `<p style="margin-top:15px;"><strong>Schedule Date/s: ${datesArr.join(', ')}</strong></p>`;
+            document.getElementById('printBodyHTML').innerHTML = finalBody;
+            
+            const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            document.getElementById('printDateGenerated').innerText = today;
+            
+            // Format Participants Loop (Numbering)
+            let count = 1;
+            let pHTML = '';
+            rosterArr.forEach(emp => {
+                if(emp.isGuest) {
+                    let end = count + parseInt(emp.guestCount) - 1;
+                    let numStr = emp.guestCount > 1 ? `${count}-${end}.` : `${count}.`;
+                    pHTML += `<div>${numStr} GUEST/S</div>`;
+                    count = end + 1;
+                } else {
+                    let pos = emp.position ? `, <span style="text-transform:capitalize;">${emp.position.toLowerCase()}</span>` : '';
+                    pHTML += `<div>${count}. <span style="text-transform:uppercase;">${emp.full_name}</span>${pos}</div>`;
+                    count++;
+                }
+            });
+            document.getElementById('printParticipantsList').innerHTML = pHTML;
+
+            const qrContainer = document.getElementById("qrcode");
+            qrContainer.innerHTML = ""; 
+            new QRCode(qrContainer, { text: qrText, width: 80, height: 80 });
+
+            setTimeout(async () => { 
+                const printArea = document.getElementById('printArea');
+                const bgBase64 = await getBgMemo();
+                if (bgBase64) {
+                    printArea.style.backgroundImage = `url(${bgBase64})`;
+                    printArea.style.backgroundSize = '100% 100%';
+                    printArea.style.backgroundPosition = 'top center';
+                    printArea.style.backgroundRepeat = 'no-repeat';
+                }
+                window.print(); 
+            }, 300);
         }
 
         async function saveDraftAndPrint() {
@@ -975,58 +1073,25 @@
             if(b_computedDates.length === 0) return alert("Compute Schedule Dates first.");
             if(b_roster.length === 0) return alert("Add at least one participant to the roster.");
 
-            // Generate a Temporary Draft ID
             const draftId = `DRAFT-${Date.now()}`;
 
             const { error: metaErr } = await supabaseClient.from('pso_metadata').upsert({
-                pso_no: draftId,
-                type: type,
-                series_year: yr,
-                subject: subj,
-                duration: dur,
-                body_content: content,
-                dates_json: b_computedDates,
-                participants_json: b_roster,
-                status: 'DRAFT'
+                pso_no: draftId, type: type, series_year: yr, subject: subj, duration: dur,
+                body_content: content, dates_json: b_computedDates, participants_json: b_roster, status: 'DRAFT'
             }, { onConflict: 'pso_no' });
 
             if (metaErr) return alert("Failed to save draft: " + metaErr.message);
 
-            // Setup Print Layout
-            const printArea = document.getElementById('printArea');
-            const bgBase64 = await getBgMemo();
-            if (bgBase64) {
-                printArea.style.backgroundImage = `url(${bgBase64})`;
-                printArea.style.backgroundSize = '100% 100%';
-                printArea.style.backgroundPosition = 'top center';
-                printArea.style.backgroundRepeat = 'no-repeat';
-            }
-
-            document.getElementById('printPsoNoOnly').innerText = `_______`;
-            document.getElementById('printSeriesYear').innerText = yr;
-            document.getElementById('printSubject').innerText = subj.toUpperCase();
-            
-            const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-            document.getElementById('printDateGenerated').innerText = today;
-            
-            document.getElementById('printDates').innerText = b_computedDates.join(', ');
-            document.getElementById('printContent').innerHTML = content;
-            
-            document.getElementById('printParticipants').innerHTML = b_roster.map(emp => emp.full_name).join(', ');
-
-            const qrContainer = document.getElementById("qrcode");
-            qrContainer.innerHTML = ""; 
-            new QRCode(qrContainer, { text: draftId, width: 90, height: 90 });
+            triggerPrint(`_______`, yr, subj, b_computedDates, content, b_roster, draftId);
 
             setTimeout(() => { 
-                window.print(); 
                 alert(`Draft Saved! Pending Signature. Open Manage Active Orders to Post it once signed.`);
                 b_roster = []; b_computedDates = [];
                 document.getElementById('b_soSubject').value = "";
                 quill.setText(""); 
                 b_renderRoster(); 
                 document.getElementById('b_computedDatesLabel').innerHTML = "No dates computed yet.";
-            }, 500); // Small delay to let BG Image & QR Code load
+            }, 800);
         }
 
         // ==========================================
@@ -1038,38 +1103,24 @@
             const resultsDiv = document.getElementById('grammarResults');
             const btn = document.getElementById('grammarBtn');
 
-            if (!text) {
-                status.innerText = "No text to check.";
-                return;
-            }
+            if (!text) { status.innerText = "No text to check."; return; }
 
-            btn.disabled = true;
-            status.innerText = "Checking grammar...";
-            resultsDiv.innerHTML = "";
-            resultsDiv.classList.add('hidden');
+            btn.disabled = true; status.innerText = "Checking grammar...";
+            resultsDiv.innerHTML = ""; resultsDiv.classList.add('hidden');
 
             try {
                 const params = new URLSearchParams();
-                params.append('text', text);
-                params.append('language', 'en-US');
-
-                const response = await fetch('https://api.languagetoolplus.com/v2/check', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: params
-                });
-
+                params.append('text', text); params.append('language', 'en-US');
+                const response = await fetch('https://api.languagetoolplus.com/v2/check', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params });
                 const data = await response.json();
                 
                 if (data.matches && data.matches.length > 0) {
                     status.innerText = `Found ${data.matches.length} suggestions.`;
                     resultsDiv.classList.remove('hidden');
-                    
                     data.matches.forEach(match => {
                         if(match.replacements && match.replacements.length > 0) {
                             const suggestion = match.replacements[0].value;
                             const errorText = text.substring(match.offset, match.offset + match.length);
-                            
                             const item = document.createElement('div');
                             item.className = "flex justify-between items-center bg-white p-2 border border-gray-200 rounded shadow-sm";
                             item.innerHTML = `
@@ -1083,49 +1134,27 @@
                             resultsDiv.appendChild(item);
                         }
                     });
-                    
-                    if(resultsDiv.innerHTML === "") {
-                        status.innerText = "No fixable errors found.";
-                    }
+                    if(resultsDiv.innerHTML === "") status.innerText = "No fixable errors found.";
                 } else {
                     status.innerText = "✨ Text looks perfect!";
                 }
-            } catch (error) {
-                console.error(error);
-                status.innerText = "API Error. Try again later.";
-            } finally {
-                btn.disabled = false;
-            }
+            } catch (error) { status.innerText = "API Error. Try again later."; } finally { btn.disabled = false; }
         }
 
         function applyGrammarFix(btnElement, errorText, replacement) {
-            let currentHTML = quill.root.innerHTML;
-            quill.root.innerHTML = currentHTML.replace(errorText, replacement);
-            
+            quill.root.innerHTML = quill.root.innerHTML.replace(errorText, replacement);
             btnElement.parentElement.style.display = 'none';
-            
             const resultsDiv = document.getElementById('grammarResults');
             if(resultsDiv.querySelectorAll('div[style=""]').length === 0 && resultsDiv.querySelectorAll('div:not([style*="none"])').length === 0) {
-                document.getElementById('grammarStatus').innerText = "✨ All fixes applied!";
-                resultsDiv.classList.add('hidden');
-            } else {
-                document.getElementById('grammarStatus').innerText = "Fix applied.";
-            }
+                document.getElementById('grammarStatus').innerText = "✨ All fixes applied!"; resultsDiv.classList.add('hidden');
+            } else { document.getElementById('grammarStatus').innerText = "Fix applied."; }
         }
 
         // ==========================================
         // --- MANAGE / CANCEL / RESCHEDULE LOGIC ---
         // ==========================================
-        
-        function openManageModal() { 
-            document.getElementById('manageModal').classList.remove('hidden'); 
-            loadAllActiveSOs();
-        }
-        
-        function closeManageModal() { 
-            document.getElementById('manageModal').classList.add('hidden'); 
-            backToSoList();
-        }
+        function openManageModal() { document.getElementById('manageModal').classList.remove('hidden'); loadAllActiveSOs(); }
+        function closeManageModal() { document.getElementById('manageModal').classList.add('hidden'); backToSoList(); }
 
         function backToSoList() {
             document.getElementById('soListContainer').classList.remove('hidden');
@@ -1140,44 +1169,39 @@
             listDiv.innerHTML = `<div class="flex items-center justify-center h-full mt-10"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Loading Orders...</span></div>`;
             const today = new Date().toISOString().split('T')[0];
             
-            const [recordsRes, draftsRes] = await Promise.all([
+            const [recordsRes, metaRes] = await Promise.all([
                 supabaseClient.from('pso_records').select('*').gte('start_date', today).order('start_date', { ascending: true }),
-                supabaseClient.from('pso_metadata').select('*').eq('status', 'DRAFT')
+                supabaseClient.from('pso_metadata').select('*') // Get all metadata (drafts & posted for reprints)
             ]);
             
-            if (recordsRes.error || draftsRes.error) { 
+            if (recordsRes.error || metaRes.error) { 
                 listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error fetching orders.</div>`; 
                 return; 
             }
 
             const soMap = {};
-            
             recordsRes.data.forEach(d => {
                 if (!soMap[d.pso_no]) soMap[d.pso_no] = { pso_no: d.pso_no, subject: d.subject || 'No Subject', dates: new Set(), emps: new Set(), isDraft: false };
                 soMap[d.pso_no].dates.add(d.start_date);
                 soMap[d.pso_no].emps.add(d.emp_id);
             });
 
-            draftsRes.data.forEach(d => {
-                const draftDates = d.dates_json || [];
-                const draftEmps = d.participants_json || [];
-                
-                soMap[d.pso_no] = { 
-                    pso_no: d.pso_no, 
-                    subject: d.subject || 'No Subject', 
-                    datesArr: draftDates.sort(),
-                    dateCount: draftDates.length,
-                    empCount: draftEmps.length,
-                    isDraft: true,
-                    draftData: d
-                };
+            metaRes.data.forEach(d => {
+                if (d.status === 'DRAFT') {
+                    const draftDates = d.dates_json || []; const draftEmps = d.participants_json || [];
+                    soMap[d.pso_no] = { 
+                        pso_no: d.pso_no, subject: d.subject || 'No Subject', datesArr: draftDates.sort(),
+                        dateCount: draftDates.length, empCount: draftEmps.length, isDraft: true, draftData: d
+                    };
+                } else if (soMap[d.pso_no]) {
+                    // Attach metadata to posted orders for reprints
+                    soMap[d.pso_no].draftData = d; 
+                }
             });
 
             allActiveSOs = Object.values(soMap).map(so => {
                 if(!so.isDraft) {
-                    so.dateCount = so.dates.size;
-                    so.empCount = so.emps.size;
-                    so.datesArr = Array.from(so.dates).sort();
+                    so.dateCount = so.dates.size; so.empCount = so.emps.size; so.datesArr = Array.from(so.dates).sort();
                 }
                 return so;
             }).sort((a,b) => b.datesArr[0]?.localeCompare(a.datesArr[0]));
@@ -1191,7 +1215,7 @@
             listDiv.innerHTML = `<div class="flex items-center justify-center h-full mt-10"><span class="loader border-t-[#003811]"></span> <span class="text-sm font-bold text-[#003811] ml-2">Searching Database...</span></div>`;
             
             let recReq = supabaseClient.from('pso_records').select('*');
-            let metaReq = supabaseClient.from('pso_metadata').select('*').eq('status', 'DRAFT');
+            let metaReq = supabaseClient.from('pso_metadata').select('*');
 
             if (query) {
                 recReq = recReq.or(`pso_no.ilike.%${query}%,subject.ilike.%${query}%`);
@@ -1200,39 +1224,28 @@
                 recReq = recReq.gte('start_date', new Date().toISOString().split('T')[0]);
             }
             
-            const [recordsRes, draftsRes] = await Promise.all([
-                recReq.order('start_date', { ascending: true }),
-                metaReq
-            ]);
+            const [recordsRes, metaRes] = await Promise.all([ recReq.order('start_date', { ascending: true }), metaReq ]);
             
-            if (recordsRes.error || draftsRes.error) { 
-                listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error searching orders.</div>`; 
-                return; 
-            }
+            if (recordsRes.error || metaRes.error) { listDiv.innerHTML = `<div class="text-red-500 font-bold p-4 text-center">Error searching orders.</div>`; return; }
 
             const soMap = {};
-            
             recordsRes.data.forEach(d => {
                 if (!soMap[d.pso_no]) soMap[d.pso_no] = { pso_no: d.pso_no, subject: d.subject || 'No Subject', dates: new Set(), emps: new Set(), isDraft: false };
-                soMap[d.pso_no].dates.add(d.start_date);
-                soMap[d.pso_no].emps.add(d.emp_id);
+                soMap[d.pso_no].dates.add(d.start_date); soMap[d.pso_no].emps.add(d.emp_id);
             });
 
-            draftsRes.data.forEach(d => {
-                const draftDates = d.dates_json || [];
-                const draftEmps = d.participants_json || [];
-                soMap[d.pso_no] = { 
-                    pso_no: d.pso_no, subject: d.subject || 'No Subject', datesArr: draftDates.sort(),
-                    dateCount: draftDates.length, empCount: draftEmps.length, isDraft: true, draftData: d 
-                };
+            metaRes.data.forEach(d => {
+                if (d.status === 'DRAFT') {
+                    const draftDates = d.dates_json || []; const draftEmps = d.participants_json || [];
+                    soMap[d.pso_no] = { 
+                        pso_no: d.pso_no, subject: d.subject || 'No Subject', datesArr: draftDates.sort(),
+                        dateCount: draftDates.length, empCount: draftEmps.length, isDraft: true, draftData: d 
+                    };
+                } else if (soMap[d.pso_no]) { soMap[d.pso_no].draftData = d; }
             });
 
             allActiveSOs = Object.values(soMap).map(so => {
-                if(!so.isDraft) {
-                    so.dateCount = so.dates.size;
-                    so.empCount = so.emps.size;
-                    so.datesArr = Array.from(so.dates).sort();
-                }
+                if(!so.isDraft) { so.dateCount = so.dates.size; so.empCount = so.emps.size; so.datesArr = Array.from(so.dates).sort(); }
                 return so;
             }).sort((a,b) => b.datesArr[0]?.localeCompare(a.datesArr[0]));
 
@@ -1241,10 +1254,7 @@
 
         function renderSOList(soArray) {
             const listDiv = document.getElementById('allSoList');
-            if (soArray.length === 0) {
-                listDiv.innerHTML = `<div class="text-gray-500 font-bold p-8 text-center text-sm uppercase mt-10">No Orders Found.</div>`;
-                return;
-            }
+            if (soArray.length === 0) { listDiv.innerHTML = `<div class="text-gray-500 font-bold p-8 text-center text-sm uppercase mt-10">No Orders Found.</div>`; return; }
             listDiv.innerHTML = soArray.map(so => `
                 <div class="bg-white p-5 rounded border border-gray-200 shadow-sm flex justify-between items-center hover:border-[#003811] cursor-pointer transition group" onclick="viewSODetails('${so.pso_no}')">
                     <div>
@@ -1264,8 +1274,7 @@
         }
 
         function filterSOList(query) {
-            const q = query.toLowerCase();
-            renderSOList(allActiveSOs.filter(so => so.pso_no.toLowerCase().includes(q) || so.subject.toLowerCase().includes(q)));
+            const q = query.toLowerCase(); renderSOList(allActiveSOs.filter(so => so.pso_no.toLowerCase().includes(q) || so.subject.toLowerCase().includes(q)));
         }
 
         async function viewSODetails(query) {
@@ -1283,14 +1292,9 @@
                         <div class="text-5xl mb-4">✍️</div>
                         <h3 class="font-black text-[#003811] text-2xl uppercase mb-2">${query}</h3>
                         <p class="text-sm text-gray-600 font-bold mb-8 max-w-lg">This Special Order has been drafted and printed, but it is waiting for the physical signature. <br><br>Once signed, post it to the system schedule to finalize it.</p>
-                        
                         <div class="flex gap-4 w-full max-w-md">
-                            <button onclick="postDraftToRecords('${query}')" class="flex-1 bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">
-                                Mark Signed & Post
-                            </button>
-                            <button onclick="deleteDraft('${query}')" class="bg-red-100 text-red-700 hover:bg-red-200 py-4 px-6 rounded text-sm font-black uppercase tracking-widest active:scale-95 transition border border-red-200">
-                                Delete Draft
-                            </button>
+                            <button onclick="postDraftToRecords('${query}')" class="flex-1 bg-[#D4AF37] text-[#003811] py-4 rounded text-sm font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition shadow">Mark Signed & Post</button>
+                            <button onclick="deleteDraft('${query}')" class="bg-red-100 text-red-700 hover:bg-red-200 py-4 px-6 rounded text-sm font-black uppercase tracking-widest active:scale-95 transition border border-red-200">Delete Draft</button>
                         </div>
                     </div>
                 `;
@@ -1314,6 +1318,11 @@
             
             const uniqueDates = Object.keys(dateMap).sort();
             const uniqueEmps = Object.entries(empMap);
+            
+            let reprintBtnHTML = '';
+            if (soRecord && soRecord.draftData) {
+                reprintBtnHTML = `<button onclick="reprintPSO('${query}')" class="bg-[#003811] text-white hover:bg-[#002200] font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow mr-2">REPRINT PSO</button>`;
+            }
 
             resArea.innerHTML = `
                 <div class="bg-gray-50 p-6 border-b border-gray-200 flex justify-between items-center shrink-0">
@@ -1321,9 +1330,10 @@
                         <h3 class="font-bold text-[#003811] text-xl uppercase">${query}</h3>
                         <p class="text-sm text-gray-600 font-bold">${subject}</p>
                     </div>
-                    <button onclick="cancelEntireSO()" class="bg-red-600 text-white hover:bg-red-700 font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow">
-                        Cancel Entire SO
-                    </button>
+                    <div>
+                        ${reprintBtnHTML}
+                        <button onclick="cancelEntireSO()" class="bg-red-600 text-white hover:bg-red-700 font-bold px-4 py-2 rounded text-xs uppercase tracking-wide transition shadow">Cancel Entire SO</button>
+                    </div>
                 </div>
 
                 <div class="flex-grow flex overflow-hidden">
@@ -1341,9 +1351,7 @@
                             <h4 class="text-xs font-bold text-gray-500 uppercase mb-3 border-b pb-1">Personnel (${uniqueEmps.length})</h4>
                             ${uniqueEmps.map(([id, info]) => `
                                 <div class="flex justify-between items-center border-b border-gray-100 py-2">
-                                    <div class="overflow-hidden">
-                                        <p class="text-xs font-bold text-gray-800 truncate uppercase">${info.name}</p>
-                                    </div>
+                                    <div class="overflow-hidden"><p class="text-xs font-bold text-gray-800 truncate uppercase">${info.name}</p></div>
                                     <button onclick="removeParticipantFromSO('${id}', '${info.name.replace(/'/g, "\\'")}')" class="text-red-500 hover:text-red-700 text-xs font-bold transition ml-2 shrink-0 px-2 py-1 bg-red-50 rounded">Remove</button>
                                 </div>
                             `).join('')}
@@ -1410,36 +1418,20 @@
             emps.forEach(emp => {
                 dates.forEach(date => {
                     payload.push({
-                        pso_no: officialPsoNo,
-                        subject: draft.subject,
-                        emp_id: emp.emp_id,
-                        full_name: emp.full_name,
-                        division: emp.division || emp.unit,
-                        start_date: date,
-                        end_date: date,
-                        duration: draft.duration
+                        pso_no: officialPsoNo, subject: draft.subject, emp_id: emp.emp_id, full_name: emp.full_name,
+                        division: emp.division || emp.unit, start_date: date, end_date: date, duration: draft.duration
                     });
                 });
             });
 
-            // 1. Insert to Records
             const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
             if (insErr) return alert("Database Error inserting records: " + insErr.message);
 
-            // 2. Create official metadata record
             await supabaseClient.from('pso_metadata').insert({
-                pso_no: officialPsoNo,
-                type: draft.type,
-                series_year: draft.series_year,
-                subject: draft.subject,
-                duration: draft.duration,
-                body_content: draft.body_content,
-                dates_json: dates,
-                participants_json: emps,
-                status: 'POSTED'
+                pso_no: officialPsoNo, type: draft.type, series_year: draft.series_year, subject: draft.subject,
+                duration: draft.duration, body_content: draft.body_content, dates_json: dates, participants_json: emps, status: 'POSTED'
             });
 
-            // 3. Delete the old draft
             await supabaseClient.from('pso_metadata').delete().eq('pso_no', psoNo);
 
             alert("Success! The order is now live on employee schedules.");
@@ -1454,17 +1446,33 @@
             else { alert("Draft deleted."); loadAllActiveSOs(); backToSoList(); }
         }
 
+        function reprintPSO(psoNo) {
+            const soRecord = allActiveSOs.find(so => so.pso_no === psoNo);
+            if(!soRecord || !soRecord.draftData) return alert("Original text data not found for reprinting.");
+            
+            const meta = soRecord.draftData;
+            // Format pso_no string safely removing "series of..." if already included
+            let rawNo = psoNo;
+            if(rawNo.includes('series of')) {
+                rawNo = rawNo.split('series of')[0].trim();
+                // strip type if included (e.g. PSO 123 -> 123)
+                rawNo = rawNo.replace(meta.type, '').trim();
+            }
+            
+            triggerPrint(rawNo, meta.series_year, meta.subject, meta.dates_json || [], meta.body_content, meta.participants_json || [], psoNo);
+        }
+
+        // Active Order Management Functions (Manage Modal inputs)
         function mngSearchEmp(query) {
             const resDiv = document.getElementById('mngEmpResults');
             document.getElementById('mngEmpIdHdn').value = ""; 
             if(!query || query.length < 2) { resDiv.classList.add('hidden'); return; }
             
             const fuse = new Fuse(employees, { keys: ['full_name', 'emp_id'], threshold: 0.3 });
-            const results = fuse.search(query);
-            const filtered = results.map(r => r.item);
+            const results = fuse.search(query).map(r => r.item);
             
-            if(filtered.length > 0) {
-                resDiv.innerHTML = filtered.slice(0,5).map(e => `
+            if(results.length > 0) {
+                resDiv.innerHTML = results.slice(0,5).map(e => `
                     <div class="p-2 hover:bg-gray-100 cursor-pointer font-bold text-[#003811] border-b border-gray-100 uppercase flex flex-col" 
                          onclick="mngSelectEmp('${e.emp_id}', '${e.full_name.replace(/'/g, "\\'")}')">
                         <span>${e.full_name}</span>
@@ -1473,129 +1481,86 @@
                 `).join('');
                 resDiv.classList.remove('hidden');
             } else {
-                resDiv.innerHTML = `<div class="p-2 text-gray-400 italic">No matches.</div>`;
-                resDiv.classList.remove('hidden');
+                resDiv.innerHTML = `<div class="p-2 text-gray-400 italic">No matches.</div>`; resDiv.classList.remove('hidden');
             }
         }
 
-        function mngSelectEmp(id, name) {
-            document.getElementById('mngEmpAdd').value = name;
-            document.getElementById('mngEmpIdHdn').value = id;
-            document.getElementById('mngEmpResults').classList.add('hidden');
-        }
+        function mngSelectEmp(id, name) { document.getElementById('mngEmpAdd').value = name; document.getElementById('mngEmpIdHdn').value = id; document.getElementById('mngEmpResults').classList.add('hidden'); }
 
         async function cancelEntireSO() {
             if(!confirm(`WARNING: This will permanently cancel ALL dates and personnel for ${activeManageSO}. Continue?`)) return;
             const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO);
-            if(error) alert("Error: " + error.message);
-            else { alert("SO Cancelled completely."); loadAllActiveSOs(); backToSoList(); }
+            if(error) alert("Error: " + error.message); else { alert("SO Cancelled completely."); loadAllActiveSOs(); backToSoList(); }
         }
 
         async function removeParticipantFromSO(empId, name) {
             if(!confirm(`Remove ${name} from ${activeManageSO} entirely?`)) return;
             const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO).eq('emp_id', empId);
-            if(error) alert("Error: " + error.message);
-            else viewSODetails(activeManageSO);
+            if(error) alert("Error: " + error.message); else viewSODetails(activeManageSO);
         }
 
         async function cancelDateFromSO(dateStr) {
             if(!confirm(`Cancel the schedule on ${dateStr} for EVERYONE in ${activeManageSO}?`)) return;
             const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO).eq('start_date', dateStr);
-            if(error) alert("Error: " + error.message);
-            else viewSODetails(activeManageSO);
+            if(error) alert("Error: " + error.message); else viewSODetails(activeManageSO);
         }
 
         async function endPSOHere(dateStr) {
-            if(!confirm(`Are you sure you want to END this PSO starting from ${dateStr}? This will delete the schedule on ${dateStr} and ALL FUTURE DATES for everyone.`)) return;
-
-            const { error } = await supabaseClient.from('pso_records')
-                .delete()
-                .eq('pso_no', activeManageSO)
-                .gte('start_date', dateStr);
-
-            if(error) alert("Error ending PSO: " + error.message);
-            else { alert("PSO successfully ended."); viewSODetails(activeManageSO); }
+            if(!confirm(`Are you sure you want to END this PSO starting from ${dateStr}?`)) return;
+            const { error } = await supabaseClient.from('pso_records').delete().eq('pso_no', activeManageSO).gte('start_date', dateStr);
+            if(error) alert("Error ending PSO: " + error.message); else { alert("PSO successfully ended."); viewSODetails(activeManageSO); }
         }
 
         async function addParticipantToSO() {
             const empId = document.getElementById('mngEmpIdHdn').value;
             const empName = document.getElementById('mngEmpAdd').value;
             if(!empId) return alert("Please search and select a valid employee first.");
-
             const { data, error } = await supabaseClient.from('pso_records').select('start_date, duration, subject').eq('pso_no', activeManageSO);
             if(error || !data || data.length===0) return alert("Cannot add to an empty SO.");
-            
-            const dateMap = {};
-            data.forEach(d => dateMap[d.start_date] = d.duration || 'Whole Day');
+            const dateMap = {}; data.forEach(d => dateMap[d.start_date] = d.duration || 'Whole Day');
             const uniqueDates = Object.keys(dateMap);
-            const subject = data[0].subject;
-            const empInfo = employees.find(e => e.emp_id === empId);
+            const subject = data[0].subject; const empInfo = employees.find(e => e.emp_id === empId);
 
             const payload = uniqueDates.map(date => ({
-                pso_no: activeManageSO,
-                subject: subject,
-                emp_id: empId,
-                full_name: empInfo.full_name,
-                division: empInfo.division || empInfo.unit,
-                start_date: date,
-                end_date: date,
-                duration: dateMap[date]
+                pso_no: activeManageSO, subject: subject, emp_id: empId, full_name: empInfo.full_name,
+                division: empInfo.division || empInfo.unit, start_date: date, end_date: date, duration: dateMap[date]
             }));
 
-            if(!confirm(`Add ${empName} to ${uniqueDates.length} existing dates of this SO?`)) return;
-
+            if(!confirm(`Add ${empName} to ${uniqueDates.length} dates?`)) return;
             const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
-            if(insErr) alert("Error adding: " + insErr.message);
-            else { alert("Participant added!"); viewSODetails(activeManageSO); }
+            if(insErr) alert("Error adding: " + insErr.message); else { alert("Participant added!"); viewSODetails(activeManageSO); }
         }
 
         async function addDateToSO() {
             const newDate = document.getElementById('mngDateAdd').value;
             const newDuration = document.getElementById('mngDurationAdd').value;
             if(!newDate) return alert("Select a new date to add.");
-
             const { data, error } = await supabaseClient.from('pso_records').select('emp_id, full_name, division, subject').eq('pso_no', activeManageSO);
             if(error || !data || data.length===0) return alert("Cannot add date to empty SO.");
 
-            const empMap = {};
-            data.forEach(d => { empMap[d.emp_id] = d; });
-            const uniqueEmps = Object.values(empMap);
-            const subject = uniqueEmps[0].subject;
+            const empMap = {}; data.forEach(d => { empMap[d.emp_id] = d; });
+            const uniqueEmps = Object.values(empMap); const subject = uniqueEmps[0].subject;
 
             const payload = uniqueEmps.map(emp => ({
-                pso_no: activeManageSO,
-                subject: subject,
-                emp_id: emp.emp_id,
-                full_name: emp.full_name,
-                division: emp.division,
-                start_date: newDate,
-                end_date: newDate,
-                duration: newDuration
+                pso_no: activeManageSO, subject: subject, emp_id: emp.emp_id, full_name: emp.full_name,
+                division: emp.division, start_date: newDate, end_date: newDate, duration: newDuration
             }));
 
-            if(!confirm(`Add schedule on ${newDate} (${newDuration}) for all ${uniqueEmps.length} participants?`)) return;
-
+            if(!confirm(`Add schedule on ${newDate} for all ${uniqueEmps.length} participants?`)) return;
             const { error: insErr } = await supabaseClient.from('pso_records').insert(payload);
-            if(insErr) alert("Error adding date: " + insErr.message);
-            else { alert("Date added to schedule!"); viewSODetails(activeManageSO); }
+            if(insErr) alert("Error: " + insErr.message); else { alert("Date added!"); viewSODetails(activeManageSO); }
         }
 
         async function modifyDate(oldDate) {
             const newDate = document.getElementById(`resched_${oldDate}`).value;
             const newDuration = document.getElementById(`resched_dur_${oldDate}`).value;
-            
             if(!newDate) return alert("Please specify the date.");
             if(!confirm(`Update schedule from ${oldDate} to ${newDate} (${newDuration})?`)) return;
 
             const { error } = await supabaseClient.from('pso_records')
-                .update({ start_date: newDate, end_date: newDate, duration: newDuration })
-                .eq('pso_no', activeManageSO)
-                .eq('start_date', oldDate);
-
-            if(error) alert("Error modifying: " + error.message);
-            else { alert("Schedule successfully updated!"); viewSODetails(activeManageSO); }
+                .update({ start_date: newDate, end_date: newDate, duration: newDuration }).eq('pso_no', activeManageSO).eq('start_date', oldDate);
+            if(error) alert("Error modifying: " + error.message); else { alert("Updated!"); viewSODetails(activeManageSO); }
         }
-
     </script>
 </body>
 </html>
