@@ -65,25 +65,9 @@
 <body class="p-8 text-gray-800">
 
     <div id="app" class="max-w-[1400px] mx-auto min-h-[80vh] flex flex-col relative">
-        <div id="login-screen" class="flex-grow flex flex-col justify-center items-center">
-            <div class="w-full max-w-md bg-white rounded-lg shadow-md overflow-hidden">
-                <div class="h-2 w-full bg-[#D4AF37]"></div>
-                <div class="p-8">
-                    <h1 class="text-[#003811] font-bold text-3xl mb-1 text-center">DAR FLEET</h1>
-                    <p class="text-xs text-gray-400 font-bold tracking-widest mb-8 uppercase text-center">Official Dispatch Command</p>
-                    <div class="space-y-5">
-                        <div>
-                            <label class="block text-sm font-bold text-[#003811] mb-1">Username</label>
-                            <input type="text" id="un" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] transition-colors">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-[#003811] mb-1">Password</label>
-                            <input type="password" id="pw" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] transition-colors">
-                        </div>
-                        <button onclick="handleLogin()" class="w-full mt-4 bg-[#003811] text-white px-6 py-3 rounded font-bold hover:bg-green-800 transition-colors uppercase tracking-wider text-sm">Enter Console</button>
-                    </div>
-                </div>
-            </div>
+        <div class="flex-grow flex flex-col justify-center items-center h-[60vh] opacity-50">
+            <span class="text-4xl">🔄</span>
+            <p class="font-bold mt-4 text-sm uppercase tracking-widest text-[#003811]">Authenticating Secure Fleet Link...</p>
         </div>
     </div>
 
@@ -103,18 +87,39 @@
         let activeRef = "", activeIsBooking = false, selectedEmpForAdd = null, activeVehForMaint = "";
         let manualPassengerQueue = [];
 
-        async function handleLogin() {
-            const u = document.getElementById('un').value.trim(), p = document.getElementById('pw').value.trim();
-            const { data } = await db.from('users').select('*');
-            const found = data.find(x => x.username === u && String(x.password) === String(p));
-            if (found && found.role === 'VEHICLE_APPROVER') { 
-                user = found; 
-                const {data: e} = await db.from('employees').select('*');
-                emps = e || []; 
-                renderDashboard(); 
-            } else alert("Invalid Login. You must be a Dispatcher.");
+        // --- SESSION MANAGEMENT ---
+        document.addEventListener("DOMContentLoaded", async () => {
+            const savedUser = sessionStorage.getItem('currentUser');
+            
+            if (!savedUser) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            user = JSON.parse(savedUser);
+            
+            // Explicitly verify the role 
+            if (user.role !== 'VEHICLE_APPROVER') {
+                alert("Access Denied. Only Dispatchers (Vehicle Approvers) can access the Fleet console.");
+                window.location.href = 'index.html';
+                return;
+            }
+
+            await initializeApp();
+        });
+
+        function logout() {
+            sessionStorage.removeItem('currentUser');
+            window.location.href = 'index.html';
         }
 
+        async function initializeApp() {
+            const {data: e} = await db.from('employees').select('*');
+            emps = e || []; 
+            renderDashboard(); 
+        }
+
+        // --- CORE DATA SYNC ---
         async function sync() {
             const [o, i, b] = await Promise.all([
                 db.from('travel_orders').select('*').neq('status','CANCELLED'), 
@@ -153,35 +158,37 @@
 
         function renderDashboard() {
             document.getElementById('app').innerHTML = `
-            <header class="flex justify-between items-center mb-6 no-print">
-                <div>
-                    <h1 class="text-3xl font-bold text-[#003811]">DAR Fleet Master Pro</h1>
-                    <p class="text-sm font-bold text-gray-500 uppercase tracking-wide">Republic of the Philippines | Provincial Office of Camarines Sur 1</p>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <div class="text-right">
-                        <p class="font-bold text-[#003811] text-sm">${user.full_name}</p>
-                        <p class="text-xs text-gray-500 font-semibold uppercase">Dispatcher</p>
+            <div class="w-full flex flex-col h-full relative">
+                <header class="flex justify-between items-center mb-6 no-print">
+                    <div>
+                        <h1 class="text-3xl font-bold text-[#003811]">DAR Fleet Master Pro</h1>
+                        <p class="text-sm font-bold text-gray-500 uppercase tracking-wide">Republic of the Philippines | Provincial Office of Camarines Sur 1</p>
                     </div>
-                    <button onclick="sync()" class="p-2 text-gray-500 hover:text-[#003811] transition-colors" title="Sync Data">🔄</button>
-                    <button onclick="location.reload()" class="bg-red-600 text-white px-4 py-2 rounded font-bold hover:bg-red-700 transition-colors">Logout</button>
-                </div>
-            </header>
-            
-            <nav class="bg-white rounded-lg shadow mb-8 flex items-center justify-between p-2 no-print">
-                <div class="flex space-x-2">
-                    <button onclick="switchTab('inbox')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='inbox'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📥 Inbox (TOs)</button>
-                    <button onclick="switchTab('reservations')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='reservations'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📋 Reservations</button>
-                    <button onclick="switchTab('schedule')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='schedule'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📅 Board & Verification</button>
-                </div>
-                <button onclick="openModal('bookModal')" class="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold text-sm hover:bg-yellow-600 transition-colors shadow-sm flex items-center gap-2">
-                    <span class="text-lg leading-none">+</span> Special Booking
-                </button>
-            </nav>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right">
+                            <p class="font-bold text-[#003811] text-sm">${user.full_name}</p>
+                            <p class="text-xs text-gray-500 font-semibold uppercase">Dispatcher</p>
+                        </div>
+                        <button onclick="sync()" class="p-2 text-gray-500 hover:text-[#003811] transition-colors" title="Sync Data">🔄</button>
+                        <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded font-bold hover:bg-red-700 transition-colors">Logout</button>
+                    </div>
+                </header>
+                
+                <nav class="bg-white rounded-lg shadow mb-8 flex items-center justify-between p-2 no-print shrink-0">
+                    <div class="flex space-x-2">
+                        <button onclick="switchTab('inbox')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='inbox'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📥 Inbox (TOs)</button>
+                        <button onclick="switchTab('reservations')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='reservations'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📋 Reservations</button>
+                        <button onclick="switchTab('schedule')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='schedule'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📅 Board & Verification</button>
+                    </div>
+                    <button onclick="openModal('bookModal')" class="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold text-sm hover:bg-yellow-600 transition-colors shadow-sm flex items-center gap-2">
+                        <span class="text-lg leading-none">+</span> Special Booking
+                    </button>
+                </nav>
 
-            <main id="main-content" class="flex-grow w-full relative z-10 print-area"></main>
-            
-            ${modalsMarkup()}`;
+                <main id="main-content" class="flex-grow w-full relative z-10 print-area overflow-y-visible pb-10"></main>
+                
+                ${modalsMarkup()}
+            </div>`;
             sync();
         }
 
@@ -270,7 +277,7 @@
                 grouped[o.to_no].push(o);
             });
 
-            m.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">` + Object.values(grouped).map(group => {
+            m.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">` + Object.values(grouped).map(group => {
                 const o = group[0];
                 const allNames = group.map(x => x.emp_name).join('<br> • ');
                 const tripItins = itins.filter(i => i.to_no === o.to_no).sort((a,b) => new Date(a.travel_date) - new Date(b.travel_date));
