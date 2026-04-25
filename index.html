@@ -31,7 +31,7 @@
                 <h2 class="text-2xl font-bold text-[#003811] mb-6">SECURE ACCESS</h2>
                 <div class="space-y-4">
                     <div><label class="form-label">Username</label><input type="text" id="username" class="form-input"></div>
-                    <div><label class="form-label">Password</label><input type="password" id="password" class="form-input"></div>
+                    <div><label class="form-label">Password</label><input type="password" id="password" class="form-input" onkeypress="if(event.key === 'Enter') login()"></div>
                 </div>
                 <p id="loginStatus" class="text-red-600 text-xs font-bold mt-4 min-h-[1rem]"></p>
                 <button onclick="login()" id="loginBtn" class="w-full btn-primary py-3 rounded-md font-bold mt-6">LOG IN</button>
@@ -43,7 +43,9 @@
     // Redirect if already logged in based on role and unit
     if (sessionStorage.getItem('currentUser')) {
         const user = JSON.parse(sessionStorage.getItem('currentUser'));
-        if (user.role && user.role.toUpperCase().includes('PSO ENCODER')) {
+        if (user.role === 'VEHICLE_APPROVER') {
+            window.location.href = 'fleet.html';
+        } else if (user.role && user.role.toUpperCase().includes('PSO ENCODER')) {
             window.location.href = 'pso_encoder.html';
         } else if (user.unit === 'BUDGET' || user.unit === 'ACCOUNTING') {
             window.location.href = 'finance_dashboard.html';
@@ -60,6 +62,7 @@
         
         if(!u || !p) return;
         btn.innerText = "AUTHENTICATING..."; btn.disabled = true;
+        status.innerText = "";
         
         try {
             const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
@@ -68,8 +71,10 @@
                 // Save user session
                 sessionStorage.setItem('currentUser', JSON.stringify(data));
                 
-                // Route based on role and unit (handles multi-role scenarios)
-                if (data.role && data.role.toUpperCase().includes('PSO ENCODER')) {
+                // Route based on role and unit
+                if (data.role === 'VEHICLE_APPROVER') {
+                    window.location.href = 'fleet.html';
+                } else if (data.role && data.role.toUpperCase().includes('PSO ENCODER')) {
                     window.location.href = 'pso_encoder.html';
                 } else if (data.unit === 'BUDGET' || data.unit === 'ACCOUNTING') {
                     window.location.href = 'finance_dashboard.html';
