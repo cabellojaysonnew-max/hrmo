@@ -144,6 +144,18 @@
             let ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${h}:${m} ${ampm}`;
         }
 
+        // --- JSON DAY-BY-DAY HELPERS ---
+        function getDailyValue(rawStr, date, defaultVal) {
+            if (!rawStr) return defaultVal;
+            if (rawStr.startsWith('{')) {
+                try {
+                    const parsed = JSON.parse(rawStr);
+                    return parsed[date] !== undefined ? parsed[date] : defaultVal;
+                } catch(e) { return rawStr; }
+            }
+            return rawStr; // Fallback for old rows that don't use JSON
+        }
+
         function getVerificationStatus(text) {
             if (!text) return 'PENDING';
             if (text.includes('[ACTUALIZED]')) return 'ACTUALIZED';
@@ -177,7 +189,7 @@
                 <nav class="bg-white rounded-lg shadow mb-8 flex items-center justify-between p-2 no-print shrink-0">
                     <div class="flex space-x-2">
                         <button onclick="switchTab('inbox')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='inbox'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📥 Inbox (TOs)</button>
-                        <button onclick="switchTab('reservations')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='reservations'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📋 Reservations</button>
+                        <button onclick="switchTab('reservations')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='reservations'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📋 Daily Reservations</button>
                         <button onclick="switchTab('schedule')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='schedule'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📅 Board & Verification</button>
                     </div>
                     <button onclick="openModal('bookModal')" class="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold text-sm hover:bg-yellow-600 transition-colors shadow-sm flex items-center gap-2">
@@ -259,7 +271,7 @@
                 </div>
             </div>
 
-            <div id="transferModal" class="hidden modal-overlay"><div class="modal-box max-w-sm"><div class="p-5 border-b bg-gray-50 rounded-t-lg"><h2 class="font-bold text-[#003811] text-lg">Smart Transfer</h2><p id="tSub" class="text-xs text-gray-500 font-bold mt-1 uppercase"></p></div><div class="p-6 space-y-4 bg-white"><label class="block text-sm font-bold text-[#003811] mb-1">Available Fleet (Matching Dates)</label><select id="tSelect" class="w-full border border-gray-300 p-3 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold"></select></div><div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg"><button onclick="closeModal('transferModal')" class="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button><button id="tExec" class="bg-[#003811] text-white px-6 py-2 rounded font-bold text-sm hover:bg-green-800 transition-colors">Confirm</button></div></div></div>
+            <div id="transferModal" class="hidden modal-overlay"><div class="modal-box max-w-sm"><div class="p-5 border-b bg-gray-50 rounded-t-lg"><h2 class="font-bold text-[#003811] text-lg">Smart Transfer</h2><p id="tSub" class="text-xs text-gray-500 font-bold mt-1 uppercase"></p></div><div class="p-6 space-y-4 bg-white"><label class="block text-sm font-bold text-[#003811] mb-1">Available Fleet (On This Specific Date)</label><select id="tSelect" class="w-full border border-gray-300 p-3 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold"></select></div><div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg"><button onclick="closeModal('transferModal')" class="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button><button id="tExec" class="bg-[#003811] text-white px-6 py-2 rounded font-bold text-sm hover:bg-green-800 transition-colors">Confirm</button></div></div></div>
             <div id="maintModal" class="hidden modal-overlay"><div class="modal-box max-w-sm"><div class="p-5 border-b bg-gray-50 rounded-t-lg"><h2 class="font-bold text-[#003811] text-lg">Schedule Maintenance</h2><p id="maintSub" class="text-xs text-gray-500 font-bold mt-1 uppercase"></p></div><div class="p-6 space-y-4 bg-white"><div><label class="block text-sm font-bold text-[#003811] mb-1">Reason</label><input id="maintReason" placeholder="e.g., Change Oil..." class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div><div><label class="block text-sm font-bold text-[#003811] mb-1">Start Date</label><input id="maintD1" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div><div><label class="block text-sm font-bold text-[#003811] mb-1">End Date</label><input id="maintD2" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div></div><div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg"><button onclick="closeModal('maintModal')" class="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button><button onclick="saveMaintenance()" class="bg-red-600 text-white px-6 py-2 rounded font-bold text-sm hover:bg-red-700 transition-colors">Off-Road</button></div></div></div>
             
             <datalist id="drivers">${DRIVERS.map(d=>`<option value="${d}">`).join('')}</datalist>`;
@@ -375,43 +387,108 @@
         function renderReservations() {
             const container = document.getElementById('main-content');
             const tos = orders.filter(x => x.transport === "GOV'T VEHICLE" && x.status !== 'PENDING_VEHICLE_APPROVER' && x.status !== 'OFF_ROAD' && x.remarks !== 'MAINTENANCE');
-            const toGrp = {}; tos.forEach(x => { if(!toGrp[x.to_no]) toGrp[x.to_no] = []; toGrp[x.to_no].push(x); });
-            const bkGrp = {}; bookings.forEach(x => { if(!bkGrp[x.ref_no]) bkGrp[x.ref_no] = []; bkGrp[x.ref_no].push(x); });
 
-            if (Object.keys(toGrp).length === 0 && Object.keys(bkGrp).length === 0) { container.innerHTML = `<div class="bg-white p-12 rounded-lg shadow text-center"><span class="text-4xl text-gray-300">📋</span><p class="font-bold text-gray-500 mt-4 text-sm uppercase">No Active Reservations</p></div>`; return; }
-            
-            let html = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">`;
-            
-            if(Object.keys(toGrp).length > 0) {
-                html += `<div><h2 class="text-lg font-bold text-[#003811] border-b-2 border-gray-200 pb-2 mb-4">Official Travel Orders</h2><div class="space-y-4">` + 
-                Object.entries(toGrp).map(([to, list]) => {
-                    let displayRec = list[0].received;
-                    let displayDrv = list[0].driver;
-                    let displayRem = list[0].remarks;
+            let dailyTrips = [];
 
-                    if (displayRec && displayRec.startsWith('{')) {
-                        try {
-                            const rObj = JSON.parse(displayRec);
-                            const dObj = JSON.parse(displayDrv);
-                            displayRec = [...new Set(Object.values(rObj).filter(x => x !== 'LAND'))].join(', ') || 'LAND';
-                            displayDrv = [...new Set(Object.values(dObj).filter(x => x && x !== 'N/A'))].join(', ') || 'N/A';
-                            displayRem = "MIXED DISPATCH";
-                        } catch(e) {}
+            // Flatten TOs into daily specific reservations
+            tos.forEach(to => {
+                const toItins = itins.filter(i => i.to_no === to.to_no);
+                toItins.forEach(itin => {
+                    const date = itin.travel_date;
+                    const v = getDailyValue(to.received, date, 'N/A');
+                    if (v && v !== 'LAND' && v !== 'N/A') {
+                        dailyTrips.push({
+                            date: date, ref: to.to_no, type: 'TO', status: to.status,
+                            passengers: orders.filter(o => o.to_no === to.to_no).map(o => o.emp_name),
+                            dest: itin.destination, vehicle: v, 
+                            driver: getDailyValue(to.driver, date, 'N/A'),
+                            remarks: getDailyValue(to.remarks, date, 'WHOLE')
+                        });
                     }
+                });
+            });
 
-                    return `<div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 border-l-4 border-l-[#003811] flex flex-col"><div class="flex justify-between items-start mb-3"><span class="text-xs font-bold text-gray-500 uppercase">TO: ${to}</span><span class="text-[10px] bg-green-50 text-[#003811] font-bold px-2 py-1 rounded border border-green-100 uppercase tracking-wider">${cleanText(displayRem)}</span></div><h3 class="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">${list[0].emp_name} <span class="bg-[#003811] text-white text-[9px] px-2 py-0.5 rounded">LEAD</span></h3>${list.length > 1 ? `<div class="text-xs text-gray-600 font-medium mb-4 pl-3 border-l-2 border-gray-100">${list.slice(1).map(x=>x.emp_name).join('<br>')}</div>` : '<div class="mb-3"></div>'}<div class="bg-gray-50 p-3 rounded border border-gray-100 mb-4 flex justify-between mt-auto"><p class="text-xs text-[#003811] font-bold uppercase">🚙 ${displayRec}</p><p class="text-xs text-gray-600 font-bold uppercase">👤 ${displayDrv}</p></div><div class="flex gap-3"><button onclick="cancelTO('${to}','${list[0].status}')" class="border border-red-300 text-red-600 px-4 py-2 rounded text-xs font-bold hover:bg-red-50 transition flex-1">Cancel</button><button onclick="openManagePersonnel('${to}', false)" class="bg-gray-100 text-[#003811] font-bold px-4 py-2 rounded text-xs hover:bg-gray-200 transition flex-[2]">Personnel (${list.length})</button></div></div>`;
-                }).join('') + `</div></div>`;
-            }
+            // Flatten Bookings into daily specific reservations
+            const bkMap = {};
+            bookings.forEach(bk => {
+                const key = bk.ref_no + '_' + bk.travel_date;
+                if(!bkMap[key]) bkMap[key] = { ...bk, passengers: [] };
+                if(!bkMap[key].passengers.includes(bk.emp_name)) bkMap[key].passengers.push(bk.emp_name);
+            });
+            Object.values(bkMap).forEach(bk => {
+                dailyTrips.push({
+                    date: bk.travel_date, ref: bk.ref_no, type: 'BK', status: 'N/A',
+                    passengers: bk.passengers, dest: bk.destination, vehicle: bk.vehicle, 
+                    driver: bk.driver, remarks: bk.assignment
+                });
+            });
 
-            if(Object.keys(bkGrp).length > 0) {
-                html += `<div><h2 class="text-lg font-bold text-[#D4AF37] border-b-2 border-gray-200 pb-2 mb-4">Special Bookings</h2><div class="space-y-4">` + 
-                Object.entries(bkGrp).map(([ref, list]) => {
-                    const dates = [...new Set(list.map(l => l.travel_date))].join(', ');
-                    const seenNames = new Set(); const pass = []; list.forEach(i => { if(!seenNames.has(i.emp_name)){ seenNames.add(i.emp_name); pass.push(i); } });
-                    return `<div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 border-l-4 border-l-[#D4AF37] flex flex-col"><div class="flex justify-between items-start mb-3"><span class="text-xs font-bold text-gray-500 uppercase">REF: ${ref}</span><span class="text-[10px] bg-yellow-50 text-yellow-700 font-bold px-2 py-1 rounded border border-yellow-100 uppercase tracking-wider">${cleanText(list[0].assignment)}</span></div><h3 class="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">${pass[0].emp_name} <span class="bg-[#D4AF37] text-white text-[9px] px-2 py-0.5 rounded">LEAD</span></h3>${pass.length > 1 ? `<div class="text-xs text-gray-600 font-medium mb-3 pl-3 border-l-2 border-gray-100">${pass.slice(1).map(x=>x.emp_name).join('<br>')}</div>` : '<div class="mb-2"></div>'}<p class="text-xs text-gray-500 font-bold uppercase mb-4"><span class="text-[#D4AF37]">Dates:</span> ${dates}</p><div class="bg-gray-50 p-3 rounded border border-gray-100 mb-4 flex justify-between mt-auto"><p class="text-xs text-[#003811] font-bold uppercase">🚙 ${list[0].vehicle}</p><p class="text-xs text-gray-600 font-bold uppercase">👤 ${list[0].driver}</p></div><div class="flex gap-3"><button onclick="cancelBooking('${ref}')" class="border border-red-300 text-red-600 px-4 py-2 rounded text-xs font-bold hover:bg-red-50 transition flex-1">Delete</button><button onclick="openManagePersonnel('${ref}', true)" class="bg-gray-100 text-yellow-700 font-bold px-4 py-2 rounded text-xs hover:bg-gray-200 transition flex-[2]">Personnel (${pass.length})</button></div></div>`;
-                }).join('') + `</div></div>`;
-            }
+            if (dailyTrips.length === 0) { container.innerHTML = `<div class="bg-white p-12 rounded-lg shadow text-center"><span class="text-4xl text-gray-300">📋</span><p class="font-bold text-gray-500 mt-4 text-sm uppercase">No Active Reservations</p></div>`; return; }
+            
+            dailyTrips.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+            let html = `<div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">`;
+            
+            dailyTrips.forEach(trip => {
+                const borderTheme = trip.type === 'TO' ? 'border-l-[#003811]' : 'border-l-[#D4AF37]';
+                const tagTheme = trip.type === 'TO' ? 'bg-green-50 text-[#003811] border-green-100' : 'bg-yellow-50 text-yellow-700 border-yellow-100';
+                
+                html += `
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 border-l-4 ${borderTheme} flex flex-col">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="text-xs font-bold text-gray-500 uppercase">${trip.type}: ${trip.ref}</span>
+                            <span class="text-xs font-bold text-[#003811] ml-2 block mt-1">${trip.date}</span>
+                        </div>
+                        <span class="text-[10px] ${tagTheme} font-bold px-2 py-1 rounded border uppercase tracking-wider text-right">${cleanText(trip.remarks)}</span>
+                    </div>
+                    <h3 class="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">${trip.passengers[0]} <span class="bg-[#003811] text-white text-[9px] px-2 py-0.5 rounded">LEAD</span></h3>
+                    ${trip.passengers.length > 1 ? `<div class="text-xs text-gray-600 font-medium mb-4 pl-3 border-l-2 border-gray-100">${trip.passengers.slice(1).join('<br>')}</div>` : '<div class="mb-3"></div>'}
+                    <div class="bg-gray-50 p-3 rounded border border-gray-100 mb-4 flex justify-between mt-auto">
+                        <p class="text-xs text-[#003811] font-bold uppercase">🚙 ${trip.vehicle}</p>
+                        <p class="text-xs text-gray-600 font-bold uppercase">👤 ${trip.driver}</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="cancelDailyItem('${trip.ref}', '${trip.date}', '${trip.type}')" class="border border-red-300 text-red-600 px-4 py-2 rounded text-xs font-bold hover:bg-red-50 transition flex-1">Cancel Day</button>
+                        <button onclick="openManagePersonnel('${trip.ref}', ${trip.type === 'BK'})" class="bg-gray-100 text-[#003811] font-bold px-4 py-2 rounded text-xs hover:bg-gray-200 transition flex-[2]">Personnel (${trip.passengers.length})</button>
+                    </div>
+                </div>`;
+            });
+            
             html += `</div>`; container.innerHTML = html;
+        }
+
+        async function cancelDailyItem(ref, date, type) {
+            if(!confirm(`Cancel dispatch for ${date}?`)) return;
+
+            if (type === 'TO') {
+                const { data } = await db.from('travel_orders').select('*').eq('to_no', ref).single();
+                if (data) {
+                    let recObj = {}, drvObj = {}, remObj = {};
+                    if(data.received && data.received.startsWith('{')) recObj = JSON.parse(data.received);
+                    else itins.filter(i=>i.to_no===ref).forEach(i=>recObj[i.travel_date]=data.received);
+                    
+                    if(data.driver && data.driver.startsWith('{')) drvObj = JSON.parse(data.driver);
+                    else itins.filter(i=>i.to_no===ref).forEach(i=>drvObj[i.travel_date]=data.driver);
+
+                    if(data.remarks && data.remarks.startsWith('{')) remObj = JSON.parse(data.remarks);
+                    else itins.filter(i=>i.to_no===ref).forEach(i=>remObj[i.travel_date]=data.remarks);
+
+                    recObj[date] = 'LAND';
+                    drvObj[date] = 'N/A';
+                    remObj[date] = 'LAND TRAVEL';
+
+                    const allLand = Object.values(recObj).every(v => v === 'LAND');
+                    if (allLand) {
+                        await db.from('travel_orders').update({ transport: 'LAND', received: null, driver: null, remarks: null }).eq('to_no', ref);
+                    } else {
+                        await db.from('travel_orders').update({ received: JSON.stringify(recObj), driver: JSON.stringify(drvObj), remarks: JSON.stringify(remObj) }).eq('to_no', ref);
+                    }
+                }
+            } else {
+                await db.from('fleet_bookings').delete().eq('ref_no', ref).eq('travel_date', date);
+            }
+            sync();
         }
 
         async function verifyTrip(ref, type, date, status) {
@@ -477,47 +554,34 @@
                 
                 let vehicleTrips = [];
 
-                // 1. Collect TOs for this Vehicle
+                // strictly find itineraries matching this vehicle
                 const vTOs = orders.filter(o => {
                     if (!validToNos.includes(o.to_no)) return false;
-                    if (o.received === v) return true;
-                    if (o.received && o.received.startsWith('{')) {
-                        try {
-                            const recObj = JSON.parse(o.received);
-                            const toItins = filteredItins.filter(i => i.to_no === o.to_no);
-                            return toItins.some(itin => recObj[itin.travel_date] === v);
-                        } catch(e){}
-                    }
-                    return false;
+                    const toItins = filteredItins.filter(i => i.to_no === o.to_no);
+                    return toItins.some(itin => getDailyValue(o.received, itin.travel_date, null) === v);
                 });
                 
                 const uniqueTo = [...new Set(vTOs.map(l => l.to_no))].sort();
                 uniqueTo.forEach(toNo => {
                     const h = vTOs.find(l => l.to_no === toNo);
-                    let vehicleDates = filteredItins.filter(itin => itin.to_no === toNo);
-                    if (h.received && h.received.startsWith('{')) {
-                        try {
-                            const recObj = JSON.parse(h.received);
-                            vehicleDates = vehicleDates.filter(itin => recObj[itin.travel_date] === v);
-                        } catch(e){}
-                    }
+                    const vehicleDates = filteredItins.filter(itin => itin.to_no === toNo);
                     
                     vehicleDates.forEach(itin => {
-                        let rem = h.remarks || 'WHOLE';
-                        let drv = h.driver || 'N/A';
-                        if (h.remarks && h.remarks.startsWith('{')) { try { rem = JSON.parse(h.remarks)[itin.travel_date] || rem; } catch(e){} }
-                        if (h.driver && h.driver.startsWith('{')) { try { drv = JSON.parse(h.driver)[itin.travel_date] || drv; } catch(e){} }
-                        
-                        vehicleTrips.push({
-                            date: itin.travel_date, ref: toNo, type: 'TO',
-                            passengers: orders.filter(o => o.to_no === toNo).map(o => o.emp_name),
-                            dest: itin.destination, purpose: itin.purpose,
-                            time: rem, driver: drv, isMaint: h.status === 'OFF_ROAD' || h.remarks === 'MAINTENANCE'
-                        });
+                        let rec = getDailyValue(h.received, itin.travel_date, null);
+                        if (rec === v) { // Push strictly if this specific day uses this vehicle
+                            let rem = getDailyValue(h.remarks, itin.travel_date, 'WHOLE');
+                            let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
+                            
+                            vehicleTrips.push({
+                                date: itin.travel_date, ref: toNo, type: 'TO',
+                                passengers: orders.filter(o => o.to_no === toNo).map(o => o.emp_name),
+                                dest: itin.destination, purpose: itin.purpose,
+                                time: rem, driver: drv, isMaint: h.status === 'OFF_ROAD' || h.remarks === 'MAINTENANCE'
+                            });
+                        }
                     });
                 });
 
-                // 2. Collect Bookings for this Vehicle
                 const vBks = filteredBookings.filter(b => b.vehicle === v);
                 const bkMap = {};
                 vBks.forEach(bk => {
@@ -623,7 +687,7 @@
                             ${verifyCell}
                         </td>
                         <td class="p-4 text-center align-top no-print">
-                            <button onclick="smartTransfer('${trip.ref}','${v}')" class="text-gray-400 hover:text-[#003811] transition bg-white rounded shadow-sm border border-gray-200 w-8 h-8 flex items-center justify-center mx-auto" title="Smart Transfer">🔄</button>
+                            <button onclick="smartTransfer('${trip.ref}','${v}','${trip.date}','${trip.type}')" class="text-gray-400 hover:text-[#003811] transition bg-white rounded shadow-sm border border-gray-200 w-8 h-8 flex items-center justify-center mx-auto" title="Smart Transfer">🔄</button>
                         </td>
                     </tr>`;
                 }).join('');
@@ -678,35 +742,29 @@
             let hasRecords = false;
 
             VEHICLES.forEach(v => {
-                
                 let vehicleTrips = [];
 
-                // Re-collect data for report just like the schedule view
                 const vTOs = orders.filter(o => {
                     if (!validTOs.includes(o.to_no)) return false;
-                    if (o.received === v) return true;
-                    if (o.received && o.received.startsWith('{')) {
-                        try { const recObj = JSON.parse(o.received); return fItins.filter(i => i.to_no === o.to_no).some(itin => recObj[itin.travel_date] === v); } catch(e){}
-                    }
-                    return false;
+                    const toItins = fItins.filter(i => i.to_no === o.to_no);
+                    return toItins.some(itin => getDailyValue(o.received, itin.travel_date, null) === v);
                 });
                 
                 const uniqueTo = [...new Set(vTOs.map(l => l.to_no))].sort();
                 uniqueTo.forEach(toNo => {
                     const h = vTOs.find(l => l.to_no === toNo);
-                    let vehicleDates = fItins.filter(itin => itin.to_no === toNo);
-                    if (h.received && h.received.startsWith('{')) {
-                        try { const recObj = JSON.parse(h.received); vehicleDates = vehicleDates.filter(itin => recObj[itin.travel_date] === v); } catch(e){}
-                    }
+                    const vehicleDates = fItins.filter(itin => itin.to_no === toNo);
                     
                     vehicleDates.forEach(itin => {
-                        let rem = h.remarks || 'WHOLE';
-                        if (h.remarks && h.remarks.startsWith('{')) { try { rem = JSON.parse(h.remarks)[itin.travel_date] || rem; } catch(e){} }
-                        vehicleTrips.push({
-                            date: itin.travel_date, ref: toNo, type: 'TO',
-                            passengers: orders.filter(o => o.to_no === toNo).map(o => o.emp_name),
-                            dest: itin.destination, purpose: itin.purpose, time: rem, isMaint: h.status === 'OFF_ROAD' || h.remarks === 'MAINTENANCE'
-                        });
+                        let rec = getDailyValue(h.received, itin.travel_date, null);
+                        if (rec === v) { 
+                            let rem = getDailyValue(h.remarks, itin.travel_date, 'WHOLE');
+                            vehicleTrips.push({
+                                date: itin.travel_date, ref: toNo, type: 'TO',
+                                passengers: orders.filter(o => o.to_no === toNo).map(o => o.emp_name),
+                                dest: itin.destination, purpose: itin.purpose, time: rem, isMaint: h.status === 'OFF_ROAD' || h.remarks === 'MAINTENANCE'
+                            });
+                        }
                     });
                 });
 
@@ -725,7 +783,6 @@
 
                 if (vehicleTrips.length === 0) return;
                 hasRecords = true;
-
                 let isFirst = true;
 
                 vehicleTrips.forEach(trip => {
@@ -907,7 +964,58 @@
         function setOffRoad(veh) { activeVehForMaint = veh; document.getElementById('maintSub').innerText = `Vehicle: ${veh}`; document.getElementById('maintD1').value = ""; document.getElementById('maintD2').value = ""; document.getElementById('maintReason').value = ""; openModal('maintModal'); }
         async function saveMaintenance() { const d1 = document.getElementById('maintD1').value, d2 = document.getElementById('maintD2').value, reason = document.getElementById('maintReason').value || "Routine Maintenance"; if(!d1) return alert("Select at least a start date."); const to = `MAINT-${Math.floor(Date.now()%10000)}`; await db.from('travel_orders').insert({ to_no: to, emp_name: '🚨 UNAVAILABLE', received: activeVehForMaint, remarks: 'MAINTENANCE', status: 'OFF_ROAD', transport: "GOV'T VEHICLE" }); let st = new Date(d1), en = new Date(d2 || d1); while(st <= en) { await db.from('itinerary').insert({ to_no: to, travel_date: st.toISOString().split('T')[0], destination: "Authorized Shop", purpose: reason }); st.setDate(st.getDate() + 1); } closeModal('maintModal'); sync(); }
         async function endMaintenance(to) { if(!confirm("Maintenance finished? This clears remaining schedules.")) return; const now = new Date(); const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0'), d = String(now.getDate()).padStart(2,'0'); await db.from('itinerary').delete().eq('to_no', to).gte('travel_date', `${y}-${m}-${d}`); const remaining = await db.from('itinerary').select('id').eq('to_no', to); if(!remaining.data || remaining.data.length === 0) await db.from('travel_orders').delete().eq('to_no', to); sync(); }
-        async function smartTransfer(toNo, curV) { activeRef = toNo; const dates = itins.filter(i => i.to_no === toNo).map(i => i.travel_date); const busy = orders.filter(o => o.status !== 'CANCELLED' && o.to_no !== toNo && o.transport === "GOV'T VEHICLE" && itins.filter(i => i.to_no === o.to_no).some(d => dates.includes(d.travel_date))).map(o => ({ v: o.received, to: o.to_no, drv: o.driver })); const opts = VEHICLES.filter(v => v !== curV).map(v => { const m = busy.find(b => b.v === v); return `<option value="${v}" data-drv="${m?m.drv:''}">${v} ${m ? `(JOIN #${m.to})` : '(AVAIL)'}</option>`; }).join(''); document.getElementById('tSub').innerText = `ID #${toNo}`; document.getElementById('tSelect').innerHTML = opts; document.getElementById('tExec').onclick = async () => { const targetV = document.getElementById('tSelect').value, targetD = document.getElementById('tSelect').options[document.getElementById('tSelect').selectedIndex].dataset.drv; await db.from('travel_orders').update({ received: targetV, driver: targetD || orders.find(o=>o.to_no===toNo).driver }).eq('to_no', toNo); closeModal('transferModal'); sync(); }; openModal('transferModal'); }
+        
+        async function smartTransfer(ref, curV, targetDate, type) { 
+            activeRef = ref; 
+            
+            const busy = [];
+            orders.forEach(o => {
+                if (o.status !== 'CANCELLED' && o.transport === "GOV'T VEHICLE") {
+                    let v = getDailyValue(o.received, targetDate, null);
+                    let d = getDailyValue(o.driver, targetDate, null);
+                    if (v && v !== 'LAND') busy.push({ v: v, drv: d });
+                }
+            });
+            bookings.forEach(b => {
+                if (b.travel_date === targetDate) busy.push({ v: b.vehicle, drv: b.driver });
+            });
+
+            const opts = VEHICLES.filter(v => v !== curV).map(v => { 
+                const m = busy.find(b => b.v === v); 
+                return `<option value="${v}" data-drv="${m?m.drv:''}">${v} ${m ? '(BUSY - WILL JOIN)' : '(AVAIL)'}</option>`; 
+            }).join(''); 
+            
+            document.getElementById('tSub').innerText = `Ref #${ref} | Date: ${targetDate}`; 
+            document.getElementById('tSelect').innerHTML = opts; 
+            
+            document.getElementById('tExec').onclick = async () => { 
+                const targetV = document.getElementById('tSelect').value; 
+                const targetD = document.getElementById('tSelect').options[document.getElementById('tSelect').selectedIndex].dataset.drv; 
+                
+                if (type === 'TO') {
+                    const { data } = await db.from('travel_orders').select('*').eq('to_no', ref).single();
+                    if (data) {
+                        let recObj = {}, drvObj = {};
+                        if(data.received && data.received.startsWith('{')) recObj = JSON.parse(data.received);
+                        else itins.filter(i=>i.to_no===ref).forEach(i=>recObj[i.travel_date]=data.received);
+                        
+                        if(data.driver && data.driver.startsWith('{')) drvObj = JSON.parse(data.driver);
+                        else itins.filter(i=>i.to_no===ref).forEach(i=>drvObj[i.travel_date]=data.driver);
+
+                        recObj[targetDate] = targetV;
+                        drvObj[targetDate] = targetD || drvObj[targetDate];
+
+                        await db.from('travel_orders').update({ received: JSON.stringify(recObj), driver: JSON.stringify(drvObj) }).eq('to_no', ref);
+                    }
+                } else if (type === 'BK') {
+                    await db.from('fleet_bookings').update({ vehicle: targetV, driver: targetD || curV.driver }).eq('ref_no', ref).eq('travel_date', targetDate);
+                }
+                
+                closeModal('transferModal'); 
+                sync(); 
+            }; 
+            openModal('transferModal'); 
+        }
     </script>
 </body>
 </html>
