@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAR Fleet Master Pro</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* BRANDING VARIABLES */
+        :root { 
+            --color-primary: #003811; 
+            --color-secondary: #D4AF37; 
+        }
+        
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background-color: #F3F4F6; 
+        }
+        
+        ::-webkit-scrollbar { width: 8px; } 
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        .modal-overlay { 
+            position: fixed; inset: 0; z-index: 999; 
+            background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); 
+            display: flex; align-items: center; justify-content: center; padding: 20px; 
+        }
+        .modal-box { 
+            background: white; width: 100%; max-width: 600px; 
+            border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            max-height: 90vh; display: flex; flex-direction: column; overflow: visible; 
+        }
+        .search-results-box { 
+            position: absolute; width: 100%; max-height: 200px; overflow-y: auto; 
+            z-index: 2000; background: white; border: 1px solid #d1d5db; 
+            border-radius: 4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); top: 100%; left: 0; 
+        }
+
+        /* PRINT STYLES */
+        @media print { 
+            .no-print { display: none !important; } 
+            
+            /* Visual Dashboard Print */
+            body:not(.printing-table) .print-area { display: block !important; width: 100% !important; background: white; padding: 0 !important; }
+            body:not(.printing-table) .card-item { border: 1px solid #e2e8f0 !important; margin-bottom: 15px; break-inside: avoid; padding: 20px; border-radius: 0; box-shadow: none !important; }
+            
+            /* Table Summary Print */
+            body.printing-table #app { display: none !important; }
+            body.printing-table #print-table-section { display: block !important; width: 100%; background: white; padding: 20px; }
+            @page { size: portrait; margin: 10mm; }
+        }
+        
+        #print-table-section { display: none; } /* Hidden by default */
+        .table-header { background-color: var(--color-primary); color: white; }
+    </style>
+</head>
+<body class="p-8 text-gray-800">
+
+    <div id="app" class="max-w-7xl mx-auto min-h-[80vh] flex flex-col relative">
+        <div id="login-screen" class="flex-grow flex flex-col justify-center items-center">
+            <div class="w-full max-w-md bg-white rounded-lg shadow-md overflow-hidden">
+                <div class="h-2 w-full bg-[#D4AF37]"></div>
+                <div class="p-8">
+                    <h1 class="text-[#003811] font-bold text-3xl mb-1 text-center">DAR FLEET</h1>
+                    <p class="text-xs text-gray-400 font-bold tracking-widest mb-8 uppercase text-center">Official Dispatch Command</p>
+                    <div class="space-y-5">
+                        <div>
+                            <label class="block text-sm font-bold text-[#003811] mb-1">Username</label>
+                            <input type="text" id="un" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] transition-colors">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-[#003811] mb-1">Password</label>
+                            <input type="password" id="pw" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] transition-colors">
+                        </div>
+                        <button onclick="handleLogin()" class="w-full mt-4 bg-[#003811] text-white px-6 py-3 rounded font-bold hover:bg-green-800 transition-colors uppercase tracking-wider text-sm">Enter Console</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="print-table-section" class="max-w-7xl mx-auto bg-white z-[9999]"></div>
+
+    <script>
+        // NOTE: No revision should be made to this code structure unless explicitly instructed.
+        const SB_URL = "https://ytfpiyfapvybihlngxks.supabase.co";
+        const SB_KEY = "sb_publishable_poSZUQ9HI4wcY9poEo5b1w_Z-pAJbKo"; 
+        const db = window.supabase.createClient(SB_URL, SB_KEY);
+
+        const VEHICLES = ["MAZDA", "REVO", "INNOVA", "SKY", "BLACK"];
+        const DRIVERS = ["Driver 1", "Driver 2", "Driver 3", "Driver 4", "Driver 5"];
+
+        let user = null, currentTab = 'inbox', scheduleFilter = 'day'; 
+        let emps = [], orders = [], itins = [], bookings = [];
+        let activeRef = "", activeIsBooking = false, selectedEmpForAdd = null, activeVehForMaint = "";
+        let manualPassengerQueue = [];
+
+        async function handleLogin() {
+            const u = document.getElementById('un').value.trim(), p = document.getElementById('pw').value.trim();
+            const { data } = await db.from('users').select('*');
+            const found = data.find(x => x.username === u && String(x.password) === String(p));
+            if (found && found.role === 'VEHICLE_APPROVER') { 
+                user = found; 
+                const {data: e} = await db.from('employees').select('*');
+                emps = e || []; 
+                renderDashboard(); 
+            } else alert("Invalid Login. You must be a Dispatcher.");
+        }
+
+        async function sync() {
+            const [o, i, b] = await Promise.all([
+                db.from('travel_orders').select('*').neq('status','CANCELLED'), 
+                db.from('itinerary').select('*'),
+                db.from('fleet_bookings').select('*')
+            ]);
+            orders = o.data || []; itins = i.data || []; bookings = b.data || [];
+            if(currentTab === 'inbox') renderInbox();
+            else if(currentTab === 'reservations') renderReservations();
+            else renderSchedule();
+        }
+
+        function renderDashboard() {
+            document.getElementById('app').innerHTML = `
+            <header class="flex justify-between items-center mb-6 no-print">
+                <div>
+                    <h1 class="text-3xl font-bold text-[#003811]">DAR Fleet Master Pro</h1>
+                    <p class="text-sm font-bold text-gray-500 uppercase tracking-wide">Republic of the Philippines | Provincial Office of Camarines Sur 1</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="font-bold text-[#003811] text-sm">${user.full_name}</p>
+                        <p class="text-xs text-gray-500 font-semibold uppercase">Dispatcher</p>
+                    </div>
+                    <button onclick="sync()" class="p-2 text-gray-500 hover:text-[#003811] transition-colors" title="Sync Data">🔄</button>
+                    <button onclick="location.reload()" class="bg-red-600 text-white px-4 py-2 rounded font-bold hover:bg-red-700 transition-colors">Logout</button>
+                </div>
+            </header>
+            
+            <nav class="bg-white rounded-lg shadow mb-8 flex items-center justify-between p-2 no-print">
+                <div class="flex space-x-2">
+                    <button onclick="switchTab('inbox')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='inbox'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📥 Inbox (TOs)</button>
+                    <button onclick="switchTab('reservations')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='reservations'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📋 Reservations</button>
+                    <button onclick="switchTab('schedule')" class="px-6 py-2 rounded font-bold text-sm transition-colors ${currentTab==='schedule'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📅 Schedule</button>
+                </div>
+                <button onclick="openModal('bookModal')" class="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold text-sm hover:bg-yellow-600 transition-colors shadow-sm flex items-center gap-2">
+                    <span class="text-lg leading-none">+</span> Special Booking
+                </button>
+            </nav>
+
+            <main id="main-content" class="flex-grow w-full relative z-10 print-area"></main>
+            
+            ${modalsMarkup()}`;
+            sync();
+        }
+
+        function modalsMarkup() {
+            return `
+            <div id="bookModal" class="hidden modal-overlay">
+                <div class="modal-box">
+                    <div class="p-5 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                        <h2 class="font-bold text-[#003811] text-lg">Special Fleet Booking</h2>
+                        <button onclick="closeModal('bookModal')" class="text-gray-400 hover:text-red-500 font-bold text-xl leading-none">✕</button>
+                    </div>
+                    
+                    <div class="p-6 space-y-5 overflow-y-auto bg-white max-h-[60vh]">
+                        <div class="border border-gray-200 bg-gray-50 p-4 rounded shadow-sm">
+                            <label class="block text-sm font-bold text-[#003811] mb-2">Queue Passengers (First is Lead)</label>
+                            <div class="flex gap-2 relative">
+                                <input id="resPAdd" oninput="runEmpSearch(this, 'resPResults')" placeholder="Search and click a name..." class="flex-1 border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm">
+                                <button onclick="queuePassenger()" class="bg-[#003811] text-white px-4 py-2 rounded font-bold text-sm hover:bg-green-800 transition-colors">Queue</button>
+                                <div id="resPResults" class="search-results-box hidden"></div>
+                            </div>
+                            <div id="manualPList" class="mt-3 space-y-2 max-h-32 overflow-y-auto"></div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="block text-sm font-bold text-[#003811] mb-1">Start Date</label><input id="resD1" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div>
+                            <div><label class="block text-sm font-bold text-[#003811] mb-1">End Date</label><input id="resD2" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="block text-sm font-bold text-[#003811] mb-1">Departure Time</label><input id="resDepTime" type="time" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div>
+                            <div><label class="block text-sm font-bold text-[#003811] mb-1">Arrival Time</label><input id="resArrTime" type="time" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="block text-sm font-bold text-[#003811] mb-1">Assignment / Type</label>
+                                <select id="resS" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold">
+                                    <option>WHOLE DAY</option>
+                                    <option>AM</option>
+                                    <option>PM</option>
+                                    <option class="text-red-600 font-bold">DROP-OFF ONLY</option>
+                                    <option class="text-blue-600 font-bold">PICK-UP ONLY</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-sm font-bold text-[#003811] mb-1">Vehicle</label><select id="resV" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold">${VEHICLES.map(v=>`<option>${v}</option>`).join('')}</select></div>
+                        </div>
+                        <div><label class="block text-sm font-bold text-[#003811] mb-1">Driver (Editable)</label><input id="resDr" list="drivers" value="Driver 1" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold"></div>
+                        
+                        <div class="space-y-4 pt-4 border-t border-gray-200">
+                            <div><label class="block text-sm font-bold text-[#003811] mb-1">Destination</label><input id="resDest" placeholder="e.g., DAR Regional Office..." class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div>
+                            <div><label class="block text-sm font-bold text-[#003811] mb-1">Purpose / Details</label><input id="resP" placeholder="Reason for travel..." class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg">
+                        <button onclick="closeModal('bookModal')" class="px-6 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button>
+                        <button onclick="saveManual()" class="bg-[#003811] text-white px-6 py-2 rounded font-bold text-sm hover:bg-green-800 transition-colors">Confirm Booking</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="peopleModal" class="hidden modal-overlay">
+                <div class="modal-box h-[600px]">
+                    <div class="p-5 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                        <div><h2 class="font-bold text-[#003811] text-lg">Manage Passengers</h2><p id="pSub" class="text-xs text-gray-500 font-bold uppercase mt-1"></p></div>
+                        <button onclick="closeModal('peopleModal')" class="text-gray-400 hover:text-red-500 font-bold text-xl">✕</button>
+                    </div>
+                    <div id="pList" class="p-6 flex-1 space-y-3 overflow-y-auto bg-white"></div>
+                    <div class="p-6 border-t bg-gray-50 relative shrink-0 rounded-b-lg">
+                        <label class="block text-sm font-bold text-[#003811] mb-2">Add Passenger</label>
+                        <div class="flex gap-3">
+                            <div class="relative flex-1">
+                                <input id="pAdd" oninput="runEmpSearch(this, 'pResults')" placeholder="Enter name..." class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm" autocomplete="off">
+                                <div id="pResults" class="search-results-box hidden"></div>
+                            </div>
+                            <button onclick="handleAddPersonnel()" class="bg-[#003811] text-white px-6 py-2 rounded font-bold text-sm hover:bg-green-800 transition-colors">Add</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="transferModal" class="hidden modal-overlay"><div class="modal-box max-w-sm"><div class="p-5 border-b bg-gray-50 rounded-t-lg"><h2 class="font-bold text-[#003811] text-lg">Smart Transfer</h2><p id="tSub" class="text-xs text-gray-500 font-bold mt-1 uppercase"></p></div><div class="p-6 space-y-4 bg-white"><label class="block text-sm font-bold text-[#003811] mb-1">Available Fleet (Matching Dates)</label><select id="tSelect" class="w-full border border-gray-300 p-3 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold"></select></div><div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg"><button onclick="closeModal('transferModal')" class="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button><button id="tExec" class="bg-[#003811] text-white px-6 py-2 rounded font-bold text-sm hover:bg-green-800 transition-colors">Confirm</button></div></div></div>
+            <div id="maintModal" class="hidden modal-overlay"><div class="modal-box max-w-sm"><div class="p-5 border-b bg-gray-50 rounded-t-lg"><h2 class="font-bold text-[#003811] text-lg">Schedule Maintenance</h2><p id="maintSub" class="text-xs text-gray-500 font-bold mt-1 uppercase"></p></div><div class="p-6 space-y-4 bg-white"><div><label class="block text-sm font-bold text-[#003811] mb-1">Reason</label><input id="maintReason" placeholder="e.g., Change Oil..." class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div><div><label class="block text-sm font-bold text-[#003811] mb-1">Start Date</label><input id="maintD1" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div><div><label class="block text-sm font-bold text-[#003811] mb-1">End Date</label><input id="maintD2" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div></div><div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg"><button onclick="closeModal('maintModal')" class="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button><button onclick="saveMaintenance()" class="bg-red-600 text-white px-6 py-2 rounded font-bold text-sm hover:bg-red-700 transition-colors">Off-Road</button></div></div></div>
+            
+            <datalist id="drivers">${DRIVERS.map(d=>`<option value="${d}">`).join('')}</datalist>`;
+        }
+
+        // --- DASHBOARD FUNCTIONS ---
+        function renderInbox() {
+            const m = document.getElementById('main-content');
+            const rawData = orders.filter(x => x.status === 'PENDING_VEHICLE_APPROVER' && x.transport === "GOV'T VEHICLE");
+            if (!rawData.length) { m.innerHTML = `<div class="bg-white p-12 rounded-lg shadow text-center"><span class="text-4xl text-gray-300">✨</span><p class="font-bold text-gray-500 mt-4 text-sm uppercase">Queue Empty</p></div>`; return; }
+            
+            const grouped = {};
+            rawData.forEach(o => {
+                if(!grouped[o.to_no]) grouped[o.to_no] = [];
+                grouped[o.to_no].push(o);
+            });
+
+            m.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">` + Object.values(grouped).map(group => {
+                const o = group[0];
+                const allNames = group.map(x => x.emp_name).join('<br> • ');
+                const tripItins = itins.filter(i => i.to_no === o.to_no).sort((a,b) => new Date(a.travel_date) - new Date(b.travel_date));
+                return `
+                <div class="bg-white p-6 rounded-lg shadow flex flex-col relative border border-gray-200">
+                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
+                        <span class="text-xs font-bold text-[#003811] bg-green-50 px-2.5 py-1 rounded border border-green-100">TO: ${o.to_no}</span>
+                        <button onclick="toLand('${o.to_no}','${o.unit}')" class="text-blue-600 text-xs font-bold underline hover:text-blue-800 transition">LAND TRIP</button>
+                    </div>
+                    <h3 class="font-bold text-gray-800 text-sm mb-3 leading-snug">• ${allNames}</h3>
+                    <div class="mb-4 bg-gray-50 p-3 rounded border border-gray-200 max-h-24 overflow-y-auto">
+                        ${tripItins.map(i => `<p class="text-xs leading-relaxed mb-1 last:mb-0"><b class="text-[#003811]">${i.travel_date}</b>: ${i.destination} <span class="text-gray-500 italic">(${i.purpose})</span></p>`).join('')}
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 mb-5 mt-auto">
+                        <div class="grid grid-cols-2 gap-3">
+                            <select id="v-${o.to_no}" class="border border-gray-300 rounded p-2 text-xs font-semibold text-[#003811] focus:outline-none focus:border-[#003811]"><option disabled selected hidden>Vehicle</option>${VEHICLES.map(v=>`<option>${v}</option>`).join('')}</select>
+                            <select id="s-${o.to_no}" class="border border-gray-300 rounded p-2 text-xs font-semibold text-gray-700 focus:outline-none focus:border-[#003811]"><option>WHOLE DAY</option><option>AM</option><option>PM</option><option>DROP-OFF ONLY</option><option>PICK-UP ONLY</option></select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <input id="d-${o.to_no}" list="drivers" placeholder="Driver..." class="border border-gray-300 rounded p-2 text-xs font-semibold focus:outline-none focus:border-[#003811]">
+                            <input id="t-${o.to_no}" type="time" title="Departure Time" class="border border-gray-300 rounded p-2 text-xs font-semibold text-gray-700 focus:outline-none focus:border-[#003811]">
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="toLand('${o.to_no}','${o.unit}')" class="border border-red-300 text-red-600 rounded px-4 py-2 text-xs font-bold hover:bg-red-50 transition flex-1">Reject</button>
+                        <button onclick="approveTrip('${o.to_no}','${o.unit}')" class="bg-[#003811] text-white px-4 py-2 rounded text-xs font-bold hover:bg-green-800 transition flex-[2]">Approve Setup</button>
+                    </div>
+                </div>`;
+            }).join('') + `</div>`;
+        }
+
+        async function approveTrip(to, unit) {
+            const v = document.getElementById(`v-${to}`).value;
+            const s = document.getElementById(`s-${to}`).value;
+            const d = document.getElementById(`d-${to}`).value || "TBD";
+            const t = document.getElementById(`t-${to}`).value;
+            
+            if(v === "Vehicle") return alert("Please select a vehicle.");
+            
+            let timeStr = s;
+            if (t) {
+                timeStr = `${s} (${formatTo12Hour(t)} Onward)`;
+            }
+
+            const { error } = await db.from('travel_orders').update({ received: v, driver: d, remarks: timeStr, status: getApprovalTarget(unit) }).eq('to_no', to);
+            if (error) alert("Database Error: " + error.message);
+            sync();
+        }
+
+        async function toLand(to, unit) {
+            await db.from('travel_orders').update({ transport: 'LAND', status: getApprovalTarget(unit), received: null, driver: null }).eq('to_no', to);
+            sync();
+        }
+
+        function renderReservations() {
+            const container = document.getElementById('main-content');
+            const tos = orders.filter(x => x.transport === "GOV'T VEHICLE" && x.status !== 'PENDING_VEHICLE_APPROVER' && x.status !== 'OFF_ROAD' && x.remarks !== 'MAINTENANCE');
+            const toGrp = {}; tos.forEach(x => { if(!toGrp[x.to_no]) toGrp[x.to_no] = []; toGrp[x.to_no].push(x); });
+            const bkGrp = {}; bookings.forEach(x => { if(!bkGrp[x.ref_no]) bkGrp[x.ref_no] = []; bkGrp[x.ref_no].push(x); });
+
+            if (Object.keys(toGrp).length === 0 && Object.keys(bkGrp).length === 0) { container.innerHTML = `<div class="bg-white p-12 rounded-lg shadow text-center"><span class="text-4xl text-gray-300">📋</span><p class="font-bold text-gray-500 mt-4 text-sm uppercase">No Active Reservations</p></div>`; return; }
+            
+            let html = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">`;
+            
+            if(Object.keys(toGrp).length > 0) {
+                html += `<div><h2 class="text-lg font-bold text-[#003811] border-b-2 border-gray-200 pb-2 mb-4">Official Travel Orders</h2><div class="space-y-4">` + 
+                Object.entries(toGrp).map(([to, list]) => {
+                    return `<div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 border-l-4 border-l-[#003811] flex flex-col"><div class="flex justify-between items-start mb-3"><span class="text-xs font-bold text-gray-500 uppercase">TO: ${to}</span><span class="text-[10px] bg-green-50 text-[#003811] font-bold px-2 py-1 rounded border border-green-100 uppercase tracking-wider">${list[0].remarks||'WHOLE'}</span></div><h3 class="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">${list[0].emp_name} <span class="bg-[#003811] text-white text-[9px] px-2 py-0.5 rounded">LEAD</span></h3>${list.length > 1 ? `<div class="text-xs text-gray-600 font-medium mb-4 pl-3 border-l-2 border-gray-100">${list.slice(1).map(x=>x.emp_name).join('<br>')}</div>` : '<div class="mb-3"></div>'}<div class="bg-gray-50 p-3 rounded border border-gray-100 mb-4 flex justify-between mt-auto"><p class="text-xs text-[#003811] font-bold uppercase">🚙 ${list[0].received}</p><p class="text-xs text-gray-600 font-bold uppercase">👤 ${list[0].driver}</p></div><div class="flex gap-3"><button onclick="cancelTO('${to}','${list[0].status}')" class="border border-red-300 text-red-600 px-4 py-2 rounded text-xs font-bold hover:bg-red-50 transition flex-1">Cancel</button><button onclick="openManagePersonnel('${to}', false)" class="bg-gray-100 text-[#003811] font-bold px-4 py-2 rounded text-xs hover:bg-gray-200 transition flex-[2]">Personnel (${list.length})</button></div></div>`;
+                }).join('') + `</div></div>`;
+            }
+
+            if(Object.keys(bkGrp).length > 0) {
+                html += `<div><h2 class="text-lg font-bold text-[#D4AF37] border-b-2 border-gray-200 pb-2 mb-4">Special Bookings</h2><div class="space-y-4">` + 
+                Object.entries(bkGrp).map(([ref, list]) => {
+                    const dates = [...new Set(list.map(l => l.travel_date))].join(', ');
+                    const seenNames = new Set(); const pass = []; list.forEach(i => { if(!seenNames.has(i.emp_name)){ seenNames.add(i.emp_name); pass.push(i); } });
+                    return `<div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 border-l-4 border-l-[#D4AF37] flex flex-col"><div class="flex justify-between items-start mb-3"><span class="text-xs font-bold text-gray-500 uppercase">REF: ${ref}</span><span class="text-[10px] bg-yellow-50 text-yellow-700 font-bold px-2 py-1 rounded border border-yellow-100 uppercase tracking-wider">${list[0].assignment}</span></div><h3 class="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">${pass[0].emp_name} <span class="bg-[#D4AF37] text-white text-[9px] px-2 py-0.5 rounded">LEAD</span></h3>${pass.length > 1 ? `<div class="text-xs text-gray-600 font-medium mb-3 pl-3 border-l-2 border-gray-100">${pass.slice(1).map(x=>x.emp_name).join('<br>')}</div>` : '<div class="mb-2"></div>'}<p class="text-xs text-gray-500 font-bold uppercase mb-4"><span class="text-[#D4AF37]">Dates:</span> ${dates}</p><div class="bg-gray-50 p-3 rounded border border-gray-100 mb-4 flex justify-between mt-auto"><p class="text-xs text-[#003811] font-bold uppercase">🚙 ${list[0].vehicle}</p><p class="text-xs text-gray-600 font-bold uppercase">👤 ${list[0].driver}</p></div><div class="flex gap-3"><button onclick="cancelBooking('${ref}')" class="border border-red-300 text-red-600 px-4 py-2 rounded text-xs font-bold hover:bg-red-50 transition flex-1">Delete</button><button onclick="openManagePersonnel('${ref}', true)" class="bg-gray-100 text-yellow-700 font-bold px-4 py-2 rounded text-xs hover:bg-gray-200 transition flex-[2]">Personnel (${pass.length})</button></div></div>`;
+                }).join('') + `</div></div>`;
+            }
+            html += `</div>`; container.innerHTML = html;
+        }
+
+        async function cancelTO(to, status) { if(confirm("Change to LAND or Cancel TO?")) { await db.from('travel_orders').update({ transport: 'LAND', status: status==='APPROVED'?'APPROVED':'PENDING_UNIT_HEAD' }).eq('to_no', to); sync(); } }
+        async function cancelBooking(ref) { if(confirm("Permanently delete this Booking?")) { await db.from('fleet_bookings').delete().eq('ref_no', ref); sync(); } }
+
+        function renderSchedule() {
+            const container = document.getElementById('main-content');
+            const now = new Date(); now.setHours(0,0,0,0);
+            
+            const filteredItins = itins.filter(i => {
+                const d = new Date(i.travel_date); d.setHours(0,0,0,0);
+                if (scheduleFilter === 'day') return d.getTime() === now.getTime();
+                if (scheduleFilter === 'week') { const s = new Date(now); s.setDate(now.getDate() - now.getDay()); const e = new Date(s); e.setDate(s.getDate() + 6); return d >= s && d <= e; }
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            });
+            const validToNos = filteredItins.map(i => i.to_no);
+
+            const filteredBookings = bookings.filter(b => {
+                const d = new Date(b.travel_date); d.setHours(0,0,0,0);
+                if (scheduleFilter === 'day') return d.getTime() === now.getTime();
+                if (scheduleFilter === 'week') { const s = new Date(now); s.setDate(now.getDate() - now.getDay()); const e = new Date(s); e.setDate(s.getDate() + 6); return d >= s && d <= e; }
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            });
+
+            container.innerHTML = `
+            <div class="no-print bg-white p-3 rounded-lg shadow mb-6 flex gap-3 items-center sticky top-0 z-20 border border-gray-200">
+                <div class="flex bg-gray-100 rounded p-1 flex-1">
+                    <button onclick="setFilter('day')" class="flex-1 py-2 text-xs font-bold rounded ${scheduleFilter==='day'?'bg-white text-[#003811] shadow-sm':'text-gray-500 hover:text-gray-800'} transition uppercase tracking-wide">Day</button>
+                    <button onclick="setFilter('week')" class="flex-1 py-2 text-xs font-bold rounded ${scheduleFilter==='week'?'bg-white text-[#003811] shadow-sm':'text-gray-500 hover:text-gray-800'} transition uppercase tracking-wide">Week</button>
+                    <button onclick="setFilter('month')" class="flex-1 py-2 text-xs font-bold rounded ${scheduleFilter==='month'?'bg-white text-[#003811] shadow-sm':'text-gray-500 hover:text-gray-800'} transition uppercase tracking-wide">Month</button>
+                </div>
+                <div class="flex gap-2 w-[40%]">
+                    <button onclick="window.print()" class="bg-gray-100 text-gray-700 hover:bg-gray-200 flex-1 py-2 rounded text-xs font-bold transition flex items-center justify-center gap-2">Card View</button>
+                    <button onclick="printTableSummary()" class="bg-[#D4AF37] text-white hover:bg-yellow-600 flex-1 py-2 rounded text-xs font-bold transition flex items-center justify-center gap-2">🖨️ Summary</button>
+                </div>
+            </div>
+            
+            <div class="print-area">
+                <h1 class="print-header text-[#003811] uppercase font-bold text-xl mb-6 pb-2 border-b-2 border-gray-200">Deployments (${scheduleFilter})</h1>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                ` + VEHICLES.map(v => {
+                const vLogs = orders.filter(o => o.received === v && validToNos.includes(o.to_no));
+                const uniqueTo = [...new Set(vLogs.map(l => l.to_no))].sort();
+                const vBookings = filteredBookings.filter(b => b.vehicle === v);
+                const uniqueRefs = [...new Set(vBookings.map(b => b.ref_no))].sort();
+
+                let html = `<div class="card-item bg-white p-6 rounded-lg border border-gray-200 shadow-sm relative"><div class="flex justify-between items-center mb-5 border-b border-gray-100 pb-3"><h3 class="font-bold text-lg text-[#003811] uppercase tracking-wider">${v}</h3><button onclick="setOffRoad('${v}')" class="no-print border border-red-200 text-red-600 hover:bg-red-50 text-[10px] px-3 py-1.5 rounded font-bold tracking-widest transition">OFF-ROAD</button></div>`;
+                
+                if(!uniqueTo.length && !uniqueRefs.length) html += `<p class="p-8 text-center text-sm text-gray-400 font-bold uppercase tracking-widest bg-gray-50 rounded border border-dashed border-gray-200">Available</p>`;
+                else {
+                    html += uniqueTo.map(toNo => {
+                        const h = vLogs.find(l => l.to_no === toNo);
+                        const dates = [...new Set(filteredItins.filter(itin => itin.to_no === toNo).map(itin => itin.travel_date))].join(', ');
+                        const allPass = orders.filter(o => o.to_no === toNo).map(o => o.emp_name).join('<br> • ');
+                        const isMaint = h.status === 'OFF_ROAD' || h.remarks === 'MAINTENANCE';
+                        const mainItin = filteredItins.find(itin => itin.to_no === toNo);
+                        
+                        if(isMaint) return `<div class="bg-red-50 p-4 rounded border border-red-200 mb-4 relative"><p class="text-sm font-bold text-red-700 uppercase mb-2 flex items-center gap-2">🚨 UNAVAILABLE</p><p class="text-xs text-red-600 font-semibold uppercase tracking-wide mb-2">${dates} | OFF-ROAD</p><p class="text-xs text-gray-700 font-medium italic border-l-2 border-red-300 pl-3">${mainItin?.purpose || 'Maintenance'}</p><button onclick="endMaintenance('${h.to_no}')" class="no-print mt-4 bg-white border border-red-300 text-red-700 px-4 py-2 rounded text-xs font-bold uppercase w-full hover:bg-red-100 transition shadow-sm">✅ Mark Complete</button></div>`;
+                        
+                        return `<div class="bg-gray-50 p-4 rounded mb-4 flex justify-between items-center border border-gray-200"><div class="overflow-hidden leading-tight pr-4"><span class="text-[10px] bg-[#003811] text-white px-2 py-1 rounded font-bold mb-2 inline-block">TO RECORD</span><p class="text-sm font-bold text-gray-800 uppercase mb-3"> • ${allPass}</p><p class="text-xs text-gray-600 font-semibold tracking-wide uppercase pt-2 border-t border-gray-200">${dates} | ${h.remarks || 'WHOLE'}</p></div><button onclick="smartTransfer('${h.to_no}','${v}')" class="text-xl no-print text-gray-500 hover:text-[#003811] bg-white rounded-full w-10 h-10 flex items-center justify-center border border-gray-300 shadow-sm shrink-0 transition">🔄</button></div>`;
+                    }).join('');
+
+                    html += uniqueRefs.map(ref => {
+                        const items = vBookings.filter(b => b.ref_no === ref);
+                        const dates = [...new Set(items.map(i => i.travel_date))].join(', ');
+                        const seenNames = new Set(); const passNames = []; items.forEach(i => { if(!seenNames.has(i.emp_name)){ seenNames.add(i.emp_name); passNames.push(i.emp_name); } });
+                        return `<div class="bg-yellow-50/50 p-4 rounded mb-4 flex justify-between items-center border border-[#D4AF37]/30"><div class="overflow-hidden leading-tight pr-4"><span class="text-[10px] bg-[#D4AF37] text-white px-2 py-1 rounded font-bold mb-2 inline-block">BOOKING</span><p class="text-sm font-bold text-gray-800 uppercase mb-3"> • ${passNames.join('<br> • ')}</p><p class="text-xs text-yellow-800 font-semibold tracking-wide uppercase pt-2 border-t border-yellow-200/50">${dates} | ${items[0].assignment}</p><p class="text-xs text-gray-500 italic mt-2">${items[0].destination}</p></div></div>`;
+                    }).join('');
+                }
+                return html + `</div>`;
+            }).join('') + `</div></div>`;
+        }
+
+        // --- PRINT TABLE REPORT LOGIC ---
+        function printTableSummary() {
+            const printSec = document.getElementById('print-table-section');
+            const now = new Date(); now.setHours(0,0,0,0);
+            
+            // Re-filter data to build table
+            const fItins = itins.filter(i => {
+                const d = new Date(i.travel_date); d.setHours(0,0,0,0);
+                if(scheduleFilter === 'day') return d.getTime() === now.getTime();
+                if(scheduleFilter === 'week') { const s = new Date(now); s.setDate(now.getDate() - now.getDay()); const e = new Date(s); e.setDate(s.getDate() + 6); return d >= s && d <= e; }
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            });
+            const validTOs = fItins.map(i => i.to_no);
+            
+            const fBk = bookings.filter(b => {
+                const d = new Date(b.travel_date); d.setHours(0,0,0,0);
+                if(scheduleFilter === 'day') return d.getTime() === now.getTime();
+                if(scheduleFilter === 'week') { const s = new Date(now); s.setDate(now.getDate() - now.getDay()); const e = new Date(s); e.setDate(s.getDate() + 6); return d >= s && d <= e; }
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            });
+
+            let html = `
+                <div class="mb-8 border-b-2 border-[#003811] pb-4 text-center">
+                    <h1 class="text-2xl font-bold text-[#003811] uppercase">DAR Fleet Manifest Summary</h1>
+                    <p class="text-sm font-bold text-gray-500 uppercase mt-1">Filter: ${scheduleFilter} | Printed: ${new Date().toLocaleDateString()}</p>
+                </div>
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="table-header uppercase tracking-wider text-xs">
+                            <th class="p-3 border border-gray-300">Vehicle</th>
+                            <th class="p-3 border border-gray-300">Date</th>
+                            <th class="p-3 border border-gray-300 w-1/4">Passengers</th>
+                            <th class="p-3 border border-gray-300">Destination / Purpose</th>
+                            <th class="p-3 border border-gray-300">Time / Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            VEHICLES.forEach(v => {
+                const vTOs = orders.filter(o => o.received === v && validTOs.includes(o.to_no));
+                const uniqueTo = [...new Set(vTOs.map(l => l.to_no))].sort();
+                const vBks = fBk.filter(b => b.vehicle === v);
+                const uniqueRefs = [...new Set(vBks.map(b => b.ref_no))].sort();
+
+                let rowSpan = uniqueTo.length + uniqueRefs.length;
+                if (rowSpan === 0) return; // Skip empty vehicles
+
+                let isFirst = true;
+
+                // Render TOs
+                uniqueTo.forEach(toNo => {
+                    const h = vTOs.find(l => l.to_no === toNo);
+                    const dates = [...new Set(fItins.filter(itin => itin.to_no === toNo).map(itin => itin.travel_date))].join(', ');
+                    const allPass = orders.filter(o => o.to_no === toNo).map(o => o.emp_name).join(', ');
+                    const mainItin = fItins.find(itin => itin.to_no === toNo);
+                    
+                    html += `<tr class="border-b border-gray-200">
+                        ${isFirst ? `<td class="p-3 border-x border-gray-300 font-bold text-[#003811] bg-gray-50 uppercase text-center align-middle" rowspan="${rowSpan}">${v}</td>` : ''}
+                        <td class="p-3 border-x border-gray-300 font-semibold whitespace-nowrap">${dates}</td>
+                        <td class="p-3 border-x border-gray-300">${h.remarks==='MAINTENANCE'||h.status==='OFF_ROAD' ? '<span class="text-red-600 font-bold">UNAVAILABLE (OFF-ROAD)</span>' : allPass}</td>
+                        <td class="p-3 border-x border-gray-300 italic text-xs">${mainItin?.destination || 'Maintenance'} <br><span class="text-gray-500">${mainItin?.purpose || ''}</span></td>
+                        <td class="p-3 border-x border-gray-300 font-semibold"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-[10px] font-bold">TO</span> <br><div class="mt-1">${h.remarks || 'WHOLE'}</div></td>
+                    </tr>`;
+                    isFirst = false;
+                });
+
+                // Render Bookings
+                uniqueRefs.forEach(ref => {
+                    const items = vBks.filter(b => b.ref_no === ref);
+                    const dates = [...new Set(items.map(i => i.travel_date))].join(', ');
+                    const seenNames = new Set(); const passNames = []; items.forEach(i => { if(!seenNames.has(i.emp_name)){ seenNames.add(i.emp_name); passNames.push(i.emp_name); } });
+                    
+                    html += `<tr class="border-b border-gray-200 bg-yellow-50/20">
+                        ${isFirst ? `<td class="p-3 border-x border-gray-300 font-bold text-[#003811] bg-gray-50 uppercase text-center align-middle" rowspan="${rowSpan}">${v}</td>` : ''}
+                        <td class="p-3 border-x border-gray-300 font-semibold whitespace-nowrap">${dates}</td>
+                        <td class="p-3 border-x border-gray-300">${passNames.join(', ')}</td>
+                        <td class="p-3 border-x border-gray-300 italic text-xs">${items[0].destination} <br><span class="text-gray-500">${items[0].purpose}</span></td>
+                        <td class="p-3 border-x border-gray-300 font-semibold"><span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-bold">BOOKING</span> <br><div class="mt-1">${items[0].assignment}</div></td>
+                    </tr>`;
+                    isFirst = false;
+                });
+            });
+
+            html += `</tbody></table>`;
+            
+            if (!html.includes('<tr>')) {
+                html += `<div class="p-10 text-center text-gray-400 font-bold uppercase">No records found for this period.</div>`;
+            }
+
+            printSec.innerHTML = html;
+            
+            // Trigger print mode
+            document.body.classList.add('printing-table');
+            setTimeout(() => {
+                window.print();
+                document.body.classList.remove('printing-table');
+            }, 300);
+        }
+
+
+        // --- SEARCH & UNIVERSAL BOOKING ASSIGNMENT ---
+        async function isDoubleBooked(empName, checkDates) {
+            const empTrips = orders.filter(o => o.emp_name === empName && o.status !== 'CANCELLED' && o.transport === "GOV'T VEHICLE");
+            for (let trip of empTrips) {
+                const tripDates = itins.filter(i => i.to_no === trip.to_no).map(i => i.travel_date);
+                if(tripDates.some(d => checkDates.includes(d))) return true;
+            }
+            const bks = bookings.filter(b => b.emp_name === empName && checkDates.includes(b.travel_date));
+            return bks.length > 0;
+        }
+
+        function runEmpSearch(inp, resId) {
+            const div = document.getElementById(resId);
+            const val = inp.value.toLowerCase().trim();
+            if (val.length < 2) { div.classList.add('hidden'); return; }
+            const match = emps.filter(e => e.full_name.toLowerCase().includes(val)).slice(0, 5);
+            div.innerHTML = match.map(e => `<div onclick="pickPersonnel('${safeStr(e.full_name)}','${resId}','${inp.id}','${safeStr(e.emp_id)}')" class="p-4 border-b border-gray-100 text-sm font-bold active:bg-gray-100 cursor-pointer uppercase text-gray-700 hover:bg-gray-50 transition">${e.full_name}</div>`).join('');
+            div.classList.remove('hidden');
+        }
+
+        function pickPersonnel(n, rId, iId, eId) {
+            document.getElementById(iId).value = n;
+            document.getElementById(rId).classList.add('hidden');
+            if(iId === 'pAdd' || iId === 'resPAdd') selectedEmpForAdd = { n, id: eId };
+        }
+
+        function queuePassenger() {
+            if(!selectedEmpForAdd) return alert("Search and click a name first.");
+            manualPassengerQueue.push(selectedEmpForAdd);
+            document.getElementById('resPAdd').value = "";
+            selectedEmpForAdd = null;
+            renderManualPList();
+        }
+
+        function renderManualPList() {
+            document.getElementById('manualPList').innerHTML = manualPassengerQueue.map((p, idx) => `
+                <div class="flex justify-between items-center bg-white p-3 rounded text-xs font-bold uppercase border ${idx===0 ? 'border-[#003811] shadow-sm' : 'border-gray-200'}">
+                    <span>${p.n} ${idx===0 ? '<span class="ml-2 bg-[#003811] text-white text-[10px] px-2 py-1 rounded">LEAD</span>' : ''}</span>
+                    <button onclick="manualPassengerQueue.splice(${idx},1);renderManualPList();" class="text-red-500 font-bold hover:scale-110 px-2 transition">✕</button>
+                </div>`).join('');
+        }
+
+        function formatTo12Hour(timeStr) {
+            if (!timeStr) return "";
+            let [h, m] = timeStr.split(':');
+            let ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${h}:${m} ${ampm}`;
+        }
+
+        async function saveManual() {
+            const d1 = document.getElementById('resD1').value, d2 = document.getElementById('resD2').value;
+            const assign = document.getElementById('resS').value, v = document.getElementById('resV').value, dr = document.getElementById('resDr').value;
+            const dest = document.getElementById('resDest').value.trim(), p = document.getElementById('resP').value.trim();
+            const depT = document.getElementById('resDepTime').value, arrT = document.getElementById('resArrTime').value;
+            
+            if(!d1 || !dest || !p) return alert("Missing Start Date, Destination, or Purpose.");
+            if(manualPassengerQueue.length === 0) return alert("Please queue at least one passenger.");
+
+            let st = new Date(d1), en = new Date(d2 || d1), dates = [];
+            while(st <= en) { dates.push(st.toISOString().split('T')[0]); st.setDate(st.getDate() + 1); }
+
+            // 1. Initial Strict Block: Are they already inside a vehicle on these dates?
+            for (let pass of manualPassengerQueue) {
+                if (await isDoubleBooked(pass.n, dates)) return alert(`Blocked: ${pass.n} is already assigned a vehicle on these dates!`);
+            }
+
+            // Generate clean time string
+            let timeStr = assign;
+            if (depT && arrT) timeStr = `${assign} (${formatTo12Hour(depT)} - ${formatTo12Hour(arrT)})`;
+            else if (depT) timeStr = `${assign} (${formatTo12Hour(depT)} Onward)`;
+
+            const fleetPayload = [];
+            const toUpdates = []; 
+            const ref = `BK-${Math.floor(Date.now()%100000)}`;
+
+            // 2. UNIVERSAL CHECK: Do they have a pending/land TO we should attach this to?
+            for (let pass of manualPassengerQueue) {
+                const passTOs = orders.filter(o => o.emp_name === pass.n && o.status !== 'CANCELLED' && (o.transport !== "GOV'T VEHICLE" || !o.transport));
+                
+                let matchedTO = null;
+                for (let to of passTOs) {
+                    const toDates = itins.filter(i => i.to_no === to.to_no).map(i => i.travel_date);
+                    if (toDates.some(d => dates.includes(d))) { matchedTO = to.to_no; break; }
+                }
+
+                if (matchedTO) {
+                    // Update their existing TO instead of creating a fleet booking
+                    toUpdates.push(matchedTO);
+                } else {
+                    // Create new fleet booking
+                    for (let date of dates) {
+                        fleetPayload.push({ ref_no: ref, emp_name: pass.n, emp_id: pass.id, travel_date: date, destination: dest, purpose: p, vehicle: v, driver: dr, assignment: timeStr });
+                    }
+                }
+            }
+
+            // 3. Execution
+            if (fleetPayload.length > 0) await db.from('fleet_bookings').insert(fleetPayload);
+            
+            // Auto-assign Gov't vehicle to found TOs
+            for (let to of [...new Set(toUpdates)]) {
+                await db.from('travel_orders').update({ transport: "GOV'T VEHICLE", received: v, driver: dr, remarks: timeStr }).eq('to_no', to);
+            }
+            
+            manualPassengerQueue = []; document.getElementById('resDest').value = ""; document.getElementById('resP').value = "";
+            renderManualPList(); closeModal('bookModal'); sync();
+        }
+
+        // Add passenger directly from Manage Modal
+        async function handleAddPersonnel() {
+            if(!selectedEmpForAdd) return alert("Search and click a name first.");
+            if (activeIsBooking) {
+                const { data } = await db.from('fleet_bookings').select('*').eq('ref_no', activeRef);
+                if(!data || !data.length) return;
+                const dates = [...new Set(data.map(d => d.travel_date))];
+                if (await isDoubleBooked(selectedEmpForAdd.n, dates)) return alert(`${selectedEmpForAdd.n} is already assigned a vehicle on these dates.`);
+                const template = data[0];
+                const payload = dates.map(d => ({ ref_no: activeRef, emp_name: selectedEmpForAdd.n, emp_id: selectedEmpForAdd.id, travel_date: d, destination: template.destination, purpose: template.purpose, vehicle: template.vehicle, driver: template.driver, assignment: template.assignment }));
+                await db.from('fleet_bookings').insert(payload);
+            } else {
+                const head = orders.find(o => o.to_no === activeRef);
+                const toDates = itins.filter(i => i.to_no === activeRef).map(i => i.travel_date);
+                if (await isDoubleBooked(selectedEmpForAdd.n, toDates)) return alert(`${selectedEmpForAdd.n} is already assigned a vehicle on these dates.`);
+                const row = { ...head, emp_name: selectedEmpForAdd.n, emp_id: selectedEmpForAdd.id }; delete row.id; delete row.created_at;
+                await db.from('travel_orders').insert([row]);
+            }
+            document.getElementById('pAdd').value = ""; selectedEmpForAdd = null; await renderPList(); await sync();
+        }
+
+        async function doRemovePerson(id, name) { 
+            if(activeIsBooking) await db.from('fleet_bookings').delete().eq('ref_no', activeRef).eq('emp_name', name);
+            else await db.from('travel_orders').delete().eq('id', id); 
+            await renderPList(); sync(); 
+        }
+
+        function switchTab(t) { currentTab = t; renderDashboard(); }
+        function setFilter(f) { scheduleFilter = f; renderSchedule(); }
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function safeStr(str) { return (str || "").replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+        function getApprovalTarget(u) { const unit = (u || "").toUpperCase(); if (unit === "PARPO") return "PENDING_PARPO"; return (unit && unit !== "NULL") ? "PENDING_UNIT_HEAD" : "PENDING_CHIEF"; }
+        
+        // Maint & Transfer functions...
+        function setOffRoad(veh) { activeVehForMaint = veh; document.getElementById('maintSub').innerText = `Vehicle: ${veh}`; document.getElementById('maintD1').value = ""; document.getElementById('maintD2').value = ""; document.getElementById('maintReason').value = ""; openModal('maintModal'); }
+        async function saveMaintenance() { const d1 = document.getElementById('maintD1').value, d2 = document.getElementById('maintD2').value, reason = document.getElementById('maintReason').value || "Routine Maintenance"; if(!d1) return alert("Select at least a start date."); const to = `MAINT-${Math.floor(Date.now()%10000)}`; await db.from('travel_orders').insert({ to_no: to, emp_name: '🚨 UNAVAILABLE', received: activeVehForMaint, remarks: 'MAINTENANCE', status: 'OFF_ROAD', transport: "GOV'T VEHICLE" }); let st = new Date(d1), en = new Date(d2 || d1); while(st <= en) { await db.from('itinerary').insert({ to_no: to, travel_date: st.toISOString().split('T')[0], destination: "Authorized Shop", purpose: reason }); st.setDate(st.getDate() + 1); } closeModal('maintModal'); sync(); }
+        async function endMaintenance(to) { if(!confirm("Maintenance finished? This clears remaining schedules.")) return; const now = new Date(); const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0'), d = String(now.getDate()).padStart(2,'0'); await db.from('itinerary').delete().eq('to_no', to).gte('travel_date', `${y}-${m}-${d}`); const remaining = await db.from('itinerary').select('id').eq('to_no', to); if(!remaining.data || remaining.data.length === 0) await db.from('travel_orders').delete().eq('to_no', to); sync(); }
+        async function smartTransfer(toNo, curV) { activeRef = toNo; const dates = itins.filter(i => i.to_no === toNo).map(i => i.travel_date); const busy = orders.filter(o => o.status !== 'CANCELLED' && o.to_no !== toNo && o.transport === "GOV'T VEHICLE" && itins.filter(i => i.to_no === o.to_no).some(d => dates.includes(d.travel_date))).map(o => ({ v: o.received, to: o.to_no, drv: o.driver })); const opts = VEHICLES.filter(v => v !== curV).map(v => { const m = busy.find(b => b.v === v); return `<option value="${v}" data-drv="${m?m.drv:''}">${v} ${m ? `(JOIN #${m.to})` : '(AVAIL)'}</option>`; }).join(''); document.getElementById('tSub').innerText = `ID #${toNo}`; document.getElementById('tSelect').innerHTML = opts; document.getElementById('tExec').onclick = async () => { const targetV = document.getElementById('tSelect').value, targetD = document.getElementById('tSelect').options[document.getElementById('tSelect').selectedIndex].dataset.drv; await db.from('travel_orders').update({ received: targetV, driver: targetD || orders.find(o=>o.to_no===toNo).driver }).eq('to_no', toNo); closeModal('transferModal'); sync(); }; openModal('transferModal'); }
+    </script>
+</body>
+</html>
