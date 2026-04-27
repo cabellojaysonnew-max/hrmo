@@ -988,7 +988,7 @@
                     const cat = getLeaveCategory(t.type);
                     if(!cat) return;
                     
-                    const tDate = new Date(t.created_at || t.start_date);
+                    const tDate = new Date(t.start_date || t.created_at);
                     const c = parseFloat(t.credit || 0);
                     const d = parseFloat(t.debit || 0);
                     
@@ -1765,7 +1765,7 @@
             });
             
             // Sort OLDEST TO NEWEST for forwards calculation based on initial balances
-            relevantData.sort((a,b) => new Date(a.created_at || a.start_date) - new Date(b.created_at || b.start_date));
+            relevantData.sort((a,b) => new Date(a.start_date || a.created_at) - new Date(b.start_date || b.created_at));
 
             const dtEnd = new Date(`${endDate}T23:59:59`);
             const dtStart = new Date(`${startDate}T00:00:00`);
@@ -1807,7 +1807,7 @@
                 document.getElementById('lblBegBal').innerText = initialBal.toFixed(3);
                 
                 let rangeData = relevantData.filter(t => {
-                    const tDate = new Date(t.created_at || t.start_date);
+                    const tDate = new Date(t.start_date || t.created_at);
                     return tDate >= dtStart && tDate <= dtEnd;
                 });
                 
@@ -1831,7 +1831,7 @@
 
             // Filter for the chosen date range
             let rangeData = relevantData.filter(t => {
-                const tDate = new Date(t.created_at || t.start_date);
+                const tDate = new Date(t.start_date || t.created_at);
                 return tDate >= dtStart && tDate <= dtEnd;
             });
 
@@ -1841,7 +1841,7 @@
             }
 
             // Reverse the array to display NEWEST to OLDEST on the UI
-            rangeData.sort((a,b) => new Date(b.created_at || b.start_date) - new Date(a.created_at || a.start_date));
+            rangeData.sort((a,b) => new Date(b.start_date || b.created_at) - new Date(a.start_date || a.created_at));
 
             let html = '';
             
@@ -1850,7 +1850,7 @@
                 const cred = parseFloat(t.credit || 0);
                 const deb = parseFloat(t.debit || 0);
                 const displayType = t.type ? t.type.toUpperCase() : '-';
-                const dateStr = new Date(t.created_at || t.start_date).toLocaleDateString('en-US');
+                const dateStr = new Date(t.start_date || t.created_at).toLocaleDateString('en-US');
                 
                 let credColor = cred > 0 ? 'text-green-600' : 'text-gray-400';
                 let debColor = deb > 0 ? 'text-red-600' : 'text-gray-400';
