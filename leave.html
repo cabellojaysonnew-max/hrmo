@@ -1140,7 +1140,7 @@
         
         // Prevent double crediting
         const { data: existing } = await supabaseClient.from('leave_ledger')
-            .select('id').eq('type', 'VL/SL EARNED').eq('start_date', `${monthVal}-01`).limit(1);
+            .select('id').eq('type', 'VL EARNED').eq('start_date', `${monthVal}-01`).limit(1);
         if(existing && existing.length > 0) {
             alert(`Credits for ${monthVal} have already been generated in the ledger!`);
             return;
@@ -1161,13 +1161,22 @@
                 
                 updates.push( supabaseClient.from('employees').update({ vl_balance: newVl, sl_balance: newSl }).eq('emp_id', emp.emp_id) );
                 
-                // Track SL and VL together for simplicity as requested
+                // Splitting ledger insertion to prevent VL/SL EARNED being entirely caught by 'VL' filter
                 ledgers.push({
                     emp_id: emp.emp_id,
-                    type: 'VL/SL EARNED',
-                    credit: 2.50, 
+                    type: 'VL EARNED',
+                    credit: 1.25,
                     transaction_type: 'CREDIT',
-                    remarks: `Monthly Earned Credits (1.25 VL / 1.25 SL) - ${monthVal}`,
+                    remarks: `Monthly Earned Credits (VL) - ${monthVal}`,
+                    start_date: `${monthVal}-01`
+                });
+
+                ledgers.push({
+                    emp_id: emp.emp_id,
+                    type: 'SL EARNED',
+                    credit: 1.25,
+                    transaction_type: 'CREDIT',
+                    remarks: `Monthly Earned Credits (SL) - ${monthVal}`,
                     start_date: `${monthVal}-01`
                 });
             });
