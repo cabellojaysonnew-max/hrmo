@@ -1,702 +1,742 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDS Manager - DAR HRMO</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-config.js"></script>
-    <style>
-        :root {
-            --color-primary: #003811;
-            --color-secondary: #D4AF37;
-        }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
-        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
-        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
-        .form-input:focus { outline: none; border-color: var(--color-primary); ring: 1px solid var(--color-primary); }
-        .form-input:disabled { background-color: #E5E7EB; cursor: not-allowed; }
-        .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.25rem; text-transform: uppercase; }
-        
-        .scroll-list::-webkit-scrollbar { width: 4px; }
-        .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
-        .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
-        .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDS Manager - DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        :root {
+            --color-primary: #003811;
+            --color-secondary: #D4AF37;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
+        .form-input:focus { outline: none; border-color: var(--color-primary); ring: 1px solid var(--color-primary); }
+        .form-input:disabled { background-color: #E5E7EB; cursor: not-allowed; }
+        .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.25rem; text-transform: uppercase; }
+        
+        .scroll-list::-webkit-scrollbar { width: 4px; }
+        .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
+        .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
-        .tab-btn { transition: all 0.2s; }
-        .tab-active { background-color: #FFFFFF; border-top: 4px solid var(--color-secondary); color: var(--color-primary); font-weight: bold; }
-        .tab-inactive { background-color: #F3F4F6; color: #6B7280; font-weight: 600; border-top: 4px solid transparent; }
-        .tab-inactive:hover { background-color: #E5E7EB; }
-    </style>
+        .tab-btn { transition: all 0.2s; }
+        .tab-active { background-color: #FFFFFF; border-top: 4px solid var(--color-secondary); color: var(--color-primary); font-weight: bold; }
+        .tab-inactive { background-color: #F3F4F6; color: #6B7280; font-weight: 600; border-top: 4px solid transparent; }
+        .tab-inactive:hover { background-color: #E5E7EB; }
+    </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
 
-    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 hidden md:block border-b border-[#006400]">
-            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
-            <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
-        </div>
-        <div class="flex-1 overflow-y-auto py-2">
-            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
-            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">PDS MANAGER</a>
-            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
-            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
-            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
-            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
-            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">USERS</a>
-        </div>
-        <div class="p-4 bg-black/20 hidden md:block">
-            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
-            <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
-        </div>
-    </nav>
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+            <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
+            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
+            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">USERS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
+        </div>
+    </nav>
 
-    <main class="flex-1 flex flex-col overflow-hidden bg-gray-100">
-        
-        <div class="flex px-8 pt-8 border-b border-gray-300">
-            <button onclick="switchTab('pds')" id="tab-pds" class="tab-btn tab-active px-6 py-3 rounded-t-lg">Employee PDS</button>
-            <button onclick="switchTab('sched')" id="tab-sched" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Work Schedule Configurator</button>
-        </div>
+    <main class="flex-1 flex flex-col overflow-hidden bg-gray-100">
+        
+        <div class="flex px-8 pt-8 border-b border-gray-300">
+            <button onclick="switchTab('pds')" id="tab-pds" class="tab-btn tab-active px-6 py-3 rounded-t-lg">Employee PDS</button>
+            <button onclick="switchTab('sched')" id="tab-sched" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Work Schedule Configurator</button>
+        </div>
 
-        <div id="module-pds" class="flex-1 flex flex-col md:flex-row gap-6 p-8 overflow-hidden">
-            <div class="w-full md:w-1/3 lg:w-1/4 flex flex-col gap-4">
-                <div class="card p-4 bg-white flex flex-col h-full">
-                    <label class="form-label">Search Employee</label>
-                    <div class="flex gap-2 mb-2">
-                        <input type="text" id="pdsSearch" class="form-input" placeholder="ID or Name..." onkeyup="if(event.key === 'Enter') filterPDS()">
-                        <button onclick="filterPDS()" class="bg-[#003811] text-white px-3 rounded text-xs font-bold hover:bg-[#006400]">GO</button>
-                    </div>
-                    <div class="flex-1 overflow-auto border rounded border-gray-200">
-                        <table class="w-full text-[11px] text-left">
-                            <thead class="bg-gray-50 sticky top-0 border-b"><tr><th class="p-2">Emp ID</th><th class="p-2">Full Name</th></tr></thead>
-                            <tbody id="pdsTableBody" class="divide-y cursor-pointer"></tbody>
-                        </table>
-                    </div>
-                    <button onclick="clearPDSForm()" class="w-full bg-[#2E7D32] text-white mt-4 py-2 rounded text-xs font-bold hover:bg-green-700 transition-colors">+ ADD NEW RECORD</button>
-                </div>
-            </div>
-            
-            <div class="flex-1 card flex flex-col overflow-hidden bg-white relative">
-                <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50 sticky top-0 z-10 shadow-sm">
-                    <h2 id="pdsFormMode" class="font-bold text-[#003811] text-sm uppercase truncate w-1/3">CREATE NEW EMPLOYEE</h2>
-                    
-                    <div class="flex items-center gap-4">
-                        <div class="flex items-center bg-[#FFF9C4] px-3 py-1.5 rounded border border-yellow-300 shadow-sm w-48">
-                            <label class="text-[10px] font-bold text-[#003811] uppercase mr-2 tracking-wide">Status:</label>
-                            <input type="text" id="f_status" list="status_list" class="bg-transparent text-sm font-bold text-[#003811] outline-none cursor-text w-full placeholder-gray-600" placeholder="Select/Type">
-                            <datalist id="status_list">
-                                <option value="Active"></option>
-                                <option value="Renewed"></option>
-                                <option value="Resigned"></option>
-                                <option value="Retired"></option>
-                                <option value="Inactive"></option>
-                            </datalist>
-                        </div>
-                        <button onclick="savePDS()" id="btnSavePDS" class="bg-[#003811] text-white px-8 py-2 rounded text-xs font-bold shadow-sm hover:bg-[#006400] transition-colors">SAVE RECORD</button>
-                    </div>
-                </div>
+        <div id="module-pds" class="flex-1 flex flex-col md:flex-row gap-6 p-8 overflow-hidden">
+            <div class="w-full md:w-1/3 lg:w-1/4 flex flex-col gap-4">
+                <div class="card p-4 bg-white flex flex-col h-full">
+                    <label class="form-label">Search Employee</label>
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="pdsSearch" class="form-input" placeholder="ID or Name..." onkeyup="if(event.key === 'Enter') filterPDS()">
+                        <button onclick="filterPDS()" class="bg-[#003811] text-white px-3 rounded text-xs font-bold hover:bg-[#006400]">GO</button>
+                    </div>
+                    <div class="flex-1 overflow-auto border rounded border-gray-200">
+                        <table class="w-full text-[11px] text-left">
+                            <thead class="bg-gray-50 sticky top-0 border-b"><tr><th class="p-2">Emp ID</th><th class="p-2">Full Name</th></tr></thead>
+                            <tbody id="pdsTableBody" class="divide-y cursor-pointer"></tbody>
+                        </table>
+                    </div>
+                    <button onclick="clearPDSForm()" class="w-full bg-[#2E7D32] text-white mt-4 py-2 rounded text-xs font-bold hover:bg-green-700 transition-colors">+ ADD NEW RECORD</button>
+                </div>
+            </div>
+            
+            <div class="flex-1 card flex flex-col overflow-hidden bg-white relative">
+                <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50 sticky top-0 z-10 shadow-sm">
+                    <h2 id="pdsFormMode" class="font-bold text-[#003811] text-sm uppercase truncate w-1/3">CREATE NEW EMPLOYEE</h2>
+                    
+                    <div class="flex items-center gap-4">
+                        <button onclick="deletePDS()" id="btnDeletePDS" class="hidden bg-red-700 text-white px-6 py-2 rounded text-xs font-bold shadow-sm hover:bg-red-800 transition-colors">DELETE</button>
+                        <div class="flex items-center bg-[#FFF9C4] px-3 py-1.5 rounded border border-yellow-300 shadow-sm w-48">
+                            <label class="text-[10px] font-bold text-[#003811] uppercase mr-2 tracking-wide">Status:</label>
+                            <input type="text" id="f_status" list="status_list" class="bg-transparent text-sm font-bold text-[#003811] outline-none cursor-text w-full placeholder-gray-600" placeholder="Select/Type">
+                            <datalist id="status_list">
+                                <option value="Active"></option>
+                                <option value="Renewed"></option>
+                                <option value="Resigned"></option>
+                                <option value="Retired"></option>
+                                <option value="Inactive"></option>
+                            </datalist>
+                        </div>
+                        <button onclick="savePDS()" id="btnSavePDS" class="bg-[#003811] text-white px-8 py-2 rounded text-xs font-bold shadow-sm hover:bg-[#006400] transition-colors">SAVE RECORD</button>
+                    </div>
+                </div>
 
-                <div id="overrideBanner" class="hidden bg-[#FFF9C4] px-6 py-3 border-b flex justify-between items-center">
-                    <span id="overrideStatusText" class="text-[11px] font-bold text-[#003811]"></span>
-                    <button onclick="clearOverride()" class="bg-red-700 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800">CLEAR OVERRIDE</button>
-                </div>
-                
-                <div class="flex-1 p-6 overflow-y-auto scroll-list">
-                    <form id="pdsForm" class="space-y-6 max-w-5xl mx-auto">
-                        <input type="hidden" id="pds_id">
-                        
-                        <div class="p-5 bg-white border rounded shadow-sm">
-                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">PRIMARY IDENTIFICATION</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div><label class="form-label">Employee ID</label><input type="text" id="f_emp_id" class="form-input"></div>
-                                <div><label class="form-label">Full Name (Display)</label><input type="text" id="f_full_name" class="form-input"></div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div><label class="form-label">Last Name</label><input type="text" id="f_last_name" class="form-input"></div>
-                                <div><label class="form-label">First Name</label><input type="text" id="f_first_name" class="form-input"></div>
-                                <div><label class="form-label">Middle Name</label><input type="text" id="f_middle_name" class="form-input"></div>
-                                <div>
-                                    <label class="form-label">Extension</label>
-                                    <input type="text" id="f_name_extension" list="name_ext_list" class="form-input" placeholder="Select/Type">
-                                    <datalist id="name_ext_list">
-                                        <option value="Jr."></option><option value="Sr."></option><option value="II"></option><option value="III"></option><option value="IV"></option>
-                                    </datalist>
-                                </div>
-                            </div>
-                        </div>
+                <div id="overrideBanner" class="hidden bg-[#FFF9C4] px-6 py-3 border-b flex justify-between items-center">
+                    <span id="overrideStatusText" class="text-[11px] font-bold text-[#003811]"></span>
+                    <button onclick="clearOverride()" class="bg-red-700 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800">CLEAR OVERRIDE</button>
+                </div>
+                
+                <div class="flex-1 p-6 overflow-y-auto scroll-list">
+                    <form id="pdsForm" class="space-y-6 max-w-5xl mx-auto">
+                        <input type="hidden" id="pds_id">
+                        
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">PRIMARY IDENTIFICATION</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div><label class="form-label">Employee ID</label><input type="text" id="f_emp_id" class="form-input"></div>
+                                <div><label class="form-label">Full Name (Display)</label><input type="text" id="f_full_name" class="form-input"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div><label class="form-label">Last Name</label><input type="text" id="f_last_name" class="form-input"></div>
+                                <div><label class="form-label">First Name</label><input type="text" id="f_first_name" class="form-input"></div>
+                                <div><label class="form-label">Middle Name</label><input type="text" id="f_middle_name" class="form-input"></div>
+                                <div>
+                                    <label class="form-label">Extension</label>
+                                    <input type="text" id="f_name_extension" list="name_ext_list" class="form-input" placeholder="Select/Type">
+                                    <datalist id="name_ext_list">
+                                        <option value="Jr."></option><option value="Sr."></option><option value="II"></option><option value="III"></option><option value="IV"></option>
+                                    </datalist>
+                                </div>
+                            </div>
+                        </div>
 
-                        <div class="p-5 bg-white border rounded shadow-sm">
-                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">DEMOGRAPHICS</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                <div><label class="form-label">Date of Birth</label><input type="date" id="f_date_of_birth" class="form-input"></div>
-                                <div class="col-span-2"><label class="form-label">Place of Birth</label><input type="text" id="f_place_of_birth" class="form-input"></div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                <div>
-                                    <label class="form-label">Sex</label>
-                                    <input type="text" id="f_sex" list="sex_list" class="form-input" placeholder="Select/Type">
-                                    <datalist id="sex_list">
-                                        <option value="Male"></option><option value="Female"></option><option value="Other"></option><option value="Prefer not to say"></option>
-                                    </datalist>
-                                </div>
-                                <div>
-                                    <label class="form-label">Civil Status</label>
-                                    <input type="text" id="f_civil_status" list="civil_status_list" class="form-input" placeholder="Select/Type">
-                                    <datalist id="civil_status_list">
-                                        <option value="Single"></option><option value="Married"></option><option value="Widowed"></option><option value="Separated"></option>
-                                    </datalist>
-                                </div>
-                                <div>
-                                    <label class="form-label">Citizenship</label>
-                                    <input type="text" id="f_citizenship" list="citizenship_list" class="form-input" placeholder="Select/Type">
-                                    <datalist id="citizenship_list">
-                                        <option value="Filipino"></option><option value="Dual Citizenship"></option>
-                                    </datalist>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div><label class="form-label">Height (m)</label><input type="text" id="f_height" class="form-input"></div>
-                                <div><label class="form-label">Weight (kg)</label><input type="text" id="f_weight" class="form-input"></div>
-                                <div>
-                                    <label class="form-label">Blood Type</label>
-                                    <input type="text" id="f_blood_type" list="blood_type_list" class="form-input" placeholder="Select/Type">
-                                    <datalist id="blood_type_list">
-                                        <option value="A+"></option><option value="A-"></option><option value="B+"></option><option value="B-"></option><option value="AB+"></option><option value="AB-"></option><option value="O+"></option><option value="O-"></option><option value="Unknown"></option>
-                                    </datalist>
-                                </div>
-                            </div>
-                        </div>
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">DEMOGRAPHICS</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div><label class="form-label">Date of Birth</label><input type="date" id="f_date_of_birth" class="form-input"></div>
+                                <div class="col-span-2"><label class="form-label">Place of Birth</label><input type="text" id="f_place_of_birth" class="form-input"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div>
+                                    <label class="form-label">Sex</label>
+                                    <input type="text" id="f_sex" list="sex_list" class="form-input" placeholder="Select/Type">
+                                    <datalist id="sex_list">
+                                        <option value="Male"></option><option value="Female"></option><option value="Other"></option><option value="Prefer not to say"></option>
+                                    </datalist>
+                                </div>
+                                <div>
+                                    <label class="form-label">Civil Status</label>
+                                    <input type="text" id="f_civil_status" list="civil_status_list" class="form-input" placeholder="Select/Type">
+                                    <datalist id="civil_status_list">
+                                        <option value="Single"></option><option value="Married"></option><option value="Widowed"></option><option value="Separated"></option>
+                                    </datalist>
+                                </div>
+                                <div>
+                                    <label class="form-label">Citizenship</label>
+                                    <input type="text" id="f_citizenship" list="citizenship_list" class="form-input" placeholder="Select/Type">
+                                    <datalist id="citizenship_list">
+                                        <option value="Filipino"></option><option value="Dual Citizenship"></option>
+                                    </datalist>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div><label class="form-label">Height (m)</label><input type="text" id="f_height" class="form-input"></div>
+                                <div><label class="form-label">Weight (kg)</label><input type="text" id="f_weight" class="form-input"></div>
+                                <div>
+                                    <label class="form-label">Blood Type</label>
+                                    <input type="text" id="f_blood_type" list="blood_type_list" class="form-input" placeholder="Select/Type">
+                                    <datalist id="blood_type_list">
+                                        <option value="A+"></option><option value="A-"></option><option value="B+"></option><option value="B-"></option><option value="AB+"></option><option value="AB-"></option><option value="O+"></option><option value="O-"></option><option value="Unknown"></option>
+                                    </datalist>
+                                </div>
+                            </div>
+                        </div>
 
-                        <div class="p-5 bg-white border rounded shadow-sm">
-                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">GOVERNMENT IDENTIFICATION</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                <div><label class="form-label">GSIS No.</label><input type="text" id="f_gsis_id_no" class="form-input"></div>
-                                <div><label class="form-label">Pag-IBIG No.</label><input type="text" id="f_pag_ibig_id_no" class="form-input"></div>
-                                <div><label class="form-label">PhilHealth No.</label><input type="text" id="f_philhealth_no" class="form-input"></div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div><label class="form-label">SSS No.</label><input type="text" id="f_sss_no" class="form-input"></div>
-                                <div><label class="form-label">TIN No.</label><input type="text" id="f_tin_no" class="form-input"></div>
-                                <div><label class="form-label">Agency Emp No.</label><input type="text" id="f_agency_employee_no" class="form-input"></div>
-                            </div>
-                        </div>
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">GOVERNMENT IDENTIFICATION</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div><label class="form-label">GSIS No.</label><input type="text" id="f_gsis_id_no" class="form-input"></div>
+                                <div><label class="form-label">Pag-IBIG No.</label><input type="text" id="f_pag_ibig_id_no" class="form-input"></div>
+                                <div><label class="form-label">PhilHealth No.</label><input type="text" id="f_philhealth_no" class="form-input"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div><label class="form-label">SSS No.</label><input type="text" id="f_sss_no" class="form-input"></div>
+                                <div><label class="form-label">TIN No.</label><input type="text" id="f_tin_no" class="form-input"></div>
+                                <div><label class="form-label">Agency Emp No.</label><input type="text" id="f_agency_employee_no" class="form-input"></div>
+                            </div>
+                        </div>
 
-                        <div class="p-5 bg-white border rounded shadow-sm">
-                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">CONTACT & EMERGENCY</h3>
-                            <div class="grid grid-cols-1 gap-4 mb-4">
-                                <div><label class="form-label">Residential Address</label><input type="text" id="f_residential_address" class="form-input"></div>
-                                <div><label class="form-label">Permanent Address</label><input type="text" id="f_permanent_address" class="form-input"></div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                <div><label class="form-label">Mobile Number</label><input type="text" id="f_mobile_number" class="form-input"></div>
-                                <div><label class="form-label">Email Address</label><input type="email" id="f_email_address" class="form-input"></div>
-                            </div>
-                            
-                            <div class="p-4 bg-red-50 border border-red-100 rounded">
-                                <h4 class="text-[10px] font-bold text-red-800 mb-3 tracking-wider">IN CASE OF EMERGENCY</h4>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div><label class="form-label">Contact Name</label><input type="text" id="f_emergency_contact_name" class="form-input border-red-200"></div>
-                                    <div><label class="form-label">Relationship</label><input type="text" id="f_emergency_contact_relation" class="form-input border-red-200"></div>
-                                    <div><label class="form-label">Contact Number</label><input type="text" id="f_emergency_contact_number" class="form-input border-red-200"></div>
-                                </div>
-                            </div>
-                        </div>
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">CONTACT & EMERGENCY</h3>
+                            <div class="grid grid-cols-1 gap-4 mb-4">
+                                <div><label class="form-label">Residential Address</label><input type="text" id="f_residential_address" class="form-input"></div>
+                                <div><label class="form-label">Permanent Address</label><input type="text" id="f_permanent_address" class="form-input"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div><label class="form-label">Mobile Number</label><input type="text" id="f_mobile_number" class="form-input"></div>
+                                <div><label class="form-label">Email Address</label><input type="email" id="f_email_address" class="form-input"></div>
+                            </div>
+                            
+                            <div class="p-4 bg-red-50 border border-red-100 rounded">
+                                <h4 class="text-[10px] font-bold text-red-800 mb-3 tracking-wider">IN CASE OF EMERGENCY</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div><label class="form-label">Contact Name</label><input type="text" id="f_emergency_contact_name" class="form-input border-red-200"></div>
+                                    <div><label class="form-label">Relationship</label><input type="text" id="f_emergency_contact_relation" class="form-input border-red-200"></div>
+                                    <div><label class="form-label">Contact Number</label><input type="text" id="f_emergency_contact_number" class="form-input border-red-200"></div>
+                                </div>
+                            </div>
+                        </div>
 
-                        <div class="p-5 bg-white border rounded shadow-sm">
-                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">EMPLOYMENT DETAILS</h3>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                <div>
-                                    <label class="form-label">Employment Type</label>
-                                    <input type="text" id="f_employment_type" list="employment_type_list" class="form-input" placeholder="Select/Type">
-                                    <datalist id="employment_type_list">
-                                        <option value="Permanent"></option>
-                                        <option value="Contract of Service (COS)"></option>
-                                        <option value="Job Order (JO)"></option>
-                                        <option value="Casual"></option>
-                                    </datalist>
-                                </div>
-                                <div><label class="form-label">Date Hired</label><input type="date" id="f_date_hired" class="form-input"></div>
-                                <div><label class="form-label">Date Separated</label><input type="date" id="f_date_separated" class="form-input"></div>
-                            </div>
+                        <div class="p-5 bg-white border rounded shadow-sm">
+                            <h3 class="text-xs font-bold text-[#D4AF37] mb-4 border-b pb-2">EMPLOYMENT DETAILS</h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div>
+                                    <label class="form-label">Employment Type</label>
+                                    <input type="text" id="f_employment_type" list="employment_type_list" class="form-input" placeholder="Select/Type">
+                                    <datalist id="employment_type_list">
+                                        <option value="Permanent"></option>
+                                        <option value="Contract of Service (COS)"></option>
+                                        <option value="Job Order (JO)"></option>
+                                        <option value="Casual"></option>
+                                    </datalist>
+                                </div>
+                                <div><label class="form-label">Date Hired</label><input type="date" id="f_date_hired" class="form-input"></div>
+                                <div><label class="form-label">Date Separated</label><input type="date" id="f_date_separated" class="form-input"></div>
+                            </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                <div><label class="form-label">Position</label><input type="text" id="f_position" class="form-input"></div>
-                                <div><label class="form-label">Salary Grade</label><input type="text" id="f_salary" class="form-input"></div>
-                                <div>
-                                    <label class="form-label">Station</label>
-                                    <input type="text" id="f_station" list="station_list" class="form-input" placeholder="Select/Type">
-                                    <datalist id="station_list">
-                                        <option value="Provincial Office"></option>
-                                        <option value="DARPO-CS1"></option>
-                                    </datalist>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                <div>
-                                    <label class="form-label">Division</label>
-                                    <input type="text" id="f_division" list="division_list" class="form-input" placeholder="Select/Type">
-                                    <datalist id="division_list">
-                                        <option value="OFFICE OF THE PARPO"></option>
-                                        <option value="PARAD"></option><option value="LTSP"></option>
-                                        <option value="AJDP"></option><option value="PBDD"></option>
-                                        <option value="STOD"></option><option value="SPLIT"></option>
-                                        <option value="DARMO"></option>
-                                    </datalist>
-                                </div>
-                                <div><label class="form-label">Unit</label><input type="text" id="f_unit" class="form-input"></div>
-                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div><label class="form-label">Position</label><input type="text" id="f_position" class="form-input"></div>
+                                <div><label class="form-label">Salary Grade</label><input type="text" id="f_salary" class="form-input"></div>
+                                <div>
+                                    <label class="form-label">Station</label>
+                                    <input type="text" id="f_station" list="station_list" class="form-input" placeholder="Select/Type">
+                                    <datalist id="station_list">
+                                        <option value="Provincial Office"></option>
+                                        <option value="DARPO-CS1"></option>
+                                    </datalist>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <label class="form-label">Division</label>
+                                    <input type="text" id="f_division" list="division_list" class="form-input" placeholder="Select/Type">
+                                    <datalist id="division_list">
+                                        <option value="OFFICE OF THE PARPO"></option>
+                                        <option value="PARAD"></option><option value="LTSP"></option>
+                                        <option value="AJDP"></option><option value="PBDD"></option>
+                                        <option value="STOD"></option><option value="SPLIT"></option>
+                                        <option value="DARMO"></option>
+                                    </datalist>
+                                </div>
+                                <div><label class="form-label">Unit</label><input type="text" id="f_unit" class="form-input"></div>
+                            </div>
 
-                            <div class="p-4 bg-gray-50 border rounded grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div>
-                                    <label class="form-label">Sched Type</label>
-                                    <input type="text" id="f_schedule_type" list="schedule_type_list" class="form-input" placeholder="Select/Type">
-                                    <datalist id="schedule_type_list">
-                                        <option value="Flexi"></option><option value="Fixed"></option>
-                                    </datalist>
-                                </div>
-                                <div><label class="form-label">Time 1 (In/Earliest)</label><input type="time" id="f_flexi_range_start" class="form-input"></div>
-                                <div><label class="form-label">Time 2 (Out/Latest)</label><input type="time" id="f_flexi_range_end" class="form-input"></div>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+                            <div class="p-4 bg-gray-50 border rounded grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="form-label">Sched Type</label>
+                                    <input type="text" id="f_schedule_type" list="schedule_type_list" class="form-input" placeholder="Select/Type">
+                                    <datalist id="schedule_type_list">
+                                        <option value="Flexi"></option><option value="Fixed"></option>
+                                    </datalist>
+                                </div>
+                                <div><label class="form-label">Time 1 (In/Earliest)</label><input type="time" id="f_flexi_range_start" class="form-input"></div>
+                                <div><label class="form-label">Time 2 (Out/Latest)</label><input type="time" id="f_flexi_range_end" class="form-input"></div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
 
-        <div id="module-sched" class="hidden flex-1 p-8 overflow-y-auto">
-            <div class="card p-8 max-w-3xl mx-auto border-t-4 border-[#003811]">
-                <h3 class="text-2xl font-bold text-[#003811] mb-2">Work Schedule Configuration</h3>
-                <p class="text-sm text-gray-500 mb-8 italic pb-4 border-b">Set Expected Time-In / Time-Out for DTR Late/Undertime Computation (OP MO 114 Support)</p>
-                
-                <div class="bg-[#FFF9C4] p-4 rounded mb-8 border border-yellow-200">
-                    <p id="sched_current_setup" class="text-sm font-bold text-[#003811]">Status: Select an employee to view current active setup.</p>
-                </div>
+        <div id="module-sched" class="hidden flex-1 p-8 overflow-y-auto">
+            <div class="card p-8 max-w-3xl mx-auto border-t-4 border-[#003811]">
+                <h3 class="text-2xl font-bold text-[#003811] mb-2">Work Schedule Configuration</h3>
+                <p class="text-sm text-gray-500 mb-8 italic pb-4 border-b">Set Expected Time-In / Time-Out for DTR Late/Undertime Computation (OP MO 114 Support)</p>
+                
+                <div class="bg-[#FFF9C4] p-4 rounded mb-8 border border-yellow-200">
+                    <p id="sched_current_setup" class="text-sm font-bold text-[#003811]">Status: Select an employee to view current active setup.</p>
+                </div>
 
-                <div class="space-y-6">
-                    <div>
-                        <label class="form-label">TARGET EMPLOYEE(S)</label>
-                        <select id="s_target" class="form-input text-lg py-3" onchange="checkActiveSetup()">
-                            <option value="ALL">All Employees (Global Override)</option>
-                        </select>
-                    </div>
+                <div class="space-y-6">
+                    <div>
+                        <label class="form-label">TARGET EMPLOYEE(S)</label>
+                        <select id="s_target" class="form-input text-lg py-3" onchange="checkActiveSetup()">
+                            <option value="ALL">All Employees (Global Override)</option>
+                        </select>
+                    </div>
 
-                    <div class="grid grid-cols-2 gap-6">
-                        <div><label class="form-label">Start Date</label><input type="date" id="s_start_date" class="form-input"></div>
-                        <div><label class="form-label">End Date</label><input type="date" id="s_end_date" class="form-input"></div>
-                    </div>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div><label class="form-label">Start Date</label><input type="date" id="s_start_date" class="form-input"></div>
+                        <div><label class="form-label">End Date</label><input type="date" id="s_end_date" class="form-input"></div>
+                    </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 bg-gray-50 border rounded mt-4">
-                        <div>
-                            <label class="form-label">Sched Setup</label>
-                            <select id="s_schedule_type" class="form-input" onchange="toggleHalfDay()">
-                                <option value="Flexi">Flexi</option>
-                                <option value="Fixed">Fixed</option>
-                                <option value="Half-Day (AM)">Half-Day (AM Only)</option>
-                                <option value="Half-Day (PM)">Half-Day (PM Only)</option>
-                                <option value="Suspension">Suspension (No Work)</option>
-                            </select>
-                        </div>
-                        <div><label class="form-label">Time 1 (In/Earliest)</label><input type="time" id="s_start_time" class="form-input"></div>
-                        <div><label class="form-label">Time 2 (Out/Latest)</label><input type="time" id="s_end_time" class="form-input"></div>
-                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 bg-gray-50 border rounded mt-4">
+                        <div>
+                            <label class="form-label">Sched Setup</label>
+                            <select id="s_schedule_type" class="form-input" onchange="toggleHalfDay()">
+                                <option value="Flexi">Flexi</option>
+                                <option value="Fixed">Fixed</option>
+                                <option value="Half-Day (AM)">Half-Day (AM Only)</option>
+                                <option value="Half-Day (PM)">Half-Day (PM Only)</option>
+                                <option value="Suspension">Suspension (No Work)</option>
+                            </select>
+                        </div>
+                        <div><label class="form-label">Time 1 (In/Earliest)</label><input type="time" id="s_start_time" class="form-input"></div>
+                        <div><label class="form-label">Time 2 (Out/Latest)</label><input type="time" id="s_end_time" class="form-input"></div>
+                    </div>
 
-                    <div class="p-4 bg-gray-50 border rounded mt-4" id="divWorkDays">
-                        <label class="form-label mb-2">Active Working Days (OP MO 114 Compressed Week)</label>
-                        <div class="flex flex-wrap gap-4">
-                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="1" checked class="w-4 h-4 accent-[#003811]"> Mon</label>
-                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="2" checked class="w-4 h-4 accent-[#003811]"> Tue</label>
-                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="3" checked class="w-4 h-4 accent-[#003811]"> Wed</label>
-                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="4" checked class="w-4 h-4 accent-[#003811]"> Thu</label>
-                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="5" checked class="w-4 h-4 accent-[#003811]"> Fri</label>
-                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="6" class="w-4 h-4 accent-[#003811]"> Sat</label>
-                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="0" class="w-4 h-4 accent-[#003811]"> Sun</label>
-                        </div>
-                    </div>
+                    <div class="p-4 bg-gray-50 border rounded mt-4" id="divWorkDays">
+                        <label class="form-label mb-2">Active Working Days (OP MO 114 Compressed Week)</label>
+                        <div class="flex flex-wrap gap-4">
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="1" checked class="w-4 h-4 accent-[#003811]"> Mon</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="2" checked class="w-4 h-4 accent-[#003811]"> Tue</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="3" checked class="w-4 h-4 accent-[#003811]"> Wed</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="4" checked class="w-4 h-4 accent-[#003811]"> Thu</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="5" checked class="w-4 h-4 accent-[#003811]"> Fri</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="6" class="w-4 h-4 accent-[#003811]"> Sat</label>
+                            <label class="flex items-center gap-1 text-sm font-bold text-gray-700"><input type="checkbox" name="s_work_days" value="0" class="w-4 h-4 accent-[#003811]"> Sun</label>
+                        </div>
+                    </div>
 
-                    <div class="flex items-center gap-4 mt-8 pt-4 border-t">
-                        <button onclick="applySchedule()" id="btnApplySched" class="bg-[#003811] text-white px-8 py-3 rounded font-bold shadow hover:bg-[#006400] transition-colors">UPDATE SCHEDULE</button>
-                        <p id="sched_status_lbl" class="text-sm font-bold text-[#2E7D32]"></p>
-                    </div>
-                </div>
-            </div>
-        </div>
+                    <div class="flex items-center gap-4 mt-8 pt-4 border-t">
+                        <button onclick="applySchedule()" id="btnApplySched" class="bg-[#003811] text-white px-8 py-3 rounded font-bold shadow hover:bg-[#006400] transition-colors">UPDATE SCHEDULE</button>
+                        <p id="sched_status_lbl" class="text-sm font-bold text-[#2E7D32]"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    </main>
+    </main>
 
 <script>
-    // --- SESSION & RBAC AUTH ---
-    const userData = sessionStorage.getItem('currentUser');
-    if (!userData) { window.location.href = 'index.html'; }
-    const currentUser = JSON.parse(userData);
-    
-    // Only allow HRMO/ADMIN to access PDS
-    const role = currentUser.role.toUpperCase();
-    if (!role.includes('HR') && !role.includes('ADMIN')) {
-        alert("Unauthorized Access. HRMO personnel only.");
-        window.location.href = 'dashboard.html';
-    }
+    // --- SESSION & RBAC AUTH ---
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) { window.location.href = 'index.html'; }
+    const currentUser = JSON.parse(userData);
+    
+    // Only allow HRMO/ADMIN to access PDS
+    const role = currentUser.role.toUpperCase();
+    if (!role.includes('HR') && !role.includes('ADMIN')) {
+        alert("Unauthorized Access. HRMO personnel only.");
+        window.location.href = 'dashboard.html';
+    }
 
-    document.getElementById('activeUser').innerText = currentUser.full_name;
-    document.getElementById('userRoleBadge').innerText = currentUser.role;
+    document.getElementById('activeUser').innerText = currentUser.full_name;
+    document.getElementById('userRoleBadge').innerText = currentUser.role;
 
-    function logout() {
-        sessionStorage.removeItem('currentUser');
-        window.location.href = 'index.html';
-    }
+    function logout() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    }
 
-    // --- TAB LOGIC ---
-    function switchTab(tab) {
-        document.getElementById('module-pds').classList.add('hidden');
-        document.getElementById('module-sched').classList.add('hidden');
-        
-        document.getElementById('tab-pds').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg';
-        document.getElementById('tab-sched').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
+    // --- TAB LOGIC ---
+    function switchTab(tab) {
+        document.getElementById('module-pds').classList.add('hidden');
+        document.getElementById('module-sched').classList.add('hidden');
+        
+        document.getElementById('tab-pds').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg';
+        document.getElementById('tab-sched').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
 
-        if (tab === 'pds') {
-            document.getElementById('module-pds').classList.remove('hidden');
-            document.getElementById('module-pds').classList.add('flex');
-            document.getElementById('tab-pds').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg';
-        } else {
-            document.getElementById('module-sched').classList.remove('hidden');
-            document.getElementById('tab-sched').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
-        }
-    }
+        if (tab === 'pds') {
+            document.getElementById('module-pds').classList.remove('hidden');
+            document.getElementById('module-pds').classList.add('flex');
+            document.getElementById('tab-pds').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg';
+        } else {
+            document.getElementById('module-sched').classList.remove('hidden');
+            document.getElementById('tab-sched').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
+        }
+    }
 
-    // --- SHARED DATA ---
-    let allEmployees = [];
-    const fields = [
-        "id", "emp_id", "full_name", "position", "station", "division", "pass", "unit", 
-        "salary", "role", "spl_balance", "vl_balance", "sl_balance", "wl_balance", 
-        "cto_balance", "flexi_range_start", "flexi_range_end", "last_name", "first_name", 
-        "middle_name", "name_extension", "date_of_birth", "place_of_birth", "sex", 
-        "civil_status", "citizenship", "height", "weight", "blood_type", "gsis_id_no", 
-        "pag_ibig_id_no", "philhealth_no", "sss_no", "tin_no", "agency_employee_no", 
-        "residential_address", "permanent_address", "mobile_number", "email_address", 
-        "mobile_device_id", "laptop_device_id", "mobile_device", "schedule_type", "type", 
-        "status", "date_hired", "date_separated", "employment_type", "emergency_contact_name", 
-        "emergency_contact_relation", "emergency_contact_number"
-    ];
+    // --- SHARED DATA ---
+    let allEmployees = [];
+    const fields = [
+        "id", "emp_id", "full_name", "position", "station", "division", "pass", "unit", 
+        "salary", "role", "spl_balance", "vl_balance", "sl_balance", "wl_balance", 
+        "cto_balance", "flexi_range_start", "flexi_range_end", "last_name", "first_name", 
+        "middle_name", "name_extension", "date_of_birth", "place_of_birth", "sex", 
+        "civil_status", "citizenship", "height", "weight", "blood_type", "gsis_id_no", 
+        "pag_ibig_id_no", "philhealth_no", "sss_no", "tin_no", "agency_employee_no", 
+        "residential_address", "permanent_address", "mobile_number", "email_address", 
+        "mobile_device_id", "laptop_device_id", "mobile_device", "schedule_type", "type", 
+        "status", "date_hired", "date_separated", "employment_type", "emergency_contact_name", 
+        "emergency_contact_relation", "emergency_contact_number"
+    ];
 
-    window.onload = async () => {
-        await fetchEmployees();
-        
-        // Setup Date Pickers Defaults
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('s_start_date').value = today;
-        document.getElementById('s_end_date').value = today;
-    };
+    window.onload = async () => {
+        await fetchEmployees();
+        
+        // Setup Date Pickers Defaults
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('s_start_date').value = today;
+        document.getElementById('s_end_date').value = today;
+    };
 
-    async function fetchEmployees() {
-        try {
-            const { data, error } = await supabaseClient.from('employees').select('*').order('full_name');
-            if (error) throw error;
-            allEmployees = data || [];
-            
-            // Populate PDS List
-            filterPDS();
-            
-            // Populate Sched List
-            const sTarget = document.getElementById('s_target');
-            sTarget.innerHTML = '<option value="ALL">All Employees (Global Override)</option>';
-            allEmployees.forEach(e => {
-                sTarget.innerHTML += `<option value="${e.emp_id}">${e.emp_id} - ${e.full_name}</option>`;
-            });
+    async function fetchEmployees() {
+        try {
+            const { data, error } = await supabaseClient.from('employees').select('*').order('full_name');
+            if (error) throw error;
+            allEmployees = data || [];
+            
+            // Populate PDS List
+            filterPDS();
+            
+            // Populate Sched List
+            const sTarget = document.getElementById('s_target');
+            sTarget.innerHTML = '<option value="ALL">All Employees (Global Override)</option>';
+            allEmployees.forEach(e => {
+                sTarget.innerHTML += `<option value="${e.emp_id}">${e.emp_id} - ${e.full_name}</option>`;
+            });
 
-            // Populate DARMO stations dynamically based on existing entries
-            const stationSet = new Set(allEmployees.map(e => String(e.station).trim()).filter(s => s.toUpperCase().includes('DARMO')));
-            const stationList = document.getElementById('station_list');
-            stationSet.forEach(s => {
-                if(!Array.from(stationList.options).some(opt => opt.value === s)) {
-                    stationList.innerHTML += `<option value="${s}"></option>`;
-                }
-            });
+            // Populate DARMO stations dynamically based on existing entries
+            const stationSet = new Set(allEmployees.map(e => String(e.station).trim()).filter(s => s.toUpperCase().includes('DARMO')));
+            const stationList = document.getElementById('station_list');
+            stationSet.forEach(s => {
+                if(!Array.from(stationList.options).some(opt => opt.value === s)) {
+                    stationList.innerHTML += `<option value="${s}"></option>`;
+                }
+            });
 
-        } catch (e) {
-            console.error(e);
-            alert("Failed to fetch employees.");
-        }
-    }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to fetch employees.");
+        }
+    }
 
-    // ==========================================
-    // PDS MANAGER LOGIC
-    // ==========================================
-    let currentEmpId = null;
+    // ==========================================
+    // PDS MANAGER LOGIC
+    // ==========================================
+    let currentEmpId = null;
 
-    function filterPDS() {
-        const query = document.getElementById('pdsSearch').value.toLowerCase().trim();
-        const tbody = document.getElementById('pdsTableBody');
-        tbody.innerHTML = '';
-        
-        allEmployees.forEach(e => {
-            const id = String(e.emp_id).toLowerCase();
-            const name = String(e.full_name).toLowerCase();
-            if (id.includes(query) || name.includes(query)) {
-                // Color Code for Status indicator
-                const statusColor = (!e.status || e.status === 'Active' || e.status === 'Renewed') ? 'bg-green-500' : 'bg-red-500';
-                
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-green-50 transition-colors";
-                tr.onclick = () => loadFullRecord(e.emp_id);
-                tr.innerHTML = `
-                    <td class="p-2 border-b text-gray-500 font-mono">${e.emp_id}</td>
-                    <td class="p-2 border-b font-bold text-[#003811] flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full ${statusColor}" title="${e.status || 'Active'}"></span>
-                        ${e.full_name}
-                    </td>`;
-                tbody.appendChild(tr);
-            }
-        });
-    }
+    function filterPDS() {
+        const query = document.getElementById('pdsSearch').value.toLowerCase().trim();
+        const tbody = document.getElementById('pdsTableBody');
+        tbody.innerHTML = '';
+        
+        allEmployees.forEach(e => {
+            const id = String(e.emp_id).toLowerCase();
+            const name = String(e.full_name).toLowerCase();
+            if (id.includes(query) || name.includes(query)) {
+                // Color Code for Status indicator
+                let statusColor = 'bg-gray-500'; // Default
+                const eStatus = String(e.status || '').toUpperCase();
+                const eType = String(e.type || '').toUpperCase();
+                const empType = String(e.employment_type || '').toUpperCase();
 
-    async function loadFullRecord(eid) {
-        const emp = allEmployees.find(e => e.emp_id === eid);
-        if (!emp) return;
+                if (eStatus === 'INACTIVE' || eType === 'INACTIVE' || empType === 'INACTIVE') {
+                    statusColor = 'bg-red-500';
+                } else if (eType === 'PROJECT SPLIT' || empType === 'PROJECT SPLIT') {
+                    statusColor = 'bg-orange-500';
+                } else if (eType.includes('COS') || empType.includes('COS')) {
+                    statusColor = 'bg-yellow-500';
+                } else if (eType === 'REGULAR' || empType === 'PERMANENT' || empType === 'REGULAR') {
+                    statusColor = 'bg-green-500';
+                } else {
+                    statusColor = 'bg-green-500'; // Fallback
+                }
+                
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-green-50 transition-colors";
+                tr.onclick = () => loadFullRecord(e.emp_id);
+                tr.innerHTML = `
+                    <td class="p-2 border-b text-gray-500 font-mono">${e.emp_id}</td>
+                    <td class="p-2 border-b font-bold text-[#003811] flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full ${statusColor}" title="Employment Type Status"></span>
+                        ${e.full_name}
+                    </td>`;
+                tbody.appendChild(tr);
+            }
+        });
+    }
 
-        currentEmpId = eid;
-        document.getElementById('pdsFormMode').innerText = `UPDATE RECORD: ${emp.full_name}`;
-        
-        fields.forEach(f => {
-            const el = document.getElementById(`f_${f}`);
-            if(el) {
-                if(f.includes('time') || f.includes('range')) {
-                    // Extract HH:MM
-                    el.value = emp[f] ? emp[f].substring(0, 5) : '';
-                } else {
-                    el.value = emp[f] || '';
-                }
-            }
-        });
-        
-        // Ensure default status if null
-        if (!emp.status) document.getElementById('f_status').value = 'Active';
-        if (!emp.employment_type) document.getElementById('f_employment_type').value = 'Permanent';
+    async function loadFullRecord(eid) {
+        const emp = allEmployees.find(e => e.emp_id === eid);
+        if (!emp) return;
 
-        document.getElementById('pds_id').value = eid;
+        currentEmpId = eid;
+        document.getElementById('pdsFormMode').innerText = `UPDATE RECORD: ${emp.full_name}`;
+        document.getElementById('btnDeletePDS').classList.remove('hidden');
+        
+        fields.forEach(f => {
+            const el = document.getElementById(`f_${f}`);
+            if(el) {
+                if(f.includes('time') || f.includes('range')) {
+                    // Extract HH:MM
+                    el.value = emp[f] ? emp[f].substring(0, 5) : '';
+                } else {
+                    el.value = emp[f] || '';
+                }
+            }
+        });
+        
+        // Ensure default status if null
+        if (!emp.status) document.getElementById('f_status').value = 'Active';
+        if (!emp.employment_type) document.getElementById('f_employment_type').value = 'Permanent';
 
-        // Check active overrides
-        const today = new Date().toISOString().split('T')[0];
-        const { data: ovr } = await supabaseClient.from('schedule_overrides').select('*').eq('emp_id', eid).lte('start_date', today).gte('end_date', today).order('id', {ascending: false}).limit(1);
-        
-        const banner = document.getElementById('overrideBanner');
-        const statusText = document.getElementById('overrideStatusText');
-        
-        if (ovr && ovr.length > 0) {
-            banner.classList.remove('hidden');
-            banner.classList.add('flex');
-            const o = ovr[0];
-            const tIn = o.start_time ? o.start_time.substring(0,5) : '';
-            const tOut = o.end_time ? o.end_time.substring(0,5) : '';
-            const wDays = o.working_days ? `[Days: ${o.working_days}] ` : '';
-            statusText.innerText = `⚠️ ACTIVE OVERRIDE: ${o.schedule_type} (${tIn} - ${tOut}) ${wDays}until ${o.end_date}`;
-        } else {
-            banner.classList.add('hidden');
-            banner.classList.remove('flex');
-        }
-    }
+        document.getElementById('pds_id').value = eid;
 
-    function clearPDSForm() {
-        currentEmpId = null;
-        document.getElementById('pdsFormMode').innerText = "CREATE NEW EMPLOYEE";
-        document.getElementById('pdsForm').reset();
-        document.getElementById('pds_id').value = '';
-        document.getElementById('f_schedule_type').value = 'Flexi';
-        document.getElementById('f_status').value = 'Active';
-        document.getElementById('f_employment_type').value = 'Permanent';
-        document.getElementById('overrideBanner').classList.add('hidden');
-        document.getElementById('overrideBanner').classList.remove('flex');
-    }
+        // Check active overrides
+        const today = new Date().toISOString().split('T')[0];
+        const { data: ovr } = await supabaseClient.from('schedule_overrides').select('*').eq('emp_id', eid).lte('start_date', today).gte('end_date', today).order('id', {ascending: false}).limit(1);
+        
+        const banner = document.getElementById('overrideBanner');
+        const statusText = document.getElementById('overrideStatusText');
+        
+        if (ovr && ovr.length > 0) {
+            banner.classList.remove('hidden');
+            banner.classList.add('flex');
+            const o = ovr[0];
+            const tIn = o.start_time ? o.start_time.substring(0,5) : '';
+            const tOut = o.end_time ? o.end_time.substring(0,5) : '';
+            const wDays = o.working_days ? `[Days: ${o.working_days}] ` : '';
+            statusText.innerText = `⚠️ ACTIVE OVERRIDE: ${o.schedule_type} (${tIn} - ${tOut}) ${wDays}until ${o.end_date}`;
+        } else {
+            banner.classList.add('hidden');
+            banner.classList.remove('flex');
+        }
+    }
 
-    async function savePDS() {
-        const btn = document.getElementById('btnSavePDS');
-        btn.innerText = "SAVING..."; btn.disabled = true;
+    function clearPDSForm() {
+        currentEmpId = null;
+        document.getElementById('pdsFormMode').innerText = "CREATE NEW EMPLOYEE";
+        document.getElementById('btnDeletePDS').classList.add('hidden');
+        document.getElementById('pdsForm').reset();
+        document.getElementById('pds_id').value = '';
+        document.getElementById('f_schedule_type').value = 'Flexi';
+        document.getElementById('f_status').value = 'Active';
+        document.getElementById('f_employment_type').value = 'Permanent';
+        document.getElementById('overrideBanner').classList.add('hidden');
+        document.getElementById('overrideBanner').classList.remove('flex');
+    }
 
-        let payload = {};
-        fields.forEach(f => {
-            const el = document.getElementById(`f_${f}`);
-            if(el) {
-                let val = el.value.trim();
-                
-                // Convert empty date fields to null to prevent postgres errors
-                if((f.includes('date') || f.includes('dob')) && val === '') {
-                    val = null;
-                }
-                
-                // Format time back to HH:MM:SS for postgres time type
-                if((f.includes('time') || f.includes('range')) && val) {
-                    if(val.length === 5) val += ":00";
-                }
-                
-                payload[f] = val;
-            }
-        });
+    async function deletePDS() {
+        if (!currentEmpId) return;
+        if (!confirm(`Are you sure you want to PERMANENTLY delete employee ${currentEmpId}? This action cannot be undone.`)) return;
 
-        if (!payload.emp_id || !payload.full_name) {
-            alert("Employee ID and Full Name are required.");
-            btn.innerText = "SAVE RECORD"; btn.disabled = false;
-            return;
-        }
+        const btn = document.getElementById('btnDeletePDS');
+        btn.innerText = "DELETING..."; btn.disabled = true;
 
-        try {
-            if (!currentEmpId) {
-                // New Employee Defaults
-                payload.pass = "1111"; // Default PIN
-                ['spl_balance', 'vl_balance', 'sl_balance', 'wl_balance', 'cto_balance'].forEach(b => payload[b] = 0.0);
-            }
+        try {
+            const { error } = await supabaseClient.from('employees').delete().eq('emp_id', currentEmpId);
+            if (error) throw error;
+            
+            alert("Employee deleted successfully.");
+            clearPDSForm();
+            await fetchEmployees(); // Refresh list
 
-            const { error } = await supabaseClient.from('employees').upsert(payload, { onConflict: 'emp_id' });
-            if (error) throw error;
-            
-            alert(currentEmpId ? "Database Updated Successfully." : "New Employee Saved to Database.");
-            clearPDSForm();
-            await fetchEmployees(); // Refresh list
+        } catch (e) {
+            alert(`Delete failed: ${e.message}`);
+        } finally {
+            btn.innerText = "DELETE"; btn.disabled = false;
+        }
+    }
 
-        } catch (e) {
-            alert(`Save failed: ${e.message}`);
-        } finally {
-            btn.innerText = "SAVE RECORD"; btn.disabled = false;
-        }
-    }
+    async function savePDS() {
+        const btn = document.getElementById('btnSavePDS');
+        btn.innerText = "SAVING..."; btn.disabled = true;
 
-    async function clearOverride() {
-        if (!currentEmpId) return;
-        if (!confirm("Are you sure you want to clear the active schedule override?\nThe employee will immediately return to their base PDS schedule.")) return;
+        let payload = {};
+        fields.forEach(f => {
+            const el = document.getElementById(`f_${f}`);
+            if(el) {
+                let val = el.value.trim();
+                
+                // Convert empty date fields to null to prevent postgres errors
+                if((f.includes('date') || f.includes('dob')) && val === '') {
+                    val = null;
+                }
+                
+                // Format time back to HH:MM:SS for postgres time type
+                if((f.includes('time') || f.includes('range')) && val) {
+                    if(val.length === 5) val += ":00";
+                }
+                
+                payload[f] = val;
+            }
+        });
 
-        try {
-            const today = new Date().toISOString().split('T')[0];
-            const { error } = await supabaseClient.from('schedule_overrides').delete().eq('emp_id', currentEmpId).lte('start_date', today).gte('end_date', today);
-            if (error) throw error;
-            
-            alert("Schedule override successfully cleared.");
-            loadFullRecord(currentEmpId); // Refresh banner
-        } catch(e) {
-            alert(`Failed to clear override: ${e.message}`);
-        }
-    }
+        if (!payload.emp_id || !payload.full_name) {
+            alert("Employee ID and Full Name are required.");
+            btn.innerText = "SAVE RECORD"; btn.disabled = false;
+            return;
+        }
 
-    // ==========================================
-    // WORK SCHEDULE CONFIGURATOR LOGIC
-    // ==========================================
-    function toggleHalfDay() {
-        const type = document.getElementById('s_schedule_type').value;
-        const timeIn = document.getElementById('s_start_time');
-        const timeOut = document.getElementById('s_end_time');
-        const dayChecks = document.querySelectorAll('input[name="s_work_days"]');
-        
-        // Reset state
-        timeIn.disabled = false;
-        timeOut.disabled = false;
-        dayChecks.forEach(cb => cb.disabled = false);
+        try {
+            if (!currentEmpId) {
+                // New Employee Defaults
+                payload.pass = "1111"; // Default PIN
+                ['spl_balance', 'vl_balance', 'sl_balance', 'wl_balance', 'cto_balance'].forEach(b => payload[b] = 0.0);
+            }
 
-        if (type === 'Suspension') {
-            timeIn.value = ''; timeOut.value = '';
-            timeIn.disabled = true; timeOut.disabled = true;
-            // Uncheck and disable all days to force full absence recognition
-            dayChecks.forEach(cb => { cb.checked = false; cb.disabled = true; });
-        } else if (type === 'Half-Day (AM)') {
-            timeIn.value = '08:00'; timeOut.value = '12:00';
-            dayChecks.forEach(cb => cb.disabled = false);
-        } else if (type === 'Half-Day (PM)') {
-            timeIn.value = '13:00'; timeOut.value = '17:00';
-            dayChecks.forEach(cb => cb.disabled = false);
-        }
-    }
+            const { error } = await supabaseClient.from('employees').upsert(payload, { onConflict: 'emp_id' });
+            if (error) throw error;
+            
+            alert(currentEmpId ? "Database Updated Successfully." : "New Employee Saved to Database.");
+            clearPDSForm();
+            await fetchEmployees(); // Refresh list
 
-    async function checkActiveSetup() {
-        const target = document.getElementById('s_target').value;
-        const lbl = document.getElementById('sched_current_setup');
+        } catch (e) {
+            alert(`Save failed: ${e.message}`);
+        } finally {
+            btn.innerText = "SAVE RECORD"; btn.disabled = false;
+        }
+    }
 
-        if (target === "ALL") {
-            lbl.innerText = "Status: Bulk update mode. This will apply to ALL employees.";
-            lbl.className = "text-sm font-bold text-orange-700";
-            return;
-        }
+    async function clearOverride() {
+        if (!currentEmpId) return;
+        if (!confirm("Are you sure you want to clear the active schedule override?\nThe employee will immediately return to their base PDS schedule.")) return;
 
-        try {
-            const today = new Date().toISOString().split('T')[0];
-            const { data: ovr } = await supabaseClient.from('schedule_overrides').select('*').eq('emp_id', target).lte('start_date', today).gte('end_date', today).order('id', {ascending: false}).limit(1);
-            
-            if (ovr && ovr.length > 0) {
-                const o = ovr[0];
-                const tIn = o.start_time ? o.start_time.substring(0,5) : '';
-                const tOut = o.end_time ? o.end_time.substring(0,5) : '';
-                const wDays = o.working_days ? `[Days: ${o.working_days}] ` : '';
-                lbl.innerText = `Status: Currently on OVERRIDE ${o.schedule_type} (${tIn} - ${tOut}) ${wDays}until ${o.end_date}.`;
-                lbl.className = "text-sm font-bold text-red-700";
-            } else {
-                lbl.innerText = "Status: No active overrides. Following Base PDS profile.";
-                lbl.className = "text-sm font-bold text-green-700";
-            }
-        } catch(e) {
-            console.error(e);
-        }
-    }
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const { error } = await supabaseClient.from('schedule_overrides').delete().eq('emp_id', currentEmpId).lte('start_date', today).gte('end_date', today);
+            if (error) throw error;
+            
+            alert("Schedule override successfully cleared.");
+            loadFullRecord(currentEmpId); // Refresh banner
+        } catch(e) {
+            alert(`Failed to clear override: ${e.message}`);
+        }
+    }
 
-    async function applySchedule() {
-        const target = document.getElementById('s_target').value;
-        const sDate = document.getElementById('s_start_date').value;
-        const eDate = document.getElementById('s_end_date').value;
-        const sType = document.getElementById('s_schedule_type').value;
-        let sTime = document.getElementById('s_start_time').value;
-        let eTime = document.getElementById('s_end_time').value;
-        
-        // NEW: Gather Working Days
-        const selectedDays = Array.from(document.querySelectorAll('input[name="s_work_days"]:checked')).map(cb => cb.value).join(',');
+    // ==========================================
+    // WORK SCHEDULE CONFIGURATOR LOGIC
+    // ==========================================
+    function toggleHalfDay() {
+        const type = document.getElementById('s_schedule_type').value;
+        const timeIn = document.getElementById('s_start_time');
+        const timeOut = document.getElementById('s_end_time');
+        const dayChecks = document.querySelectorAll('input[name="s_work_days"]');
+        
+        // Reset state
+        timeIn.disabled = false;
+        timeOut.disabled = false;
+        dayChecks.forEach(cb => cb.disabled = false);
 
-        if (!sDate || !eDate) {
-            return alert("Start and End Dates are required.");
-        }
-        
-        if (sType !== 'Suspension') {
-            if (!sTime || !eTime) return alert("Time 1 and Time 2 are required unless it is a full Suspension.");
-            if (!selectedDays) return alert("Please select at least one working day.");
-        }
+        if (type === 'Suspension') {
+            timeIn.value = ''; timeOut.value = '';
+            timeIn.disabled = true; timeOut.disabled = true;
+            // Uncheck and disable all days to force full absence recognition
+            dayChecks.forEach(cb => { cb.checked = false; cb.disabled = true; });
+        } else if (type === 'Half-Day (AM)') {
+            timeIn.value = '08:00'; timeOut.value = '12:00';
+            dayChecks.forEach(cb => cb.disabled = false);
+        } else if (type === 'Half-Day (PM)') {
+            timeIn.value = '13:00'; timeOut.value = '17:00';
+            dayChecks.forEach(cb => cb.disabled = false);
+        }
+    }
 
-        if (new Date(eDate) < new Date(sDate)) {
-            return alert("End Date cannot be before Start Date.");
-        }
+    async function checkActiveSetup() {
+        const target = document.getElementById('s_target').value;
+        const lbl = document.getElementById('sched_current_setup');
 
-        const msg = target === "ALL" 
-            ? `Are you sure you want to apply this schedule override to ALL EMPLOYEES from ${sDate} to ${eDate}?`
-            : `Schedule override for ${target} from ${sDate} to ${eDate}?`;
+        if (target === "ALL") {
+            lbl.innerText = "Status: Bulk update mode. This will apply to ALL employees.";
+            lbl.className = "text-sm font-bold text-orange-700";
+            return;
+        }
 
-        if (!confirm(msg)) return;
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const { data: ovr } = await supabaseClient.from('schedule_overrides').select('*').eq('emp_id', target).lte('start_date', today).gte('end_date', today).order('id', {ascending: false}).limit(1);
+            
+            if (ovr && ovr.length > 0) {
+                const o = ovr[0];
+                const tIn = o.start_time ? o.start_time.substring(0,5) : '';
+                const tOut = o.end_time ? o.end_time.substring(0,5) : '';
+                const wDays = o.working_days ? `[Days: ${o.working_days}] ` : '';
+                lbl.innerText = `Status: Currently on OVERRIDE ${o.schedule_type} (${tIn} - ${tOut}) ${wDays}until ${o.end_date}.`;
+                lbl.className = "text-sm font-bold text-red-700";
+            } else {
+                lbl.innerText = "Status: No active overrides. Following Base PDS profile.";
+                lbl.className = "text-sm font-bold text-green-700";
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    }
 
-        const btn = document.getElementById('btnApplySched');
-        const lbl = document.getElementById('sched_status_lbl');
-        btn.innerText = "UPDATING..."; btn.disabled = true;
-        lbl.innerText = "";
+    async function applySchedule() {
+        const target = document.getElementById('s_target').value;
+        const sDate = document.getElementById('s_start_date').value;
+        const eDate = document.getElementById('s_end_date').value;
+        const sType = document.getElementById('s_schedule_type').value;
+        let sTime = document.getElementById('s_start_time').value;
+        let eTime = document.getElementById('s_end_time').value;
+        
+        // NEW: Gather Working Days
+        const selectedDays = Array.from(document.querySelectorAll('input[name="s_work_days"]:checked')).map(cb => cb.value).join(',');
 
-        // Format to Postgres Time, handle nulls for Suspension
-        if(sTime && sTime.length === 5) sTime += ":00";
-        if(eTime && eTime.length === 5) eTime += ":00";
+        if (!sDate || !eDate) {
+            return alert("Start and End Dates are required.");
+        }
+        
+        if (sType !== 'Suspension') {
+            if (!sTime || !eTime) return alert("Time 1 and Time 2 are required unless it is a full Suspension.");
+            if (!selectedDays) return alert("Please select at least one working day.");
+        }
 
-        try {
-            const targetIds = target === "ALL" ? allEmployees.map(e => e.emp_id) : [target];
-            const payload = targetIds.map(eid => ({
-                emp_id: eid,
-                schedule_type: sType,
-                start_date: sDate,
-                end_date: eDate,
-                start_time: sTime || null,
-                end_time: eTime || null,
-                working_days: sType === 'Suspension' ? null : selectedDays // Clear working days entirely if suspension
-            }));
+        if (new Date(eDate) < new Date(sDate)) {
+            return alert("End Date cannot be before Start Date.");
+        }
 
-            const { error } = await supabaseClient.from('schedule_overrides').insert(payload);
-            if (error) throw error;
+        const msg = target === "ALL" 
+            ? `Are you sure you want to apply this schedule override to ALL EMPLOYEES from ${sDate} to ${eDate}?`
+            : `Schedule override for ${target} from ${sDate} to ${eDate}?`;
 
-            lbl.innerText = `Successfully scheduled shifts for ${targetIds.length} employee(s).`;
-            alert("Work schedule dates configured successfully in the database.");
-            checkActiveSetup();
+        if (!confirm(msg)) return;
 
-        } catch (e) {
-            alert(`Error updating schedule: ${e.message}`);
-        } finally {
-            btn.innerText = "UPDATE SCHEDULE"; btn.disabled = false;
-        }
-    }
+        const btn = document.getElementById('btnApplySched');
+        const lbl = document.getElementById('sched_status_lbl');
+        btn.innerText = "UPDATING..."; btn.disabled = true;
+        lbl.innerText = "";
+
+        // Format to Postgres Time, handle nulls for Suspension
+        if(sTime && sTime.length === 5) sTime += ":00";
+        if(eTime && eTime.length === 5) eTime += ":00";
+
+        try {
+            const targetIds = target === "ALL" ? allEmployees.map(e => e.emp_id) : [target];
+            const payload = targetIds.map(eid => ({
+                emp_id: eid,
+                schedule_type: sType,
+                start_date: sDate,
+                end_date: eDate,
+                start_time: sTime || null,
+                end_time: eTime || null,
+                working_days: sType === 'Suspension' ? null : selectedDays // Clear working days entirely if suspension
+            }));
+
+            const { error } = await supabaseClient.from('schedule_overrides').insert(payload);
+            if (error) throw error;
+
+            lbl.innerText = `Successfully scheduled shifts for ${targetIds.length} employee(s).`;
+            alert("Work schedule dates configured successfully in the database.");
+            checkActiveSetup();
+
+        } catch (e) {
+            alert(`Error updating schedule: ${e.message}`);
+        } finally {
+            btn.innerText = "UPDATE SCHEDULE"; btn.disabled = false;
+        }
+    }
 </script>
 </body>
 </html>
