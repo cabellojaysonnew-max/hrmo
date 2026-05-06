@@ -26,10 +26,7 @@
             <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
             <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
             <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
-            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
-            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">REPORTS</a>
-            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">SYSTEM USERS</a>
         </div>
         <div class="p-4 bg-black/20 hidden md:block">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
@@ -372,25 +369,25 @@
             let emps = empsData || [];
             if(!emps.length) throw new Error("No employees found in database.");
 
-            // --- ROLE-BASED ACCESS CONTROL (REPORTS LIMITATION) ---
-            const userPos = currentUser && currentUser.position ? String(currentUser.position).toUpperCase() : "";
-            const userRole = currentUser && currentUser.role ? String(currentUser.role).toUpperCase() : "";
-            const isExempt = ["PARPO II", "PARPO I", "HRMO", "HRMO STAFF"].some(role => userPos.includes(role) || userRole.includes(role));
+            // --- ROLE-BASED ACCESS CONTROL (REPORTS LIMITATION) ---
+            const uPos = currentUser && currentUser.position ? String(currentUser.position).toUpperCase() : "";
+            const uRole = currentUser && currentUser.role ? String(currentUser.role).toUpperCase() : "";
+            const isExempt = uPos.includes("PARPO") || uRole.includes("PARPO") || uPos.includes("HRMO") || uRole.includes("HRMO");
 
-            if (!isExempt) {
-                const uDiv = currentUser && currentUser.division ? String(currentUser.division).toUpperCase().trim() : "";
-                const uUnit = currentUser && currentUser.unit ? String(currentUser.unit).toUpperCase().trim() : "";
-                
-                emps = emps.filter(e => {
-                    const eDiv = e.division ? String(e.division).toUpperCase().trim() : "";
-                    const eUnit = e.unit ? String(e.unit).toUpperCase().trim() : "";
-                    
-                    if (uUnit && uUnit !== "NONE" && uUnit !== "N/A" && uUnit !== "NULL") {
-                        return eUnit === uUnit;
-                    }
-                    return eDiv === uDiv;
-                });
-            }
+            if (!isExempt) {
+                const uDiv = currentUser && currentUser.division ? String(currentUser.division).toUpperCase().trim() : "";
+                const uUnit = currentUser && currentUser.unit ? String(currentUser.unit).toUpperCase().trim() : "";
+                
+                emps = emps.filter(e => {
+                    const eDiv = e.division ? String(e.division).toUpperCase().trim() : "";
+                    const eUnit = e.unit ? String(e.unit).toUpperCase().trim() : "";
+                    
+                    if (uUnit && uUnit !== "NONE" && uUnit !== "N/A" && uUnit !== "NULL") {
+                        return eUnit === uUnit;
+                    }
+                    return eDiv === uDiv;
+                });
+            }
 
             const nameMap = {}, divMap = {}, posMap = {}, stationMap = {}, balMap = {};
             emps.forEach(e => {
@@ -439,7 +436,7 @@
                     const names = String(t.emp_name).toUpperCase();
                     const positions = String(posMap[cleanId(t.emp_id)] || "").toUpperCase();
                     const stations = String(stationMap[cleanId(t.emp_id)] || "").toUpperCase();
-                    const rawType = emps.find(e => cleanId(e.emp_id) == cleanId(t.emp_id))?.type?.toUpperCase();
+                    const rawType = empsData.find(e => cleanId(e.emp_id) == cleanId(t.emp_id))?.type?.toUpperCase();
                     const typeLabel = rawType === 'SPLIT' ? 'SPLIT/COS' : (rawType === 'REGULAR' ? 'REGULAR' : '');
                     const isMARPO = currentUser.position && currentUser.position.toUpperCase().includes("MARPO");
 
@@ -989,7 +986,7 @@
                     });
 
                     const headers = ["EMP NUMBER", "NAME", "LEAVE TYPE", "DATE OF FILING", "DATE(S) OF LEAVE", "BALANCE (AS OF TODAY)", "NO. OF DAYS", "USED CREDITS", "REMAINING BALANCE"];
-                    const widths = [25, 45, 35, 25, 45, 35, 20, 25, 35];
+                    const widths = [22, 45, 30, 25, 45, 30, 20, 25, 35];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
