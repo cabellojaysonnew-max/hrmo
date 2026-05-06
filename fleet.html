@@ -99,13 +99,13 @@
         const DRIVERS = ["Driver 1", "Driver 2", "Driver 3", "Driver 4", "Driver 5"];
 
         let user = null, currentTab = 'inbox', scheduleFilter = 'day'; 
-        let emps = [], orders = [], itins = [], bookings = [];
+        let emps = [], orders = [], itins = [], bookings = [], vehLogs = [];
         let activeRef = "", activeIsBooking = false, selectedEmpForAdd = null, activeVehForMaint = "";
         let manualPassengerQueue = [];
         
         let activeReservationGroups = {};
         let editPassRef = "", editPassType = "", currentPassList = [], removedPassList = [], addedPassList = [];
-        let currentEditTrip = {}; // specific trip being re-assigned
+        let currentEditTrip = {}; 
 
         // --- SESSION AND AUTH ---
         document.addEventListener("DOMContentLoaded", async () => {
@@ -113,7 +113,7 @@
             if (!savedUser) { window.location.href = 'index.html'; return; }
             
             user = JSON.parse(savedUser);
-            document.getElementById('activeUser').innerText = user.full_name;
+            if(document.getElementById('activeUser')) document.getElementById('activeUser').innerText = user.full_name;
             if(document.getElementById('userRoleBadge')) document.getElementById('userRoleBadge').innerText = user.role || '';
 
             const uRole = String(user.role).toUpperCase();
@@ -150,16 +150,18 @@
 
         // --- CORE DATA SYNC ---
         async function sync() {
-            const [o, i, b] = await Promise.all([
+            const [o, i, b, vl] = await Promise.all([
                 db.from('travel_orders').select('*').neq('status','CANCELLED'), 
                 db.from('itinerary').select('*'),
-                db.from('fleet_bookings').select('*')
+                db.from('fleet_bookings').select('*'),
+                db.from('vehicle_logs').select('*')
             ]);
-            orders = o.data || []; itins = i.data || []; bookings = b.data || [];
+            orders = o.data || []; itins = i.data || []; bookings = b.data || []; vehLogs = vl.data || [];
             
             if(currentTab === 'inbox') renderInbox();
             else if(currentTab === 'reservations') renderReservations();
-            else renderSchedule();
+            else if(currentTab === 'schedule') renderSchedule();
+            else renderLogs();
         }
 
         function getApprovalTarget(unitStr) {
@@ -185,15 +187,8 @@
             return rawStr;
         }
 
-        function getVerificationStatus(text) {
-            if (!text) return 'PENDING';
-            if (text.includes('[ACTUALIZED]')) return 'ACTUALIZED';
-            if (text.includes('[NO-SHOW]')) return 'NO-SHOW';
-            return 'PENDING';
-        }
-
         function cleanText(text) {
-            return text ? text.replace(/\[ACTUALIZED\]/g, '').replace(/\[NO-SHOW\]/g, '').trim() : '';
+            return text ? text.replace(/\[COMPLETED\]/g, '').replace(/\[ACTUALIZED\]/g, '').replace(/\[NO-SHOW\]/g, '').trim() : '';
         }
 
         function escQ(str) { 
@@ -219,6 +214,7 @@
                         <button onclick="switchTab('inbox')" class="px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='inbox'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📥 Pending Dispatch (TOs)</button>
                         <button onclick="switchTab('reservations')" class="px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='reservations'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📋 Daily Active Trips</button>
                         <button onclick="switchTab('schedule')" class="px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='schedule'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📅 Fleet Availability</button>
+                        <button onclick="switchTab('logs')" class="px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='logs'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📊 Trip & Fleet Logs</button>
                     </div>
                     <button onclick="openModal('bookModal')" class="bg-[#D4AF37] text-black px-6 py-2 rounded font-bold text-sm hover:brightness-110 transition-colors shadow-sm flex items-center gap-2">
                         <span class="text-lg leading-none">+</span> Special Booking
@@ -343,8 +339,47 @@
                 </div>
             </div>
 
-            <div id="maintModal" class="hidden modal-overlay"><div class="modal-box max-w-sm"><div class="p-5 border-b bg-gray-50 rounded-t-lg"><h2 class="font-bold text-[#003811] text-lg">Schedule Maintenance</h2><p id="maintSub" class="text-xs text-gray-500 font-bold mt-1 uppercase"></p></div><div class="p-6 space-y-4 bg-white"><div><label class="block text-sm font-bold text-[#003811] mb-1">Reason</label><input id="maintReason" placeholder="e.g., Change Oil..." class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div><div><label class="block text-sm font-bold text-[#003811] mb-1">Start Date</label><input id="maintD1" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div><div><label class="block text-sm font-bold text-[#003811] mb-1">End Date</label><input id="maintD2" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div></div><div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg"><button onclick="closeModal('maintModal')" class="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button><button onclick="saveMaintenance()" class="bg-red-600 text-white px-6 py-2 rounded font-bold text-sm hover:bg-red-700 transition-colors">Off-Road</button></div></div></div>
-            
+            <!-- MAINTENANCE MODAL -->
+            <div id="maintModal" class="hidden modal-overlay">
+                <div class="modal-box max-w-sm">
+                    <div class="p-5 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                        <h2 class="font-bold text-[#003811] text-lg">Schedule Maintenance</h2>
+                        <button onclick="closeModal('maintModal')" class="text-gray-400 hover:text-red-500 font-bold text-xl leading-none">✕</button>
+                    </div>
+                    <div class="p-6 space-y-4 bg-white">
+                        <p id="maintSub" class="text-xs text-gray-500 font-bold mt-1 uppercase"></p>
+                        <div><label class="block text-sm font-bold text-[#003811] mb-1">Reason</label><input id="maintReason" placeholder="e.g., Change Oil..." class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div>
+                        <div><label class="block text-sm font-bold text-[#003811] mb-1">Start Date</label><input id="maintD1" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div>
+                        <div><label class="block text-sm font-bold text-[#003811] mb-1">End Date</label><input id="maintD2" type="date" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></div>
+                    </div>
+                    <div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg">
+                        <button onclick="closeModal('maintModal')" class="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button>
+                        <button onclick="saveMaintenance()" class="bg-red-600 text-white px-6 py-2 rounded font-bold text-sm hover:bg-red-700 transition-colors">Off-Road</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LOG ISSUE MODAL -->
+            <div id="issueModal" class="hidden modal-overlay">
+                <div class="modal-box max-w-sm">
+                    <div class="p-5 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                        <h2 class="font-bold text-[#003811] text-lg">Log Fleet Issue</h2>
+                        <button onclick="closeModal('issueModal')" class="text-gray-400 hover:text-red-500 font-bold text-xl leading-none">✕</button>
+                    </div>
+                    <div class="p-6 space-y-4 bg-white">
+                        <p class="text-xs text-gray-500 font-bold uppercase" id="issueVehName"></p>
+                        <div>
+                            <label class="block text-sm font-bold text-[#003811] mb-1">Describe Issue / Error</label>
+                            <textarea id="issueDesc" rows="4" placeholder="e.g., Engine knocking sound, flat tire, scratched bumper..." class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm"></textarea>
+                        </div>
+                    </div>
+                    <div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg">
+                        <button onclick="closeModal('issueModal')" class="px-6 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button>
+                        <button onclick="saveIssue()" class="bg-[#003811] text-white px-6 py-2 rounded font-bold text-sm hover:bg-green-800 shadow-sm transition-colors">Submit Report</button>
+                    </div>
+                </div>
+            </div>
+
             <datalist id="drivers">${DRIVERS.map(d=>`<option value="${d}">`).join('')}</datalist>`;
         }
 
@@ -447,7 +482,6 @@
 
                 receivedObj[date] = v;
                 driverObj[date] = v === 'LAND' ? 'N/A' : d;
-                
                 scheduleObj[date] = v === 'LAND' ? 'LAND TRAVEL' : timeStr;
 
                 if (v !== 'LAND') allLand = false;
@@ -504,11 +538,16 @@
                     toItins.forEach(itin => {
                         const date = itin.travel_date;
                         const v = getDailyValue(toRecord.received, date, 'N/A');
+                        const sStr = getDailyValue(toRecord.schedule, date, 'WHOLE DAY');
+                        
+                        // Hide completed trips
+                        if(sStr.includes('[COMPLETED]')) return;
+
                         if (v && v !== 'LAND' && v !== 'N/A') {
                             activeReservationGroups[ref].trips.push({
                                 date: date, dest: itin.destination, vehicle: v,
                                 driver: getDailyValue(toRecord.driver, date, 'N/A'),
-                                scheduleStr: getDailyValue(toRecord.schedule, date, 'WHOLE DAY')
+                                scheduleStr: sStr
                             });
                         }
                     });
@@ -517,6 +556,8 @@
 
             // 2. Group Bookings
             bookings.forEach(bk => {
+                if(bk.schedule && bk.schedule.includes('[COMPLETED]')) return; // Hide completed
+                
                 if (!activeReservationGroups[bk.ref_no]) {
                     activeReservationGroups[bk.ref_no] = { ref: bk.ref_no, type: 'BK', passengers: [], trips: [] };
                 }
@@ -531,7 +572,6 @@
                 }
             });
 
-            // Sort trips inside each group by date
             const groupsToRender = Object.values(activeReservationGroups).filter(g => g.trips.length > 0);
 
             if (groupsToRender.length === 0) { 
@@ -695,7 +735,6 @@
             // Apply deletions
             for (let p of removedPassList) {
                 if (editPassType === 'TO') {
-                    // Downgrade their personal record to LAND travel to keep history but free vehicle space
                     await db.from('travel_orders').update({ transport: 'LAND', received: null, driver: null, schedule: null }).eq('to_no', editPassRef).eq('emp_id', p.id);
                 } else {
                     await db.from('fleet_bookings').delete().eq('ref_no', editPassRef).eq('emp_id', p.id);
@@ -705,19 +744,17 @@
             // Apply additions
             if (addedPassList.length > 0) {
                 if (editPassType === 'TO') {
-                    // Clone TO row for newly attached passenger
                     const baseTO = orders.find(o => o.to_no === editPassRef);
                     if (baseTO) {
                         for (let p of addedPassList) {
                             const newRow = { ...baseTO };
-                            delete newRow.id; // Supabase generates new UUID
+                            delete newRow.id; 
                             newRow.emp_name = p.n;
                             newRow.emp_id = p.id;
                             await db.from('travel_orders').insert(newRow);
                         }
                     }
                 } else {
-                    // Add rows to fleet_bookings for every active date in this booking reference
                     const baseBks = bookings.filter(b => b.ref_no === editPassRef);
                     const uniqueDates = [...new Set(baseBks.map(b => b.travel_date))];
                     const baseBk = baseBks[0];
@@ -768,9 +805,12 @@
             sync();
         }
 
-        async function verifyTrip(ref, type, date, status) {
-            const tag = status === 'ACTUALIZED' ? '[ACTUALIZED]' : (status === 'NO-SHOW' ? '[NO-SHOW]' : '');
+        async function markTripHappened(ref, type, date, passengerStr, scheduleStr) {
+            if(!confirm("Mark this trip as HAPPENED? This will finalize it, hide it from the board, and move it to the Logs.")) return;
             
+            const tag = '[COMPLETED]';
+            
+            // 1. Tag in orders/bookings to hide it
             if (type === 'TO') {
                 const to = orders.find(o => o.to_no === ref);
                 let currentSched = to.schedule || '';
@@ -778,19 +818,29 @@
                 if (currentSched.startsWith('{')) {
                     const parsed = JSON.parse(currentSched);
                     let baseText = cleanText(parsed[date] || '');
-                    parsed[date] = tag ? `${tag} ${baseText}` : baseText;
+                    parsed[date] = `${tag} ${baseText}`;
                     await db.from('travel_orders').update({ schedule: JSON.stringify(parsed) }).eq('to_no', ref);
                 } else {
                     let baseText = cleanText(currentSched);
-                    await db.from('travel_orders').update({ schedule: tag ? `${tag} ${baseText}` : baseText }).eq('to_no', ref);
+                    await db.from('travel_orders').update({ schedule: `${tag} ${baseText}` }).eq('to_no', ref);
                 }
             } else {
                 const bkList = bookings.filter(b => b.ref_no === ref && b.travel_date === date);
                 if (bkList.length > 0) {
                     let baseText = cleanText(bkList[0].schedule || '');
-                    await db.from('fleet_bookings').update({ schedule: tag ? `${tag} ${baseText}` : baseText }).eq('ref_no', ref).eq('travel_date', date);
+                    await db.from('fleet_bookings').update({ schedule: `${tag} ${baseText}` }).eq('ref_no', ref).eq('travel_date', date);
                 }
             }
+
+            // 2. Insert to vehicle_logs
+            await db.from('vehicle_logs').insert({
+                to_no: ref,
+                applicant: passengerStr,
+                travel_date: date,
+                action: 'COMPLETED',
+                schedule: cleanText(scheduleStr)
+            });
+
             sync();
         }
 
@@ -843,8 +893,10 @@
                     
                     vehicleDates.forEach(itin => {
                         let rec = getDailyValue(h.received, itin.travel_date, null);
-                        if (rec === v) { 
-                            let sched = getDailyValue(h.schedule, itin.travel_date, 'WHOLE DAY');
+                        let sched = getDailyValue(h.schedule, itin.travel_date, 'WHOLE DAY');
+                        
+                        // Exclude completed ones from this active schedule board
+                        if (rec === v && !sched.includes('[COMPLETED]')) { 
                             let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
                             
                             vehicleTrips.push({
@@ -860,6 +912,7 @@
                 const vBks = filteredBookings.filter(b => b.vehicle === v);
                 const bkMap = {};
                 vBks.forEach(bk => {
+                    if(bk.schedule && bk.schedule.includes('[COMPLETED]')) return; // Exclude completed
                     const key = bk.ref_no + '_' + bk.travel_date;
                     if(!bkMap[key]) bkMap[key] = { ...bk, passengers: [] };
                     if(!bkMap[key].passengers.includes(bk.emp_name)) bkMap[key].passengers.push(bk.emp_name);
@@ -875,7 +928,7 @@
                 vehicleTrips.sort((a,b) => new Date(a.date) - new Date(b.date));
 
                 if (vehicleTrips.length === 0) {
-                    return `<div class="mb-8"><div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-gray-300"></div><h2 class="text-xl font-bold text-gray-400 uppercase tracking-widest">${v}</h2></div><button onclick="setOffRoad('${v}')" class="no-print border border-red-200 text-red-600 hover:bg-red-50 text-[10px] px-3 py-1.5 rounded font-bold tracking-widest transition">OFF-ROAD</button></div><p class="p-6 text-center text-sm text-gray-400 font-bold uppercase tracking-widest bg-white rounded-lg shadow-sm border border-dashed border-gray-300">Available</p></div>`;
+                    return `<div class="mb-8"><div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-gray-300"></div><h2 class="text-xl font-bold text-gray-400 uppercase tracking-widest">${v}</h2></div><div class="flex gap-2"><button onclick="openLogIssue('${v}')" class="no-print border border-yellow-500 text-yellow-600 hover:bg-yellow-50 text-[10px] px-3 py-1.5 rounded font-bold tracking-widest transition">LOG ISSUE</button><button onclick="setOffRoad('${v}')" class="no-print border border-red-200 text-red-600 hover:bg-red-50 text-[10px] px-3 py-1.5 rounded font-bold tracking-widest transition">OFF-ROAD</button></div></div><p class="p-6 text-center text-sm text-gray-400 font-bold uppercase tracking-widest bg-white rounded-lg shadow-sm border border-dashed border-gray-300">Available</p></div>`;
                 }
 
                 let html = `
@@ -886,7 +939,10 @@
                             <h2 class="text-xl font-bold text-[#003811] uppercase tracking-widest">${v}</h2>
                             <span class="text-xs text-gray-600 font-bold ml-2 bg-gray-200 px-2.5 py-0.5 rounded-full">${vehicleTrips.length} Trips</span>
                         </div>
-                        <button onclick="setOffRoad('${v}')" class="no-print border border-red-200 text-red-600 hover:bg-red-50 text-[10px] px-3 py-1.5 rounded font-bold tracking-widest transition">OFF-ROAD</button>
+                        <div class="flex gap-2">
+                            <button onclick="openLogIssue('${v}')" class="no-print border border-yellow-500 text-yellow-600 hover:bg-yellow-50 text-[10px] px-3 py-1.5 rounded font-bold tracking-widest transition">LOG ISSUE</button>
+                            <button onclick="setOffRoad('${v}')" class="no-print border border-red-200 text-red-600 hover:bg-red-50 text-[10px] px-3 py-1.5 rounded font-bold tracking-widest transition">OFF-ROAD</button>
+                        </div>
                     </div>
                     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                         <table class="w-full text-left text-sm">
@@ -897,35 +953,20 @@
                                     <th class="p-4 border-b border-gray-200 w-48">Passengers</th>
                                     <th class="p-4 border-b border-gray-200">Destination & Purpose</th>
                                     <th class="p-4 border-b border-gray-200 w-48">Assignment & Driver</th>
-                                    <th class="p-4 border-b border-gray-200 w-36 text-center no-print">Verification</th>
+                                    <th class="p-4 border-b border-gray-200 w-36 text-center no-print">Action</th>
                                 </tr>
                             </thead>
                             <tbody>`;
                 
                 html += vehicleTrips.map(trip => {
                     const rawTime = trip.time || '';
-                    const vStatus = getVerificationStatus(rawTime);
                     const cleanTime = cleanText(rawTime);
                     const isPastOrToday = trip.date <= todayStr;
+                    const passStr = escQ(trip.passengers.join(', '));
                     
-                    let statusColor = "bg-gray-100 text-gray-500 border border-gray-200";
-                    let statusLabel = "Unverified ▾";
-                    if (vStatus === 'ACTUALIZED') { statusColor = "bg-green-500 text-white border border-green-600 shadow-sm"; statusLabel = "✔ Actualized ▾"; }
-                    if (vStatus === 'NO-SHOW') { statusColor = "bg-red-500 text-white border border-red-600 shadow-sm"; statusLabel = "✖ No-Show ▾"; }
-
-                    let verifyCell = `<div class="text-[11px] text-gray-400 italic font-medium text-center">Upcoming</div>`;
+                    let actionCell = `<div class="text-[11px] text-gray-400 italic font-medium text-center">Upcoming</div>`;
                     if (isPastOrToday && !trip.isMaint) {
-                        verifyCell = `
-                        <div class="relative group">
-                            <button class="w-full py-2 rounded text-[10px] font-bold uppercase tracking-wider transition ${statusColor} hover:opacity-90">
-                                ${statusLabel}
-                            </button>
-                            <div class="absolute right-0 top-full mt-1 w-full bg-white border border-gray-200 rounded shadow-lg hidden group-hover:block z-50 overflow-hidden">
-                                <div onclick="verifyTrip('${trip.ref}', '${trip.type}', '${trip.date}', 'ACTUALIZED')" class="px-3 py-2.5 text-[10px] font-bold text-green-700 hover:bg-green-50 cursor-pointer uppercase border-b border-gray-100 transition">✔ Actualized</div>
-                                <div onclick="verifyTrip('${trip.ref}', '${trip.type}', '${trip.date}', 'NO-SHOW')" class="px-3 py-2.5 text-[10px] font-bold text-red-700 hover:bg-red-50 cursor-pointer uppercase border-b border-gray-100 transition">✖ No-Show</div>
-                                <div onclick="verifyTrip('${trip.ref}', '${trip.type}', '${trip.date}', 'PENDING')" class="px-3 py-2.5 text-[10px] font-bold text-gray-500 hover:bg-gray-50 cursor-pointer uppercase transition">Reset</div>
-                            </div>
-                        </div>`;
+                        actionCell = `<button onclick="markTripHappened('${trip.ref}', '${trip.type}', '${trip.date}', '${passStr}', '${escQ(cleanTime)}')" class="w-full py-2 rounded text-[10px] font-bold uppercase tracking-wider transition bg-green-500 text-white border border-green-600 shadow-sm hover:opacity-90">✔ Trip Happened</button>`;
                     }
 
                     if (trip.isMaint) {
@@ -958,7 +999,7 @@
                             <p class="text-[10px] font-bold text-gray-600 uppercase tracking-widest">👤 ${trip.driver}</p>
                         </td>
                         <td class="p-4 align-top no-print">
-                            ${verifyCell}
+                            ${actionCell}
                         </td>
                     </tr>`;
                 }).join('');
@@ -967,7 +1008,62 @@
             }).join('') + `</div>`;
         }
 
-        // --- 4. PRINT REPORT ---
+        // --- 4. LOGS REPORT ---
+        function renderLogs() {
+            const container = document.getElementById('main-content');
+            
+            let html = `
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6 flex justify-between items-center sticky top-0 z-20">
+                <div>
+                    <h2 class="text-xl font-bold text-[#003811] uppercase tracking-widest flex items-center gap-2"><span class="text-2xl">📊</span> Trip & Fleet Logs</h2>
+                    <p class="text-[10px] text-gray-500 font-bold tracking-widest uppercase mt-1">Corporate Reporting Archive</p>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-800 text-white uppercase text-[10px] tracking-widest font-bold">
+                        <tr>
+                            <th class="p-4 w-32 border-b border-gray-700">Date Logged</th>
+                            <th class="p-4 w-32 border-b border-gray-700">Travel Date</th>
+                            <th class="p-4 w-40 border-b border-gray-700">Ref No.</th>
+                            <th class="p-4 border-b border-gray-700">Action / Details</th>
+                            <th class="p-4 border-b border-gray-700 w-64">Passengers / Vehicle</th>
+                            <th class="p-4 border-b border-gray-700 w-48">Schedule</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                    
+            if(vehLogs.length === 0) {
+                html += `<tr><td colspan="6" class="p-10 text-center text-gray-400 font-bold uppercase tracking-widest">No Logs Found</td></tr>`;
+            } else {
+                // sort descending by created_at
+                vehLogs.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+                
+                html += vehLogs.map(l => {
+                    const dLogged = new Date(l.created_at).toLocaleDateString() + ' ' + new Date(l.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    
+                    let actionBadge = `<span class="bg-green-100 text-green-800 border border-green-200 px-2 py-1 rounded text-[10px] font-bold tracking-widest uppercase">${l.action}</span>`;
+                    if (l.action && l.action.startsWith('ISSUE')) {
+                        actionBadge = `<span class="bg-red-100 text-red-800 border border-red-200 px-2 py-1 rounded text-[10px] font-bold tracking-widest uppercase">🚨 ${l.action}</span>`;
+                    }
+                    
+                    return `<tr class="border-b border-gray-100 hover:bg-gray-50">
+                        <td class="p-4 text-xs font-semibold text-gray-600">${dLogged}</td>
+                        <td class="p-4 text-sm font-bold text-gray-800">${l.travel_date}</td>
+                        <td class="p-4 text-[11px] font-bold text-[#003811] uppercase">${l.to_no}</td>
+                        <td class="p-4">${actionBadge}</td>
+                        <td class="p-4 text-xs font-semibold text-gray-700 leading-relaxed">${l.applicant}</td>
+                        <td class="p-4 text-[10px] font-bold text-gray-600 uppercase">${l.schedule || 'N/A'}</td>
+                    </tr>`;
+                }).join('');
+            }
+            
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        // --- PRINT DAILY REPORT ---
         function printTableSummary() {
             const printSec = document.getElementById('print-table-section');
             const now = new Date(); now.setHours(0,0,0,0);
@@ -994,7 +1090,7 @@
                     <p style="font-size: 11pt; margin: 0;">Provincial Office of Camarines Sur 1</p>
                     <p style="font-size: 10pt; margin: 0; font-style: italic;">San Jose, Pili, Camarines Sur</p>
                     <br><br>
-                    <h2 style="font-size: 14pt; font-weight: bold; margin: 0; text-decoration: underline;">OFFICIAL FLEET DEPLOYMENT AND UTILIZATION REPORT</h2>
+                    <h2 style="font-size: 14pt; font-weight: bold; margin: 0; text-decoration: underline;">OFFICIAL FLEET DEPLOYMENT REPORT</h2>
                     <p style="font-size: 11pt; margin-top: 5px;">Filter Period: <strong>${scheduleFilter.toUpperCase()}</strong> | Date Printed: ${new Date().toLocaleDateString()}</p>
                 </div>
                 <table class="formal-table">
@@ -1004,7 +1100,7 @@
                             <th style="width: 15%;">Date</th>
                             <th style="width: 25%;">Passengers</th>
                             <th style="width: 25%;">Destination / Purpose</th>
-                            <th style="width: 20%;">Schedule & Driver / Verification</th>
+                            <th style="width: 20%;">Schedule & Driver</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1028,8 +1124,8 @@
                     
                     vehicleDates.forEach(itin => {
                         let rec = getDailyValue(h.received, itin.travel_date, null);
-                        if (rec === v) { 
-                            let sched = getDailyValue(h.schedule, itin.travel_date, 'WHOLE DAY');
+                        let sched = getDailyValue(h.schedule, itin.travel_date, 'WHOLE DAY');
+                        if (rec === v && !sched.includes('[COMPLETED]')) { 
                             let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
                             vehicleTrips.push({
                                 date: itin.travel_date, ref: toNo, type: 'TO',
@@ -1043,6 +1139,7 @@
                 const vBks = fBk.filter(b => b.vehicle === v);
                 const bkMap = {};
                 vBks.forEach(bk => {
+                    if(bk.schedule && bk.schedule.includes('[COMPLETED]')) return;
                     const key = bk.ref_no + '_' + bk.travel_date;
                     if(!bkMap[key]) bkMap[key] = { ...bk, passengers: [] };
                     if(!bkMap[key].passengers.includes(bk.emp_name)) bkMap[key].passengers.push(bk.emp_name);
@@ -1058,13 +1155,8 @@
                 let isFirst = true;
 
                 vehicleTrips.forEach(trip => {
-                    let displaySched = trip.time;
+                    let displaySched = cleanText(trip.time);
                     let rowStatus = trip.type === 'TO' ? "TO RECORD" : "BOOKING";
-                    
-                    if (displaySched.includes('[ACTUALIZED]')) rowStatus += " (ACTUALIZED)";
-                    if (displaySched.includes('[NO-SHOW]')) rowStatus += " (NO-SHOW)";
-                    
-                    displaySched = cleanText(displaySched);
 
                     html += `<tr>
                         ${isFirst ? `<td rowspan="${vehicleTrips.length}" style="text-align: center; vertical-align: middle; font-weight: bold;">${v}</td>` : ''}
@@ -1208,8 +1300,35 @@
         function safeStr(str) { return (str || "").replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
         
         function setOffRoad(veh) { activeVehForMaint = veh; document.getElementById('maintSub').innerText = `Vehicle: ${veh}`; document.getElementById('maintD1').value = ""; document.getElementById('maintD2').value = ""; document.getElementById('maintReason').value = ""; openModal('maintModal'); }
+        
         async function saveMaintenance() { const d1 = document.getElementById('maintD1').value, d2 = document.getElementById('maintD2').value, reason = document.getElementById('maintReason').value || "Routine Maintenance"; if(!d1) return alert("Select at least a start date."); const to = `MAINT-${Math.floor(Date.now()%10000)}`; await db.from('travel_orders').insert({ to_no: to, emp_name: '🚨 UNAVAILABLE', received: activeVehForMaint, status: 'OFF_ROAD', transport: "GOV'T VEHICLE" }); let st = new Date(d1), en = new Date(d2 || d1); while(st <= en) { await db.from('itinerary').insert({ to_no: to, travel_date: st.toISOString().split('T')[0], destination: "Authorized Shop", purpose: reason }); st.setDate(st.getDate() + 1); } closeModal('maintModal'); sync(); }
         async function endMaintenance(to) { if(!confirm("Maintenance finished? This clears remaining schedules.")) return; const now = new Date(); const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0'), d = String(now.getDate()).padStart(2,'0'); await db.from('itinerary').delete().eq('to_no', to).gte('travel_date', `${y}-${m}-${d}`); const remaining = await db.from('itinerary').select('id').eq('to_no', to); if(!remaining.data || remaining.data.length === 0) await db.from('travel_orders').delete().eq('to_no', to); sync(); }
+
+        // --- FLEET ISSUES ---
+        function openLogIssue(veh) {
+            activeVehForMaint = veh;
+            document.getElementById('issueVehName').innerText = `Vehicle: ${veh}`;
+            document.getElementById('issueDesc').value = '';
+            openModal('issueModal');
+        }
+
+        async function saveIssue() {
+            const desc = document.getElementById('issueDesc').value.trim();
+            if(!desc) return alert("Please detail the issue.");
+            
+            const today = new Date().toISOString().split('T')[0];
+            
+            await db.from('vehicle_logs').insert({
+                to_no: 'FLEET-ISSUE',
+                applicant: activeVehForMaint,
+                travel_date: today,
+                action: 'ISSUE: ' + desc,
+                schedule: 'N/A'
+            });
+            
+            closeModal('issueModal');
+            sync();
+        }
     </script>
 </body>
 </html>
