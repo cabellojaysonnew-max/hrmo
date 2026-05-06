@@ -381,9 +381,24 @@
         allEmployees.forEach(e => {
             const id = String(e.emp_id || '').toLowerCase();
             const name = String(e.full_name || '').toLowerCase();
+            
             if (id.includes(query) || name.includes(query)) {
-                let statusColor = 'bg-green-500';
-                if (String(e.status).toUpperCase() === 'INACTIVE') statusColor = 'bg-red-500';
+                let statusColor = 'bg-green-500'; // Default active color
+                
+                const empStatus = String(e.status || '').toUpperCase();
+                const empType = String(e.type || '').toUpperCase();
+                const empEmpType = String(e.employment_type || '').toUpperCase();
+
+                if (empStatus === 'INACTIVE') {
+                    statusColor = 'bg-red-500';
+                } else if (empType === 'REGULAR' && empEmpType === 'PERMANENT') {
+                    statusColor = 'bg-green-500';
+                } else if (empType === 'SPLIT' && (empEmpType.includes('CONTRACT OF SERVICE') || empEmpType === 'COS')) {
+                    statusColor = 'bg-yellow-500';
+                } else if (empType === 'REGULAR' && (empEmpType.includes('CONTRACT OF SERVICE') || empEmpType === 'COS')) {
+                    statusColor = 'bg-orange-500';
+                }
+
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-green-50 transition-colors";
                 tr.onclick = () => loadFullRecord(e.emp_id);
