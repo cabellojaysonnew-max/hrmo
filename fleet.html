@@ -578,7 +578,7 @@
                         const sStr = getDailyValue(toRecord.released, date, 'WHOLE DAY'); 
                         
                         // Hide completed trips checking vehicle_logs
-                        if(vehLogs.some(vl => vl.to_no === ref && vl.travel_date === date && vl.action === 'COMPLETED')) return;
+                        if(vehLogs.some(vl => vl.to_no === ref && vl.travel_date === date && (vl.action === 'COMPLETED' || vl.action === 'CANCELLED'))) return;
 
                         if (v && v !== 'LAND' && v !== 'N/A') {
                             activeReservationGroups[ref].trips.push({
@@ -894,7 +894,7 @@
             sync();
         }
 
-        async function markTripHappened(ref, type, date, passengerStr, scheduleStr) {
+        async function markTripHappened(ref, type, date, passengerStr, scheduleStr, dest) {
             if(!confirm("Mark this trip as HAPPENED? This will finalize it, hide it from the board, and move it to the Logs.")) return;
             
             const tag = '[COMPLETED]';
@@ -914,8 +914,48 @@
                 applicant: passengerStr,
                 travel_date: date,
                 action: 'COMPLETED',
-                schedule: cleanText(scheduleStr) // Writes schedule directly to vehicle_logs where the column lives
+                schedule: cleanText(scheduleStr),
+                destination: dest
             });
+
+            sync();
+        }
+
+        async function cancelScheduleTrip(ref, type, date, passengerStr, scheduleStr, dest, veh) {
+            if(!confirm("Are you sure you want to CANCEL this trip? It will be logged as Cancelled and the vehicle assignment will be set to LAND.")) return;
+
+            await db.from('vehicle_logs').insert({
+                to_no: ref,
+                applicant: passengerStr,
+                travel_date: date,
+                action: 'CANCELLED',
+                schedule: cleanText(scheduleStr),
+                destination: dest
+            });
+
+            if (type === 'TO') {
+                const { data } = await db.from('travel_orders').select('*').eq('to_no', ref).limit(1);
+                if (data && data.length > 0) {
+                    const row = data[0];
+                    let recObj = {}, drvObj = {}, schObj = {};
+                    if(row.received && row.received.startsWith('{')) recObj = JSON.parse(row.received);
+                    if(row.driver && row.driver.startsWith('{')) drvObj = JSON.parse(row.driver);
+                    if(row.released && row.released.startsWith('{')) schObj = JSON.parse(row.released);
+
+                    recObj[date] = 'LAND';
+                    drvObj[date] = 'N/A';
+                    schObj[date] = 'N/A';
+
+                    const allLand = Object.values(recObj).every(v => v === 'LAND');
+                    if (allLand) {
+                        await db.from('travel_orders').update({ transport: 'LAND', received: null, driver: null, released: null }).eq('to_no', ref);
+                    } else {
+                        await db.from('travel_orders').update({ received: JSON.stringify(recObj), driver: JSON.stringify(drvObj), released: JSON.stringify(schObj) }).eq('to_no', ref);
+                    }
+                }
+            } else {
+                await db.from('fleet_bookings').delete().eq('ref_no', ref).eq('travel_date', date);
+            }
 
             sync();
         }
@@ -924,7 +964,8 @@
         function renderSchedule() {
             const container = document.getElementById('main-content');
             const now = new Date(scheduleDateStr); now.setHours(0,0,0,0);
-            const todayStr = now.toISOString().split('T')[0];
+            const selectedStr = now.toISOString().split('T')[0];
+            const realTodayStr = new Date().toISOString().split('T')[0];
             
             const filteredItins = itins.filter(i => {
                 const d = new Date(i.travel_date); d.setHours(0,0,0,0);
@@ -973,7 +1014,7 @@
                         let sched = getDailyValue(h.released, itin.travel_date, 'WHOLE DAY'); 
                         
                         // Check vehicle_logs to hide completed trips
-                        if (rec === v && !vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && vl.action === 'COMPLETED')) { 
+                        if (rec === v && !vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && (vl.action === 'COMPLETED' || vl.action === 'CANCELLED'))) { 
                             let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
                             
                             vehicleTrips.push({
@@ -1038,12 +1079,19 @@
                 html += vehicleTrips.map(trip => {
                     const rawTime = trip.time || '';
                     const cleanTime = cleanText(rawTime);
-                    const isPastOrToday = trip.date <= todayStr;
+                    const isFuture = trip.date > realTodayStr;
                     const passStr = escQ(trip.passengers.join(', '));
+                    const safeDest = escQ(trip.dest);
                     
                     let actionCell = '';
                     if (!trip.isMaint) {
-                        actionCell += `<button onclick="markTripHappened('${trip.ref}', '${trip.type}', '${trip.date}', '${passStr}', '${escQ(cleanTime)}')" class="w-full py-2 mb-1 rounded text-[10px] font-bold uppercase tracking-wider transition bg-green-500 text-white border border-green-600 shadow-sm hover:opacity-90">✔ Trip Happened</button>`;
+                        if (isFuture) {
+                            actionCell += `<button disabled title="Cannot complete a future trip" class="w-full py-2 mb-1 rounded text-[10px] font-bold uppercase tracking-wider transition bg-gray-300 text-gray-500 border border-gray-400 shadow-sm cursor-not-allowed">✔ Trip Happened</button>`;
+                        } else {
+                            actionCell += `<button onclick="markTripHappened('${trip.ref}', '${trip.type}', '${trip.date}', '${passStr}', '${escQ(cleanTime)}', '${safeDest}')" class="w-full py-2 mb-1 rounded text-[10px] font-bold uppercase tracking-wider transition bg-green-500 text-white border border-green-600 shadow-sm hover:opacity-90">✔ Trip Happened</button>`;
+                        }
+                        
+                        actionCell += `<button onclick="cancelScheduleTrip('${trip.ref}', '${trip.type}', '${trip.date}', '${passStr}', '${escQ(cleanTime)}', '${safeDest}', '${v}')" class="w-full py-1.5 mt-1 rounded text-[9px] font-bold uppercase tracking-wider transition bg-red-100 text-red-700 border border-red-200 shadow-sm hover:bg-red-200">❌ Cancel Trip</button>`;
                         actionCell += `<button onclick="openTransferModal('${trip.ref}', '${trip.date}', '${trip.type}', '${v}')" class="w-full py-1.5 mt-1 rounded text-[9px] font-bold uppercase tracking-wider transition bg-purple-100 text-purple-700 border border-purple-200 shadow-sm hover:bg-purple-200">🔄 Transfer Pass</button>`;
                     }
 
@@ -1097,36 +1145,45 @@
                     <p class="text-[10px] text-gray-500 font-bold tracking-widest uppercase mt-1">Corporate Reporting Archive</p>
                 </div>
                 <input type="month" value="${logsMonthStr}" onchange="logsMonthStr = this.value; renderLogs();" class="border border-gray-300 p-2 text-sm font-bold rounded focus:outline-none focus:border-[#003811] text-gray-700">
-            </div>
+            </div>`;
             
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-gray-800 text-white uppercase text-[10px] tracking-widest font-bold">
-                        <tr>
-                            <th class="p-4 w-32 border-b border-gray-700">Date Logged</th>
-                            <th class="p-4 w-32 border-b border-gray-700">Travel Date</th>
-                            <th class="p-4 w-40 border-b border-gray-700">Ref No.</th>
-                            <th class="p-4 border-b border-gray-700">Action / Details</th>
-                            <th class="p-4 border-b border-gray-700 w-64">Passengers / Vehicle</th>
-                            <th class="p-4 border-b border-gray-700 w-48">Schedule</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-                    
             const filteredLogs = vehLogs.filter(l => l.travel_date && l.travel_date.startsWith(logsMonthStr));
+            filteredLogs.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
-            if(filteredLogs.length === 0) {
-                html += `<tr><td colspan="6" class="p-10 text-center text-gray-400 font-bold uppercase tracking-widest">No Logs Found</td></tr>`;
-            } else {
-                // sort descending by created_at
-                filteredLogs.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-                
-                html += filteredLogs.map(l => {
+            const tripLogs = filteredLogs.filter(l => l.action === 'COMPLETED' || l.action === 'CANCELLED');
+            const issueLogs = filteredLogs.filter(l => l.action && l.action.startsWith('ISSUE'));
+
+            function buildLogTable(logsArr, title) {
+                if (logsArr.length === 0) {
+                    return `<h3 class="text-md font-bold text-[#003811] mt-6 mb-3 uppercase tracking-wider">${title}</h3>
+                            <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center text-gray-400 font-bold uppercase tracking-widest mb-6">No Logs Found</div>`;
+                }
+
+                let tableHtml = `
+                <h3 class="text-md font-bold text-[#003811] mt-6 mb-3 uppercase tracking-wider">${title}</h3>
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-800 text-white uppercase text-[10px] tracking-widest font-bold">
+                            <tr>
+                                <th class="p-4 w-32 border-b border-gray-700">Date Logged</th>
+                                <th class="p-4 w-32 border-b border-gray-700">Travel Date</th>
+                                <th class="p-4 w-40 border-b border-gray-700">Ref No.</th>
+                                <th class="p-4 border-b border-gray-700">Action / Details</th>
+                                <th class="p-4 border-b border-gray-700 w-64">Passengers / Vehicle</th>
+                                <th class="p-4 border-b border-gray-700 w-48">Destination</th>
+                                <th class="p-4 border-b border-gray-700 w-48">Schedule</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                        
+                tableHtml += logsArr.map(l => {
                     const dLogged = new Date(l.created_at).toLocaleDateString() + ' ' + new Date(l.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     
                     let actionBadge = `<span class="bg-green-100 text-green-800 border border-green-200 px-2 py-1 rounded text-[10px] font-bold tracking-widest uppercase">${l.action}</span>`;
-                    if (l.action && l.action.startsWith('ISSUE')) {
-                        actionBadge = `<span class="bg-red-100 text-red-800 border border-red-200 px-2 py-1 rounded text-[10px] font-bold tracking-widest uppercase">🚨 ${l.action}</span>`;
+                    if (l.action === 'CANCELLED') {
+                        actionBadge = `<span class="bg-red-100 text-red-800 border border-red-200 px-2 py-1 rounded text-[10px] font-bold tracking-widest uppercase">❌ ${l.action}</span>`;
+                    } else if (l.action && l.action.startsWith('ISSUE')) {
+                        actionBadge = `<span class="bg-yellow-100 text-yellow-800 border border-yellow-300 px-2 py-1 rounded text-[10px] font-bold tracking-widest uppercase">🚨 ${l.action}</span>`;
                     }
                     
                     return `<tr class="border-b border-gray-100 hover:bg-gray-50">
@@ -1135,12 +1192,18 @@
                         <td class="p-4 text-[11px] font-bold text-[#003811] uppercase">${l.to_no}</td>
                         <td class="p-4">${actionBadge}</td>
                         <td class="p-4 text-xs font-semibold text-gray-700 leading-relaxed">${l.applicant}</td>
+                        <td class="p-4 text-xs font-semibold text-gray-700 leading-relaxed">${l.destination || 'N/A'}</td>
                         <td class="p-4 text-[10px] font-bold text-gray-600 uppercase">${l.schedule || 'N/A'}</td>
                     </tr>`;
                 }).join('');
+                
+                tableHtml += `</tbody></table></div>`;
+                return tableHtml;
             }
-            
-            html += `</tbody></table></div>`;
+
+            html += buildLogTable(tripLogs, "Trip Logs (Happened & Cancelled)");
+            html += buildLogTable(issueLogs, "Vehicle Issue Logs");
+
             container.innerHTML = html;
         }
 
@@ -1206,7 +1269,7 @@
                     vehicleDates.forEach(itin => {
                         let rec = getDailyValue(h.received, itin.travel_date, null);
                         let sched = getDailyValue(h.released, itin.travel_date, 'WHOLE DAY');
-                        if (rec === v && !vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && vl.action === 'COMPLETED')) { 
+                        if (rec === v && !vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && (vl.action === 'COMPLETED' || vl.action === 'CANCELLED'))) { 
                             let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
                             vehicleTrips.push({
                                 date: itin.travel_date, ref: toNo, type: 'TO',
@@ -1364,8 +1427,6 @@
             
             for (let to of [...new Set(toUpdates)]) {
                 const toRec = orders.find(x => x.to_no === to);
-
-                // For TOs mapped to a manual booking, we DO NOT write a schedule object to travel_orders to avoid schema errors.
                 await db.from('travel_orders').update({ transport: "GOV'T VEHICLE", received: v, driver: dr, status: getApprovalTarget(toRec.unit) }).eq('to_no', to);
             }
             
@@ -1403,7 +1464,8 @@
                 applicant: activeVehForMaint,
                 travel_date: today,
                 action: 'ISSUE: ' + desc,
-                schedule: 'N/A'
+                schedule: 'N/A',
+                destination: 'N/A'
             });
             
             closeModal('issueModal');
