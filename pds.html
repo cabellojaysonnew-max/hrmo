@@ -333,7 +333,8 @@
                     </div>
                     <div>
                         <label class="form-label">Filter Value</label>
-                        <input type="text" id="list_filter_val" class="form-input" placeholder="N/A for ALL" disabled>
+                        <input type="text" id="list_filter_val" list="filter_val_list" class="form-input" placeholder="N/A for ALL" disabled>
+                        <datalist id="filter_val_list"></datalist>
                     </div>
                     <div class="flex items-end gap-2 md:col-span-2">
                         <button onclick="generateEmployeeList()" class="bg-[#003811] text-white px-6 py-2 rounded text-xs font-bold hover:bg-[#006400] transition-colors">GENERATE</button>
@@ -539,16 +540,57 @@
     function updateListFilterInput() {
         const cat = document.getElementById('list_filter_cat').value;
         const valInput = document.getElementById('list_filter_val');
+        const dataList = document.getElementById('filter_val_list');
+        
+        dataList.innerHTML = '';
+        valInput.value = '';
+
         if (cat === 'ALL') {
-            valInput.value = '';
             valInput.disabled = true;
             valInput.placeholder = 'N/A for ALL';
         } else {
             valInput.disabled = false;
-            if (cat === 'BIRTHMONTH') valInput.placeholder = 'e.g. 01, 12, or Jan, Dec';
-            else if (cat === 'TYPE') valInput.placeholder = 'e.g. Regular, SPLIT, COS';
-            else if (cat === 'AGE') valInput.placeholder = 'e.g. 30, >30, <25';
-            else valInput.placeholder = `Type ${cat.toLowerCase()} to search...`;
+            let uniqueOptions = new Set();
+            
+            if (cat === 'DIVISION') {
+                valInput.placeholder = 'Select/Type Division...';
+                allEmployees.forEach(e => { if(e.division) uniqueOptions.add(e.division); });
+            } else if (cat === 'UNIT') {
+                valInput.placeholder = 'Select/Type Unit...';
+                allEmployees.forEach(e => { if(e.unit) uniqueOptions.add(e.unit); });
+            } else if (cat === 'TYPE') {
+                valInput.placeholder = 'Select/Type Classification...';
+                uniqueOptions.add('COS-REGULAR');
+                uniqueOptions.add('COS-SPLIT');
+                uniqueOptions.add('PERMANENT');
+                uniqueOptions.add('REGULAR-PERMANENT');
+                allEmployees.forEach(e => {
+                    if(e.type) uniqueOptions.add(e.type);
+                    if(e.employment_type) uniqueOptions.add(e.employment_type);
+                });
+            } else if (cat === 'AGE') {
+                valInput.placeholder = 'Select/Type Age...';
+                allEmployees.forEach(e => { 
+                    const a = getAge(e.date_of_birth); 
+                    if(a !== '') uniqueOptions.add(a.toString()); 
+                });
+            } else if (cat === 'ADDRESS') {
+                valInput.placeholder = 'Select/Type Address...';
+                allEmployees.forEach(e => { 
+                    if(e.residential_address) uniqueOptions.add(e.residential_address);
+                    if(e.permanent_address) uniqueOptions.add(e.permanent_address);
+                });
+            } else if (cat === 'BIRTHMONTH') {
+                valInput.placeholder = 'Select/Type Month (1-12 or Jan-Dec)...';
+                ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', 
+                 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].forEach(m => uniqueOptions.add(m));
+            }
+
+            Array.from(uniqueOptions).sort().forEach(opt => {
+                const el = document.createElement('option');
+                el.value = opt;
+                dataList.appendChild(el);
+            });
         }
     }
 
@@ -562,9 +604,16 @@
             if (cat === 'DIVISION') return String(e.division || '').toLowerCase().includes(val);
             if (cat === 'UNIT') return String(e.unit || '').toLowerCase().includes(val);
             if (cat === 'TYPE') {
-                const t = String(e.type || '').toLowerCase();
-                const et = String(e.employment_type || '').toLowerCase();
-                return t.includes(val) || et.includes(val);
+                const t = String(e.type || '').toUpperCase();
+                const et = String(e.employment_type || '').toUpperCase();
+                const searchVal = val.toUpperCase();
+                
+                if (searchVal === 'COS-REGULAR') return t.includes('REGULAR') && et.includes('COS');
+                if (searchVal === 'COS-SPLIT') return t.includes('SPLIT') && et.includes('COS');
+                if (searchVal === 'PERMANENT') return et.includes('PERMANENT');
+                if (searchVal === 'REGULAR-PERMANENT') return t.includes('REGULAR') && et.includes('PERMANENT');
+                
+                return String(e.type || '').toLowerCase().includes(val) || String(e.employment_type || '').toLowerCase().includes(val);
             }
             if (cat === 'ADDRESS') {
                 const addr = String(e.residential_address || '') + ' ' + String(e.permanent_address || '');
@@ -591,7 +640,6 @@
     function randomizeEmployeeList() {
         if(currentListData.length === 0) generateEmployeeList();
         
-        // Fisher-Yates shuffle
         let shuffled = [...currentListData];
         for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
