@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DAR HRMO Login</title>
+    <title>DAR Integrated System Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
@@ -24,7 +24,8 @@
 <body>
     <div class="flex h-screen bg-gray-100">
         <div class="hidden md:flex flex-col w-[400px] bg-[#003811] text-white p-12 justify-center">
-            <h1 class="text-4xl font-serif font-bold leading-tight uppercase tracking-widest">HR Report<br>Generator</h1>
+            <h1 class="text-4xl font-serif font-bold leading-tight uppercase tracking-widest">DAR Integrated<br>System</h1>
+            <p class="mt-4 text-sm font-semibold tracking-wide text-[#D4AF37] uppercase">Provincial Office of Camarines Sur I</p>
         </div>
         <div class="flex-1 flex items-center justify-center p-8">
             <div class="bg-white rounded-lg shadow w-full max-w-md p-10 border-t-4 border-[#D4AF37]">
@@ -40,12 +41,12 @@
     </div>
 
 <script>
-    // Redirect if already logged in based on role and unit
+    // Redirect if already logged in based on role, unit, and position
     if (sessionStorage.getItem('currentUser')) {
         const user = JSON.parse(sessionStorage.getItem('currentUser'));
         if (user.role === 'VEHICLE_APPROVER') {
             window.location.href = 'fleet.html';
-        } else if (user.role && user.role.toUpperCase().includes('PSO ENCODER')) {
+        } else if ((user.role && user.role.toUpperCase().includes('PSO ENCODER')) || user.position === 'UNIT_HEAD') {
             window.location.href = 'pso_encoder.html';
         } else if (user.unit === 'BUDGET' || user.unit === 'ACCOUNTING') {
             window.location.href = 'finance_dashboard.html';
@@ -65,16 +66,16 @@
         status.innerText = "";
         
         try {
-            const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
+            const { data, error } = await supabaseClient.from('Users').select('*').eq('username', u).single();
             if (error) throw new Error("Authentication failed");
             if (data && data.password === p) {
                 // Save user session
                 sessionStorage.setItem('currentUser', JSON.stringify(data));
                 
-                // Route based on role and unit
+                // Route based on role, unit, and position
                 if (data.role === 'VEHICLE_APPROVER') {
                     window.location.href = 'fleet.html';
-                } else if (data.role && data.role.toUpperCase().includes('PSO ENCODER')) {
+                } else if ((data.role && data.role.toUpperCase().includes('PSO ENCODER')) || data.position === 'UNIT_HEAD') {
                     window.location.href = 'pso_encoder.html';
                 } else if (data.unit === 'BUDGET' || data.unit === 'ACCOUNTING') {
                     window.location.href = 'finance_dashboard.html';
