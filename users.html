@@ -1,182 +1,182 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Users & Passwords - DAR HRMO</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-config.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
-        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; overflow: hidden; }
-        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; }
-        .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: #003811; margin-bottom: 0.25rem; text-transform: uppercase; }
-        .tab-btn { padding: 0.75rem 1.5rem; font-size: 0.875rem; font-weight: bold; color: #4B5563; border-bottom: 2px solid transparent; transition: all 0.2s; cursor: pointer; }
-        .tab-btn.active { color: #003811; border-bottom-color: #D4AF37; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .table-th { background-color: #f9fafb; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #6b7280; padding: 0.75rem 1.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
-        .table-td { padding: 0.75rem 1.5rem; font-size: 0.875rem; color: #111827; border-bottom: 1px solid #e5e7eb; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Users & Passwords - DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; overflow: hidden; }
+        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; }
+        .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: #003811; margin-bottom: 0.25rem; text-transform: uppercase; }
+        .tab-btn { padding: 0.75rem 1.5rem; font-size: 0.875rem; font-weight: bold; color: #4B5563; border-bottom: 2px solid transparent; transition: all 0.2s; cursor: pointer; }
+        .tab-btn.active { color: #003811; border-bottom-color: #D4AF37; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .table-th { background-color: #f9fafb; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #6b7280; padding: 0.75rem 1.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .table-td { padding: 0.75rem 1.5rem; font-size: 0.875rem; color: #111827; border-bottom: 1px solid #e5e7eb; }
+    </style>
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 hidden md:block border-b border-[#006400]">
-            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
-        </div>
-        <div class="flex-1 overflow-y-auto py-2">
-            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
-            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
-            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
-            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
-            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
-            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">SYSTEM USERS</a>
-        </div>
-        <div class="p-4 bg-black/20 hidden md:block">
-            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
-            <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow hover:bg-red-700">LOGOUT</button>
-        </div>
-    </nav>
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
+            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">SYSTEM USERS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-1.5 text-xs font-bold rounded shadow hover:bg-red-700">LOGOUT</button>
+        </div>
+    </nav>
 
-    <main class="flex-1 flex flex-col h-full bg-[#F3F4F6]">
-        <div class="p-8 pb-0">
-            <h2 class="text-3xl font-bold text-[#003811] mb-6">Users & Passwords</h2>
-            <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
-                <button class="tab-btn active whitespace-nowrap" onclick="switchTab('empTab')">Employee Passwords</button>
-                <button class="tab-btn whitespace-nowrap" onclick="switchTab('sysUserTab')">System Users</button>
-            </div>
-        </div>
+    <main class="flex-1 flex flex-col h-full bg-[#F3F4F6]">
+        <div class="p-8 pb-0">
+            <h2 class="text-3xl font-bold text-[#003811] mb-6">Users & Passwords</h2>
+            <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+                <button class="tab-btn active whitespace-nowrap" onclick="switchTab('empTab')">Employee Passwords</button>
+                <button class="tab-btn whitespace-nowrap" onclick="switchTab('sysUserTab')">System Users</button>
+            </div>
+        </div>
 
-        <div class="flex-1 overflow-y-auto px-8 pb-8">
-            
-            <div id="empTab" class="tab-content active">
-                <div class="card flex flex-col h-full">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
-                        <h3 class="font-bold text-[#003811]">Reset Employee App Passwords</h3>
-                        <div class="w-full md:w-1/3">
-                            <input type="text" id="empSearch" onkeyup="filterEmployees()" class="form-input" placeholder="Search by Emp ID or Name...">
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto flex-1">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr>
-                                    <th class="table-th">Emp ID</th>
-                                    <th class="table-th">Employee Name</th>
-                                    <th class="table-th">Division / Station</th>
-                                    <th class="table-th text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="emp-list">
-                                <tr><td colspan="4" class="table-td text-center text-gray-500">Loading employees...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+        <div class="flex-1 overflow-y-auto px-8 pb-8">
+            
+            <div id="empTab" class="tab-content active">
+                <div class="card flex flex-col h-full">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <h3 class="font-bold text-[#003811]">Reset Employee App Passwords</h3>
+                        <div class="w-full md:w-1/3">
+                            <input type="text" id="empSearch" onkeyup="filterEmployees()" class="form-input" placeholder="Search by Emp ID or Name...">
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto flex-1">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="table-th">Emp ID</th>
+                                    <th class="table-th">Employee Name</th>
+                                    <th class="table-th">Division / Station</th>
+                                    <th class="table-th text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="emp-list">
+                                <tr><td colspan="4" class="table-td text-center text-gray-500">Loading employees...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
-            <div id="sysUserTab" class="tab-content">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    
-                    <div class="card p-6 h-fit">
-                        <h3 id="formTitle" class="font-bold text-[#003811] mb-4">Create System User</h3>
-                        <p class="text-xs text-gray-500 mb-4">New users will automatically be assigned the default password <strong>1111</strong>.</p>
-                        
-                        <form id="createUserForm" onsubmit="handleCreateUser(event)">
-                            <input type="hidden" id="editUserId">
-                            <div class="mb-4">
-                                <label class="form-label">Full Name</label>
-                                <input type="text" id="newUserFullName" class="form-input" required>
-                            </div>
-                            <div class="mb-4">
-                                <label class="form-label">Username</label>
-                                <input type="text" id="newUserUsername" class="form-input" required>
-                            </div>
-                            <div class="mb-4">
-                                <label class="form-label">Role</label>
-                                <input type="text" id="newUserRole" class="form-input" required placeholder="e.g. HR, PARPO, CHIEF, USER">
-                            </div>
-                            <div class="mb-4">
-                                <label class="form-label">Division</label>
-                                <input type="text" id="newUserDivision" class="form-input">
-                            </div>
-                            <div class="mb-4">
-                                <label class="form-label">Unit</label>
-                                <input type="text" id="newUserUnit" class="form-input">
-                            </div>
-                            <div class="mb-6">
-                                <label class="form-label">E-Signature (Image or Paste Screenshot)</label>
-                                <input type="file" id="newUserSignature" class="form-input" accept="image/*">
-                            </div>
-                            <div class="flex gap-2">
-                                <button type="submit" id="btnSubmitUser" class="w-full bg-[#003811] text-white font-bold py-2 px-4 rounded hover:bg-[#002200] shadow">Save User</button>
-                                <button type="button" id="btnCancelEdit" onclick="cancelEdit()" class="hidden w-full bg-gray-500 text-white font-bold py-2 px-4 rounded hover:bg-gray-600 shadow">Cancel</button>
-                            </div>
-                        </form>
-                    </div>
+            <div id="sysUserTab" class="tab-content">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <div class="card p-6 h-fit">
+                        <h3 id="formTitle" class="font-bold text-[#003811] mb-4">Create System User</h3>
+                        <p class="text-xs text-gray-500 mb-4">New users will automatically be assigned the default password <strong>1111</strong>.</p>
+                        
+                        <form id="createUserForm" onsubmit="handleCreateUser(event)">
+                            <input type="hidden" id="editUserId">
+                            <div class="mb-4">
+                                <label class="form-label">Full Name</label>
+                                <input type="text" id="newUserFullName" class="form-input" required>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Username</label>
+                                <input type="text" id="newUserUsername" class="form-input" required>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Role</label>
+                                <input type="text" id="newUserRole" class="form-input" required placeholder="e.g. HR, PARPO, CHIEF, USER">
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Division</label>
+                                <input type="text" id="newUserDivision" class="form-input">
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Unit</label>
+                                <input type="text" id="newUserUnit" class="form-input">
+                            </div>
+                            <div class="mb-6">
+                                <label class="form-label">E-Signature (Image or Paste Screenshot)</label>
+                                <input type="file" id="newUserSignature" class="form-input" accept="image/*">
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="submit" id="btnSubmitUser" class="w-full bg-[#003811] text-white font-bold py-2 px-4 rounded hover:bg-[#002200] shadow">Save User</button>
+                                <button type="button" id="btnCancelEdit" onclick="cancelEdit()" class="hidden w-full bg-gray-500 text-white font-bold py-2 px-4 rounded hover:bg-gray-600 shadow">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
 
-                    <div class="card lg:col-span-2 flex flex-col">
-                        <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                            <h3 class="font-bold text-[#003811]">System Users Directory</h3>
-                            <button onclick="loadUsers()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
-                        </div>
-                        <div class="overflow-x-auto flex-1">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr>
-                                        <th class="table-th">Username</th>
-                                        <th class="table-th">Full Name</th>
-                                        <th class="table-th">Role</th>
-                                        <th class="table-th">Division / Unit</th>
-                                        <th class="table-th text-center">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sys-user-list">
-                                    <tr><td colspan="5" class="table-td text-center text-gray-500">Loading users...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <div class="card lg:col-span-2 flex flex-col">
+                        <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                            <h3 class="font-bold text-[#003811]">System Users Directory</h3>
+                            <button onclick="loadUsers()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
+                        </div>
+                        <div class="overflow-x-auto flex-1">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr>
+                                        <th class="table-th">Username</th>
+                                        <th class="table-th">Full Name</th>
+                                        <th class="table-th">Role</th>
+                                        <th class="table-th">Division / Unit</th>
+                                        <th class="table-th text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sys-user-list">
+                                    <tr><td colspan="5" class="table-td text-center text-gray-500">Loading users...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
-                </div>
-            </div>
+                </div>
+            </div>
 
-        </div>
-    </main>
+        </div>
+    </main>
 
 <script>
-    // --- SESSION AUTH ---
-    const userData = sessionStorage.getItem('currentUser');
-    if (!userData) { window.location.href = 'index.html'; }
-    const currentUser = JSON.parse(userData);
-    document.getElementById('activeUser').innerText = `User: ${currentUser.full_name ? currentUser.full_name.toUpperCase() : currentUser.username}`;
+    // --- SESSION AUTH ---
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) { window.location.href = 'index.html'; }
+    const currentUser = JSON.parse(userData);
+    document.getElementById('activeUser').innerText = `User: ${currentUser.full_name ? currentUser.full_name.toUpperCase() : currentUser.username}`;
 
-    function logout() {
-        sessionStorage.removeItem('currentUser');
-        window.location.href = 'index.html';
-    }
+    function logout() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    }
 
-    // --- TAB LOGIC ---
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        
-        event.target.classList.add('active');
-        document.getElementById(tabId).classList.add('active');
-
-        if(tabId === 'empTab') loadEmployees();
-        if(tabId === 'sysUserTab') loadUsers();
-    }
-
-    // --- GLOBALS ---
-    let allEmployees = [];
-
-    // --- INITIALIZATION ---
-    document.addEventListener('DOMContentLoaded', () => {
-        loadEmployees();
+    // --- TAB LOGIC ---
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         
+        event.target.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+
+        if(tabId === 'empTab') loadEmployees();
+        if(tabId === 'sysUserTab') loadUsers();
+    }
+
+    // --- GLOBALS ---
+    let allEmployees = [];
+
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', () => {
+        loadEmployees();
+
         // Allow pasting screenshots directly into the signature file input
         document.addEventListener('paste', function(e) {
             const fileInput = document.getElementById('newUserSignature');
@@ -189,143 +189,143 @@
                 }
             }
         });
-    });
+    });
 
-    // --- EMPLOYEE PASSWORD LOGIC (employees table) ---
-    async function loadEmployees() {
-        const list = document.getElementById('emp-list');
-        list.innerHTML = `<tr><td colspan="4" class="table-td text-center">Loading...</td></tr>`;
+    // --- EMPLOYEE PASSWORD LOGIC (employees table) ---
+    async function loadEmployees() {
+        const list = document.getElementById('emp-list');
+        list.innerHTML = `<tr><td colspan="4" class="table-td text-center">Loading...</td></tr>`;
 
-        try {
-            // Deliberately excluding 'pass' column so HR cannot view current passwords
-            const { data, error } = await supabaseClient.from('employees')
-                .select('emp_id, full_name, division, station')
-                .order('full_name', { ascending: true });
+        try {
+            // Deliberately excluding 'pass' column so HR cannot view current passwords
+            const { data, error } = await supabaseClient.from('employees')
+                .select('emp_id, full_name, division, station')
+                .order('full_name', { ascending: true });
 
-            if (error) throw error;
+            if (error) throw error;
 
-            allEmployees = data || [];
-            renderEmployees(allEmployees);
-        } catch (e) {
-            list.innerHTML = `<tr><td colspan="4" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
-        }
-    }
+            allEmployees = data || [];
+            renderEmployees(allEmployees);
+        } catch (e) {
+            list.innerHTML = `<tr><td colspan="4" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+        }
+    }
 
-    function renderEmployees(data) {
-        const list = document.getElementById('emp-list');
-        if (data.length === 0) {
-            list.innerHTML = `<tr><td colspan="4" class="table-td text-center text-gray-500">No employees found.</td></tr>`;
-            return;
-        }
+    function renderEmployees(data) {
+        const list = document.getElementById('emp-list');
+        if (data.length === 0) {
+            list.innerHTML = `<tr><td colspan="4" class="table-td text-center text-gray-500">No employees found.</td></tr>`;
+            return;
+        }
 
-        let html = '';
-        data.forEach(emp => {
-            const loc = [emp.division, emp.station].filter(Boolean).join(' / ');
-            html += `
-                <tr class="hover:bg-gray-50">
-                    <td class="table-td font-mono text-sm">${emp.emp_id}</td>
-                    <td class="table-td font-bold">${emp.full_name ? emp.full_name.toUpperCase() : 'N/A'}</td>
-                    <td class="table-td text-sm">${loc || 'N/A'}</td>
-                    <td class="table-td text-center">
-                        <button onclick="resetEmpPassword('${emp.emp_id}', '${emp.full_name ? emp.full_name.replace(/'/g, "\\'") : emp.emp_id}')" class="bg-yellow-600 text-white text-xs px-3 py-1.5 rounded hover:bg-yellow-700 shadow font-bold">Reset to 1111</button>
-                    </td>
-                </tr>
-            `;
-        });
-        list.innerHTML = html;
-    }
+        let html = '';
+        data.forEach(emp => {
+            const loc = [emp.division, emp.station].filter(Boolean).join(' / ');
+            html += `
+                <tr class="hover:bg-gray-50">
+                    <td class="table-td font-mono text-sm">${emp.emp_id}</td>
+                    <td class="table-td font-bold">${emp.full_name ? emp.full_name.toUpperCase() : 'N/A'}</td>
+                    <td class="table-td text-sm">${loc || 'N/A'}</td>
+                    <td class="table-td text-center">
+                        <button onclick="resetEmpPassword('${emp.emp_id}', '${emp.full_name ? emp.full_name.replace(/'/g, "\\'") : emp.emp_id}')" class="bg-yellow-600 text-white text-xs px-3 py-1.5 rounded hover:bg-yellow-700 shadow font-bold">Reset to 1111</button>
+                    </td>
+                </tr>
+            `;
+        });
+        list.innerHTML = html;
+    }
 
-    function filterEmployees() {
-        const term = document.getElementById('empSearch').value.toLowerCase();
-        const filtered = allEmployees.filter(e => 
-            (e.emp_id && e.emp_id.toLowerCase().includes(term)) || 
-            (e.full_name && e.full_name.toLowerCase().includes(term))
-        );
-        renderEmployees(filtered);
-    }
+    function filterEmployees() {
+        const term = document.getElementById('empSearch').value.toLowerCase();
+        const filtered = allEmployees.filter(e => 
+            (e.emp_id && e.emp_id.toLowerCase().includes(term)) || 
+            (e.full_name && e.full_name.toLowerCase().includes(term))
+        );
+        renderEmployees(filtered);
+    }
 
-    async function resetEmpPassword(emp_id, name) {
-        if(!confirm(`Are you sure you want to reset the app password for ${name} to 1111?`)) return;
+    async function resetEmpPassword(emp_id, name) {
+        if(!confirm(`Are you sure you want to reset the app password for ${name} to 1111?`)) return;
 
-        try {
-            const { error } = await supabaseClient.from('employees')
-                .update({ pass: '1111' })
-                .eq('emp_id', emp_id);
+        try {
+            const { error } = await supabaseClient.from('employees')
+                .update({ pass: '1111' })
+                .eq('emp_id', emp_id);
 
-            if (error) throw error;
-            alert(`Password for ${name} has been successfully reset to 1111.`);
-        } catch (e) {
-            alert(`Error resetting password: ${e.message}`);
-        }
-    }
+            if (error) throw error;
+            alert(`Password for ${name} has been successfully reset to 1111.`);
+        } catch (e) {
+            alert(`Error resetting password: ${e.message}`);
+        }
+    }
 
-    // --- SYSTEM USERS LOGIC (users table) ---
-    async function loadUsers() {
-        const list = document.getElementById('sys-user-list');
-        list.innerHTML = `<tr><td colspan="5" class="table-td text-center">Loading...</td></tr>`;
+    // --- SYSTEM USERS LOGIC (users table) ---
+    async function loadUsers() {
+        const list = document.getElementById('sys-user-list');
+        list.innerHTML = `<tr><td colspan="5" class="table-td text-center">Loading...</td></tr>`;
 
-        try {
-            // Deliberately excluding 'password' column so HR cannot view current passwords
-            const { data, error } = await supabaseClient.from('users')
-                .select('id, username, full_name, role, division, unit')
-                .order('role', { ascending: true });
+        try {
+            // Deliberately excluding 'password' column so HR cannot view current passwords
+            const { data, error } = await supabaseClient.from('users')
+                .select('id, username, full_name, role, division, unit')
+                .order('role', { ascending: true });
 
-            if (error) throw error;
+            if (error) throw error;
 
-            if (!data || data.length === 0) {
-                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No system users found.</td></tr>`;
-                return;
-            }
+            if (!data || data.length === 0) {
+                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No system users found.</td></tr>`;
+                return;
+            }
 
-            let html = '';
-            data.forEach(user => {
-                const loc = [user.division, user.unit].filter(Boolean).join(' / ');
-                const safeFullName = user.full_name ? user.full_name.replace(/'/g, "\\'") : '';
-                const safeRole = user.role ? user.role.replace(/'/g, "\\'") : '';
-                const safeDiv = user.division ? user.division.replace(/'/g, "\\'") : '';
-                const safeUnit = user.unit ? user.unit.replace(/'/g, "\\'") : '';
+            let html = '';
+            data.forEach(user => {
+                const loc = [user.division, user.unit].filter(Boolean).join(' / ');
+                const safeFullName = user.full_name ? user.full_name.replace(/'/g, "\\'") : '';
+                const safeRole = user.role ? user.role.replace(/'/g, "\\'") : '';
+                const safeDiv = user.division ? user.division.replace(/'/g, "\\'") : '';
+                const safeUnit = user.unit ? user.unit.replace(/'/g, "\\'") : '';
 
-                html += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="table-td font-bold">${user.username}</td>
-                        <td class="table-td">${user.full_name || '-'}</td>
-                        <td class="table-td"><span class="bg-gray-200 text-gray-800 text-xs px-2 py-1 rounded font-bold">${user.role}</span></td>
-                        <td class="table-td text-sm">${loc || '-'}</td>
-                        <td class="table-td text-center">
-                            <button onclick="editSysUser('${user.id}', '${user.username}', '${safeFullName}', '${safeRole}', '${safeDiv}', '${safeUnit}')" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 shadow font-bold mr-2">Edit</button>
-                            <button onclick="resetSysUserPassword('${user.id}', '${user.username}')" class="bg-red-700 text-white text-xs px-3 py-1.5 rounded hover:bg-red-800 shadow font-bold">Reset to 1111</button>
-                        </td>
-                    </tr>
-                `;
-            });
-            list.innerHTML = html;
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="table-td font-bold">${user.username}</td>
+                        <td class="table-td">${user.full_name || '-'}</td>
+                        <td class="table-td"><span class="bg-gray-200 text-gray-800 text-xs px-2 py-1 rounded font-bold">${user.role}</span></td>
+                        <td class="table-td text-sm">${loc || '-'}</td>
+                        <td class="table-td text-center">
+                            <button onclick="editSysUser('${user.id}', '${user.username}', '${safeFullName}', '${safeRole}', '${safeDiv}', '${safeUnit}')" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 shadow font-bold mr-2">Edit</button>
+                            <button onclick="resetSysUserPassword('${user.id}', '${user.username}')" class="bg-red-700 text-white text-xs px-3 py-1.5 rounded hover:bg-red-800 shadow font-bold">Reset to 1111</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            list.innerHTML = html;
 
-        } catch (e) {
-            list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
-        }
-    }
+        } catch (e) {
+            list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+        }
+    }
 
-    function editSysUser(id, username, fullName, role, division, unit) {
-        document.getElementById('editUserId').value = id;
-        document.getElementById('newUserUsername').value = username;
-        document.getElementById('newUserFullName').value = fullName;
-        document.getElementById('newUserRole').value = role;
-        document.getElementById('newUserDivision').value = division;
-        document.getElementById('newUserUnit').value = unit;
+    function editSysUser(id, username, fullName, role, division, unit) {
+        document.getElementById('editUserId').value = id;
+        document.getElementById('newUserUsername').value = username;
+        document.getElementById('newUserFullName').value = fullName;
+        document.getElementById('newUserRole').value = role;
+        document.getElementById('newUserDivision').value = division;
+        document.getElementById('newUserUnit').value = unit;
 
-        document.getElementById('formTitle').innerText = 'Edit System User';
-        document.getElementById('btnSubmitUser').innerText = 'Update User';
-        document.getElementById('btnCancelEdit').classList.remove('hidden');
-    }
+        document.getElementById('formTitle').innerText = 'Edit System User';
+        document.getElementById('btnSubmitUser').innerText = 'Update User';
+        document.getElementById('btnCancelEdit').classList.remove('hidden');
+    }
 
-    function cancelEdit() {
-        document.getElementById('editUserId').value = '';
-        document.getElementById('createUserForm').reset();
-        
-        document.getElementById('formTitle').innerText = 'Create System User';
-        document.getElementById('btnSubmitUser').innerText = 'Save User';
-        document.getElementById('btnCancelEdit').classList.add('hidden');
-    }
+    function cancelEdit() {
+        document.getElementById('editUserId').value = '';
+        document.getElementById('createUserForm').reset();
+        
+        document.getElementById('formTitle').innerText = 'Create System User';
+        document.getElementById('btnSubmitUser').innerText = 'Save User';
+        document.getElementById('btnCancelEdit').classList.add('hidden');
+    }
 
     // Process image to resize and convert to PNG Blob
     function processImageToPNG(file, maxWidth = 300, maxHeight = 100) {
@@ -352,7 +352,6 @@
                         }
                     }
 
-                    // Double check bounds to maintain ratio precisely
                     if (height > maxHeight) {
                         width = Math.round((width * maxHeight) / height);
                         height = maxHeight;
@@ -377,18 +376,18 @@
         });
     }
 
-    async function handleCreateUser(e) {
-        e.preventDefault();
-        
-        const id = document.getElementById('editUserId').value;
-        const username = document.getElementById('newUserUsername').value.trim();
-        const full_name = document.getElementById('newUserFullName').value.trim();
-        const role = document.getElementById('newUserRole').value.trim();
-        const division = document.getElementById('newUserDivision').value.trim();
-        const unit = document.getElementById('newUserUnit').value.trim();
+    async function handleCreateUser(e) {
+        e.preventDefault();
+        
+        const id = document.getElementById('editUserId').value;
+        const username = document.getElementById('newUserUsername').value.trim();
+        const full_name = document.getElementById('newUserFullName').value.trim();
+        const role = document.getElementById('newUserRole').value.trim();
+        const division = document.getElementById('newUserDivision').value.trim();
+        const unit = document.getElementById('newUserUnit').value.trim();
         const signatureFile = document.getElementById('newUserSignature').files[0];
 
-        try {
+        try {
             let processedSignature = null;
             if (signatureFile) {
                 try {
@@ -401,93 +400,93 @@
                 }
             }
 
-            if (id) {
-                // UPDATE EXISTING USER
-                if(!confirm(`Are you sure you want to update user '${username}'?`)) {
+            if (id) {
+                // UPDATE EXISTING USER
+                if(!confirm(`Are you sure you want to update user '${username}'?`)) {
                     document.getElementById('btnSubmitUser').innerText = 'Update User';
                     return;
                 }
                 
                 document.getElementById('btnSubmitUser').innerText = 'Updating...';
 
-                const { error } = await supabaseClient.from('users')
-                    .update({
-                        username: username,
-                        full_name: full_name,
-                        role: role,
-                        division: division || null,
-                        unit: unit || null
-                    }).eq('id', id);
+                const { error } = await supabaseClient.from('users')
+                    .update({
+                        username: username,
+                        full_name: full_name,
+                        role: role,
+                        division: division || null,
+                        unit: unit || null
+                    }).eq('id', id);
 
-                if (error) throw error;
-
+                if (error) throw error;
+                
                 // Upload processed signature if provided
                 if (processedSignature) {
                     const { error: uploadError } = await supabaseClient.storage.from('e-sign').upload(`${username}.png`, processedSignature, { 
-                        upsert: true, 
+                        upsert: true,
                         contentType: 'image/png' 
                     });
                     if (uploadError) throw uploadError;
                 }
 
-                alert(`User '${username}' updated successfully!`);
-                cancelEdit();
+                alert(`User '${username}' updated successfully!`);
+                cancelEdit();
 
-            } else {
-                // CREATE NEW USER
-                if(!confirm(`Are you sure you want to create user '${username}'? The default password will be 1111.`)) {
+            } else {
+                // CREATE NEW USER
+                if(!confirm(`Are you sure you want to create user '${username}'? The default password will be 1111.`)) {
                     document.getElementById('btnSubmitUser').innerText = 'Save User';
                     return;
                 }
-                
+
                 document.getElementById('btnSubmitUser').innerText = 'Saving...';
 
-                const { error } = await supabaseClient.from('users').insert([{
-                    username: username,
-                    password: '1111',
-                    full_name: full_name,
-                    role: role,
-                    division: division || null,
-                    unit: unit || null
-                }]);
+                const { error } = await supabaseClient.from('users').insert([{
+                    username: username,
+                    password: '1111',
+                    full_name: full_name,
+                    role: role,
+                    division: division || null,
+                    unit: unit || null
+                }]);
 
-                if (error) throw error;
+                if (error) throw error;
                 
                 // Upload processed signature if provided
                 if (processedSignature) {
                     const { error: uploadError } = await supabaseClient.storage.from('e-sign').upload(`${username}.png`, processedSignature, { 
-                        upsert: true, 
-                        contentType: 'image/png' 
+                        upsert: true,
+                        contentType: 'image/png'
                     });
                     if (uploadError) throw uploadError;
                 }
 
-                alert(`User '${username}' created successfully!`);
-                document.getElementById('createUserForm').reset();
+                alert(`User '${username}' created successfully!`);
+                document.getElementById('createUserForm').reset();
                 document.getElementById('btnSubmitUser').innerText = 'Save User';
-            }
+            }
 
-            loadUsers();
-        } catch (err) {
-            alert(`Error saving user: ${err.message}`);
+            loadUsers();
+        } catch (err) {
+            alert(`Error saving user: ${err.message}`);
             document.getElementById('btnSubmitUser').innerText = id ? 'Update User' : 'Save User';
-        }
-    }
+        }
+    }
 
-    async function resetSysUserPassword(id, username) {
-        if(!confirm(`Are you sure you want to reset the portal password for system user '${username}' to 1111?`)) return;
+    async function resetSysUserPassword(id, username) {
+        if(!confirm(`Are you sure you want to reset the portal password for system user '${username}' to 1111?`)) return;
 
-        try {
-            const { error } = await supabaseClient.from('users')
-                .update({ password: '1111' })
-                .eq('id', id);
+        try {
+            const { error } = await supabaseClient.from('users')
+                .update({ password: '1111' })
+                .eq('id', id);
 
-            if (error) throw error;
-            alert(`Password for system user '${username}' has been successfully reset to 1111.`);
-        } catch (e) {
-            alert(`Error resetting password: ${e.message}`);
-        }
-    }
+            if (error) throw error;
+            alert(`Password for system user '${username}' has been successfully reset to 1111.`);
+        } catch (e) {
+            alert(`Error resetting password: ${e.message}`);
+        }
+    }
 
 </script>
 </body>
