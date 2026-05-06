@@ -106,6 +106,7 @@
         let activeReservationGroups = {};
         let editPassRef = "", editPassType = "", currentPassList = [], removedPassList = [], addedPassList = [];
         let currentEditTrip = {}; 
+        let currentTransfer = {};
 
         // --- SESSION AND AUTH ---
         document.addEventListener("DOMContentLoaded", async () => {
@@ -327,14 +328,38 @@
                             <label class="block text-sm font-bold text-[#003811] mb-1">Driver</label>
                             <input id="editTripDr" list="drivers" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold">
                         </div>
-                        <div>
-                            <label class="block text-sm font-bold text-[#003811] mb-1">Schedule</label>
-                            <input id="editTripSch" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold">
-                        </div>
                     </div>
                     <div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg">
                         <button onclick="closeModal('editTripModal')" class="px-6 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button>
                         <button onclick="saveEditTrip()" class="bg-[#D4AF37] text-black px-6 py-2 rounded font-bold text-sm hover:brightness-110 shadow-sm transition-colors">Save Updates</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- TRANSFER PASSENGER MODAL -->
+            <div id="transferModal" class="hidden modal-overlay">
+                <div class="modal-box max-w-sm">
+                    <div class="p-5 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                        <h2 class="font-bold text-[#003811] text-lg">Transfer Passenger</h2>
+                        <button onclick="closeModal('transferModal')" class="text-gray-400 hover:text-red-500 font-bold text-xl leading-none">✕</button>
+                    </div>
+                    <div class="p-6 space-y-4 bg-white">
+                        <p class="text-xs text-gray-500 font-bold mb-2 uppercase" id="transferLabel"></p>
+                        <div>
+                            <label class="block text-sm font-bold text-[#003811] mb-1">Select Passenger</label>
+                            <select id="transferPassSel" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold"></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-[#003811] mb-1">Transfer To Vehicle</label>
+                            <select id="transferVehSel" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold">
+                                <option value="LAND" class="text-red-600">LAND (No Gov Veh)</option>
+                                ${VEHICLES.map(v=>`<option>${v}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg">
+                        <button onclick="closeModal('transferModal')" class="px-6 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button>
+                        <button onclick="saveTransfer()" class="bg-[#D4AF37] text-black px-6 py-2 rounded font-bold text-sm hover:brightness-110 shadow-sm transition-colors">Transfer</button>
                     </div>
                 </div>
             </div>
@@ -464,7 +489,7 @@
             const tripItins = itins.filter(i => i.to_no === to).sort((a,b) => new Date(a.travel_date) - new Date(b.travel_date));
             if (!tripItins.length) return alert("No itinerary dates found for this TO.");
 
-            let receivedObj = {}, driverObj = {}, scheduleObj = {}, allLand = true;
+            let receivedObj = {}, driverObj = {}, allLand = true;
 
             for (let i of tripItins) {
                 const date = i.travel_date;
@@ -473,16 +498,10 @@
                 if (!vSelect || vSelect.value === "Select...") return alert(`Please assign a vehicle or set LAND for ${date}.`);
                 
                 const v = vSelect.value;
-                const s = document.getElementById(`s-${to}-${date}`).value;
                 const d = document.getElementById(`d-${to}-${date}`).value || "TBD";
-                const t = document.getElementById(`t-${to}-${date}`).value;
                 
-                let timeStr = s;
-                if (t) timeStr = `${s} (${formatTo12Hour(t)} Onward)`;
-
                 receivedObj[date] = v;
                 driverObj[date] = v === 'LAND' ? 'N/A' : d;
-                scheduleObj[date] = v === 'LAND' ? 'LAND TRAVEL' : timeStr;
 
                 if (v !== 'LAND') allLand = false;
             }
@@ -491,14 +510,13 @@
 
             if (allLand) {
                 const { error } = await db.from('travel_orders').update({ 
-                    transport: 'LAND', received: null, driver: null, schedule: null, status: nextStatus 
+                    transport: 'LAND', received: null, driver: null, status: nextStatus 
                 }).eq('to_no', to);
                 if (error) alert("Database Error: " + error.message);
             } else {
                 const { error } = await db.from('travel_orders').update({ 
                     received: JSON.stringify(receivedObj), 
                     driver: JSON.stringify(driverObj), 
-                    schedule: JSON.stringify(scheduleObj), 
                     status: nextStatus 
                 }).eq('to_no', to);
                 if (error) alert("Database Error: " + error.message);
@@ -508,7 +526,7 @@
 
         async function toLand(to, unit) {
             if(!confirm("Are you sure you want to set the entire trip to LAND TRAVEL?")) return;
-            await db.from('travel_orders').update({ transport: 'LAND', status: getApprovalTarget(unit), received: null, driver: null, schedule: null }).eq('to_no', to);
+            await db.from('travel_orders').update({ transport: 'LAND', status: getApprovalTarget(unit), received: null, driver: null }).eq('to_no', to);
             sync();
         }
 
@@ -538,16 +556,15 @@
                     toItins.forEach(itin => {
                         const date = itin.travel_date;
                         const v = getDailyValue(toRecord.received, date, 'N/A');
-                        const sStr = getDailyValue(toRecord.schedule, date, 'WHOLE DAY');
                         
-                        // Hide completed trips
-                        if(sStr.includes('[COMPLETED]')) return;
+                        // Check if completed via vehLogs
+                        if(vehLogs.some(vl => vl.to_no === ref && vl.travel_date === date && vl.action === 'COMPLETED')) return;
 
                         if (v && v !== 'LAND' && v !== 'N/A') {
                             activeReservationGroups[ref].trips.push({
                                 date: date, dest: itin.destination, vehicle: v,
                                 driver: getDailyValue(toRecord.driver, date, 'N/A'),
-                                scheduleStr: sStr
+                                scheduleStr: 'WHOLE DAY' // Fallback
                             });
                         }
                     });
@@ -556,7 +573,8 @@
 
             // 2. Group Bookings
             bookings.forEach(bk => {
-                if(bk.schedule && bk.schedule.includes('[COMPLETED]')) return; // Hide completed
+                // Check if completed via vehLogs
+                if(vehLogs.some(vl => vl.to_no === bk.ref_no && vl.travel_date === bk.travel_date && vl.action === 'COMPLETED')) return; 
                 
                 if (!activeReservationGroups[bk.ref_no]) {
                     activeReservationGroups[bk.ref_no] = { ref: bk.ref_no, type: 'BK', passengers: [], trips: [] };
@@ -632,7 +650,6 @@
             document.getElementById('editTripLabel').innerText = `${ref} - ${date}`;
             document.getElementById('editTripVeh').value = currVeh !== 'N/A' ? currVeh : 'MAZDA';
             document.getElementById('editTripDr').value = currDr !== 'N/A' ? currDr : 'Driver 1';
-            document.getElementById('editTripSch').value = currSch;
             openModal('editTripModal');
         }
 
@@ -640,12 +657,11 @@
             const { ref, date, type } = currentEditTrip;
             const v = document.getElementById('editTripVeh').value;
             const dr = document.getElementById('editTripDr').value;
-            const sch = document.getElementById('editTripSch').value;
 
             if (type === 'TO') {
                 const row = orders.find(o => o.to_no === ref);
                 if (row) {
-                    let recObj = {}, drvObj = {}, schedObj = {};
+                    let recObj = {}, drvObj = {};
                     
                     if(row.received && row.received.startsWith('{')) recObj = JSON.parse(row.received);
                     else if(row.received) recObj[date] = row.received;
@@ -653,33 +669,78 @@
                     if(row.driver && row.driver.startsWith('{')) drvObj = JSON.parse(row.driver);
                     else if(row.driver) drvObj[date] = row.driver;
 
-                    if(row.schedule && row.schedule.startsWith('{')) schedObj = JSON.parse(row.schedule);
-                    else if(row.schedule) schedObj[date] = row.schedule;
-
                     recObj[date] = v;
                     drvObj[date] = dr;
-                    schedObj[date] = sch;
 
                     const allLand = Object.values(recObj).every(val => val === 'LAND');
                     if (allLand) {
-                        await db.from('travel_orders').update({ transport: 'LAND', received: null, driver: null, schedule: null }).eq('to_no', ref);
+                        await db.from('travel_orders').update({ transport: 'LAND', received: null, driver: null }).eq('to_no', ref);
                     } else {
                         await db.from('travel_orders').update({
                             received: JSON.stringify(recObj),
-                            driver: JSON.stringify(drvObj),
-                            schedule: JSON.stringify(schedObj)
+                            driver: JSON.stringify(drvObj)
                         }).eq('to_no', ref);
                     }
                 }
             } else {
                 await db.from('fleet_bookings').update({
                     vehicle: v,
-                    driver: dr,
-                    schedule: sch
+                    driver: dr
                 }).eq('ref_no', ref).eq('travel_date', date);
             }
             
             closeModal('editTripModal');
+            sync();
+        }
+
+        // --- Transfer Passenger ---
+        function openTransferModal(ref, date, type, currentVeh) {
+            currentTransfer = { ref, date, type, currentVeh };
+            document.getElementById('transferLabel').innerText = `${ref} - ${date} (${currentVeh})`;
+
+            let passList = [];
+            if (type === 'TO') {
+                const tos = orders.filter(o => o.to_no === ref && getDailyValue(o.received, date, null) === currentVeh);
+                passList = tos.map(o => ({ id: o.emp_id, name: o.emp_name }));
+            } else {
+                const bks = bookings.filter(b => b.ref_no === ref && b.travel_date === date && b.vehicle === currentVeh);
+                passList = bks.map(b => ({ id: b.emp_id, name: b.emp_name }));
+            }
+
+            const sel = document.getElementById('transferPassSel');
+            sel.innerHTML = passList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+            document.getElementById('transferVehSel').value = currentVeh;
+            openModal('transferModal');
+        }
+
+        async function saveTransfer() {
+            const { ref, date, type, currentVeh } = currentTransfer;
+            const empId = document.getElementById('transferPassSel').value;
+            const newVeh = document.getElementById('transferVehSel').value;
+
+            if (newVeh === currentVeh) return alert("Select a different vehicle.");
+
+            if (type === 'TO') {
+                const row = orders.find(o => o.to_no === ref && o.emp_id === empId);
+                if (row) {
+                    let recObj = {};
+                    if(row.received && row.received.startsWith('{')) recObj = JSON.parse(row.received);
+                    else if(row.received) recObj[date] = row.received;
+
+                    recObj[date] = newVeh;
+
+                    await db.from('travel_orders').update({
+                        received: JSON.stringify(recObj)
+                    }).eq('to_no', ref).eq('emp_id', empId);
+                }
+            } else {
+                await db.from('fleet_bookings').update({
+                    vehicle: newVeh
+                }).eq('ref_no', ref).eq('travel_date', date).eq('emp_id', empId);
+            }
+
+            closeModal('transferModal');
             sync();
         }
 
@@ -735,7 +796,7 @@
             // Apply deletions
             for (let p of removedPassList) {
                 if (editPassType === 'TO') {
-                    await db.from('travel_orders').update({ transport: 'LAND', received: null, driver: null, schedule: null }).eq('to_no', editPassRef).eq('emp_id', p.id);
+                    await db.from('travel_orders').update({ transport: 'LAND', received: null, driver: null }).eq('to_no', editPassRef).eq('emp_id', p.id);
                 } else {
                     await db.from('fleet_bookings').delete().eq('ref_no', editPassRef).eq('emp_id', p.id);
                 }
@@ -783,20 +844,18 @@
                 const { data } = await db.from('travel_orders').select('*').eq('to_no', ref).limit(1);
                 if (data && data.length > 0) {
                     const row = data[0];
-                    let recObj = {}, drvObj = {}, schedObj = {};
+                    let recObj = {}, drvObj = {};
                     if(row.received && row.received.startsWith('{')) recObj = JSON.parse(row.received);
                     if(row.driver && row.driver.startsWith('{')) drvObj = JSON.parse(row.driver);
-                    if(row.schedule && row.schedule.startsWith('{')) schedObj = JSON.parse(row.schedule);
 
                     recObj[date] = 'LAND';
                     drvObj[date] = 'N/A';
-                    schedObj[date] = 'LAND TRAVEL';
 
                     const allLand = Object.values(recObj).every(v => v === 'LAND');
                     if (allLand) {
-                        await db.from('travel_orders').update({ transport: 'LAND', received: null, driver: null, schedule: null }).eq('to_no', ref);
+                        await db.from('travel_orders').update({ transport: 'LAND', received: null, driver: null }).eq('to_no', ref);
                     } else {
-                        await db.from('travel_orders').update({ received: JSON.stringify(recObj), driver: JSON.stringify(drvObj), schedule: JSON.stringify(schedObj) }).eq('to_no', ref);
+                        await db.from('travel_orders').update({ received: JSON.stringify(recObj), driver: JSON.stringify(drvObj) }).eq('to_no', ref);
                     }
                 }
             } else {
@@ -810,21 +869,8 @@
             
             const tag = '[COMPLETED]';
             
-            // 1. Tag in orders/bookings to hide it
-            if (type === 'TO') {
-                const to = orders.find(o => o.to_no === ref);
-                let currentSched = to.schedule || '';
-                
-                if (currentSched.startsWith('{')) {
-                    const parsed = JSON.parse(currentSched);
-                    let baseText = cleanText(parsed[date] || '');
-                    parsed[date] = `${tag} ${baseText}`;
-                    await db.from('travel_orders').update({ schedule: JSON.stringify(parsed) }).eq('to_no', ref);
-                } else {
-                    let baseText = cleanText(currentSched);
-                    await db.from('travel_orders').update({ schedule: `${tag} ${baseText}` }).eq('to_no', ref);
-                }
-            } else {
+            // 1. Tag in bookings only
+            if (type === 'BK') {
                 const bkList = bookings.filter(b => b.ref_no === ref && b.travel_date === date);
                 if (bkList.length > 0) {
                     let baseText = cleanText(bkList[0].schedule || '');
@@ -832,7 +878,7 @@
                 }
             }
 
-            // 2. Insert to vehicle_logs
+            // 2. Insert to vehicle_logs to mark completion for TOs and BKs
             await db.from('vehicle_logs').insert({
                 to_no: ref,
                 applicant: passengerStr,
@@ -888,23 +934,25 @@
                 
                 const uniqueTo = [...new Set(vTOs.map(l => l.to_no))].sort();
                 uniqueTo.forEach(toNo => {
-                    const h = vTOs.find(l => l.to_no === toNo);
                     const vehicleDates = filteredItins.filter(itin => itin.to_no === toNo);
                     
                     vehicleDates.forEach(itin => {
-                        let rec = getDailyValue(h.received, itin.travel_date, null);
-                        let sched = getDailyValue(h.schedule, itin.travel_date, 'WHOLE DAY');
+                        const passengersInVeh = orders.filter(o => o.to_no === toNo && getDailyValue(o.received, itin.travel_date, null) === v);
                         
-                        // Exclude completed ones from this active schedule board
-                        if (rec === v && !sched.includes('[COMPLETED]')) { 
-                            let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
+                        if (passengersInVeh.length > 0) { 
+                            const h = passengersInVeh[0];
+                            let sched = 'WHOLE DAY'; 
                             
-                            vehicleTrips.push({
-                                date: itin.travel_date, ref: toNo, type: 'TO',
-                                passengers: orders.filter(o => o.to_no === toNo).map(o => o.emp_name),
-                                dest: itin.destination, purpose: itin.purpose,
-                                time: sched, driver: drv, isMaint: h.status === 'OFF_ROAD'
-                            });
+                            if (!vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && vl.action === 'COMPLETED')) { 
+                                let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
+                                
+                                vehicleTrips.push({
+                                    date: itin.travel_date, ref: toNo, type: 'TO',
+                                    passengers: passengersInVeh.map(o => o.emp_name),
+                                    dest: itin.destination, purpose: itin.purpose,
+                                    time: sched, driver: drv, isMaint: h.status === 'OFF_ROAD'
+                                });
+                            }
                         }
                     });
                 });
@@ -912,7 +960,7 @@
                 const vBks = filteredBookings.filter(b => b.vehicle === v);
                 const bkMap = {};
                 vBks.forEach(bk => {
-                    if(bk.schedule && bk.schedule.includes('[COMPLETED]')) return; // Exclude completed
+                    if(vehLogs.some(vl => vl.to_no === bk.ref_no && vl.travel_date === bk.travel_date && vl.action === 'COMPLETED')) return;
                     const key = bk.ref_no + '_' + bk.travel_date;
                     if(!bkMap[key]) bkMap[key] = { ...bk, passengers: [] };
                     if(!bkMap[key].passengers.includes(bk.emp_name)) bkMap[key].passengers.push(bk.emp_name);
@@ -964,9 +1012,12 @@
                     const isPastOrToday = trip.date <= todayStr;
                     const passStr = escQ(trip.passengers.join(', '));
                     
-                    let actionCell = `<div class="text-[11px] text-gray-400 italic font-medium text-center">Upcoming</div>`;
+                    let actionCell = `<div class="text-[11px] text-gray-400 italic font-medium text-center mb-1">Upcoming</div>`;
                     if (isPastOrToday && !trip.isMaint) {
-                        actionCell = `<button onclick="markTripHappened('${trip.ref}', '${trip.type}', '${trip.date}', '${passStr}', '${escQ(cleanTime)}')" class="w-full py-2 rounded text-[10px] font-bold uppercase tracking-wider transition bg-green-500 text-white border border-green-600 shadow-sm hover:opacity-90">✔ Trip Happened</button>`;
+                        actionCell = `<button onclick="markTripHappened('${trip.ref}', '${trip.type}', '${trip.date}', '${passStr}', '${escQ(cleanTime)}')" class="w-full py-2 mb-1 rounded text-[10px] font-bold uppercase tracking-wider transition bg-green-500 text-white border border-green-600 shadow-sm hover:opacity-90">✔ Trip Happened</button>`;
+                    }
+                    if (!trip.isMaint) {
+                        actionCell += `<button onclick="openTransferModal('${trip.ref}', '${trip.date}', '${trip.type}', '${v}')" class="w-full py-1.5 rounded text-[9px] font-bold uppercase tracking-wider transition bg-purple-100 text-purple-700 border border-purple-200 shadow-sm hover:bg-purple-200 mt-1">🔄 Transfer Pass</button>`;
                     }
 
                     if (trip.isMaint) {
@@ -1119,19 +1170,21 @@
                 
                 const uniqueTo = [...new Set(vTOs.map(l => l.to_no))].sort();
                 uniqueTo.forEach(toNo => {
-                    const h = vTOs.find(l => l.to_no === toNo);
                     const vehicleDates = fItins.filter(itin => itin.to_no === toNo);
                     
                     vehicleDates.forEach(itin => {
-                        let rec = getDailyValue(h.received, itin.travel_date, null);
-                        let sched = getDailyValue(h.schedule, itin.travel_date, 'WHOLE DAY');
-                        if (rec === v && !sched.includes('[COMPLETED]')) { 
-                            let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
-                            vehicleTrips.push({
-                                date: itin.travel_date, ref: toNo, type: 'TO',
-                                passengers: orders.filter(o => o.to_no === toNo).map(o => o.emp_name),
-                                dest: itin.destination, purpose: itin.purpose, time: sched, driver: drv, isMaint: h.status === 'OFF_ROAD'
-                            });
+                        const passengersInVeh = orders.filter(o => o.to_no === toNo && getDailyValue(o.received, itin.travel_date, null) === v);
+                        if (passengersInVeh.length > 0) { 
+                            const h = passengersInVeh[0];
+                            let sched = 'WHOLE DAY';
+                            if (!vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && vl.action === 'COMPLETED')) { 
+                                let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
+                                vehicleTrips.push({
+                                    date: itin.travel_date, ref: toNo, type: 'TO',
+                                    passengers: passengersInVeh.map(o => o.emp_name),
+                                    dest: itin.destination, purpose: itin.purpose, time: sched, driver: drv, isMaint: h.status === 'OFF_ROAD'
+                                });
+                            }
                         }
                     });
                 });
@@ -1139,7 +1192,7 @@
                 const vBks = fBk.filter(b => b.vehicle === v);
                 const bkMap = {};
                 vBks.forEach(bk => {
-                    if(bk.schedule && bk.schedule.includes('[COMPLETED]')) return;
+                    if(vehLogs.some(vl => vl.to_no === bk.ref_no && vl.travel_date === bk.travel_date && vl.action === 'COMPLETED')) return;
                     const key = bk.ref_no + '_' + bk.travel_date;
                     if(!bkMap[key]) bkMap[key] = { ...bk, passengers: [] };
                     if(!bkMap[key].passengers.includes(bk.emp_name)) bkMap[key].passengers.push(bk.emp_name);
@@ -1283,10 +1336,8 @@
             
             for (let to of [...new Set(toUpdates)]) {
                 const toRec = orders.find(x => x.to_no === to);
-                let scheduleObj = {};
-                dates.forEach(d => { scheduleObj[d] = timeStr; });
 
-                await db.from('travel_orders').update({ transport: "GOV'T VEHICLE", received: v, driver: dr, schedule: JSON.stringify(scheduleObj), status: getApprovalTarget(toRec.unit) }).eq('to_no', to);
+                await db.from('travel_orders').update({ transport: "GOV'T VEHICLE", received: v, driver: dr, status: getApprovalTarget(toRec.unit) }).eq('to_no', to);
             }
             
             manualPassengerQueue = []; document.getElementById('resDest').value = ""; document.getElementById('resP').value = "";
