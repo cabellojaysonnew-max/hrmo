@@ -328,6 +328,10 @@
                             <label class="block text-sm font-bold text-[#003811] mb-1">Driver</label>
                             <input id="editTripDr" list="drivers" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold">
                         </div>
+                        <div>
+                            <label class="block text-sm font-bold text-[#003811] mb-1">Schedule</label>
+                            <input id="editTripSch" placeholder="e.g. WHOLE DAY" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold">
+                        </div>
                     </div>
                     <div class="p-5 border-t flex justify-end gap-3 bg-gray-50 rounded-b-lg">
                         <button onclick="closeModal('editTripModal')" class="px-6 py-2 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded transition-colors">Cancel</button>
@@ -556,15 +560,16 @@
                     toItins.forEach(itin => {
                         const date = itin.travel_date;
                         const v = getDailyValue(toRecord.received, date, 'N/A');
+                        const sStr = 'WHOLE DAY'; 
                         
-                        // Check if completed via vehLogs
+                        // Hide completed trips checking vehicle_logs
                         if(vehLogs.some(vl => vl.to_no === ref && vl.travel_date === date && vl.action === 'COMPLETED')) return;
 
                         if (v && v !== 'LAND' && v !== 'N/A') {
                             activeReservationGroups[ref].trips.push({
                                 date: date, dest: itin.destination, vehicle: v,
                                 driver: getDailyValue(toRecord.driver, date, 'N/A'),
-                                scheduleStr: 'WHOLE DAY' // Fallback
+                                scheduleStr: sStr
                             });
                         }
                     });
@@ -573,8 +578,7 @@
 
             // 2. Group Bookings
             bookings.forEach(bk => {
-                // Check if completed via vehLogs
-                if(vehLogs.some(vl => vl.to_no === bk.ref_no && vl.travel_date === bk.travel_date && vl.action === 'COMPLETED')) return; 
+                if(bk.schedule && bk.schedule.includes('[COMPLETED]')) return; // Hide completed
                 
                 if (!activeReservationGroups[bk.ref_no]) {
                     activeReservationGroups[bk.ref_no] = { ref: bk.ref_no, type: 'BK', passengers: [], trips: [] };
@@ -650,6 +654,7 @@
             document.getElementById('editTripLabel').innerText = `${ref} - ${date}`;
             document.getElementById('editTripVeh').value = currVeh !== 'N/A' ? currVeh : 'MAZDA';
             document.getElementById('editTripDr').value = currDr !== 'N/A' ? currDr : 'Driver 1';
+            document.getElementById('editTripSch').value = currSch;
             openModal('editTripModal');
         }
 
@@ -657,6 +662,7 @@
             const { ref, date, type } = currentEditTrip;
             const v = document.getElementById('editTripVeh').value;
             const dr = document.getElementById('editTripDr').value;
+            const sch = document.getElementById('editTripSch').value;
 
             if (type === 'TO') {
                 const row = orders.find(o => o.to_no === ref);
@@ -685,7 +691,8 @@
             } else {
                 await db.from('fleet_bookings').update({
                     vehicle: v,
-                    driver: dr
+                    driver: dr,
+                    schedule: sch
                 }).eq('ref_no', ref).eq('travel_date', date);
             }
             
@@ -869,7 +876,7 @@
             
             const tag = '[COMPLETED]';
             
-            // 1. Tag in bookings only
+            // 1. Tag in bookings to hide it
             if (type === 'BK') {
                 const bkList = bookings.filter(b => b.ref_no === ref && b.travel_date === date);
                 if (bkList.length > 0) {
@@ -878,13 +885,13 @@
                 }
             }
 
-            // 2. Insert to vehicle_logs to mark completion for TOs and BKs
+            // 2. Insert to vehicle_logs to record the specific schedule block and hide TOs
             await db.from('vehicle_logs').insert({
                 to_no: ref,
                 applicant: passengerStr,
                 travel_date: date,
                 action: 'COMPLETED',
-                schedule: cleanText(scheduleStr)
+                schedule: cleanText(scheduleStr) // Writes schedule directly to vehicle_logs where the column lives
             });
 
             sync();
@@ -934,25 +941,23 @@
                 
                 const uniqueTo = [...new Set(vTOs.map(l => l.to_no))].sort();
                 uniqueTo.forEach(toNo => {
+                    const h = vTOs.find(l => l.to_no === toNo);
                     const vehicleDates = filteredItins.filter(itin => itin.to_no === toNo);
                     
                     vehicleDates.forEach(itin => {
-                        const passengersInVeh = orders.filter(o => o.to_no === toNo && getDailyValue(o.received, itin.travel_date, null) === v);
+                        let rec = getDailyValue(h.received, itin.travel_date, null);
+                        let sched = 'WHOLE DAY'; 
                         
-                        if (passengersInVeh.length > 0) { 
-                            const h = passengersInVeh[0];
-                            let sched = 'WHOLE DAY'; 
+                        // Check vehicle_logs to hide completed trips
+                        if (rec === v && !vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && vl.action === 'COMPLETED')) { 
+                            let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
                             
-                            if (!vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && vl.action === 'COMPLETED')) { 
-                                let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
-                                
-                                vehicleTrips.push({
-                                    date: itin.travel_date, ref: toNo, type: 'TO',
-                                    passengers: passengersInVeh.map(o => o.emp_name),
-                                    dest: itin.destination, purpose: itin.purpose,
-                                    time: sched, driver: drv, isMaint: h.status === 'OFF_ROAD'
-                                });
-                            }
+                            vehicleTrips.push({
+                                date: itin.travel_date, ref: toNo, type: 'TO',
+                                passengers: orders.filter(o => o.to_no === toNo).map(o => o.emp_name),
+                                dest: itin.destination, purpose: itin.purpose,
+                                time: sched, driver: drv, isMaint: h.status === 'OFF_ROAD'
+                            });
                         }
                     });
                 });
@@ -960,7 +965,7 @@
                 const vBks = filteredBookings.filter(b => b.vehicle === v);
                 const bkMap = {};
                 vBks.forEach(bk => {
-                    if(vehLogs.some(vl => vl.to_no === bk.ref_no && vl.travel_date === bk.travel_date && vl.action === 'COMPLETED')) return;
+                    if(bk.schedule && bk.schedule.includes('[COMPLETED]')) return; // Exclude completed
                     const key = bk.ref_no + '_' + bk.travel_date;
                     if(!bkMap[key]) bkMap[key] = { ...bk, passengers: [] };
                     if(!bkMap[key].passengers.includes(bk.emp_name)) bkMap[key].passengers.push(bk.emp_name);
@@ -1012,12 +1017,10 @@
                     const isPastOrToday = trip.date <= todayStr;
                     const passStr = escQ(trip.passengers.join(', '));
                     
-                    let actionCell = `<div class="text-[11px] text-gray-400 italic font-medium text-center mb-1">Upcoming</div>`;
-                    if (isPastOrToday && !trip.isMaint) {
-                        actionCell = `<button onclick="markTripHappened('${trip.ref}', '${trip.type}', '${trip.date}', '${passStr}', '${escQ(cleanTime)}')" class="w-full py-2 mb-1 rounded text-[10px] font-bold uppercase tracking-wider transition bg-green-500 text-white border border-green-600 shadow-sm hover:opacity-90">✔ Trip Happened</button>`;
-                    }
+                    let actionCell = '';
                     if (!trip.isMaint) {
-                        actionCell += `<button onclick="openTransferModal('${trip.ref}', '${trip.date}', '${trip.type}', '${v}')" class="w-full py-1.5 rounded text-[9px] font-bold uppercase tracking-wider transition bg-purple-100 text-purple-700 border border-purple-200 shadow-sm hover:bg-purple-200 mt-1">🔄 Transfer Pass</button>`;
+                        actionCell += `<button onclick="markTripHappened('${trip.ref}', '${trip.type}', '${trip.date}', '${passStr}', '${escQ(cleanTime)}')" class="w-full py-2 mb-1 rounded text-[10px] font-bold uppercase tracking-wider transition bg-green-500 text-white border border-green-600 shadow-sm hover:opacity-90">✔ Trip Happened</button>`;
+                        actionCell += `<button onclick="openTransferModal('${trip.ref}', '${trip.date}', '${trip.type}', '${v}')" class="w-full py-1.5 mt-1 rounded text-[9px] font-bold uppercase tracking-wider transition bg-purple-100 text-purple-700 border border-purple-200 shadow-sm hover:bg-purple-200">🔄 Transfer Pass</button>`;
                     }
 
                     if (trip.isMaint) {
@@ -1170,21 +1173,19 @@
                 
                 const uniqueTo = [...new Set(vTOs.map(l => l.to_no))].sort();
                 uniqueTo.forEach(toNo => {
+                    const h = vTOs.find(l => l.to_no === toNo);
                     const vehicleDates = fItins.filter(itin => itin.to_no === toNo);
                     
                     vehicleDates.forEach(itin => {
-                        const passengersInVeh = orders.filter(o => o.to_no === toNo && getDailyValue(o.received, itin.travel_date, null) === v);
-                        if (passengersInVeh.length > 0) { 
-                            const h = passengersInVeh[0];
-                            let sched = 'WHOLE DAY';
-                            if (!vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && vl.action === 'COMPLETED')) { 
-                                let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
-                                vehicleTrips.push({
-                                    date: itin.travel_date, ref: toNo, type: 'TO',
-                                    passengers: passengersInVeh.map(o => o.emp_name),
-                                    dest: itin.destination, purpose: itin.purpose, time: sched, driver: drv, isMaint: h.status === 'OFF_ROAD'
-                                });
-                            }
+                        let rec = getDailyValue(h.received, itin.travel_date, null);
+                        let sched = 'WHOLE DAY';
+                        if (rec === v && !vehLogs.some(vl => vl.to_no === toNo && vl.travel_date === itin.travel_date && vl.action === 'COMPLETED')) { 
+                            let drv = getDailyValue(h.driver, itin.travel_date, 'N/A');
+                            vehicleTrips.push({
+                                date: itin.travel_date, ref: toNo, type: 'TO',
+                                passengers: orders.filter(o => o.to_no === toNo).map(o => o.emp_name),
+                                dest: itin.destination, purpose: itin.purpose, time: sched, driver: drv, isMaint: h.status === 'OFF_ROAD'
+                            });
                         }
                     });
                 });
@@ -1192,7 +1193,7 @@
                 const vBks = fBk.filter(b => b.vehicle === v);
                 const bkMap = {};
                 vBks.forEach(bk => {
-                    if(vehLogs.some(vl => vl.to_no === bk.ref_no && vl.travel_date === bk.travel_date && vl.action === 'COMPLETED')) return;
+                    if(bk.schedule && bk.schedule.includes('[COMPLETED]')) return;
                     const key = bk.ref_no + '_' + bk.travel_date;
                     if(!bkMap[key]) bkMap[key] = { ...bk, passengers: [] };
                     if(!bkMap[key].passengers.includes(bk.emp_name)) bkMap[key].passengers.push(bk.emp_name);
@@ -1337,6 +1338,7 @@
             for (let to of [...new Set(toUpdates)]) {
                 const toRec = orders.find(x => x.to_no === to);
 
+                // For TOs mapped to a manual booking, we DO NOT write a schedule object to travel_orders to avoid schema errors.
                 await db.from('travel_orders').update({ transport: "GOV'T VEHICLE", received: v, driver: dr, status: getApprovalTarget(toRec.unit) }).eq('to_no', to);
             }
             
