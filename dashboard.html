@@ -856,15 +856,20 @@
                 <label class="block text-xs font-bold text-gray-700 mb-1 mt-4">Cancellation Scope</label>
                 <select id="cancelScope" class="w-full border rounded p-2 text-sm bg-gray-50" onchange="document.getElementById('specificDateWrapper').style.display = this.value === 'SPECIFIC' ? 'block' : 'none'">
                     <option value="WHOLE">Cancel Whole Leave</option>
-                    <option value="SPECIFIC">Cancel Specific Date</option>
+                    <option value="SPECIFIC">Cancel Specific Date(s)</option>
                 </select>
             `;
             specificDateHtml = `
                 <div id="specificDateWrapper" style="display: none;" class="mt-4">
-                    <label class="block text-xs font-bold text-gray-700 mb-1">Select Date to Cancel</label>
-                    <select id="cancelDate" class="w-full border rounded p-2 text-sm bg-gray-50">
-                        ${validDates.map(d => `<option value="${d}">${d}</option>`).join('')}
-                    </select>
+                    <label class="block text-xs font-bold text-gray-700 mb-2">Select Date(s) to Cancel</label>
+                    <div class="max-h-32 overflow-y-auto border border-gray-300 rounded p-3 bg-white shadow-inner flex flex-col gap-2">
+                        ${validDates.map(d => `
+                            <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors">
+                                <input type="checkbox" name="cancelDates" value="${d}" class="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
+                                <span class="text-sm font-medium text-gray-700">${d}</span>
+                            </label>
+                        `).join('')}
+                    </div>
                 </div>
             `;
         } else {
@@ -873,19 +878,19 @@
 
         const modalHtml = `
             <div id="cancelModalOverlay" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center font-sans">
-                <div class="bg-white rounded-lg p-6 w-96 shadow-xl text-left">
+                <div class="bg-white rounded-lg p-6 w-96 shadow-xl text-left border border-gray-200">
                     <h3 class="font-bold text-lg text-red-700 mb-2">Cancel Leave</h3>
                     <p class="text-sm text-gray-600 mb-4"><strong>${empName}</strong> - ${leaveType}<br>(${startDate}${endDate !== startDate ? ' to ' + endDate : ''})</p>
 
                     <label class="block text-xs font-bold text-gray-700 mb-1">Reason for Cancellation</label>
-                    <input type="text" id="cancelReason" class="w-full border rounded p-2 text-sm bg-gray-50" placeholder="Enter reason...">
+                    <input type="text" id="cancelReason" class="w-full border rounded p-2 text-sm bg-gray-50 focus:ring-red-500 focus:border-red-500" placeholder="Enter reason...">
 
                     ${scopeHtml}
                     ${specificDateHtml}
 
-                    <div class="flex justify-end gap-2 mt-6">
-                        <button onclick="document.getElementById('cancelModalOverlay').remove()" class="px-4 py-2 bg-gray-200 text-gray-800 text-xs font-bold rounded shadow hover:bg-gray-300">Close</button>
-                        <button id="confirmCancelBtn" class="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded shadow hover:bg-red-700">Confirm Cancel</button>
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button onclick="document.getElementById('cancelModalOverlay').remove()" class="px-4 py-2 bg-gray-200 text-gray-800 text-xs font-bold rounded shadow-sm hover:bg-gray-300 transition-colors">Close</button>
+                        <button id="confirmCancelBtn" class="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded shadow-sm hover:bg-red-700 transition-colors">Confirm Cancel</button>
                     </div>
                 </div>
             </div>
@@ -898,7 +903,18 @@
             if (!reason) return alert("Reason is required.");
 
             const scope = document.getElementById('cancelScope').value;
-            const specificDate = document.getElementById('cancelDate')?.value;
+            let selectedDates = [];
+            let specificDatesStr = '';
+
+            if (scope === 'SPECIFIC') {
+                const checkboxes = document.querySelectorAll('input[name="cancelDates"]:checked');
+                selectedDates = Array.from(checkboxes).map(el => el.value);
+                if (selectedDates.length === 0) {
+                    alert("Please select at least one date to cancel.");
+                    return;
+                }
+                specificDatesStr = selectedDates.join(', ');
+            }
 
             this.innerText = "Processing...";
             this.disabled = true;
@@ -934,12 +950,13 @@
                     notifMessage = `Your ${leaveType} on ${startDate} to ${endDate} was CANCELLED by ${currentUser.full_name}. Reason: ${reason}`;
                     hrNotifMessage = `${currentUser.full_name} cancelled the WHOLE ${leaveType} of ${empName} (${startDate} to ${endDate}). Reason: ${reason}`;
                 } else {
-                    refundAmount = parseFloat(currentDebit || 0) / calDays;
+                    let deductionPerDay = parseFloat(currentDebit || 0) / calDays;
+                    refundAmount = deductionPerDay * selectedDates.length;
 
                     // Update Original Ledger Remarks
                     await supabaseClient.from('leave_ledger')
                         .update({
-                            remarks: (currentRemarks ? currentRemarks + ' | ' : '') + `Cancelled on ${specificDate}: ${reason}`
+                            remarks: (currentRemarks ? currentRemarks + ' | ' : '') + `Cancelled on ${specificDatesStr}: ${reason}`
                         })
                         .eq('id', leaveId);
 
@@ -950,12 +967,12 @@
                         type: leaveType + ' (CANCEL REFUND)',
                         credit: refundAmount,
                         transaction_type: 'CREDIT',
-                        remarks: `Refund for cancelled date: ${specificDate}. Reason: ${reason}`,
-                        start_date: specificDate
+                        remarks: `Refund for cancelled date(s): ${specificDatesStr}. Reason: ${reason}`,
+                        start_date: selectedDates[0]
                     }]);
 
-                    notifMessage = `One day (${specificDate}) of your ${leaveType} was CANCELLED by ${currentUser.full_name}. Reason: ${reason}`;
-                    hrNotifMessage = `${currentUser.full_name} cancelled ONE DAY (${specificDate}) of the ${leaveType} for ${empName}. Reason: ${reason}`;
+                    notifMessage = `${selectedDates.length} day(s) (${specificDatesStr}) of your ${leaveType} was CANCELLED by ${currentUser.full_name}. Reason: ${reason}`;
+                    hrNotifMessage = `${currentUser.full_name} cancelled ${selectedDates.length} DAY(S) (${specificDatesStr}) of the ${leaveType} for ${empName}. Reason: ${reason}`;
                 }
 
                 // Apply Refund to Employee Balances
