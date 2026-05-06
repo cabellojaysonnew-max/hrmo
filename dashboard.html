@@ -1,1179 +1,1246 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - DAR HRMO</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="supabase-config.js"></script>
-    <style>
-        :root {
-            --color-primary: #003811;
-            --color-secondary: #D4AF37;
-        }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
-        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
-        
-        .scroll-list::-webkit-scrollbar { width: 4px; }
-        .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
-        .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
-        .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        :root {
+            --color-primary: #003811;
+            --color-secondary: #D4AF37;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+        
+        .scroll-list::-webkit-scrollbar { width: 4px; }
+        .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
+        .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
 
-    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
-        <div class="p-6 hidden md:block border-b border-[#006400]">
-            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
-            <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
-        </div>
-        <div class="flex-1 overflow-y-auto py-2">
-            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
-            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
-            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
-            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
-            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
-            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
-            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">SYSTEM USERS</a>
-        </div>
-        <div class="p-4 bg-black/20 hidden md:block">
-            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
-            <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
-        </div>
-    </nav>
-    
-    <main class="flex-1 overflow-y-auto p-8 relative">
-        <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
-            <div>
-                <h2 class="text-3xl font-bold text-[#003811]">Operations Dashboard</h2>
-                <p id="scopeLabel" class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide"></p>
-            </div>
-            <p id="dashDate" class="text-[#D4AF37] font-bold text-lg bg-white px-4 py-2 rounded shadow-sm border border-gray-200"></p>
-        </div>
-        
-        <!-- Notifications Panel -->
-        <div id="notificationsPanel" class="mb-8 hidden">
-            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded shadow-sm flex flex-col">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-sm font-bold text-yellow-800">Unread Notifications</h3>
-                    <button onclick="markNotificationsRead()" class="text-xs text-yellow-700 hover:text-yellow-900 underline font-bold transition-colors">Mark all as read</button>
-                </div>
-                <ul id="notificationsList" class="text-xs text-yellow-800 space-y-2 max-h-32 overflow-y-auto scroll-list"></ul>
-            </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="card p-6 border-l-4 border-[#003811] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Staff</p>
-                    <h3 id="statTotal" class="text-4xl font-bold text-[#003811] mt-1">0</h3>
-                </div>
-                <div class="bg-green-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#003811]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
-            </div>
-            <div class="card p-6 border-l-4 border-[#1976D2] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On Travel</p>
-                    <h3 id="statTravel" class="text-4xl font-bold text-[#1976D2] mt-1">0</h3>
-                </div>
-                <div class="bg-blue-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#1976D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
-            </div>
-            <div class="card p-6 border-l-4 border-[#C62828] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
-                    <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
-                </div>
-                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
-            </div>
-        </div>
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+            <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
+            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
+            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">SYSTEM USERS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
+        </div>
+    </nav>
+    
+    <main class="flex-1 overflow-y-auto p-8 relative">
+        <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
+            <div>
+                <h2 class="text-3xl font-bold text-[#003811]">Operations Dashboard</h2>
+                <p id="scopeLabel" class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide"></p>
+            </div>
+            <p id="dashDate" class="text-[#D4AF37] font-bold text-lg bg-white px-4 py-2 rounded shadow-sm border border-gray-200"></p>
+        </div>
+        
+        <!-- Notifications Panel -->
+        <div id="notificationsPanel" class="mb-8 hidden">
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded shadow-sm flex flex-col">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-sm font-bold text-yellow-800">Unread Notifications</h3>
+                    <button onclick="markNotificationsRead()" class="text-xs text-yellow-700 hover:text-yellow-900 underline font-bold transition-colors">Mark all as read</button>
+                </div>
+                <ul id="notificationsList" class="text-xs text-yellow-800 space-y-2 max-h-32 overflow-y-auto scroll-list"></ul>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="card p-6 border-l-4 border-[#003811] flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Staff</p>
+                    <h3 id="statTotal" class="text-4xl font-bold text-[#003811] mt-1">0</h3>
+                </div>
+                <div class="bg-green-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#003811]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
+            </div>
+            <div class="card p-6 border-l-4 border-[#1976D2] flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On Travel</p>
+                    <h3 id="statTravel" class="text-4xl font-bold text-[#1976D2] mt-1">0</h3>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#1976D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+            </div>
+            <div class="card p-6 border-l-4 border-[#C62828] flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
+                    <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
+                </div>
+                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+            </div>
+        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-[#1976D2] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON TRAVEL</h4></div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - DESTINATION</div></div>
-                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
-            </div>
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-[#C62828] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4></div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">PSO NUMBER, DETAILS OF PSO</div></div>
-                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
-            </div>
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-[#006400] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON LEAVE</h4></div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - LEAVE TYPE</div></div>
-                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
-            </div>
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-gray-700 text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4></div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - STATUS</div></div>
-                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
-            </div>
-        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-[#1976D2] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON TRAVEL</h4></div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - DESTINATION</div></div>
+                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+            </div>
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-[#C62828] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4></div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">PSO NUMBER, DETAILS OF PSO</div></div>
+                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+            </div>
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-[#006400] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON LEAVE</h4></div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - LEAVE TYPE</div></div>
+                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+            </div>
+            <div class="card bg-white flex flex-col h-[400px]">
+                <div class="bg-gray-700 text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4></div>
+                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - STATUS</div></div>
+                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+            </div>
+        </div>
 
-        <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-[#003811] border-b pb-2 mb-4">Incoming / Future Leaves</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-gray-50 text-gray-700">
-                        <tr>
-                            <th class="p-3 font-bold border-b">Employee Name</th>
-                            <th class="p-3 font-bold border-b">Leave Type</th>
-                            <th class="p-3 font-bold border-b text-center">Date</th>
-                            <th class="p-3 font-bold border-b text-center">Status</th>
-                            <th class="p-3 font-bold border-b text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listIncomingLeaves" class="divide-y">
-                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Loading...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <div class="card mt-8 p-6">
+            <h3 class="text-xl font-bold text-[#003811] border-b pb-2 mb-4">Incoming / Future Leaves</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-700">
+                        <tr>
+                            <th class="p-3 font-bold border-b">Employee Name</th>
+                            <th class="p-3 font-bold border-b">Leave Type</th>
+                            <th class="p-3 font-bold border-b text-center">Date</th>
+                            <th class="p-3 font-bold border-b text-center">No. of Days</th>
+                            <th class="p-3 font-bold border-b text-center">Status</th>
+                            <th class="p-3 font-bold border-b text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listIncomingLeaves" class="divide-y">
+                        <tr><td colspan="6" class="p-4 text-center text-gray-400 text-xs italic">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-        <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-red-700 border-b pb-2 mb-4">Habitual Tardiness & Absenteeism Monitoring (Civil Service Rules)</h3>
-            <p class="text-xs text-gray-500 mb-4">Under Civil Service rules, employees incurring 10 or more late arrivals within a month for two consecutive months, or excessive unauthorized absent days, are subject to disciplinary action. <strong>(Target: DARPO-CS1 Personnel Only)</strong></p>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-red-50 text-red-800">
-                        <tr>
-                            <th class="p-3 font-bold border-b">Employee Name</th>
-                            <th class="p-3 font-bold border-b text-center">Lates (Prev / Curr)</th>
-                            <th class="p-3 font-bold border-b text-center">Total Late/UT (Curr)</th>
-                            <th class="p-3 font-bold border-b text-center">Absent Days (Curr)</th>
-                            <th class="p-3 font-bold border-b text-center">Status/Warning Level</th>
-                            <th class="p-3 font-bold border-b text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listHabitual" class="divide-y">
-                        <tr><td colspan="6" class="p-4 text-center text-gray-400 text-xs italic">Calculating...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <div class="card mt-8 p-6">
+            <h3 class="text-xl font-bold text-red-700 border-b pb-2 mb-4">Habitual Tardiness & Absenteeism Monitoring (Civil Service Rules)</h3>
+            <p class="text-xs text-gray-500 mb-4">Under Civil Service rules, employees incurring 10 or more late arrivals within a month for two consecutive months, or excessive unauthorized absent days, are subject to disciplinary action. <strong>(Target: DARPO-CS1 Personnel Only)</strong></p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-red-50 text-red-800">
+                        <tr>
+                            <th class="p-3 font-bold border-b">Employee Name</th>
+                            <th class="p-3 font-bold border-b text-center">Lates (Prev / Curr)</th>
+                            <th class="p-3 font-bold border-b text-center">Total Late/UT (Curr)</th>
+                            <th class="p-3 font-bold border-b text-center">Absent Days (Curr)</th>
+                            <th class="p-3 font-bold border-b text-center">Status/Warning Level</th>
+                            <th class="p-3 font-bold border-b text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listHabitual" class="divide-y">
+                        <tr><td colspan="6" class="p-4 text-center text-gray-400 text-xs italic">Calculating...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-        <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1 Mondays Only)</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-blue-50 text-blue-800">
-                        <tr>
-                            <th class="p-3 font-bold border-b">Employee Name</th>
-                            <th class="p-3 font-bold border-b text-center">Attendance (Present / Total)</th>
-                            <th class="p-3 font-bold border-b text-center">Missed Dates</th>
-                            <th class="p-3 font-bold border-b text-center">Status</th>
-                            <th class="p-3 font-bold border-b text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listFlagAttendance" class="divide-y">
-                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Scanning Flag Ceremony Logs...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
+        <div class="card mt-8 p-6">
+            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1 Mondays Only)</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-blue-50 text-blue-800">
+                        <tr>
+                            <th class="p-3 font-bold border-b">Employee Name</th>
+                            <th class="p-3 font-bold border-b text-center">Attendance (Present / Total)</th>
+                            <th class="p-3 font-bold border-b text-center">Missed Dates</th>
+                            <th class="p-3 font-bold border-b text-center">Status</th>
+                            <th class="p-3 font-bold border-b text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listFlagAttendance" class="divide-y">
+                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Scanning Flag Ceremony Logs...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
 
 <script>
-    /* No revision should be made unless explicitly instructed. */
-    const userData = sessionStorage.getItem('currentUser');
-    if (!userData) { window.location.href = 'index.html'; }
-    const currentUser = JSON.parse(userData);
-    document.getElementById('activeUser').innerText = currentUser.full_name;
-    document.getElementById('userRoleBadge').innerText = currentUser.role;
-
-    // RBAC: PARPO and HRMO are ADMIN. Everyone else is limited to their division/unit.
-    const rawRole = (currentUser.role || '').toUpperCase();
-    const userRoles = rawRole.replace(/_/g, ' ').split(',').map(r => r.trim());
-    const uPos = (currentUser.position || '').toUpperCase();
-    
-    const isAdmin = userRoles.some(r => r.includes('HRMO') || r.includes('ADMIN') || r.includes('PARPO')) || 
-                    uPos.includes('HRMO') || uPos.includes('PARPO');
-    
-    const isLimited = !isAdmin;
-    
-    const targetDivision = currentUser.division;
-    const targetUnit = currentUser.unit;
-    const SYSTEM_START_DATE = "2026-05-01";
-
-    function logout() { sessionStorage.removeItem('currentUser'); window.location.href = 'index.html'; }
-
-    function formatMinutesToHours(totalMinutes) {
-        if (!totalMinutes || totalMinutes <= 0) return "0m";
-        const h = Math.floor(totalMinutes / 60); const m = totalMinutes % 60;
-        return h > 0 ? `${h}h ${m}m` : `${m}m`;
-    }
-
-    const fetchSafe = async (query) => {
-        try {
-            return await query;
-        } catch(e) {
-            console.error('Fetch error:', e);
-            return { data: [] };
-        }
-    };
-
-    let cachedBgMemo = null;
-    async function getBgMemo() {
-        if (cachedBgMemo) return cachedBgMemo;
-        try {
-            const { data } = await supabaseClient.storage.from('e-sign').download('bg_memo.jpg');
-            if (data) {
-                return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        cachedBgMemo = reader.result;
-                        resolve(cachedBgMemo);
-                    };
-                    reader.readAsDataURL(data);
-                });
-            }
-        } catch(e) { console.error("Error downloading bg_memo.jpg", e); }
-        return null;
-    }
-
-    window.onload = async () => {
-        const todayDate = new Date();
-        const todayStr = todayDate.toISOString().split('T')[0];
-        document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        
-        // Fetch Employees - Apply strict RBAC filter
-        let empQuery = supabaseClient.from('employees').select('*');
-        let scopeText = "Provincial Oversight";
-
-        if (isLimited) {
-            if (targetUnit && targetUnit !== 'NULL' && targetUnit !== 'null' && targetUnit.trim() !== '') {
-                empQuery = empQuery.eq('unit', targetUnit);
-                scopeText = `Unit: ${targetUnit}`;
-            } else if (targetDivision && targetDivision !== 'NULL' && targetDivision !== 'null' && targetDivision.trim() !== '') {
-                empQuery = empQuery.eq('division', targetDivision);
-                scopeText = `Division: ${targetDivision}`;
-            } else {
-                empQuery = empQuery.eq('emp_id', currentUser.username);
-                scopeText = `Personal Dashboard`;
-            }
-        }
-        
-        document.getElementById('scopeLabel').innerText = scopeText;
-        const { data: emps } = await fetchSafe(empQuery);
-        
-        const empIds = new Set((emps || []).map(e => String(e.emp_id).trim()));
-        document.getElementById('statTotal').innerText = emps?.length || 0;
-
-        const [travelItin, pso, leave, logs, scheduleOverrides] = await Promise.all([
-            fetchSafe(supabaseClient.from('itinerary').select('to_no, destination').eq('travel_date', todayStr)),
-            fetchSafe(supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr)),
-            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, type').eq('start_date', todayStr).eq('transaction_type', 'APPROVED')),
-            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59')),
-            fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr))
-        ]);
-
-        let travelOrdersToday = { data: [] };
-        const todayToNos = (travelItin.data || []).map(i => String(i.to_no).trim());
-        if (todayToNos.length > 0) {
-            travelOrdersToday = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').in('to_no', todayToNos).eq('status', 'APPROVED'));
-        }
-
-        // STRICTLY FILTER ALL MAPS TO ONLY INCLUDE EMPLOYEES WITHIN THE PERMITTED SCOPE
-        const travelMap = {};
-        (travelOrdersToday.data || []).forEach(to => {
-            const eId = String(to.emp_id).trim();
-            if (empIds.has(eId)) {
-                const itin = (travelItin.data || []).find(i => String(i.to_no).trim() === String(to.to_no).trim());
-                if (itin) travelMap[eId] = itin.destination;
-            }
-        });
-
-        const leaveMap = {};
-        (leave.data || []).forEach(l => {
-            const eId = String(l.emp_id).trim();
-            if (empIds.has(eId)) leaveMap[eId] = l.type;
-        });
-        
-        const psoMap = {};
-        (pso.data || []).forEach(p => { 
-            const eId = String(p.emp_id).trim();
-            if (empIds.has(eId)) psoMap[eId] = p; 
-        });
-
-        const overrideMap = {}; 
-        (scheduleOverrides.data || []).forEach(o => {
-            const eId = String(o.emp_id).trim();
-            if (empIds.has(eId)) overrideMap[eId] = o;
-        });
-
-        const logMap = {}; 
-        (logs.data || []).forEach(l => { 
-            const eId = String(l.emp_id).trim();
-            if (empIds.has(eId)) {
-                if (!logMap[eId] || new Date(l.log_time) < logMap[eId]) logMap[eId] = new Date(l.log_time); 
-            }
-        });
-
-        const listT = document.getElementById('listTravel'); const listP = document.getElementById('listPSO'); 
-        const listL = document.getElementById('listLeave'); const listLA = document.getElementById('listLateAbsent');
-        
-        let htmlTravel = '';
-        let htmlPSO = '';
-        let htmlLeave = '';
-        let htmlLate = '';
-        
-        let countTravel = 0;
-        let countPSO = 0;
-
-        (emps || []).forEach(e => {
-            const eId = String(e.emp_id).trim();
-            
-            // Check for multi-status conflicts
-            let conflictCount = 0;
-            if (travelMap[eId]) conflictCount++;
-            if (psoMap[eId]) conflictCount++;
-            if (leaveMap[eId]) conflictCount++;
-            
-            const isConflict = conflictCount > 1;
-            const conflictStyle = isConflict ? 'bg-red-100 border-red-600 text-red-900 font-bold' : '';
-
-            // Populate Dashboards with Conflict Awareness
-            if (travelMap[eId]) {
-                countTravel++;
-                const style = isConflict ? conflictStyle : 'bg-blue-50 border-blue-500 text-[#1F2937]';
-                htmlTravel += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${travelMap[eId]}</div>`;
-            }
-            if (psoMap[eId]) {
-                countPSO++;
-                const style = isConflict ? conflictStyle : 'bg-red-50 border-red-500 text-[#1F2937]';
-                htmlPSO += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${psoMap[eId].pso_no} (${psoMap[eId].subject})</div>`;
-            }
-            if (leaveMap[eId]) {
-                const style = isConflict ? conflictStyle : 'bg-green-50 border-green-600 text-[#1F2937]';
-                htmlLeave += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${leaveMap[eId]}</div>`;
-            }
-            
-            // Late & Absent Monitor (DARPO-CS1 Only)
-            if (String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
-                if (!travelMap[eId] && !psoMap[eId] && !leaveMap[eId]) {
-                    
-                    let expectedDays = ['1', '2', '3', '4', '5'];
-                    let cutoffStr = e.flexi_range_end || '08:00:00';
-
-                    if (overrideMap[eId]) {
-                        if (overrideMap[eId].working_days) {
-                            expectedDays = overrideMap[eId].working_days.split(',').map(d => d.trim());
-                        }
-                        if (overrideMap[eId].start_time) {
-                            cutoffStr = overrideMap[eId].start_time;
-                        }
-                    }
-                    
-                    const dayOfWeek = todayDate.getDay().toString();
-                    
-                    if (expectedDays.includes(dayOfWeek)) {
-                        const cutoffDate = new Date(`${todayStr}T${cutoffStr}`);
-                        const now = new Date(); 
-
-                        if (logMap[eId]) {
-                            if (logMap[eId] > cutoffDate) {
-                                htmlLate += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-orange-700 font-bold">LATE</span></div>`;
-                            }
-                        } else if (now > cutoffDate) {
-                            htmlLate += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-gray-500 font-bold italic">ABSENT / NO LOG</span></div>`;
-                        }
-                    }
-                }
-            }
-        });
-
-        // Set strictly matching summary counts
-        document.getElementById('statTravel').innerText = countTravel;
-        document.getElementById('statPSO').innerText = countPSO;
-        
-        listT.innerHTML = htmlTravel || '<div class="text-center text-gray-400 text-xs mt-10">No records found</div>';
-        listP.innerHTML = htmlPSO || '<div class="text-center text-gray-400 text-xs mt-10">No records found</div>';
-        listL.innerHTML = htmlLeave || '<div class="text-center text-gray-400 text-xs mt-10">No records found</div>';
-        listLA.innerHTML = htmlLate || '<div class="text-center text-gray-400 text-xs mt-10">All accounted for</div>';
-
-        // --- Tardiness & Habitual Monitoring (DARPO-CS1 ONLY) ---
-        const currMonth = todayDate.getMonth(); 
-        const currYear = todayDate.getFullYear();
-        const prevMonth = currMonth === 0 ? 11 : currMonth - 1;
-        const prevYear = currMonth === 0 ? currYear - 1 : currYear;
-
-        const sysStart = new Date(SYSTEM_START_DATE);
-        
-        let reqStartPrevMonth = new Date(prevYear, prevMonth, 1);
-        if (reqStartPrevMonth < sysStart) reqStartPrevMonth = sysStart;
-
-        let reqStartCurrMonth = new Date(currYear, currMonth, 1);
-        if (reqStartCurrMonth < sysStart) reqStartCurrMonth = sysStart;
-
-        const startPrevMonth = reqStartPrevMonth.toISOString().split('T')[0];
-        const startCurrMonth = reqStartCurrMonth.toISOString().split('T')[0];
-        const endCurrMonth = new Date(currYear, currMonth + 1, 0).toISOString().split('T')[0]; 
-
-        const [histLogsRes, histTravelItin, histPso, histLeave, histOverrides] = await Promise.all([
-            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59')),
-            fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr)),
-            fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth)),
-            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, start_date').eq('transaction_type', 'APPROVED').gte('start_date', startCurrMonth).lte('start_date', todayStr)),
-            fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth))
-        ]);
-
-        const histToNos = (histTravelItin.data || []).map(i => String(i.to_no).trim());
-        let histTravelOrders = { data: [] };
-        if (histToNos.length > 0) {
-            histTravelOrders = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').in('to_no', histToNos).eq('status', 'APPROVED'));
-        }
-
-        const histLogs = histLogsRes.data || [];
-        const excused = new Set();
-        
-        (histTravelOrders.data || []).forEach(to => {
-            const matchingItins = (histTravelItin.data || []).filter(i => String(i.to_no).trim() === String(to.to_no).trim());
-            matchingItins.forEach(itin => excused.add(String(to.emp_id).trim() + '_' + itin.travel_date));
-        });
-        (histLeave.data || []).forEach(l => excused.add(String(l.emp_id).trim() + '_' + l.start_date));
-        (histPso.data || []).forEach(p => {
-            let currD = new Date(p.start_date);
-            let endD = new Date(p.end_date);
-            while(currD <= endD) {
-                if (currD >= sysStart) {
-                    excused.add(String(p.emp_id).trim() + '_' + currD.toISOString().split('T')[0]);
-                }
-                currD.setDate(currD.getDate() + 1);
-            }
-        });
-        
-        const histOverrideMap = {};
-        (histOverrides.data || []).forEach(o => {
-            const eId = String(o.emp_id).trim();
-            if (!histOverrideMap[eId]) histOverrideMap[eId] = [];
-            let currD = new Date(o.start_date);
-            let endD = new Date(o.end_date);
-            while(currD <= endD) {
-                if (currD >= sysStart) {
-                    histOverrideMap[eId].push({
-                        date: currD.toISOString().split('T')[0],
-                        start: o.start_time,
-                        end: o.end_time,
-                        working_days: o.working_days
-                    });
-                }
-                currD.setDate(currD.getDate() + 1);
-            }
-        });
-
-        const datesToCheck = [];
-        let dCheck = new Date(reqStartCurrMonth); 
-        while(dCheck <= todayDate) {
-            datesToCheck.push(dCheck.toISOString().split('T')[0]);
-            dCheck.setDate(dCheck.getDate() + 1);
-        }
-
-        const habMap = {};
-        (emps || []).forEach(e => {
-            if (String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
-                const eId = String(e.emp_id).trim();
-                habMap[eId] = { id: eId, name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
-            }
-        });
-
-        const empLogDates = {};
-        histLogs.forEach(l => {
-            const eId = String(l.emp_id).trim();
-            if (!habMap[eId]) return; 
-            const d = l.log_time.split('T')[0];
-            if (!empLogDates[eId]) empLogDates[eId] = {};
-            if (!empLogDates[eId][d]) empLogDates[eId][d] = [];
-            empLogDates[eId][d].push(new Date(l.log_time));
-        });
-
-        Object.keys(habMap).forEach(emp_id => {
-            const e = emps.find(x => String(x.emp_id).trim() === emp_id);
-            
-            datesToCheck.forEach(dateStr => {
-                let expectedDays = ['1', '2', '3', '4', '5'];
-                if (histOverrideMap[emp_id]) {
-                    const override = histOverrideMap[emp_id].find(o => o.date === dateStr);
-                    if (override && override.working_days) {
-                        expectedDays = override.working_days.split(',').map(d => d.trim());
-                    }
-                }
-                
-                const dObj = new Date(dateStr);
-                const dayOfWeek = dObj.getDay().toString();
-                
-                if (expectedDays.includes(dayOfWeek)) {
-                    const hasLog = empLogDates[emp_id] && empLogDates[emp_id][dateStr];
-                    const isExcused = excused.has(emp_id + '_' + dateStr);
-                    if (!hasLog && !isExcused) {
-                        if (dateStr === todayStr && todayDate.getHours() < 9) return; 
-                        habMap[emp_id].absentDays++;
-                    }
-                }
-            });
-
-            const myLogs = empLogDates[emp_id];
-            if(!myLogs) return;
-
-            Object.keys(myLogs).forEach(dateStr => {
-                const logsForDay = myLogs[dateStr].sort((a,b) => a-b);
-                const firstLog = logsForDay[0];
-                const lastLog = logsForDay[logsForDay.length - 1];
-
-                let expectedDays = ['1', '2', '3', '4', '5'];
-                let startReqStr = e.flexi_range_start || '08:00:00';
-                let cutoffStr = e.flexi_range_end || '08:00:00';
-                let overrideEndStr = null;
-
-                if (histOverrideMap[emp_id]) {
-                    const override = histOverrideMap[emp_id].find(o => o.date === dateStr);
-                    if (override) {
-                        if(override.working_days) expectedDays = override.working_days.split(',').map(d => d.trim());
-                        startReqStr = override.start;
-                        cutoffStr = override.start; 
-                        overrideEndStr = override.end; 
-                    }
-                }
-                
-                const dObj = new Date(dateStr);
-                const dayOfWeek = dObj.getDay().toString();
-                
-                if (!expectedDays.includes(dayOfWeek)) {
-                    return; 
-                }
-
-                const startDate = new Date(dateStr + 'T' + startReqStr);
-                const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
-                
-                let isLate = false;
-                
-                if (firstLog > cutoffDate) {
-                    isLate = true;
-                    if(firstLog.getMonth() === currMonth) {
-                        habMap[emp_id].totalLateMins += Math.floor((firstLog - cutoffDate) / 60000);
-                    }
-                }
-
-                if (isLate) {
-                    if (firstLog.getMonth() === prevMonth) habMap[emp_id].prevCount++;
-                    if (firstLog.getMonth() === currMonth) habMap[emp_id].currCount++;
-                }
-
-                if(firstLog.getMonth() === currMonth) {
-                    let requiredEnd;
-                    if (overrideEndStr) {
-                        requiredEnd = new Date(dateStr + 'T' + overrideEndStr);
-                    } else {
-                        let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
-                        requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
-                    }
-
-                    if (lastLog < requiredEnd && firstLog !== lastLog) {
-                        habMap[emp_id].totalUtMins += Math.floor((requiredEnd - lastLog) / 60000);
-                    }
-                }
-            });
-        });
-
-        const listH = document.getElementById('listHabitual'); listH.innerHTML = '';
-        let hasHabitual = false;
-        
-        Object.values(habMap).forEach(h => {
-            const isHabitualLate = (h.prevCount >= 10 && h.currCount >= 10);
-            const totalMins = h.totalLateMins + h.totalUtMins;
-            const isExcessiveLate = totalMins >= 480;
-            const isAbsenteeism = h.absentDays >= 2.5;
-
-            if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
-                hasHabitual = true;
-                let statusBadge = '';
-                if (isHabitualLate && isAbsenteeism) {
-                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE & ABSENT</span>`;
-                } else if (isHabitualLate) {
-                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE (CS WARNING)</span>`;
-                } else if (isAbsenteeism) {
-                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">UNAUTH. ABSENTEEISM</span>`;
-                } else if (isExcessiveLate) {
-                    statusBadge = `<span class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] font-bold">EXCESSIVE LATE (DEDUCT VL)</span>`;
-                } else {
-                    statusBadge = `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-bold border border-yellow-300">MONITORING</span>`;
-                }
-
-                let actionColumn = isAdmin ? 
-                    `<button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins}, ${h.absentDays})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>` 
-                    : `<span class="text-[10px] text-gray-400 italic">Admin Only</span>`;
-
-                listH.innerHTML += `<tr class="hover:bg-gray-50">
-                    <td class="p-3 font-bold">${h.name}</td>
-                    <td class="text-center">${h.prevCount}/${h.currCount}</td>
-                    <td class="text-center">${formatMinutesToHours(totalMins)}</td>
-                    <td class="text-center">${h.absentDays}</td>
-                    <td class="text-center">${statusBadge}</td>
-                    <td class="text-center">${actionColumn}</td>
-                </tr>`;
-            }
-        });
-        
-        if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
-
-        // --- NEW: Flag Ceremony Monitoring (ALL DATA, NO MAY 1 LIMIT, DARPO-CS1 ONLY) ---
-        const { data: allFlagLogs } = await fetchSafe(supabaseClient.from('flag_attendance').select('emp_id, date, time_in, status'));
-            
-        const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
-        
-        let validMondays = new Set();
-        const flagStartDates = {};
-
-        (allFlagLogs || []).forEach(log => {
-            validMondays.add(log.date);
-            
-            const d = new Date(log.date);
-            d.setHours(0,0,0,0);
-            const eId = String(log.emp_id).trim();
-            if (!flagStartDates[eId] || d < flagStartDates[eId]) {
-                flagStartDates[eId] = d;
-            }
-        });
-        
-        // STRICT FILTER FOR CURRENT MONTH ONLY
-        const currentMonthPrefix = todayStr.substring(0, 7);
-        let mondays = Array.from(validMondays)
-            .filter(m => m.startsWith(currentMonthPrefix))
-            .sort((a,b) => new Date(b) - new Date(a)); 
-
-        const [allFlagTravelItinRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
-            fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date')),
-            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, start_date').eq('transaction_type', 'APPROVED')),
-            fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date'))
-        ]);
-        
-        let allFlagTravelOrders = { data: [] };
-        const allFlagToNos = (allFlagTravelItinRes.data || []).map(i => String(i.to_no).trim());
-        if (allFlagToNos.length > 0) {
-            allFlagTravelOrders = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED'));
-        }
-
-        const flagExcused = new Set();
-        (allFlagTravelOrders.data || []).forEach(to => {
-            const matchingItins = (allFlagTravelItinRes.data || []).filter(i => String(i.to_no).trim() === String(to.to_no).trim());
-            matchingItins.forEach(itin => flagExcused.add(String(to.emp_id).trim() + '_' + itin.travel_date));
-        });
-        (allFlagLeaveRes.data || []).forEach(l => flagExcused.add(String(l.emp_id).trim() + '_' + l.start_date));
-        (allFlagPsoRes.data || []).forEach(p => {
-            let currD = new Date(p.start_date);
-            let endD = new Date(p.end_date);
-            while(currD <= endD) {
-                flagExcused.add(String(p.emp_id).trim() + '_' + currD.toISOString().split('T')[0]);
-                currD.setDate(currD.getDate() + 1);
-            }
-        });
-
-        const { data: globalLogs } = await fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time'));
-        
-        (emps || []).forEach(e => {
-            if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
-            const eId = String(e.emp_id).trim();
-            
-            let firstLogDate = flagStartDates[eId]; 
-            if (globalLogs) {
-                globalLogs.forEach(l => {
-                    if (String(l.emp_id).trim() === eId) {
-                        const dStr = l.log_time.split('T')[0];
-                        const d = new Date(dStr);
-                        d.setHours(0,0,0,0);
-                        if (!firstLogDate || d < firstLogDate) {
-                            firstLogDate = d;
-                        }
-                    }
-                });
-            }
-
-            if (!firstLogDate) return; 
-
-            let missedDates = [];
-            let presentCount = 0;
-            let expectedMondays = 0;
-
-            mondays.forEach(m => {
-                const mDate = new Date(m);
-                mDate.setHours(0,0,0,0);
-                
-                if (mDate >= firstLogDate) {
-                    expectedMondays++;
-                    const log = (allFlagLogs || []).find(l => String(l.emp_id).trim() === eId && l.date === m);
-                    const isExcused = flagExcused.has(eId + '_' + m); 
-                    
-                    const isPresent = log && String(log.status).toUpperCase() !== 'ABSENT' && String(log.time_in).toUpperCase() !== 'ABSENT' && log.time_in !== null;
-
-                    if (isPresent) {
-                        presentCount++;
-                    } else if (!isExcused) {
-                        missedDates.push(m);
-                    }
-                }
-            });
-
-            if (missedDates.length > 0) {
-                let fBadgeClass = 'bg-yellow-100 text-yellow-800 border border-yellow-300';
-                let fBadgeText = 'REMINDER';
-                if (missedDates.length === 2) { fBadgeClass = 'bg-orange-100 text-orange-800 border border-orange-300'; fBadgeText = 'WARNING'; }
-                else if (missedDates.length >= 3) { fBadgeClass = 'bg-red-600 text-white'; fBadgeText = 'REPRIMAND'; }
-
-                let actionColumn = isAdmin ? 
-                    `<button onclick="printFlagMemo('${eId}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>`
-                    : `<span class="text-[10px] text-gray-400 italic">Admin Only</span>`;
-
-                listF.innerHTML += `<tr class="hover:bg-gray-50">
-                    <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
-                    <td class="text-center font-bold text-gray-700">${presentCount} / ${expectedMondays}</td>
-                    <td class="text-center text-xs text-gray-500">${missedDates.join(", ")}</td>
-                    <td class="text-center"><span class="px-2 py-1 rounded text-[10px] ${fBadgeClass} font-bold">${fBadgeText}</span></td>
-                    <td class="text-center">${actionColumn}</td>
-                </tr>`;
-            }
-        });
-        if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
-
-        // --- NEW: INCOMING / FUTURE LEAVES PROCESSING ---
-        const { data: rawFutureLeaves } = await fetchSafe(supabaseClient.from('leave_ledger')
-            .select('*')
-            .eq('transaction_type', 'APPROVED')
-            .order('start_date', { ascending: true }));
-
-        const futureLeaves = (rawFutureLeaves || []).filter(l => {
-            if (!l.start_date) return false;
-            const eDate = (l.end_date && l.end_date.trim() !== '') ? l.end_date : l.start_date;
-            return eDate >= todayStr; 
-        });
-
-        let htmlIncoming = '';
-        futureLeaves.forEach(l => {
-            const eId = String(l.emp_id).trim();
-            const emp = (emps || []).find(e => String(e.emp_id).trim() === eId);
-            if (!emp) return;
-            
-            const badgeColor = l.transaction_type === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
-            const displayDate = l.start_date + (l.end_date && l.end_date !== l.start_date ? ' to ' + l.end_date : '');
-            
-            htmlIncoming += `
-                <tr class="hover:bg-gray-50">
-                    <td class="p-3 font-bold">${emp.full_name}</td>
-                    <td class="p-3">${l.type}</td>
-                    <td class="p-3 text-center">${displayDate}</td>
-                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold ${badgeColor}">${l.transaction_type}</span></td>
-                    <td class="p-3 text-center">
-                        <button onclick="cancelLeave('${l.id}', '${eId}', '${emp.full_name.replace(/'/g,"\\'")}', '${l.start_date}', '${l.type}')" class="bg-red-600 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-red-700">CANCEL LEAVE</button>
-                    </td>
-                </tr>
-            `;
-        });
-        document.getElementById('listIncomingLeaves').innerHTML = htmlIncoming || '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No incoming leaves found.</td></tr>';
-
-        // --- NEW: NOTIFICATIONS FETCHING ---
-        fetchNotifications();
-    };
-
-    async function fetchNotifications() {
-        const targetIds = [currentUser.username];
-        if (isAdmin) targetIds.push('HRMO');
-        
-        const { data } = await supabaseClient.from('hr_notifications')
-            .select('*')
-            .in('emp_id', targetIds)
-            .eq('is_read', false)
-            .order('created_at', { ascending: false });
-            
-        const panel = document.getElementById('notificationsPanel');
-        const list = document.getElementById('notificationsList');
-        
-        if (data && data.length > 0) {
-            panel.classList.remove('hidden');
-            list.innerHTML = data.map(n => `<li><strong>${n.sender_name}:</strong> ${n.message}</li>`).join('');
-        } else {
-            panel.classList.add('hidden');
-        }
-    }
-    
-    window.markNotificationsRead = async function() {
-        const targetIds = [currentUser.username];
-        if (isAdmin) targetIds.push('HRMO');
-        
-        await supabaseClient.from('hr_notifications')
-            .update({ is_read: true })
-            .in('emp_id', targetIds)
-            .eq('is_read', false);
-            
-        fetchNotifications();
-    };
-
-    window.cancelLeave = async function(leaveId, empId, empName, leaveDate, leaveType) {
-        if (!confirm(`Are you sure you want to cancel the ${leaveType} of ${empName} on ${leaveDate}?`)) return;
-        
-        try {
-            const { error } = await supabaseClient.from('leave_ledger')
-                .update({ transaction_type: 'CANCELLED' })
-                .eq('id', leaveId);
-            if (error) throw error;
-            
-            const notifs = [];
-            // Notification to the Employee
-            notifs.push({
-                emp_id: empId,
-                sender_name: 'Leave System',
-                message: `Your ${leaveType} on ${leaveDate} was cancelled by ${currentUser.full_name}.`
-            });
-            // Notification to HR (if the canceller is not HR themselves)
-            if (!isAdmin) {
-                notifs.push({
-                    emp_id: 'HRMO',
-                    sender_name: 'Leave System',
-                    message: `${currentUser.full_name} cancelled the ${leaveType} of ${empName} for ${leaveDate}.`
-                });
-            }
-            
-            await supabaseClient.from('hr_notifications').insert(notifs);
-            
-            alert("Leave cancelled successfully.");
-            location.reload(); 
-        } catch (err) {
-            alert("Error cancelling leave: " + err.message);
-        }
-    };
-
-    async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins, absentDays = 0) {
-        if (!confirm(`Generate memo for ${empName}?`)) return;
-
-        try {
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); 
-            
-            const bgBase64 = await getBgMemo();
-            if (bgBase64) {
-                pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
-            }
-            
-            const todayDate = new Date();
-            const todayStr = todayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-            const currYear = todayDate.getFullYear();
-            const currMonthName = todayDate.toLocaleDateString('en-US', { month: 'long' });
-            
-            const prevMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
-            const prevMonthName = prevMonthDate.toLocaleDateString('en-US', { month: 'long' });
-            const prevYearStr = prevMonthDate.getFullYear();
-
-            const isHabitualLate = (prevCount >= 10 && currCount >= 10);
-            const isHabitualAbsent = (absentDays >= 2.5);
-
-            let memoType = "";
-            let memoTypeDb = "";
-            
-            if (isHabitualLate) {
-                memoType = "HABITUAL TARDINESS";
-                memoTypeDb = "Habitual Tardiness";
-            } else if (isHabitualAbsent) {
-                memoType = "UNAUTHORIZED ABSENTEEISM";
-                memoTypeDb = "Unauthorized Absenteeism";
-            } else if (totalMins > 0) {
-                memoType = "ACCUMULATED TARDINESS AND ATTENDANCE MONITORING";
-                memoTypeDb = "Accumulated Tardiness";
-            } else {
-                alert("No tardiness or absenteeism criteria met for a memo.");
-                return;
-            }
-
-            let offenseCount = 1;
-            try {
-                const { data: pastMemos } = await supabaseClient
-                    .from('memo_records')
-                    .select('*')
-                    .eq('emp_id', empId)
-                    .eq('memo_type', memoTypeDb)
-                    .neq('month', currMonthName); 
-                
-                if (pastMemos) {
-                    offenseCount = pastMemos.length + 1;
-                }
-            } catch(e) {
-                console.error("Could not fetch past memos", e);
-            }
-
-            let offenseText = "";
-            let penaltyText = "";
-            let p1 = "";
-            let p2 = "";
-            let p3 = "";
-
-            if (memoTypeDb === "Habitual Tardiness") {
-                if (offenseCount === 1) {
-                    offenseText = "FIRST OFFENSE";
-                    penaltyText = "Suspension of one (1) month and one (1) day to six (6) months.";
-                } else {
-                    offenseText = "SECOND OFFENSE / FINAL WARNING";
-                    penaltyText = "Dismissal from the service.";
-                }
-                p1 = String(`A review of your Daily Time Records (DTR) shows that you incurred tardiness as follows:\n\n    ${prevMonthName} ${prevYearStr} - ${prevCount} instances of tardiness\n    ${currMonthName} ${currYear} - ${currCount} instances of tardiness`);
-                p2 = String(`Under the Revised Rules on Administrative Cases in the Civil Service (RRACCS), an employee is considered habitually tardy if he or she incurs at least ten (10) times of tardiness in a month for at least two (2) consecutive months. This constitutes a Less Grave Offense. As this is your ${offenseText}, the prescribed penalty is ${penaltyText}`);
-                p3 = String("In view thereof, you are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative case should be filed against you.\n\nFailure to respond within the prescribed period shall be deemed a waiver of your right to be heard.");
-            } else if (memoTypeDb === "Unauthorized Absenteeism") {
-                if (offenseCount === 1) {
-                    offenseText = "FIRST WARNING";
-                } else {
-                    offenseText = "NOTICE TO EXPLAIN / FINAL WARNING";
-                    memoType = `${memoType} (NOTICE TO EXPLAIN)`;
-                }
-                p1 = String(`A review of your Daily Time Records (DTR) shows that you incurred ${absentDays} days of unauthorized absences for the month of ${currMonthName} ${currYear}.`);
-                p2 = String(`Under Civil Service Commission (CSC) rules, an employee is considered Habitually Absent if they incur unauthorized absences of at least 2.5 days in a month for three (3) consecutive months, or for three (3) months in a semester, or three (3) consecutive months in a year. This constitutes a grave offense.`);
-                p3 = String(`This serves as your ${offenseText}. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative disciplinary action should be taken against you for unauthorized absenteeism. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`);
-            } else {
-                const totalHrs = (totalMins / 60.0).toFixed(2);
-                const daysEq = (totalMins / 60.0 / 8.0).toFixed(3);
-                
-                if (offenseCount === 1) {
-                    offenseText = "FIRST WARNING";
-                } else if (offenseCount === 2) {
-                    offenseText = "NOTICE TO EXPLAIN";
-                    memoType = `${memoType} (NOTICE TO EXPLAIN)`;
-                } else {
-                    offenseText = "FINAL WARNING";
-                }
-
-                p1 = String(`Based on the review of your Daily Time Records (DTR) for the month of ${currMonthName} ${currYear}, you have incurred a total of ${totalMins} minutes (${totalHrs} hours) of accumulated tardiness/undertime.`);
-                p2 = String(`Under Civil Service Commission (CSC) rules on attendance and leave, tardiness and undertime accumulated to eight (8) hours is equivalent to one (1) day absence. Accordingly, your accumulated tardiness is equivalent to ${daysEq} day/s, which shall be deducted from your available leave credits (Vacation Leave first, if available).`);
-                
-                if (offenseCount === 2) {
-                    p3 = String(`This serves as your NOTICE TO EXPLAIN. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative action should be taken against you for excessive tardiness. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`);
-                } else {
-                    p3 = String(`This serves as your ${offenseText}. You are strongly advised to improve your attendance. Continued excessive tardiness may result in an administrative case should it eventually qualify as Habitual Tardiness under Civil Service rules.`);
-                }
-            }
-
-            pdf.setFont("helvetica", "bold");
-            pdf.setFontSize(12);
-            
-            pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
-            pdf.setFontSize(11);
-            pdf.text(`Series of ${currYear}`, 30, 51); 
-
-            pdf.setFontSize(11);
-            let currentY = 65;
-            const lineH = 8;
-            
-            pdf.text("TO", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${empName}`, 60, currentY); currentY += lineH;
-            pdf.text("FROM", 30, currentY); pdf.text(":", 55, currentY); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, currentY); currentY += lineH;
-            pdf.text("DATE", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${todayStr}`, 60, currentY); currentY += lineH;
-            pdf.text("SUBJECT", 30, currentY); pdf.text(":", 55, currentY); 
-            
-            const splitSubject = pdf.splitTextToSize(memoType, 130);
-            pdf.text(splitSubject, 60, currentY);
-            currentY += (splitSubject.length * lineH);
-
-            pdf.setLineWidth(0.6);
-            pdf.line(30, currentY, 215.9 - 30, currentY); 
-            currentY += 8;
-
-            pdf.setFont("helvetica", "normal");
-            
-            const linesP1 = pdf.splitTextToSize(p1, 155.9);
-            pdf.text(linesP1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesP1.length * 5) + 5;
-
-            const linesP2 = pdf.splitTextToSize(p2, 155.9);
-            pdf.text(linesP2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesP2.length * 5) + 5;
-
-            const linesP3 = pdf.splitTextToSize(p3, 155.9);
-            pdf.text(linesP3, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesP3.length * 5) + 10;
-
-            const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
-            const linesC1 = pdf.splitTextToSize(closing1, 155.9);
-            pdf.text(linesC1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesC1.length * 5) + 5;
-
-            const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
-            const linesC2 = pdf.splitTextToSize(closing2, 155.9);
-            pdf.text(linesC2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
-            currentY += (linesC2.length * 5) + 15;
-
-            pdf.setFont("helvetica", "bold");
-            pdf.text("RICARDO C. GARCIA", 30, currentY); 
-
-            try {
-                await supabaseClient.from('memo_records').insert({
-                    emp_id: empId,
-                    memo_type: memoTypeDb,
-                    offense_level: offenseCount,
-                    month: currMonthName,
-                    year: currYear
-                });
-            } catch(e) {
-                console.error("Error logging memo to DB", e);
-            }
-
-            const traceId = `TRC-${empId}-${Math.floor(Date.now() / 1000)}`;
-            const qrPayload = `DAR HRMO RECORD\nTrace: ${traceId}\nEmp: ${empId}\nType: ${memoTypeDb}\nDate: ${new Date().toLocaleDateString()}`;
-            
-            let qrContainer = document.getElementById('hiddenQrContainer');
-            if (!qrContainer) {
-                qrContainer = document.createElement('div');
-                qrContainer.id = 'hiddenQrContainer';
-                qrContainer.style.position = 'fixed';
-                qrContainer.style.left = '-9999px';
-                qrContainer.style.top = '-9999px';
-                document.body.appendChild(qrContainer);
-            }
-            qrContainer.innerHTML = '';
-            
-            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100, correctLevel: QRCode.CorrectLevel.L });
-            
-            setTimeout(() => {
-                try {
-                    const qrCanvas = qrContainer.querySelector('canvas');
-                    if (qrCanvas) {
-                        const qrDataUrl = qrCanvas.toDataURL('image/png');
-                        pdf.addImage(qrDataUrl, 'PNG', 30, currentY + 5, 22, 22);
-                    }
-                    pdf.save(`Memo_${empId}_${memoTypeDb.replace(" ", "_")}_${currMonthName}_${currYear}.pdf`);
-                } catch(err) {
-                    console.error(err);
-                    alert("Error saving PDF: " + err.message);
-                }
-            }, 300);
-
-        } catch(error) {
-            console.error(error);
-            alert("Error generating PDF: " + error.message);
-        }
-    }
-
-    async function printFlagMemo(empId, empName, missedDates) {
-        if (!confirm(`Generate Flag Ceremony Memo for ${empName}?`)) return;
-        
-        try {
-            const { jsPDF } = window.jspdf; 
-            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]);
-
-            const bgBase64 = await getBgMemo();
-            if (bgBase64) {
-                pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
-            }
-
-            const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-            const currYear = new Date().getFullYear();
-            const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
-
-            const missedArray = missedDates.split(',').map(d => d.trim()).filter(d => d !== '');
-            const missedCount = missedArray.length;
-            
-            let actionLevel = "REMINDER";
-            if (missedCount === 2) actionLevel = "WARNING";
-            if (missedCount >= 3) actionLevel = "REPRIMAND";
-
-            pdf.setFont("helvetica", "bold"); 
-            pdf.setFontSize(12);
-            
-            pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
-            pdf.setFontSize(11); 
-            pdf.text(`Series of ${currYear}`, 30, 51); 
-            
-            let y = 65; 
-            const lineH = 8;
-            pdf.text("TO", 30, y); pdf.text(":", 55, y); pdf.text(empName, 60, y); y += lineH;
-            pdf.text("FROM", 30, y); pdf.text(":", 55, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, y); y += lineH;
-            pdf.text("DATE", 30, y); pdf.text(":", 55, y); pdf.text(today, 60, y); y += lineH;
-            pdf.text("SUBJECT", 30, y); pdf.text(":", 55, y); pdf.text(`NON-ATTENDANCE TO FLAG CEREMONY (${actionLevel})`, 60, y);
-            
-            pdf.setLineWidth(0.6); 
-            pdf.line(30, y+5, 215.9 - 30, y+5); 
-            y += 15;
-
-            pdf.setFont("helvetica", "normal");
-            const p1 = String(`Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following date(s): ${missedDates}.`);
-            const p2 = String("Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory. Under office rules, non-attendance in a single month warrants: one (1) missed ceremony = REMINDER, two (2) = WARNING, and three (3) or more = REPRIMAND.");
-            
-            let p3 = "";
-            if (missedCount === 1) {
-                p3 = "This serves as your REMINDER. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you.";
-            } else if (missedCount === 2) {
-                p3 = "This serves as your WARNING. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you.";
-            } else {
-                p3 = "This serves as your REPRIMAND. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no formal administrative disciplinary action should be taken against you for your repeated failure to attend.";
-            }
-            p3 += " Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.";
-
-            const linesP1 = pdf.splitTextToSize(p1, 155.9);
-            pdf.text(linesP1, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesP1.length * 5) + 5; 
-            
-            const linesP2 = pdf.splitTextToSize(p2, 155.9);
-            pdf.text(linesP2, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesP2.length * 5) + 5; 
-            
-            const linesP3 = pdf.splitTextToSize(p3, 155.9);
-            pdf.text(linesP3, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesP3.length * 5) + 10; 
-
-            const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
-            const linesC1 = pdf.splitTextToSize(closing1, 155.9);
-            pdf.text(linesC1, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesC1.length * 5) + 5;
-
-            const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
-            const linesC2 = pdf.splitTextToSize(closing2, 155.9);
-            pdf.text(linesC2, 30, y, { maxWidth: 155.9, align: 'justify' });
-            y += (linesC2.length * 5) + 15;
-            
-            pdf.setFont("helvetica", "bold"); 
-            pdf.text("RICARDO C. GARCIA", 30, y); 
-
-            try {
-                await supabaseClient.from('memo_records').insert({
-                    emp_id: empId,
-                    memo_type: `Flag Ceremony ${actionLevel}`,
-                    offense_level: missedCount, 
-                    month: currMonthName,
-                    year: currYear
-                });
-            } catch(e) {
-                console.error("Error logging memo to DB", e);
-            }
-
-            const traceId = `TRC-FLAG-${empId}-${Math.floor(Date.now() / 1000)}`;
-            const qrPayload = `DAR HRMO RECORD\nTrace: ${traceId}\nEmp: ${empId}\nType: Flag Ceremony\nLevel: ${actionLevel}\nDate: ${new Date().toLocaleDateString()}`;
-            
-            let qrContainer = document.getElementById('hiddenQrContainer');
-            if (!qrContainer) {
-                qrContainer = document.createElement('div');
-                qrContainer.id = 'hiddenQrContainer';
-                qrContainer.style.position = 'fixed';
-                qrContainer.style.left = '-9999px';
-                qrContainer.style.top = '-9999px';
-                document.body.appendChild(qrContainer);
-            }
-            qrContainer.innerHTML = '';
-            
-            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100, correctLevel: QRCode.CorrectLevel.L });
-            
-            setTimeout(() => {
-                try {
-                    const qrCanvas = qrContainer.querySelector('canvas');
-                    if (qrCanvas) {
-                        const qrDataUrl = qrCanvas.toDataURL('image/png');
-                        pdf.addImage(qrDataUrl, 'PNG', 30, y + 5, 22, 22);
-                    }
-                    pdf.save(`Flag_Ceremony_Memo_${empId}_${currMonthName}_${currYear}.pdf`);
-                } catch(err) {
-                    console.error(err);
-                    alert("Error saving PDF: " + err.message);
-                }
-            }, 300);
-
-        } catch(error) {
-            console.error(error);
-            alert("Error generating PDF: " + error.message);
-        }
-    }
+    /* No revision should be made unless explicitly instructed. */
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) { window.location.href = 'index.html'; }
+    const currentUser = JSON.parse(userData);
+    document.getElementById('activeUser').innerText = currentUser.full_name;
+    document.getElementById('userRoleBadge').innerText = currentUser.role;
+
+    // RBAC: PARPO and HRMO are ADMIN. Everyone else is limited to their division/unit.
+    const rawRole = (currentUser.role || '').toUpperCase();
+    const userRoles = rawRole.replace(/_/g, ' ').split(',').map(r => r.trim());
+    const uPos = (currentUser.position || '').toUpperCase();
+    
+    const isAdmin = userRoles.some(r => r.includes('HRMO') || r.includes('ADMIN') || r.includes('PARPO')) || 
+                    uPos.includes('HRMO') || uPos.includes('PARPO');
+    
+    const isLimited = !isAdmin;
+    
+    const targetDivision = currentUser.division;
+    const targetUnit = currentUser.unit;
+    const SYSTEM_START_DATE = "2026-05-01";
+
+    function logout() { sessionStorage.removeItem('currentUser'); window.location.href = 'index.html'; }
+
+    function formatMinutesToHours(totalMinutes) {
+        if (!totalMinutes || totalMinutes <= 0) return "0m";
+        const h = Math.floor(totalMinutes / 60); const m = totalMinutes % 60;
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    const fetchSafe = async (query) => {
+        try {
+            return await query;
+        } catch(e) {
+            console.error('Fetch error:', e);
+            return { data: [] };
+        }
+    };
+
+    let cachedBgMemo = null;
+    async function getBgMemo() {
+        if (cachedBgMemo) return cachedBgMemo;
+        try {
+            const { data } = await supabaseClient.storage.from('e-sign').download('bg_memo.jpg');
+            if (data) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        cachedBgMemo = reader.result;
+                        resolve(cachedBgMemo);
+                    };
+                    reader.readAsDataURL(data);
+                });
+            }
+        } catch(e) { console.error("Error downloading bg_memo.jpg", e); }
+        return null;
+    }
+
+    window.onload = async () => {
+        const todayDate = new Date();
+        const todayStr = todayDate.toISOString().split('T')[0];
+        document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        
+        // Fetch Employees - Apply strict RBAC filter
+        let empQuery = supabaseClient.from('employees').select('*');
+        let scopeText = "Provincial Oversight";
+
+        if (isLimited) {
+            if (targetUnit && targetUnit !== 'NULL' && targetUnit !== 'null' && targetUnit.trim() !== '') {
+                empQuery = empQuery.eq('unit', targetUnit);
+                scopeText = `Unit: ${targetUnit}`;
+            } else if (targetDivision && targetDivision !== 'NULL' && targetDivision !== 'null' && targetDivision.trim() !== '') {
+                empQuery = empQuery.eq('division', targetDivision);
+                scopeText = `Division: ${targetDivision}`;
+            } else {
+                empQuery = empQuery.eq('emp_id', currentUser.username);
+                scopeText = `Personal Dashboard`;
+            }
+        }
+        
+        document.getElementById('scopeLabel').innerText = scopeText;
+        const { data: emps } = await fetchSafe(empQuery);
+        
+        const empIds = new Set((emps || []).map(e => String(e.emp_id).trim()));
+        document.getElementById('statTotal').innerText = emps?.length || 0;
+
+        const [travelItin, pso, leave, logs, scheduleOverrides] = await Promise.all([
+            fetchSafe(supabaseClient.from('itinerary').select('to_no, destination').eq('travel_date', todayStr)),
+            fetchSafe(supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr)),
+            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, type').eq('start_date', todayStr).eq('transaction_type', 'APPROVED')),
+            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59')),
+            fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr))
+        ]);
+
+        let travelOrdersToday = { data: [] };
+        const todayToNos = (travelItin.data || []).map(i => String(i.to_no).trim());
+        if (todayToNos.length > 0) {
+            travelOrdersToday = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').in('to_no', todayToNos).eq('status', 'APPROVED'));
+        }
+
+        // STRICTLY FILTER ALL MAPS TO ONLY INCLUDE EMPLOYEES WITHIN THE PERMITTED SCOPE
+        const travelMap = {};
+        (travelOrdersToday.data || []).forEach(to => {
+            const eId = String(to.emp_id).trim();
+            if (empIds.has(eId)) {
+                const itin = (travelItin.data || []).find(i => String(i.to_no).trim() === String(to.to_no).trim());
+                if (itin) travelMap[eId] = itin.destination;
+            }
+        });
+
+        const leaveMap = {};
+        (leave.data || []).forEach(l => {
+            const eId = String(l.emp_id).trim();
+            if (empIds.has(eId)) leaveMap[eId] = l.type;
+        });
+        
+        const psoMap = {};
+        (pso.data || []).forEach(p => { 
+            const eId = String(p.emp_id).trim();
+            if (empIds.has(eId)) psoMap[eId] = p; 
+        });
+
+        const overrideMap = {}; 
+        (scheduleOverrides.data || []).forEach(o => {
+            const eId = String(o.emp_id).trim();
+            if (empIds.has(eId)) overrideMap[eId] = o;
+        });
+
+        const logMap = {}; 
+        (logs.data || []).forEach(l => { 
+            const eId = String(l.emp_id).trim();
+            if (empIds.has(eId)) {
+                if (!logMap[eId] || new Date(l.log_time) < logMap[eId]) logMap[eId] = new Date(l.log_time); 
+            }
+        });
+
+        const listT = document.getElementById('listTravel'); const listP = document.getElementById('listPSO'); 
+        const listL = document.getElementById('listLeave'); const listLA = document.getElementById('listLateAbsent');
+        
+        let htmlTravel = '';
+        let htmlPSO = '';
+        let htmlLeave = '';
+        let htmlLate = '';
+        
+        let countTravel = 0;
+        let countPSO = 0;
+
+        (emps || []).forEach(e => {
+            const eId = String(e.emp_id).trim();
+            
+            // Check for multi-status conflicts
+            let conflictCount = 0;
+            if (travelMap[eId]) conflictCount++;
+            if (psoMap[eId]) conflictCount++;
+            if (leaveMap[eId]) conflictCount++;
+            
+            const isConflict = conflictCount > 1;
+            const conflictStyle = isConflict ? 'bg-red-100 border-red-600 text-red-900 font-bold' : '';
+
+            // Populate Dashboards with Conflict Awareness
+            if (travelMap[eId]) {
+                countTravel++;
+                const style = isConflict ? conflictStyle : 'bg-blue-50 border-blue-500 text-[#1F2937]';
+                htmlTravel += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${travelMap[eId]}</div>`;
+            }
+            if (psoMap[eId]) {
+                countPSO++;
+                const style = isConflict ? conflictStyle : 'bg-red-50 border-red-500 text-[#1F2937]';
+                htmlPSO += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${psoMap[eId].pso_no} (${psoMap[eId].subject})</div>`;
+            }
+            if (leaveMap[eId]) {
+                const style = isConflict ? conflictStyle : 'bg-green-50 border-green-600 text-[#1F2937]';
+                htmlLeave += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${leaveMap[eId]}</div>`;
+            }
+            
+            // Late & Absent Monitor (DARPO-CS1 Only)
+            if (String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
+                if (!travelMap[eId] && !psoMap[eId] && !leaveMap[eId]) {
+                    
+                    let expectedDays = ['1', '2', '3', '4', '5'];
+                    let cutoffStr = e.flexi_range_end || '08:00:00';
+
+                    if (overrideMap[eId]) {
+                        if (overrideMap[eId].working_days) {
+                            expectedDays = overrideMap[eId].working_days.split(',').map(d => d.trim());
+                        }
+                        if (overrideMap[eId].start_time) {
+                            cutoffStr = overrideMap[eId].start_time;
+                        }
+                    }
+                    
+                    const dayOfWeek = todayDate.getDay().toString();
+                    
+                    if (expectedDays.includes(dayOfWeek)) {
+                        const cutoffDate = new Date(`${todayStr}T${cutoffStr}`);
+                        const now = new Date(); 
+
+                        if (logMap[eId]) {
+                            if (logMap[eId] > cutoffDate) {
+                                htmlLate += `<div class="p-2 bg-orange-50 border-l-4 border-orange-500 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-orange-700 font-bold">LATE</span></div>`;
+                            }
+                        } else if (now > cutoffDate) {
+                            htmlLate += `<div class="p-2 bg-gray-100 border-l-4 border-gray-400 rounded mb-1 text-[11px] flex justify-between"><span class="font-bold">${e.full_name}</span><span class="text-gray-500 font-bold italic">ABSENT / NO LOG</span></div>`;
+                        }
+                    }
+                }
+            }
+        });
+
+        // Set strictly matching summary counts
+        document.getElementById('statTravel').innerText = countTravel;
+        document.getElementById('statPSO').innerText = countPSO;
+        
+        listT.innerHTML = htmlTravel || '<div class="text-center text-gray-400 text-xs mt-10">No records found</div>';
+        listP.innerHTML = htmlPSO || '<div class="text-center text-gray-400 text-xs mt-10">No records found</div>';
+        listL.innerHTML = htmlLeave || '<div class="text-center text-gray-400 text-xs mt-10">No records found</div>';
+        listLA.innerHTML = htmlLate || '<div class="text-center text-gray-400 text-xs mt-10">All accounted for</div>';
+
+        // --- Tardiness & Habitual Monitoring (DARPO-CS1 ONLY) ---
+        const currMonth = todayDate.getMonth(); 
+        const currYear = todayDate.getFullYear();
+        const prevMonth = currMonth === 0 ? 11 : currMonth - 1;
+        const prevYear = currMonth === 0 ? currYear - 1 : currYear;
+
+        const sysStart = new Date(SYSTEM_START_DATE);
+        
+        let reqStartPrevMonth = new Date(prevYear, prevMonth, 1);
+        if (reqStartPrevMonth < sysStart) reqStartPrevMonth = sysStart;
+
+        let reqStartCurrMonth = new Date(currYear, currMonth, 1);
+        if (reqStartCurrMonth < sysStart) reqStartCurrMonth = sysStart;
+
+        const startPrevMonth = reqStartPrevMonth.toISOString().split('T')[0];
+        const startCurrMonth = reqStartCurrMonth.toISOString().split('T')[0];
+        const endCurrMonth = new Date(currYear, currMonth + 1, 0).toISOString().split('T')[0]; 
+
+        const [histLogsRes, histTravelItin, histPso, histLeave, histOverrides] = await Promise.all([
+            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startPrevMonth + 'T00:00:00').lte('log_time', endCurrMonth + 'T23:59:59')),
+            fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startCurrMonth).lte('travel_date', todayStr)),
+            fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', todayStr).gte('end_date', startCurrMonth)),
+            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, start_date').eq('transaction_type', 'APPROVED').gte('start_date', startCurrMonth).lte('start_date', todayStr)),
+            fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', startPrevMonth))
+        ]);
+
+        const histToNos = (histTravelItin.data || []).map(i => String(i.to_no).trim());
+        let histTravelOrders = { data: [] };
+        if (histToNos.length > 0) {
+            histTravelOrders = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').in('to_no', histToNos).eq('status', 'APPROVED'));
+        }
+
+        const histLogs = histLogsRes.data || [];
+        const excused = new Set();
+        
+        (histTravelOrders.data || []).forEach(to => {
+            const matchingItins = (histTravelItin.data || []).filter(i => String(i.to_no).trim() === String(to.to_no).trim());
+            matchingItins.forEach(itin => excused.add(String(to.emp_id).trim() + '_' + itin.travel_date));
+        });
+        (histLeave.data || []).forEach(l => excused.add(String(l.emp_id).trim() + '_' + l.start_date));
+        (histPso.data || []).forEach(p => {
+            let currD = new Date(p.start_date);
+            let endD = new Date(p.end_date);
+            while(currD <= endD) {
+                if (currD >= sysStart) {
+                    excused.add(String(p.emp_id).trim() + '_' + currD.toISOString().split('T')[0]);
+                }
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
+        
+        const histOverrideMap = {};
+        (histOverrides.data || []).forEach(o => {
+            const eId = String(o.emp_id).trim();
+            if (!histOverrideMap[eId]) histOverrideMap[eId] = [];
+            let currD = new Date(o.start_date);
+            let endD = new Date(o.end_date);
+            while(currD <= endD) {
+                if (currD >= sysStart) {
+                    histOverrideMap[eId].push({
+                        date: currD.toISOString().split('T')[0],
+                        start: o.start_time,
+                        end: o.end_time,
+                        working_days: o.working_days
+                    });
+                }
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
+
+        const datesToCheck = [];
+        let dCheck = new Date(reqStartCurrMonth); 
+        while(dCheck <= todayDate) {
+            datesToCheck.push(dCheck.toISOString().split('T')[0]);
+            dCheck.setDate(dCheck.getDate() + 1);
+        }
+
+        const habMap = {};
+        (emps || []).forEach(e => {
+            if (String(e.station).toUpperCase().trim() === 'DARPO-CS1') {
+                const eId = String(e.emp_id).trim();
+                habMap[eId] = { id: eId, name: e.full_name, prevCount: 0, currCount: 0, totalLateMins: 0, totalUtMins: 0, absentDays: 0 };
+            }
+        });
+
+        const empLogDates = {};
+        histLogs.forEach(l => {
+            const eId = String(l.emp_id).trim();
+            if (!habMap[eId]) return; 
+            const d = l.log_time.split('T')[0];
+            if (!empLogDates[eId]) empLogDates[eId] = {};
+            if (!empLogDates[eId][d]) empLogDates[eId][d] = [];
+            empLogDates[eId][d].push(new Date(l.log_time));
+        });
+
+        Object.keys(habMap).forEach(emp_id => {
+            const e = emps.find(x => String(x.emp_id).trim() === emp_id);
+            
+            datesToCheck.forEach(dateStr => {
+                let expectedDays = ['1', '2', '3', '4', '5'];
+                if (histOverrideMap[emp_id]) {
+                    const override = histOverrideMap[emp_id].find(o => o.date === dateStr);
+                    if (override && override.working_days) {
+                        expectedDays = override.working_days.split(',').map(d => d.trim());
+                    }
+                }
+                
+                const dObj = new Date(dateStr);
+                const dayOfWeek = dObj.getDay().toString();
+                
+                if (expectedDays.includes(dayOfWeek)) {
+                    const hasLog = empLogDates[emp_id] && empLogDates[emp_id][dateStr];
+                    const isExcused = excused.has(emp_id + '_' + dateStr);
+                    if (!hasLog && !isExcused) {
+                        if (dateStr === todayStr && todayDate.getHours() < 9) return; 
+                        habMap[emp_id].absentDays++;
+                    }
+                }
+            });
+
+            const myLogs = empLogDates[emp_id];
+            if(!myLogs) return;
+
+            Object.keys(myLogs).forEach(dateStr => {
+                const logsForDay = myLogs[dateStr].sort((a,b) => a-b);
+                const firstLog = logsForDay[0];
+                const lastLog = logsForDay[logsForDay.length - 1];
+
+                let expectedDays = ['1', '2', '3', '4', '5'];
+                let startReqStr = e.flexi_range_start || '08:00:00';
+                let cutoffStr = e.flexi_range_end || '08:00:00';
+                let overrideEndStr = null;
+
+                if (histOverrideMap[emp_id]) {
+                    const override = histOverrideMap[emp_id].find(o => o.date === dateStr);
+                    if (override) {
+                        if(override.working_days) expectedDays = override.working_days.split(',').map(d => d.trim());
+                        startReqStr = override.start;
+                        cutoffStr = override.start; 
+                        overrideEndStr = override.end; 
+                    }
+                }
+                
+                const dObj = new Date(dateStr);
+                const dayOfWeek = dObj.getDay().toString();
+                
+                if (!expectedDays.includes(dayOfWeek)) {
+                    return; 
+                }
+
+                const startDate = new Date(dateStr + 'T' + startReqStr);
+                const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
+                
+                let isLate = false;
+                
+                if (firstLog > cutoffDate) {
+                    isLate = true;
+                    if(firstLog.getMonth() === currMonth) {
+                        habMap[emp_id].totalLateMins += Math.floor((firstLog - cutoffDate) / 60000);
+                    }
+                }
+
+                if (isLate) {
+                    if (firstLog.getMonth() === prevMonth) habMap[emp_id].prevCount++;
+                    if (firstLog.getMonth() === currMonth) habMap[emp_id].currCount++;
+                }
+
+                if(firstLog.getMonth() === currMonth) {
+                    let requiredEnd;
+                    if (overrideEndStr) {
+                        requiredEnd = new Date(dateStr + 'T' + overrideEndStr);
+                    } else {
+                        let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
+                        requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
+                    }
+
+                    if (lastLog < requiredEnd && firstLog !== lastLog) {
+                        habMap[emp_id].totalUtMins += Math.floor((requiredEnd - lastLog) / 60000);
+                    }
+                }
+            });
+        });
+
+        const listH = document.getElementById('listHabitual'); listH.innerHTML = '';
+        let hasHabitual = false;
+        
+        Object.values(habMap).forEach(h => {
+            const isHabitualLate = (h.prevCount >= 10 && h.currCount >= 10);
+            const totalMins = h.totalLateMins + h.totalUtMins;
+            const isExcessiveLate = totalMins >= 480;
+            const isAbsenteeism = h.absentDays >= 2.5;
+
+            if (isHabitualLate || isExcessiveLate || isAbsenteeism || totalMins > 0 || h.absentDays > 0) {
+                hasHabitual = true;
+                let statusBadge = '';
+                if (isHabitualLate && isAbsenteeism) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE & ABSENT</span>`;
+                } else if (isHabitualLate) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">HABITUAL LATE (CS WARNING)</span>`;
+                } else if (isAbsenteeism) {
+                    statusBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">UNAUTH. ABSENTEEISM</span>`;
+                } else if (isExcessiveLate) {
+                    statusBadge = `<span class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] font-bold">EXCESSIVE LATE (DEDUCT VL)</span>`;
+                } else {
+                    statusBadge = `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-bold border border-yellow-300">MONITORING</span>`;
+                }
+
+                let actionColumn = isAdmin ? 
+                    `<button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins}, ${h.absentDays})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>` 
+                    : `<span class="text-[10px] text-gray-400 italic">Admin Only</span>`;
+
+                listH.innerHTML += `<tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold">${h.name}</td>
+                    <td class="text-center">${h.prevCount}/${h.currCount}</td>
+                    <td class="text-center">${formatMinutesToHours(totalMins)}</td>
+                    <td class="text-center">${h.absentDays}</td>
+                    <td class="text-center">${statusBadge}</td>
+                    <td class="text-center">${actionColumn}</td>
+                </tr>`;
+            }
+        });
+        
+        if (!hasHabitual) listH.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-500 italic bg-gray-50">All personnel are in excellent compliance. No infractions logged.</td></tr>';
+
+        // --- NEW: Flag Ceremony Monitoring (ALL DATA, NO MAY 1 LIMIT, DARPO-CS1 ONLY) ---
+        const { data: allFlagLogs } = await fetchSafe(supabaseClient.from('flag_attendance').select('emp_id, date, time_in, status'));
+            
+        const listF = document.getElementById('listFlagAttendance'); listF.innerHTML = '';
+        
+        let validMondays = new Set();
+        const flagStartDates = {};
+
+        (allFlagLogs || []).forEach(log => {
+            validMondays.add(log.date);
+            
+            const d = new Date(log.date);
+            d.setHours(0,0,0,0);
+            const eId = String(log.emp_id).trim();
+            if (!flagStartDates[eId] || d < flagStartDates[eId]) {
+                flagStartDates[eId] = d;
+            }
+        });
+        
+        // STRICT FILTER FOR CURRENT MONTH ONLY
+        const currentMonthPrefix = todayStr.substring(0, 7);
+        let mondays = Array.from(validMondays)
+            .filter(m => m.startsWith(currentMonthPrefix))
+            .sort((a,b) => new Date(b) - new Date(a)); 
+
+        const [allFlagTravelItinRes, allFlagLeaveRes, allFlagPsoRes] = await Promise.all([
+            fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date')),
+            fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, start_date').eq('transaction_type', 'APPROVED')),
+            fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date'))
+        ]);
+        
+        let allFlagTravelOrders = { data: [] };
+        const allFlagToNos = (allFlagTravelItinRes.data || []).map(i => String(i.to_no).trim());
+        if (allFlagToNos.length > 0) {
+            allFlagTravelOrders = await fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').eq('status', 'APPROVED'));
+        }
+
+        const flagExcused = new Set();
+        (allFlagTravelOrders.data || []).forEach(to => {
+            const matchingItins = (allFlagTravelItinRes.data || []).filter(i => String(i.to_no).trim() === String(to.to_no).trim());
+            matchingItins.forEach(itin => flagExcused.add(String(to.emp_id).trim() + '_' + itin.travel_date));
+        });
+        (allFlagLeaveRes.data || []).forEach(l => flagExcused.add(String(l.emp_id).trim() + '_' + l.start_date));
+        (allFlagPsoRes.data || []).forEach(p => {
+            let currD = new Date(p.start_date);
+            let endD = new Date(p.end_date);
+            while(currD <= endD) {
+                flagExcused.add(String(p.emp_id).trim() + '_' + currD.toISOString().split('T')[0]);
+                currD.setDate(currD.getDate() + 1);
+            }
+        });
+
+        const { data: globalLogs } = await fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time'));
+        
+        (emps || []).forEach(e => {
+            if (String(e.station).toUpperCase().trim() !== 'DARPO-CS1') return;
+            const eId = String(e.emp_id).trim();
+            
+            let firstLogDate = flagStartDates[eId]; 
+            if (globalLogs) {
+                globalLogs.forEach(l => {
+                    if (String(l.emp_id).trim() === eId) {
+                        const dStr = l.log_time.split('T')[0];
+                        const d = new Date(dStr);
+                        d.setHours(0,0,0,0);
+                        if (!firstLogDate || d < firstLogDate) {
+                            firstLogDate = d;
+                        }
+                    }
+                });
+            }
+
+            if (!firstLogDate) return; 
+
+            let missedDates = [];
+            let presentCount = 0;
+            let expectedMondays = 0;
+
+            mondays.forEach(m => {
+                const mDate = new Date(m);
+                mDate.setHours(0,0,0,0);
+                
+                if (mDate >= firstLogDate) {
+                    expectedMondays++;
+                    const log = (allFlagLogs || []).find(l => String(l.emp_id).trim() === eId && l.date === m);
+                    const isExcused = flagExcused.has(eId + '_' + m); 
+                    
+                    const isPresent = log && String(log.status).toUpperCase() !== 'ABSENT' && String(log.time_in).toUpperCase() !== 'ABSENT' && log.time_in !== null;
+
+                    if (isPresent) {
+                        presentCount++;
+                    } else if (!isExcused) {
+                        missedDates.push(m);
+                    }
+                }
+            });
+
+            if (missedDates.length > 0) {
+                let fBadgeClass = 'bg-yellow-100 text-yellow-800 border border-yellow-300';
+                let fBadgeText = 'REMINDER';
+                if (missedDates.length === 2) { fBadgeClass = 'bg-orange-100 text-orange-800 border border-orange-300'; fBadgeText = 'WARNING'; }
+                else if (missedDates.length >= 3) { fBadgeClass = 'bg-red-600 text-white'; fBadgeText = 'REPRIMAND'; }
+
+                let actionColumn = isAdmin ? 
+                    `<button onclick="printFlagMemo('${eId}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>`
+                    : `<span class="text-[10px] text-gray-400 italic">Admin Only</span>`;
+
+                listF.innerHTML += `<tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
+                    <td class="text-center font-bold text-gray-700">${presentCount} / ${expectedMondays}</td>
+                    <td class="text-center text-xs text-gray-500">${missedDates.join(", ")}</td>
+                    <td class="text-center"><span class="px-2 py-1 rounded text-[10px] ${fBadgeClass} font-bold">${fBadgeText}</span></td>
+                    <td class="text-center">${actionColumn}</td>
+                </tr>`;
+            }
+        });
+        if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
+
+        // --- NEW: INCOMING / FUTURE LEAVES PROCESSING ---
+        const { data: rawFutureLeaves } = await fetchSafe(supabaseClient.from('leave_ledger')
+            .select('*')
+            .eq('transaction_type', 'APPROVED')
+            .order('start_date', { ascending: true }));
+
+        const futureLeaves = (rawFutureLeaves || []).filter(l => {
+            if (!l.start_date) return false;
+            // DO NOT INCLUDE TODAY
+            return l.start_date > todayStr; 
+        });
+
+        let htmlIncoming = '';
+        futureLeaves.forEach(l => {
+            const eId = String(l.emp_id).trim();
+            const emp = (emps || []).find(e => String(e.emp_id).trim() === eId);
+            if (!emp) return;
+            
+            // Apply RBAC filters for incoming leaves
+            if (isLimited) {
+                if (targetUnit && targetUnit !== 'NULL' && targetUnit !== 'null' && targetUnit.trim() !== '') {
+                    if (emp.unit !== targetUnit) return;
+                } else if (targetDivision && targetDivision !== 'NULL' && targetDivision !== 'null' && targetDivision.trim() !== '') {
+                    if (emp.division !== targetDivision) return;
+                } else if (eId !== currentUser.username) {
+                    return; 
+                }
+            }
+            
+            const badgeColor = l.transaction_type === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+            const displayDate = l.start_date + (l.end_date && l.end_date !== l.start_date ? ' to ' + l.end_date : '');
+            
+            let calDays = 1;
+            if (l.start_date && l.end_date && l.start_date !== l.end_date) {
+                let d1 = new Date(l.start_date);
+                let d2 = new Date(l.end_date);
+                if (!isNaN(d1) && !isNaN(d2)) {
+                    calDays = Math.floor(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+                }
+            }
+
+            htmlIncoming += `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold">${emp.full_name}</td>
+                    <td class="p-3">${l.type}</td>
+                    <td class="p-3 text-center">${displayDate}</td>
+                    <td class="p-3 text-center font-bold text-gray-700">${calDays}</td>
+                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold ${badgeColor}">${l.transaction_type}</span></td>
+                    <td class="p-3 text-center">
+                        <button onclick="cancelLeave('${l.id}', '${eId}', '${emp.full_name.replace(/'/g,"\\'")}', '${displayDate}', '${l.type}', ${calDays}, ${l.debit || 0}, '${(l.remarks || '').replace(/'/g,"\\'")}')" class="bg-red-600 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-red-700">CANCEL LEAVE</button>
+                    </td>
+                </tr>
+            `;
+        });
+        document.getElementById('listIncomingLeaves').innerHTML = htmlIncoming || '<tr><td colspan="6" class="p-4 text-center text-gray-500 italic">No incoming leaves found.</td></tr>';
+
+        // --- NEW: NOTIFICATIONS FETCHING ---
+        fetchNotifications();
+    };
+
+    async function fetchNotifications() {
+        const targetIds = [currentUser.username];
+        if (isAdmin) targetIds.push('HRMO');
+        
+        const { data } = await supabaseClient.from('hr_notifications')
+            .select('*')
+            .in('emp_id', targetIds)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+            
+        const panel = document.getElementById('notificationsPanel');
+        const list = document.getElementById('notificationsList');
+        
+        if (data && data.length > 0) {
+            panel.classList.remove('hidden');
+            list.innerHTML = data.map(n => `<li><strong>${n.sender_name}:</strong> ${n.message}</li>`).join('');
+        } else {
+            panel.classList.add('hidden');
+        }
+    }
+    
+    window.markNotificationsRead = async function() {
+        const targetIds = [currentUser.username];
+        if (isAdmin) targetIds.push('HRMO');
+        
+        await supabaseClient.from('hr_notifications')
+            .update({ is_read: true })
+            .in('emp_id', targetIds)
+            .eq('is_read', false);
+            
+        fetchNotifications();
+    };
+
+    window.cancelLeave = async function(leaveId, empId, empName, leaveDate, leaveType, calDays, currentDebit, currentRemarks) {
+        let reason = prompt(`Reason for cancelling the ${leaveType} of ${empName}?`);
+        if (!reason) return; // Exit if user cancels or submits empty reason
+
+        let cancelScope = 'WHOLE';
+        let specificDate = '';
+
+        // If leave spans multiple days, ask if they want to cancel everything or just one day
+        if (calDays > 1) {
+            let scopeInput = prompt(`This leave spans ${calDays} days (${leaveDate}).\nType 'WHOLE' to cancel the entire leave, or type 'SPECIFIC' to cancel just one day:`, 'WHOLE');
+            if (!scopeInput) return;
+            cancelScope = scopeInput.trim().toUpperCase();
+
+            if (cancelScope === 'SPECIFIC') {
+                specificDate = prompt(`Enter the specific date to cancel (YYYY-MM-DD) from the range ${leaveDate}:`);
+                if (!specificDate) return;
+            } else if (cancelScope !== 'WHOLE') {
+                alert("Invalid input. Please type WHOLE or SPECIFIC.");
+                return;
+            }
+        }
+
+        if (!confirm(`Are you sure you want to cancel ${cancelScope === 'WHOLE' ? 'the WHOLE leave' : `the specific date ${specificDate}`} for ${empName}?`)) return;
+        
+        try {
+            let updatePayload = {};
+            let notifMessage = '';
+            let hrNotifMessage = '';
+
+            if (cancelScope === 'WHOLE') {
+                updatePayload = { 
+                    transaction_type: 'CANCELLED',
+                    remarks: (currentRemarks ? currentRemarks + ' | ' : '') + 'Cancelled: ' + reason
+                };
+                notifMessage = `Your ${leaveType} on ${leaveDate} was CANCELLED by ${currentUser.full_name}. Reason: ${reason}`;
+                hrNotifMessage = `${currentUser.full_name} cancelled the WHOLE ${leaveType} of ${empName} for ${leaveDate}. Reason: ${reason}`;
+            } else {
+                let deductionPerDay = currentDebit / calDays;
+                let newDebit = currentDebit - deductionPerDay;
+                updatePayload = { 
+                    debit: newDebit,
+                    remarks: (currentRemarks ? currentRemarks + ' | ' : '') + `Cancelled on ${specificDate}: ${reason}`
+                };
+                notifMessage = `One day (${specificDate}) of your ${leaveType} on ${leaveDate} was CANCELLED by ${currentUser.full_name}. Reason: ${reason}`;
+                hrNotifMessage = `${currentUser.full_name} cancelled ONE DAY (${specificDate}) of the ${leaveType} for ${empName} on ${leaveDate}. Reason: ${reason}`;
+            }
+
+            const { error } = await supabaseClient.from('leave_ledger')
+                .update(updatePayload)
+                .eq('id', leaveId);
+            
+            if (error) throw error;
+            
+            const notifs = [];
+            // Notification to the Employee
+            notifs.push({
+                emp_id: empId,
+                sender_name: currentUser.full_name,
+                message: notifMessage
+            });
+
+            // Notification to HR (if the canceller is not an Admin/HR)
+            if (!isAdmin) {
+                notifs.push({
+                    emp_id: 'HRMO',
+                    sender_name: currentUser.full_name,
+                    message: hrNotifMessage
+                });
+            }
+            
+            await supabaseClient.from('hr_notifications').insert(notifs);
+            
+            alert("Leave cancellation processed successfully.");
+            location.reload(); 
+        } catch (err) {
+            alert("Error cancelling leave: " + err.message);
+        }
+    };
+
+    async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins, absentDays = 0) {
+        if (!confirm(`Generate memo for ${empName}?`)) return;
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]); 
+            
+            const bgBase64 = await getBgMemo();
+            if (bgBase64) {
+                pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
+            }
+            
+            const todayDate = new Date();
+            const todayStr = todayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            const currYear = todayDate.getFullYear();
+            const currMonthName = todayDate.toLocaleDateString('en-US', { month: 'long' });
+            
+            const prevMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+            const prevMonthName = prevMonthDate.toLocaleDateString('en-US', { month: 'long' });
+            const prevYearStr = prevMonthDate.getFullYear();
+
+            const isHabitualLate = (prevCount >= 10 && currCount >= 10);
+            const isHabitualAbsent = (absentDays >= 2.5);
+
+            let memoType = "";
+            let memoTypeDb = "";
+            
+            if (isHabitualLate) {
+                memoType = "HABITUAL TARDINESS";
+                memoTypeDb = "Habitual Tardiness";
+            } else if (isHabitualAbsent) {
+                memoType = "UNAUTHORIZED ABSENTEEISM";
+                memoTypeDb = "Unauthorized Absenteeism";
+            } else if (totalMins > 0) {
+                memoType = "ACCUMULATED TARDINESS AND ATTENDANCE MONITORING";
+                memoTypeDb = "Accumulated Tardiness";
+            } else {
+                alert("No tardiness or absenteeism criteria met for a memo.");
+                return;
+            }
+
+            let offenseCount = 1;
+            try {
+                const { data: pastMemos } = await supabaseClient
+                    .from('memo_records')
+                    .select('*')
+                    .eq('emp_id', empId)
+                    .eq('memo_type', memoTypeDb)
+                    .neq('month', currMonthName); 
+                
+                if (pastMemos) {
+                    offenseCount = pastMemos.length + 1;
+                }
+            } catch(e) {
+                console.error("Could not fetch past memos", e);
+            }
+
+            let offenseText = "";
+            let penaltyText = "";
+            let p1 = "";
+            let p2 = "";
+            let p3 = "";
+
+            if (memoTypeDb === "Habitual Tardiness") {
+                if (offenseCount === 1) {
+                    offenseText = "FIRST OFFENSE";
+                    penaltyText = "Suspension of one (1) month and one (1) day to six (6) months.";
+                } else {
+                    offenseText = "SECOND OFFENSE / FINAL WARNING";
+                    penaltyText = "Dismissal from the service.";
+                }
+                p1 = String(`A review of your Daily Time Records (DTR) shows that you incurred tardiness as follows:\n\n    ${prevMonthName} ${prevYearStr} - ${prevCount} instances of tardiness\n    ${currMonthName} ${currYear} - ${currCount} instances of tardiness`);
+                p2 = String(`Under the Revised Rules on Administrative Cases in the Civil Service (RRACCS), an employee is considered habitually tardy if he or she incurs at least ten (10) times of tardiness in a month for at least two (2) consecutive months. This constitutes a Less Grave Offense. As this is your ${offenseText}, the prescribed penalty is ${penaltyText}`);
+                p3 = String("In view thereof, you are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative case should be filed against you.\n\nFailure to respond within the prescribed period shall be deemed a waiver of your right to be heard.");
+            } else if (memoTypeDb === "Unauthorized Absenteeism") {
+                if (offenseCount === 1) {
+                    offenseText = "FIRST WARNING";
+                } else {
+                    offenseText = "NOTICE TO EXPLAIN / FINAL WARNING";
+                    memoType = `${memoType} (NOTICE TO EXPLAIN)`;
+                }
+                p1 = String(`A review of your Daily Time Records (DTR) shows that you incurred ${absentDays} days of unauthorized absences for the month of ${currMonthName} ${currYear}.`);
+                p2 = String(`Under Civil Service Commission (CSC) rules, an employee is considered Habitually Absent if they incur unauthorized absences of at least 2.5 days in a month for three (3) consecutive months, or for three (3) months in a semester, or three (3) consecutive months in a year. This constitutes a grave offense.`);
+                p3 = String(`This serves as your ${offenseText}. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative disciplinary action should be taken against you for unauthorized absenteeism. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`);
+            } else {
+                const totalHrs = (totalMins / 60.0).toFixed(2);
+                const daysEq = (totalMins / 60.0 / 8.0).toFixed(3);
+                
+                if (offenseCount === 1) {
+                    offenseText = "FIRST WARNING";
+                } else if (offenseCount === 2) {
+                    offenseText = "NOTICE TO EXPLAIN";
+                    memoType = `${memoType} (NOTICE TO EXPLAIN)`;
+                } else {
+                    offenseText = "FINAL WARNING";
+                }
+
+                p1 = String(`Based on the review of your Daily Time Records (DTR) for the month of ${currMonthName} ${currYear}, you have incurred a total of ${totalMins} minutes (${totalHrs} hours) of accumulated tardiness/undertime.`);
+                p2 = String(`Under Civil Service Commission (CSC) rules on attendance and leave, tardiness and undertime accumulated to eight (8) hours is equivalent to one (1) day absence. Accordingly, your accumulated tardiness is equivalent to ${daysEq} day/s, which shall be deducted from your available leave credits (Vacation Leave first, if available).`);
+                
+                if (offenseCount === 2) {
+                    p3 = String(`This serves as your NOTICE TO EXPLAIN. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum why no administrative action should be taken against you for excessive tardiness. Failure to respond within the prescribed period shall be deemed a waiver of your right to be heard.`);
+                } else {
+                    p3 = String(`This serves as your ${offenseText}. You are strongly advised to improve your attendance. Continued excessive tardiness may result in an administrative case should it eventually qualify as Habitual Tardiness under Civil Service rules.`);
+                }
+            }
+
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(12);
+            
+            pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
+            pdf.setFontSize(11);
+            pdf.text(`Series of ${currYear}`, 30, 51); 
+
+            pdf.setFontSize(11);
+            let currentY = 65;
+            const lineH = 8;
+            
+            pdf.text("TO", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${empName}`, 60, currentY); currentY += lineH;
+            pdf.text("FROM", 30, currentY); pdf.text(":", 55, currentY); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, currentY); currentY += lineH;
+            pdf.text("DATE", 30, currentY); pdf.text(":", 55, currentY); pdf.text(`${todayStr}`, 60, currentY); currentY += lineH;
+            pdf.text("SUBJECT", 30, currentY); pdf.text(":", 55, currentY); 
+            
+            const splitSubject = pdf.splitTextToSize(memoType, 130);
+            pdf.text(splitSubject, 60, currentY);
+            currentY += (splitSubject.length * lineH);
+
+            pdf.setLineWidth(0.6);
+            pdf.line(30, currentY, 215.9 - 30, currentY); 
+            currentY += 8;
+
+            pdf.setFont("helvetica", "normal");
+            
+            const linesP1 = pdf.splitTextToSize(p1, 155.9);
+            pdf.text(linesP1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesP1.length * 5) + 5;
+
+            const linesP2 = pdf.splitTextToSize(p2, 155.9);
+            pdf.text(linesP2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesP2.length * 5) + 5;
+
+            const linesP3 = pdf.splitTextToSize(p3, 155.9);
+            pdf.text(linesP3, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesP3.length * 5) + 10;
+
+            const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
+            const linesC1 = pdf.splitTextToSize(closing1, 155.9);
+            pdf.text(linesC1, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesC1.length * 5) + 5;
+
+            const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
+            const linesC2 = pdf.splitTextToSize(closing2, 155.9);
+            pdf.text(linesC2, 30, currentY, { maxWidth: 155.9, align: 'justify' });
+            currentY += (linesC2.length * 5) + 15;
+
+            pdf.setFont("helvetica", "bold");
+            pdf.text("RICARDO C. GARCIA", 30, currentY); 
+
+            try {
+                await supabaseClient.from('memo_records').insert({
+                    emp_id: empId,
+                    memo_type: memoTypeDb,
+                    offense_level: offenseCount,
+                    month: currMonthName,
+                    year: currYear
+                });
+            } catch(e) {
+                console.error("Error logging memo to DB", e);
+            }
+
+            const traceId = `TRC-${empId}-${Math.floor(Date.now() / 1000)}`;
+            const qrPayload = `DAR HRMO RECORD\nTrace: ${traceId}\nEmp: ${empId}\nType: ${memoTypeDb}\nDate: ${new Date().toLocaleDateString()}`;
+            
+            let qrContainer = document.getElementById('hiddenQrContainer');
+            if (!qrContainer) {
+                qrContainer = document.createElement('div');
+                qrContainer.id = 'hiddenQrContainer';
+                qrContainer.style.position = 'fixed';
+                qrContainer.style.left = '-9999px';
+                qrContainer.style.top = '-9999px';
+                document.body.appendChild(qrContainer);
+            }
+            qrContainer.innerHTML = '';
+            
+            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100, correctLevel: QRCode.CorrectLevel.L });
+            
+            setTimeout(() => {
+                try {
+                    const qrCanvas = qrContainer.querySelector('canvas');
+                    if (qrCanvas) {
+                        const qrDataUrl = qrCanvas.toDataURL('image/png');
+                        pdf.addImage(qrDataUrl, 'PNG', 30, currentY + 5, 22, 22);
+                    }
+                    pdf.save(`Memo_${empId}_${memoTypeDb.replace(" ", "_")}_${currMonthName}_${currYear}.pdf`);
+                } catch(err) {
+                    console.error(err);
+                    alert("Error saving PDF: " + err.message);
+                }
+            }, 300);
+
+        } catch(error) {
+            console.error(error);
+            alert("Error generating PDF: " + error.message);
+        }
+    }
+
+    async function printFlagMemo(empId, empName, missedDates) {
+        if (!confirm(`Generate Flag Ceremony Memo for ${empName}?`)) return;
+        
+        try {
+            const { jsPDF } = window.jspdf; 
+            const pdf = new jsPDF('p', 'mm', [215.9, 330.2]);
+
+            const bgBase64 = await getBgMemo();
+            if (bgBase64) {
+                pdf.addImage(bgBase64, 'JPEG', 0, 0, 215.9, 330.2);
+            }
+
+            const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            const currYear = new Date().getFullYear();
+            const currMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
+
+            const missedArray = missedDates.split(',').map(d => d.trim()).filter(d => d !== '');
+            const missedCount = missedArray.length;
+            
+            let actionLevel = "REMINDER";
+            if (missedCount === 2) actionLevel = "WARNING";
+            if (missedCount >= 3) actionLevel = "REPRIMAND";
+
+            pdf.setFont("helvetica", "bold"); 
+            pdf.setFontSize(12);
+            
+            pdf.text("PROVINCIAL MEMORANDUM ORDER No. _________", 30, 45); 
+            pdf.setFontSize(11); 
+            pdf.text(`Series of ${currYear}`, 30, 51); 
+            
+            let y = 65; 
+            const lineH = 8;
+            pdf.text("TO", 30, y); pdf.text(":", 55, y); pdf.text(empName, 60, y); y += lineH;
+            pdf.text("FROM", 30, y); pdf.text(":", 55, y); pdf.text("THE PROVINCIAL AGRARIAN REFORM PROGRAM OFFICER II", 60, y); y += lineH;
+            pdf.text("DATE", 30, y); pdf.text(":", 55, y); pdf.text(today, 60, y); y += lineH;
+            pdf.text("SUBJECT", 30, y); pdf.text(":", 55, y); pdf.text(`NON-ATTENDANCE TO FLAG CEREMONY (${actionLevel})`, 60, y);
+            
+            pdf.setLineWidth(0.6); 
+            pdf.line(30, y+5, 215.9 - 30, y+5); 
+            y += 15;
+
+            pdf.setFont("helvetica", "normal");
+            const p1 = String(`Records from the Human Resource Management Office (HRMO) indicate your non-attendance at the Flag Raising Ceremony held on the following date(s): ${missedDates}.`);
+            const p2 = String("Pursuant to CSC Memorandum Circular No. 19, s. 1999, attendance at the Flag Raising Ceremony every Monday is mandatory. Under office rules, non-attendance in a single month warrants: one (1) missed ceremony = REMINDER, two (2) = WARNING, and three (3) or more = REPRIMAND.");
+            
+            let p3 = "";
+            if (missedCount === 1) {
+                p3 = "This serves as your REMINDER. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you.";
+            } else if (missedCount === 2) {
+                p3 = "This serves as your WARNING. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no administrative disciplinary action should be taken against you.";
+            } else {
+                p3 = "This serves as your REPRIMAND. You are hereby directed to submit a written explanation within seventy-two (72) hours from receipt of this Memorandum as to why no formal administrative disciplinary action should be taken against you for your repeated failure to attend.";
+            }
+            p3 += " Failure to submit your explanation within the prescribed period shall be construed as a waiver of your right to be heard.";
+
+            const linesP1 = pdf.splitTextToSize(p1, 155.9);
+            pdf.text(linesP1, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesP1.length * 5) + 5; 
+            
+            const linesP2 = pdf.splitTextToSize(p2, 155.9);
+            pdf.text(linesP2, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesP2.length * 5) + 5; 
+            
+            const linesP3 = pdf.splitTextToSize(p3, 155.9);
+            pdf.text(linesP3, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesP3.length * 5) + 10; 
+
+            const closing1 = String("All Provincial Memorandums and Special Orders inconsistent herewith shall be deemed amended, revoked and/or superseded.");
+            const linesC1 = pdf.splitTextToSize(closing1, 155.9);
+            pdf.text(linesC1, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesC1.length * 5) + 5;
+
+            const closing2 = String("_________________________, Department of Agrarian Reform Provincial Office of Camarines Sur 1, HL Building, Carnation Street, Triangulo, City of Naga.");
+            const linesC2 = pdf.splitTextToSize(closing2, 155.9);
+            pdf.text(linesC2, 30, y, { maxWidth: 155.9, align: 'justify' });
+            y += (linesC2.length * 5) + 15;
+            
+            pdf.setFont("helvetica", "bold"); 
+            pdf.text("RICARDO C. GARCIA", 30, y); 
+
+            try {
+                await supabaseClient.from('memo_records').insert({
+                    emp_id: empId,
+                    memo_type: `Flag Ceremony ${actionLevel}`,
+                    offense_level: missedCount, 
+                    month: currMonthName,
+                    year: currYear
+                });
+            } catch(e) {
+                console.error("Error logging memo to DB", e);
+            }
+
+            const traceId = `TRC-FLAG-${empId}-${Math.floor(Date.now() / 1000)}`;
+            const qrPayload = `DAR HRMO RECORD\nTrace: ${traceId}\nEmp: ${empId}\nType: Flag Ceremony\nLevel: ${actionLevel}\nDate: ${new Date().toLocaleDateString()}`;
+            
+            let qrContainer = document.getElementById('hiddenQrContainer');
+            if (!qrContainer) {
+                qrContainer = document.createElement('div');
+                qrContainer.id = 'hiddenQrContainer';
+                qrContainer.style.position = 'fixed';
+                qrContainer.style.left = '-9999px';
+                qrContainer.style.top = '-9999px';
+                document.body.appendChild(qrContainer);
+            }
+            qrContainer.innerHTML = '';
+            
+            new QRCode(qrContainer, { text: qrPayload, width: 100, height: 100, correctLevel: QRCode.CorrectLevel.L });
+            
+            setTimeout(() => {
+                try {
+                    const qrCanvas = qrContainer.querySelector('canvas');
+                    if (qrCanvas) {
+                        const qrDataUrl = qrCanvas.toDataURL('image/png');
+                        pdf.addImage(qrDataUrl, 'PNG', 30, y + 5, 22, 22);
+                    }
+                    pdf.save(`Flag_Ceremony_Memo_${empId}_${currMonthName}_${currYear}.pdf`);
+                } catch(err) {
+                    console.error(err);
+                    alert("Error saving PDF: " + err.message);
+                }
+            }, 300);
+
+        } catch(error) {
+            console.error(error);
+            alert("Error generating PDF: " + error.message);
+        }
+    }
 </script>
 </body>
 </html>
