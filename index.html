@@ -46,7 +46,7 @@
         const user = JSON.parse(sessionStorage.getItem('currentUser'));
         if (user.role === 'VEHICLE_APPROVER') {
             window.location.href = 'fleet.html';
-        } else if ((user.role && user.role.toUpperCase().includes('PSO ENCODER')) || user.position === 'UNIT_HEAD') {
+        } else if ((user.role && user.role.toUpperCase().includes('PSO ENCODER')) || user.position === 'UNIT_HEAD' || user.role === 'UNIT_HEAD') {
             window.location.href = 'pso_encoder.html';
         } else if (user.unit === 'BUDGET' || user.unit === 'ACCOUNTING') {
             window.location.href = 'finance_dashboard.html';
@@ -66,7 +66,8 @@
         status.innerText = "";
         
         try {
-            const { data, error } = await supabaseClient.from('Users').select('*').eq('username', u).single();
+            // Using lowercase 'users' to match your exact Supabase database table name
+            const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).single();
             if (error) throw new Error("Authentication failed");
             if (data && data.password === p) {
                 // Save user session
@@ -75,7 +76,7 @@
                 // Route based on role, unit, and position
                 if (data.role === 'VEHICLE_APPROVER') {
                     window.location.href = 'fleet.html';
-                } else if ((data.role && data.role.toUpperCase().includes('PSO ENCODER')) || data.position === 'UNIT_HEAD') {
+                } else if ((data.role && data.role.toUpperCase().includes('PSO ENCODER')) || data.position === 'UNIT_HEAD' || data.role === 'UNIT_HEAD') {
                     window.location.href = 'pso_encoder.html';
                 } else if (data.unit === 'BUDGET' || data.unit === 'ACCOUNTING') {
                     window.location.href = 'finance_dashboard.html';
