@@ -183,15 +183,15 @@
     document.getElementById('activeUser').innerText = currentUser.full_name;
     document.getElementById('userRoleBadge').innerText = currentUser.role;
 
-    // Split roles into an array, clean whitespace, and normalize underscores for safe mapping
+    // RBAC: PARPO and HRMO are ADMIN. Everyone else is limited to their division/unit.
     const rawRole = (currentUser.role || '').toUpperCase();
     const userRoles = rawRole.replace(/_/g, ' ').split(',').map(r => r.trim());
+    const uPos = (currentUser.position || '').toUpperCase();
     
-    // Check if the user possesses the HRMO role anywhere in their assigned roles
-    const isHR = userRoles.includes('HRMO') || userRoles.some(r => r.includes('HR'));
+    const isAdmin = userRoles.some(r => r.includes('HRMO') || r.includes('ADMIN') || r.includes('PARPO')) || 
+                    uPos.includes('HRMO') || uPos.includes('PARPO');
     
-    // Limits apply ONLY if the user is strictly a CHIEF or UNIT HEAD and does NOT also have HR rights
-    const isLimited = !isHR && (userRoles.includes('CHIEF') || userRoles.includes('UNIT HEAD'));
+    const isLimited = !isAdmin;
     
     const targetDivision = currentUser.division;
     const targetUnit = currentUser.unit;
@@ -238,17 +238,20 @@
         const todayStr = todayDate.toISOString().split('T')[0];
         document.getElementById('dashDate').innerText = todayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
-        // Fetch Employees - Dynamic Query Building based on normalized roles
+        // Fetch Employees - Apply strict RBAC filter
         let empQuery = supabaseClient.from('employees').select('*');
         let scopeText = "Provincial Oversight";
 
         if (isLimited) {
-            if (userRoles.includes('UNIT HEAD') && targetUnit && targetUnit !== 'NULL' && targetUnit !== 'null' && targetUnit.trim() !== '') {
+            if (targetUnit && targetUnit !== 'NULL' && targetUnit !== 'null' && targetUnit.trim() !== '') {
                 empQuery = empQuery.eq('unit', targetUnit);
                 scopeText = `Unit: ${targetUnit}`;
-            } else if (targetDivision) {
+            } else if (targetDivision && targetDivision !== 'NULL' && targetDivision !== 'null' && targetDivision.trim() !== '') {
                 empQuery = empQuery.eq('division', targetDivision);
                 scopeText = `Division: ${targetDivision}`;
+            } else {
+                empQuery = empQuery.eq('emp_id', currentUser.username);
+                scopeText = `Personal Dashboard`;
             }
         }
         
@@ -597,9 +600,9 @@
                     statusBadge = `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-bold border border-yellow-300">MONITORING</span>`;
                 }
 
-                let actionColumn = isHR ? 
+                let actionColumn = isAdmin ? 
                     `<button onclick="printTardinessMemo('${h.id}', '${h.name.replace(/'/g, "\\'")}', ${h.prevCount}, ${h.currCount}, ${totalMins}, ${h.absentDays})" class="bg-[#A51C30] text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-800 shadow">PRINT MEMO</button>` 
-                    : `<span class="text-[10px] text-gray-400 italic">HR Only</span>`;
+                    : `<span class="text-[10px] text-gray-400 italic">Admin Only</span>`;
 
                 listH.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold">${h.name}</td>
@@ -717,9 +720,9 @@
                 if (missedDates.length === 2) { fBadgeClass = 'bg-orange-100 text-orange-800 border border-orange-300'; fBadgeText = 'WARNING'; }
                 else if (missedDates.length >= 3) { fBadgeClass = 'bg-red-600 text-white'; fBadgeText = 'REPRIMAND'; }
 
-                let actionColumn = isHR ? 
+                let actionColumn = isAdmin ? 
                     `<button onclick="printFlagMemo('${eId}', '${e.full_name.replace(/'/g, "\\'")}', '${missedDates.join(", ")}')" class="bg-blue-800 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-blue-700">PRINT MEMO</button>`
-                    : `<span class="text-[10px] text-gray-400 italic">HR Only</span>`;
+                    : `<span class="text-[10px] text-gray-400 italic">Admin Only</span>`;
 
                 listF.innerHTML += `<tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold text-blue-900">${e.full_name}</td>
@@ -735,9 +738,9 @@
         // --- NEW: INCOMING / FUTURE LEAVES PROCESSING ---
         const { data: futureLeaves } = await fetchSafe(supabaseClient.from('leave_ledger')
             .select('*')
-            .gt('date', todayStr)
-            .neq('transaction_t', 'CANCELLED')
-            .order('date', { ascending: true }));
+            .gt('start_date', todayStr)
+            .eq('transaction_type', 'APPROVED')
+            .order('start_date', { ascending: true }));
 
         let htmlIncoming = '';
         (futureLeaves || []).forEach(l => {
@@ -747,22 +750,26 @@
             
             // Apply RBAC filters for incoming leaves
             if (isLimited) {
-                if (userRoles.includes('UNIT HEAD') && emp.unit !== targetUnit) return;
-                if (!userRoles.includes('UNIT HEAD') && emp.division !== targetDivision) return;
-            } else if (!isHR && !userRoles.includes('PARPO') && eId !== currentUser.username) {
-                return; // Normal users only see their own
+                if (targetUnit && targetUnit !== 'NULL' && targetUnit !== 'null' && targetUnit.trim() !== '') {
+                    if (emp.unit !== targetUnit) return;
+                } else if (targetDivision && targetDivision !== 'NULL' && targetDivision !== 'null' && targetDivision.trim() !== '') {
+                    if (emp.division !== targetDivision) return;
+                } else if (eId !== currentUser.username) {
+                    return; 
+                }
             }
             
-            const badgeColor = l.transaction_t === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+            const badgeColor = l.transaction_type === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+            const displayDate = l.start_date + (l.end_date && l.end_date !== l.start_date ? ' to ' + l.end_date : '');
             
             htmlIncoming += `
                 <tr class="hover:bg-gray-50">
                     <td class="p-3 font-bold">${emp.full_name}</td>
                     <td class="p-3">${l.type}</td>
-                    <td class="p-3 text-center">${l.date}</td>
-                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold ${badgeColor}">${l.transaction_t}</span></td>
+                    <td class="p-3 text-center">${displayDate}</td>
+                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold ${badgeColor}">${l.transaction_type}</span></td>
                     <td class="p-3 text-center">
-                        <button onclick="cancelLeave('${l.id}', '${eId}', '${emp.full_name.replace(/'/g,"\\'")}', '${l.date}', '${l.type}')" class="bg-red-600 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-red-700">CANCEL LEAVE</button>
+                        <button onclick="cancelLeave('${l.id}', '${eId}', '${emp.full_name.replace(/'/g,"\\'")}', '${l.start_date}', '${l.type}')" class="bg-red-600 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-red-700">CANCEL LEAVE</button>
                     </td>
                 </tr>
             `;
@@ -774,9 +781,8 @@
     };
 
     async function fetchNotifications() {
-        // Build array of IDs to check: The user's username, and 'HRMO' if they are HR
         const targetIds = [currentUser.username];
-        if (isHR) targetIds.push('HRMO');
+        if (isAdmin) targetIds.push('HRMO');
         
         const { data } = await supabaseClient.from('hr_notifications')
             .select('*')
@@ -797,7 +803,7 @@
     
     window.markNotificationsRead = async function() {
         const targetIds = [currentUser.username];
-        if (isHR) targetIds.push('HRMO');
+        if (isAdmin) targetIds.push('HRMO');
         
         await supabaseClient.from('hr_notifications')
             .update({ is_read: true })
@@ -812,7 +818,7 @@
         
         try {
             const { error } = await supabaseClient.from('leave_ledger')
-                .update({ transaction_t: 'CANCELLED' })
+                .update({ transaction_type: 'CANCELLED' })
                 .eq('id', leaveId);
             if (error) throw error;
             
@@ -824,7 +830,7 @@
                 message: `Your ${leaveType} on ${leaveDate} was cancelled by ${currentUser.full_name}.`
             });
             // Notification to HR (if the canceller is not HR themselves)
-            if (!isHR) {
+            if (!isAdmin) {
                 notifs.push({
                     emp_id: 'HRMO',
                     sender_name: 'Leave System',
