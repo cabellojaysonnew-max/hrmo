@@ -37,7 +37,7 @@
             <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
             <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
             <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
-            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">USERS</a>
+            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">SYSTEM USERS</a>
         </div>
         <div class="p-4 bg-black/20 hidden md:block">
             <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
@@ -52,6 +52,17 @@
                 <p id="scopeLabel" class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide"></p>
             </div>
             <p id="dashDate" class="text-[#D4AF37] font-bold text-lg bg-white px-4 py-2 rounded shadow-sm border border-gray-200"></p>
+        </div>
+        
+        <!-- Notifications Panel -->
+        <div id="notificationsPanel" class="mb-8 hidden">
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded shadow-sm flex flex-col">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-sm font-bold text-yellow-800">Unread Notifications</h3>
+                    <button onclick="markNotificationsRead()" class="text-xs text-yellow-700 hover:text-yellow-900 underline font-bold transition-colors">Mark all as read</button>
+                </div>
+                <ul id="notificationsList" class="text-xs text-yellow-800 space-y-2 max-h-32 overflow-y-auto scroll-list"></ul>
+            </div>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -98,6 +109,26 @@
                 <div class="bg-gray-700 text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4></div>
                 <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - STATUS</div></div>
                 <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+            </div>
+        </div>
+
+        <div class="card mt-8 p-6">
+            <h3 class="text-xl font-bold text-[#003811] border-b pb-2 mb-4">Incoming / Future Leaves</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-700">
+                        <tr>
+                            <th class="p-3 font-bold border-b">Employee Name</th>
+                            <th class="p-3 font-bold border-b">Leave Type</th>
+                            <th class="p-3 font-bold border-b text-center">Date</th>
+                            <th class="p-3 font-bold border-b text-center">Status</th>
+                            <th class="p-3 font-bold border-b text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listIncomingLeaves" class="divide-y">
+                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Loading...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -700,6 +731,114 @@
             }
         });
         if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
+
+        // --- NEW: INCOMING / FUTURE LEAVES PROCESSING ---
+        const { data: futureLeaves } = await fetchSafe(supabaseClient.from('leave_ledger')
+            .select('*')
+            .gt('date', todayStr)
+            .neq('transaction_t', 'CANCELLED')
+            .order('date', { ascending: true }));
+
+        let htmlIncoming = '';
+        (futureLeaves || []).forEach(l => {
+            const eId = String(l.emp_id).trim();
+            const emp = (emps || []).find(e => String(e.emp_id).trim() === eId);
+            if (!emp) return;
+            
+            // Apply RBAC filters for incoming leaves
+            if (isLimited) {
+                if (userRoles.includes('UNIT HEAD') && emp.unit !== targetUnit) return;
+                if (!userRoles.includes('UNIT HEAD') && emp.division !== targetDivision) return;
+            } else if (!isHR && !userRoles.includes('PARPO') && eId !== currentUser.username) {
+                return; // Normal users only see their own
+            }
+            
+            const badgeColor = l.transaction_t === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+            
+            htmlIncoming += `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold">${emp.full_name}</td>
+                    <td class="p-3">${l.type}</td>
+                    <td class="p-3 text-center">${l.date}</td>
+                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold ${badgeColor}">${l.transaction_t}</span></td>
+                    <td class="p-3 text-center">
+                        <button onclick="cancelLeave('${l.id}', '${eId}', '${emp.full_name.replace(/'/g,"\\'")}', '${l.date}', '${l.type}')" class="bg-red-600 text-white px-3 py-1 rounded text-[10px] font-bold shadow hover:bg-red-700">CANCEL LEAVE</button>
+                    </td>
+                </tr>
+            `;
+        });
+        document.getElementById('listIncomingLeaves').innerHTML = htmlIncoming || '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No incoming leaves found.</td></tr>';
+
+        // --- NEW: NOTIFICATIONS FETCHING ---
+        fetchNotifications();
+    };
+
+    async function fetchNotifications() {
+        // Build array of IDs to check: The user's username, and 'HRMO' if they are HR
+        const targetIds = [currentUser.username];
+        if (isHR) targetIds.push('HRMO');
+        
+        const { data } = await supabaseClient.from('hr_notifications')
+            .select('*')
+            .in('emp_id', targetIds)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+            
+        const panel = document.getElementById('notificationsPanel');
+        const list = document.getElementById('notificationsList');
+        
+        if (data && data.length > 0) {
+            panel.classList.remove('hidden');
+            list.innerHTML = data.map(n => `<li><strong>${n.sender_name}:</strong> ${n.message}</li>`).join('');
+        } else {
+            panel.classList.add('hidden');
+        }
+    }
+    
+    window.markNotificationsRead = async function() {
+        const targetIds = [currentUser.username];
+        if (isHR) targetIds.push('HRMO');
+        
+        await supabaseClient.from('hr_notifications')
+            .update({ is_read: true })
+            .in('emp_id', targetIds)
+            .eq('is_read', false);
+            
+        fetchNotifications();
+    };
+
+    window.cancelLeave = async function(leaveId, empId, empName, leaveDate, leaveType) {
+        if (!confirm(`Are you sure you want to cancel the ${leaveType} of ${empName} on ${leaveDate}?`)) return;
+        
+        try {
+            const { error } = await supabaseClient.from('leave_ledger')
+                .update({ transaction_t: 'CANCELLED' })
+                .eq('id', leaveId);
+            if (error) throw error;
+            
+            const notifs = [];
+            // Notification to the Employee
+            notifs.push({
+                emp_id: empId,
+                sender_name: 'Leave System',
+                message: `Your ${leaveType} on ${leaveDate} was cancelled by ${currentUser.full_name}.`
+            });
+            // Notification to HR (if the canceller is not HR themselves)
+            if (!isHR) {
+                notifs.push({
+                    emp_id: 'HRMO',
+                    sender_name: 'Leave System',
+                    message: `${currentUser.full_name} cancelled the ${leaveType} of ${empName} for ${leaveDate}.`
+                });
+            }
+            
+            await supabaseClient.from('hr_notifications').insert(notifs);
+            
+            alert("Leave cancelled successfully.");
+            location.reload(); 
+        } catch (err) {
+            alert("Error cancelling leave: " + err.message);
+        }
     };
 
     async function printTardinessMemo(empId, empName, prevCount, currCount, totalMins, absentDays = 0) {
