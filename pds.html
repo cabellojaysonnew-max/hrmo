@@ -57,6 +57,7 @@
         <div class="flex px-8 pt-8 border-b border-gray-300">
             <button onclick="switchTab('pds')" id="tab-pds" class="tab-btn tab-active px-6 py-3 rounded-t-lg">Employee PDS</button>
             <button onclick="switchTab('sched')" id="tab-sched" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Work Schedule Configurator</button>
+            <button onclick="switchTab('list')" id="tab-list" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Generate List</button>
         </div>
 
         <div id="module-pds" class="flex-1 flex flex-col md:flex-row gap-6 p-8 overflow-hidden">
@@ -313,6 +314,55 @@
                 </div>
             </div>
         </div>
+
+        <div id="module-list" class="hidden flex-1 p-8 overflow-y-auto flex-col">
+            <div class="card p-6 mb-6 border-t-4 border-[#D4AF37]">
+                <h3 class="text-xl font-bold text-[#003811] mb-4 border-b pb-2">Generate Employee List</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label class="form-label">Filter Category</label>
+                        <select id="list_filter_cat" class="form-input" onchange="updateListFilterInput()">
+                            <option value="ALL">All Employees</option>
+                            <option value="DIVISION">Per Division</option>
+                            <option value="UNIT">Per Unit</option>
+                            <option value="TYPE">Classification / Type</option>
+                            <option value="BIRTHMONTH">Birthdays (by Month)</option>
+                            <option value="AGE">Age</option>
+                            <option value="ADDRESS">Address</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Filter Value</label>
+                        <input type="text" id="list_filter_val" class="form-input" placeholder="N/A for ALL" disabled>
+                    </div>
+                    <div class="flex items-end gap-2 md:col-span-2">
+                        <button onclick="generateEmployeeList()" class="bg-[#003811] text-white px-6 py-2 rounded text-xs font-bold hover:bg-[#006400] transition-colors">GENERATE</button>
+                        <button onclick="printEmployeeList()" class="bg-[#D4AF37] text-white px-6 py-2 rounded text-xs font-bold hover:bg-yellow-600 transition-colors">PRINT LIST</button>
+                    </div>
+                </div>
+                
+                <h4 class="text-[10px] font-bold text-gray-500 mb-2 mt-6 border-t pt-4 tracking-wider uppercase">Randomizer & Grouping</h4>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label class="form-label">Divide into Groups</label>
+                        <input type="number" id="list_num_groups" class="form-input" min="1" value="1">
+                    </div>
+                    <div>
+                        <button onclick="randomizeEmployeeList()" class="bg-blue-800 text-white px-6 py-2 rounded text-xs font-bold hover:bg-blue-700 transition-colors w-full">SHUFFLE / GROUP</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex-1 card overflow-hidden flex flex-col bg-white">
+                <div class="p-4 bg-[#003811] text-[#D4AF37] font-bold text-sm flex justify-between">
+                    <span>LIST PREVIEW</span>
+                    <span>Total Found: <span id="list_count" class="text-white">0</span></span>
+                </div>
+                <div class="flex-1 overflow-auto p-4 scroll-list" id="list_preview_container">
+                    <p class="text-gray-500 text-sm text-center mt-10 italic">Select filters and click GENERATE to preview the list here.</p>
+                </div>
+            </div>
+        </div>
     </main>
 
 <script>
@@ -330,13 +380,24 @@
     function switchTab(tab) {
         document.getElementById('module-pds').classList.add('hidden');
         document.getElementById('module-sched').classList.add('hidden');
+        document.getElementById('module-list').classList.add('hidden');
+        
+        document.getElementById('module-pds').classList.remove('flex');
+        document.getElementById('module-list').classList.remove('flex');
+
         document.getElementById('tab-pds').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg';
         document.getElementById('tab-sched').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
+        document.getElementById('tab-list').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
+
         if (tab === 'pds') {
             document.getElementById('module-pds').classList.remove('hidden'); document.getElementById('module-pds').classList.add('flex');
             document.getElementById('tab-pds').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg';
-        } else {
-            document.getElementById('module-sched').classList.remove('hidden'); document.getElementById('tab-sched').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
+        } else if (tab === 'sched') {
+            document.getElementById('module-sched').classList.remove('hidden'); 
+            document.getElementById('tab-sched').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
+        } else if (tab === 'list') {
+            document.getElementById('module-list').classList.remove('hidden'); document.getElementById('module-list').classList.add('flex');
+            document.getElementById('tab-list').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
         }
     }
 
@@ -461,6 +522,185 @@
     function toggleHalfDay() { /* Logic for schedule automation */ }
     async function checkActiveSetup() { /* Fetch overrides */ }
     async function applySchedule() { /* Insert to schedule_overrides */ }
+
+    // --- GENERATE LIST LOGIC ---
+    let currentListData = []; 
+    let isGroupedList = false;
+
+    function getAge(dobStr) {
+        if(!dobStr) return '';
+        const dob = new Date(dobStr);
+        if(isNaN(dob)) return '';
+        const diff = Date.now() - dob.getTime();
+        const ageDate = new Date(diff); 
+        return Math.abs(ageDate.getUTCFullYear() - 1970);
+    }
+
+    function updateListFilterInput() {
+        const cat = document.getElementById('list_filter_cat').value;
+        const valInput = document.getElementById('list_filter_val');
+        if (cat === 'ALL') {
+            valInput.value = '';
+            valInput.disabled = true;
+            valInput.placeholder = 'N/A for ALL';
+        } else {
+            valInput.disabled = false;
+            if (cat === 'BIRTHMONTH') valInput.placeholder = 'e.g. 01, 12, or Jan, Dec';
+            else if (cat === 'TYPE') valInput.placeholder = 'e.g. Regular, SPLIT, COS';
+            else if (cat === 'AGE') valInput.placeholder = 'e.g. 30, >30, <25';
+            else valInput.placeholder = `Type ${cat.toLowerCase()} to search...`;
+        }
+    }
+
+    function generateEmployeeList() {
+        const cat = document.getElementById('list_filter_cat').value;
+        const val = document.getElementById('list_filter_val').value.toLowerCase().trim();
+        isGroupedList = false;
+        
+        currentListData = allEmployees.filter(e => {
+            if (cat === 'ALL') return true;
+            if (cat === 'DIVISION') return String(e.division || '').toLowerCase().includes(val);
+            if (cat === 'UNIT') return String(e.unit || '').toLowerCase().includes(val);
+            if (cat === 'TYPE') {
+                const t = String(e.type || '').toLowerCase();
+                const et = String(e.employment_type || '').toLowerCase();
+                return t.includes(val) || et.includes(val);
+            }
+            if (cat === 'ADDRESS') {
+                const addr = String(e.residential_address || '') + ' ' + String(e.permanent_address || '');
+                return addr.toLowerCase().includes(val);
+            }
+            if (cat === 'AGE') {
+                const age = getAge(e.date_of_birth);
+                if (age === '') return false;
+                if (val.startsWith('>')) return age > parseInt(val.substring(1));
+                if (val.startsWith('<')) return age < parseInt(val.substring(1));
+                return age.toString() === val;
+            }
+            if (cat === 'BIRTHMONTH') {
+                if (!e.date_of_birth) return false;
+                const monthStr = new Date(e.date_of_birth).toLocaleString('default', { month: 'short' }).toLowerCase();
+                const monthNum = e.date_of_birth.split('-')[1]; 
+                return monthNum === val || parseInt(monthNum).toString() === val || monthStr.includes(val);
+            }
+            return true;
+        });
+        renderListPreview();
+    }
+
+    function randomizeEmployeeList() {
+        if(currentListData.length === 0) generateEmployeeList();
+        
+        // Fisher-Yates shuffle
+        let shuffled = [...currentListData];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        
+        const numGroups = parseInt(document.getElementById('list_num_groups').value) || 1;
+        if (numGroups <= 1) {
+            currentListData = shuffled;
+            isGroupedList = false;
+        } else {
+            let groups = Array.from({length: numGroups}, () => []);
+            shuffled.forEach((emp, index) => {
+                groups[index % numGroups].push(emp);
+            });
+            currentListData = groups;
+            isGroupedList = true;
+        }
+        renderListPreview();
+    }
+
+    function renderListPreview() {
+        const container = document.getElementById('list_preview_container');
+        let html = '';
+        
+        if (isGroupedList) {
+            let totalCount = 0;
+            currentListData.forEach((group, index) => {
+                totalCount += group.length;
+                html += `<div class="mb-6"><h5 class="font-bold text-xs uppercase mb-2 bg-[#D4AF37] text-white px-3 py-1.5 rounded-t inline-block">GROUP ${index + 1} &nbsp;|&nbsp; ${group.length} MEMBERS</h5>`;
+                html += buildTableHTML(group);
+                html += `</div>`;
+            });
+            document.getElementById('list_count').innerText = totalCount;
+        } else {
+            document.getElementById('list_count').innerText = currentListData.length;
+            html = buildTableHTML(currentListData);
+        }
+        container.innerHTML = html;
+    }
+
+    function buildTableHTML(data) {
+        if(data.length === 0) return '<p class="text-sm text-gray-500 italic p-2 border border-dashed border-gray-300">No records found for this group/filter.</p>';
+
+        let html = `<table class="w-full text-xs text-left border-collapse border border-gray-300">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="border border-gray-300 p-2 text-[#003811]">Emp ID</th>
+                    <th class="border border-gray-300 p-2 text-[#003811]">Full Name</th>
+                    <th class="border border-gray-300 p-2 text-[#003811]">Division / Unit</th>
+                    <th class="border border-gray-300 p-2 text-[#003811]">Classification / Type</th>
+                    <th class="border border-gray-300 p-2 text-[#003811]">Age</th>
+                    <th class="border border-gray-300 p-2 text-[#003811]">Address</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        data.forEach(e => {
+            const age = getAge(e.date_of_birth);
+            const address = String(e.residential_address || '') + (e.permanent_address ? ' / ' + e.permanent_address : '');
+            html += `<tr>
+                <td class="border border-gray-300 p-1 font-mono">${e.emp_id || ''}</td>
+                <td class="border border-gray-300 p-1 font-bold">${e.full_name || ''}</td>
+                <td class="border border-gray-300 p-1">${e.division || ''} ${e.unit ? '- '+e.unit : ''}</td>
+                <td class="border border-gray-300 p-1">${e.type || ''} ${e.employment_type ? '('+e.employment_type+')' : ''}</td>
+                <td class="border border-gray-300 p-1 text-center">${age}</td>
+                <td class="border border-gray-300 p-1 truncate max-w-[200px]" title="${address}">${address || '-'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+        return html;
+    }
+
+    function printEmployeeList() {
+        if (currentListData.length === 0) {
+            alert("Please generate a list first.");
+            return;
+        }
+        
+        const printWindow = window.open('', '', 'height=700,width=900');
+        const catSelect = document.getElementById('list_filter_cat');
+        const filterTitle = catSelect.options[catSelect.selectedIndex].text;
+        const filterVal = document.getElementById('list_filter_val').value || 'ALL';
+        const previewHTML = document.getElementById('list_preview_container').innerHTML;
+        
+        printWindow.document.write('<html><head><title>Employee List</title>');
+        printWindow.document.write('<style>');
+        printWindow.document.write('body { font-family: "Segoe UI", Arial, sans-serif; padding: 20px; color: #1F2937; }');
+        printWindow.document.write('table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }');
+        printWindow.document.write('th, td { border: 1px solid #9CA3AF; padding: 6px; text-align: left; }');
+        printWindow.document.write('th { background-color: #F3F4F6; color: #003811; }');
+        printWindow.document.write('h2 { margin-bottom: 2px; color: #003811; }');
+        printWindow.document.write('p.subtitle { margin-top: 0; margin-bottom: 20px; font-size: 12px; color: #6B7280; }');
+        printWindow.document.write('.bg-\\[\\#D4AF37\\] { background-color: #D4AF37; }');
+        printWindow.document.write('.text-white { color: #FFFFFF; }');
+        printWindow.document.write('.rounded-t { border-top-left-radius: 4px; border-top-right-radius: 4px; }');
+        printWindow.document.write('.inline-block { display: inline-block; }');
+        printWindow.document.write('.px-3 { padding-left: 12px; padding-right: 12px; }');
+        printWindow.document.write('.py-1\\.5 { padding-top: 6px; padding-bottom: 6px; }');
+        printWindow.document.write('@media print { body { padding: 0; } }');
+        printWindow.document.write('</style>');
+        printWindow.document.write('</head><body>');
+        printWindow.document.write('<h2>DAR HRMO - Employee List</h2>');
+        printWindow.document.write(`<p class="subtitle">Filter: ${filterTitle} (${filterVal.toUpperCase()}) | Total Count: ${document.getElementById('list_count').innerText}</p>`);
+        printWindow.document.write(previewHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+    }
 </script>
 </body>
 </html>
