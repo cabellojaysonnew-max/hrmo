@@ -736,28 +736,22 @@
         if (!listF.innerHTML) listF.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Excellent! No unexcused missed Flag Ceremonies detected for DARPO-CS1.</td></tr>';
 
         // --- NEW: INCOMING / FUTURE LEAVES PROCESSING ---
-        const { data: futureLeaves } = await fetchSafe(supabaseClient.from('leave_ledger')
+        const { data: rawFutureLeaves } = await fetchSafe(supabaseClient.from('leave_ledger')
             .select('*')
-            .gt('start_date', todayStr)
             .eq('transaction_type', 'APPROVED')
             .order('start_date', { ascending: true }));
 
+        const futureLeaves = (rawFutureLeaves || []).filter(l => {
+            if (!l.start_date) return false;
+            const eDate = (l.end_date && l.end_date.trim() !== '') ? l.end_date : l.start_date;
+            return eDate >= todayStr; 
+        });
+
         let htmlIncoming = '';
-        (futureLeaves || []).forEach(l => {
+        futureLeaves.forEach(l => {
             const eId = String(l.emp_id).trim();
             const emp = (emps || []).find(e => String(e.emp_id).trim() === eId);
             if (!emp) return;
-            
-            // Apply RBAC filters for incoming leaves
-            if (isLimited) {
-                if (targetUnit && targetUnit !== 'NULL' && targetUnit !== 'null' && targetUnit.trim() !== '') {
-                    if (emp.unit !== targetUnit) return;
-                } else if (targetDivision && targetDivision !== 'NULL' && targetDivision !== 'null' && targetDivision.trim() !== '') {
-                    if (emp.division !== targetDivision) return;
-                } else if (eId !== currentUser.username) {
-                    return; 
-                }
-            }
             
             const badgeColor = l.transaction_type === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
             const displayDate = l.start_date + (l.end_date && l.end_date !== l.start_date ? ' to ' + l.end_date : '');
