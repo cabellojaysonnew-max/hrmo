@@ -85,10 +85,20 @@
             <div class="card bg-white flex flex-col h-full overflow-hidden">
                 <div class="p-4 border-b bg-gray-50 flex flex-wrap gap-4 items-end">
                     <div>
+                        <label class="form-label">Station</label>
+                        <select id="viewStation" class="form-input py-1.5 w-32 h-[36px]">
+                            <option value="DARPO-CS1">DARPO-CS1</option>
+                            <option value="DARMOS">DARMOs</option>
+                        </select>
+                    </div>
+                    <div>
                         <label class="form-label">Type Filter</label>
                         <div class="flex gap-3 bg-white border border-gray-300 rounded px-3 py-1.5 h-[36px] items-center">
                             <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
                                 <input type="radio" name="viewType" value="REGULAR" class="accent-[#003811]"> REGULAR
+                            </label>
+                            <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
+                                <input type="radio" name="viewType" value="COS" class="accent-[#003811]"> COS
                             </label>
                             <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
                                 <input type="radio" name="viewType" value="SPLIT" class="accent-[#003811]"> SPLIT
@@ -97,7 +107,7 @@
                     </div>
                     <div>
                         <label class="form-label">Month</label>
-                        <select id="viewMonth" class="form-input py-1.5 w-32">
+                        <select id="viewMonth" class="form-input py-1.5 w-32 h-[36px]">
                             <option value="1">January</option><option value="2">February</option><option value="3">March</option>
                             <option value="4">April</option><option value="5">May</option><option value="6">June</option>
                             <option value="7">July</option><option value="8">August</option><option value="9">September</option>
@@ -106,13 +116,13 @@
                     </div>
                     <div>
                         <label class="form-label">Year</label>
-                        <select id="viewYear" class="form-input py-1.5 w-24"></select>
+                        <select id="viewYear" class="form-input py-1.5 w-24 h-[36px]"></select>
                     </div>
-                    <button onclick="generateMonthlyView()" id="btnGenerateView" class="bg-[#003811] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-[#006400]">GENERATE VIEW</button>
+                    <button onclick="generateMonthlyView()" id="btnGenerateView" class="bg-[#003811] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-[#006400] h-[36px]">GENERATE VIEW</button>
                     
                     <div class="flex-1"></div>
-                    <button onclick="printMissingLogs()" class="bg-[#C62828] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-red-800 shadow-sm mr-2">PRINT MISSING LOGS</button>
-                    <button onclick="openManualEntryModal()" class="bg-[#D4AF37] text-[#003811] px-4 py-1.5 rounded text-sm font-bold hover:bg-yellow-500 shadow-sm">+ MANUAL ENTRY</button>
+                    <button onclick="printMissingLogs()" class="bg-[#C62828] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-red-800 shadow-sm mr-2 h-[36px]">PRINT MISSING LOGS</button>
+                    <button onclick="openManualEntryModal()" class="bg-[#D4AF37] text-[#003811] px-4 py-1.5 rounded text-sm font-bold hover:bg-yellow-500 shadow-sm h-[36px]">+ MANUAL ENTRY</button>
                 </div>
                 
                 <div class="flex-1 overflow-auto scroll-list">
@@ -192,12 +202,15 @@
                                                 <input type="radio" name="f48Type" value="REGULAR" class="accent-[#003811]"> REGULAR
                                             </label>
                                             <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-gray-700">
+                                                <input type="radio" name="f48Type" value="COS" class="accent-[#003811]"> COS
+                                            </label>
+                                            <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-gray-700">
                                                 <input type="radio" name="f48Type" value="SPLIT" class="accent-[#003811]"> SPLIT
                                             </label>
                                         </div>
                                     </div>
                                     <select id="f48Division" class="form-input py-1.5 text-xs">
-                                        <option value="ALL">ALL (DARPO-CS1)</option>
+                                        <option value="ALL">ALL</option>
                                         <option value="OFFICE OF THE PARPO">OFFICE OF THE PARPO</option>
                                         <option value="MARPOs">MARPOs</option>
                                         <option value="PARAD">PARAD</option>
@@ -269,10 +282,19 @@
                 </div>
 
                 <div class="mb-4 flex gap-4 items-center">
-                    <label class="form-label mb-0">Type Filter:</label>
+                    <label class="form-label mb-0">Station:</label>
+                    <select id="mStation" class="form-input w-32 py-1" onchange="populateManualSearch()">
+                        <option value="DARPO-CS1">DARPO-CS1</option>
+                        <option value="DARMOS">DARMOs</option>
+                    </select>
+                    
+                    <label class="form-label mb-0 ml-2">Type Filter:</label>
                     <div id="manualTypeContainer" class="flex gap-3">
                         <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
                             <input type="radio" name="mType" value="REGULAR" class="accent-[#003811]" onchange="populateManualSearch()"> REGULAR
+                        </label>
+                        <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
+                            <input type="radio" name="mType" value="COS" class="accent-[#003811]" onchange="populateManualSearch()"> COS
                         </label>
                         <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
                             <input type="radio" name="mType" value="SPLIT" class="accent-[#003811]" onchange="populateManualSearch()"> SPLIT
@@ -281,7 +303,7 @@
                 </div>
                 
                 <div class="mb-4">
-                    <label class="form-label">Search Employee (DARPO-CS1)</label>
+                    <label class="form-label">Search Employee</label>
                     <input type="text" id="mEmployeeSearch" list="mEmployeeList" class="form-input" placeholder="Type name or ID to search..." onchange="checkMissingLogs()">
                     <datalist id="mEmployeeList"></datalist>
                 </div>
@@ -414,9 +436,11 @@
         if (currentUser.role.toUpperCase() === 'HRMO-SPLIT') {
             document.querySelector('input[name="mType"][value="SPLIT"]').checked = true;
             document.querySelector('input[name="mType"][value="REGULAR"]').disabled = true;
+            document.querySelector('input[name="mType"][value="COS"]').disabled = true;
             
             document.querySelector('input[name="viewType"][value="SPLIT"]').checked = true;
             document.querySelector('input[name="viewType"][value="REGULAR"]').disabled = true;
+            document.querySelector('input[name="viewType"][value="COS"]').disabled = true;
         } else {
             document.querySelector('input[name="mType"][value="REGULAR"]').checked = true;
             document.querySelector('input[name="viewType"][value="REGULAR"]').checked = true;
@@ -454,13 +478,18 @@
         const typeFilter = document.querySelector('input[name="mType"]:checked');
         if (!typeFilter) return;
         const selectedType = typeFilter.value;
+        const selectedStation = document.getElementById('mStation').value;
         
         let searchHtml = '';
         allEmployees.forEach(e => {
             const eStation = String(e.station || '').toUpperCase();
             const eType = String(e.type || '').toUpperCase();
             
-            if (eStation === 'DARPO-CS1' && eType === selectedType) {
+            let stationMatch = false;
+            if (selectedStation === 'DARPO-CS1' && eStation === 'DARPO-CS1') stationMatch = true;
+            if (selectedStation === 'DARMOS' && eStation.includes('DARMO')) stationMatch = true;
+
+            if (stationMatch && eType === selectedType) {
                 searchHtml += `<option value="${e.emp_id} - ${e.full_name}"></option>`;
             }
         });
@@ -526,6 +555,7 @@
             let html = '';
             
             const selectedViewType = document.querySelector('input[name="viewType"]:checked').value;
+            const selectedStation = document.getElementById('viewStation').value;
             
             for(let d = 1; d <= endDt.getDate(); d++) {
                 const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -536,7 +566,11 @@
                     const eStation = String(e.station || '').toUpperCase();
                     const eType = String(e.type || '').toUpperCase();
 
-                    if (eStation !== 'DARPO-CS1') return;
+                    let stationMatch = false;
+                    if (selectedStation === 'DARPO-CS1' && eStation === 'DARPO-CS1') stationMatch = true;
+                    if (selectedStation === 'DARMOS' && eStation.includes('DARMO')) stationMatch = true;
+
+                    if (!stationMatch) return;
                     if (eType !== selectedViewType) return;
 
                     let expectedDays = ['1', '2', '3', '4', '5'];
@@ -978,13 +1012,13 @@
                 const found = allEmployees.find(e => e.emp_id === eVal);
                 if (found) {
                     const isDarpo = String(found.station || '').toUpperCase() === 'DARPO-CS1';
-                    const isSplit = String(found.type || '').toUpperCase() === 'SPLIT';
-                    const isRegular = String(found.type || '').toUpperCase() === 'REGULAR';
+                    const isDarmo = String(found.station || '').toUpperCase().includes('DARMO');
+                    const eType = String(found.type || '').toUpperCase();
                     
-                    if (isDarpo && (isSplit || isRegular)) {
+                    if ((isDarpo || isDarmo) && (eType === 'SPLIT' || eType === 'REGULAR' || eType === 'COS')) {
                         targetEmps = [found];
                     } else {
-                         throw new Error("Only DARPO-CS1 Regular and Split employees can be generated.");
+                         throw new Error("Only DARPO-CS1 or DARMOs Regular, COS, and Split employees can be generated.");
                     }
                 } else {
                     throw new Error("Please select a valid employee from the search list.");
@@ -995,7 +1029,8 @@
 
                 targetEmps = allEmployees.filter(e => {
                     const isDarpo = String(e.station || '').toUpperCase() === 'DARPO-CS1';
-                    if (!isDarpo) return false;
+                    const isDarmo = String(e.station || '').toUpperCase().includes('DARMO');
+                    if (!isDarpo && !isDarmo) return false;
 
                     let eDiv = String(e.division || '').toUpperCase().trim();
                     let eType = String(e.type || '').toUpperCase().trim();
@@ -1005,7 +1040,7 @@
                     if (eDiv === 'PARPO I') eDiv = 'OFFICE OF THE PARPO'; 
 
                     if (empTypeFilter !== 'ALL' && eType !== empTypeFilter) return false;
-                    if (eType !== 'SPLIT' && eType !== 'REGULAR') return false;
+                    if (eType !== 'SPLIT' && eType !== 'REGULAR' && eType !== 'COS') return false;
 
                     if (div === 'ALL') return true;
                     return eDiv === div;
