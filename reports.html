@@ -379,12 +379,12 @@
             );
 
             if (!isExempt) {
-                const uDiv = (currentUser.division || "").toUpperCase();
-                const uUnit = (currentUser.unit || "").toUpperCase();
+                const uDiv = (currentUser.division || "").toUpperCase().trim();
+                const uUnit = (currentUser.unit || "").toUpperCase().trim();
                 
                 emps = emps.filter(e => {
-                    const eDiv = (e.division || "").toUpperCase();
-                    const eUnit = (e.unit || "").toUpperCase();
+                    const eDiv = (e.division || "").toUpperCase().trim();
+                    const eUnit = (e.unit || "").toUpperCase().trim();
                     
                     if (uUnit && uUnit !== "NONE" && uUnit !== "N/A" && uUnit !== "NULL") {
                         return eUnit === uUnit;
@@ -427,8 +427,8 @@
                     const uHead = String(t.unithead_signed || '').toUpperCase().trim();
                     const dc = String(t.dc_signed || '').toUpperCase().trim();
                     
-                    const uEmp = emps.find(e => String(e.full_name).toUpperCase() === uHead);
-                    const dEmp = emps.find(e => String(e.full_name).toUpperCase() === dc);
+                    const uEmp = empsData.find(e => String(e.full_name).toUpperCase() === uHead);
+                    const dEmp = empsData.find(e => String(e.full_name).toUpperCase() === dc);
                     const uSign = uEmp ? await getAssetBase64(`${cleanId(uEmp.emp_id)}.png`) : null;
                     const dSign = dEmp ? await getAssetBase64(`${cleanId(dEmp.emp_id)}.png`) : null;
                     const qr = await getQRBase64(t.to_no);
@@ -989,8 +989,8 @@
                         empGroups[div].push(t);
                     });
 
-                    const headers = ["EMP NUMBER", "NAME", "LEAVE TYPE", "DATE OF FILING", "DATE(S) OF LEAVE", "BALANCE (AS OF TODAY)", "NO. OF DAYS", "REMAINING BALANCE"];
-                    const widths = [30, 50, 40, 30, 40, 40, 25, 45];
+                    const headers = ["EMP NUMBER", "NAME", "LEAVE TYPE", "DATE OF FILING", "DATE(S) OF LEAVE", "BALANCE (AS OF TODAY)", "NO. OF DAYS", "USED CREDITS", "REMAINING BALANCE"];
+                    const widths = [22, 45, 30, 25, 45, 35, 20, 25, 35];
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
@@ -1026,6 +1026,7 @@
                                 dateOfLeave,
                                 bal.toFixed(3), 
                                 days.toFixed(3), 
+                                days.toFixed(3),
                                 (bal - days).toFixed(3)
                             ];
                         }, isAppend, levelNum, currY);
