@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DARPO-CS1 Mobile Enrollment</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Playfair+Display:wght@700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .dar-green { background-color: #003811; }
+        .dar-gold { color: #D4AF37; }
+        
+        #video-container { position: relative; width: 100%; max-width: 350px; aspect-ratio: 3/4; overflow: hidden; border-radius: 1.5rem; margin: 0 auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); /* Mirror front camera */ }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- LOGIN VIEW -->
+    <div id="login-view" class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8 border-t-4 border-[#003811]">
+        <div class="text-center mb-6">
+            <h1 class="text-4xl font-serif text-[#003811] font-black leading-none mb-1">DAR</h1>
+            <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Employee Portal Login</p>
+        </div>
+
+        <div id="loginError" class="hidden bg-red-50 border border-red-200 text-red-700 text-xs font-bold p-3 rounded-lg mb-4 text-center uppercase tracking-wide"></div>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Employee Number</label>
+                <input type="text" id="loginEmpId" placeholder="e.g. 2026-001" class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#003811] text-sm font-bold">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Password</label>
+                <input type="password" id="loginPass" placeholder="••••••••" class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#003811] text-sm font-bold" onkeypress="if(event.key === 'Enter') handleLogin()">
+            </div>
+            <button id="loginBtn" onclick="handleLogin()" class="w-full dar-green text-white font-black py-4 rounded-xl shadow-lg hover:shadow-xl transition-all uppercase tracking-widest text-sm mt-2">
+                Verify & Proceed
+            </button>
+        </div>
+    </div>
+
+    <!-- CAMERA VIEW -->
+    <div id="camera-view" class="hidden w-full max-w-sm flex flex-col items-center">
+        <div class="bg-white p-4 rounded-2xl shadow-xl w-full text-center mb-6 border-t-4 border-[#D4AF37]">
+            <h2 id="welcomeName" class="font-black text-gray-800 text-lg uppercase truncate">Welcome</h2>
+            <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Biometric Setup</p>
+        </div>
+
+        <div id="video-container" class="border-4 border-white relative">
+            <video id="video" autoplay muted playsinline></video>
+            <!-- Overlay Guide -->
+            <div class="absolute inset-0 border-[15px] border-black/30 pointer-events-none z-20"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-64 border-2 border-dashed border-white/60 rounded-[80px] z-20 shadow-[0_0_0_9999px_rgba(0,0,0,0.3)]"></div>
+        </div>
+
+        <div id="statusBox" class="mt-6 bg-white px-6 py-3 rounded-full shadow-md">
+            <p id="statusText" class="text-xs font-black text-[#003811] uppercase tracking-widest animate-pulse">Loading AI Models...</p>
+        </div>
+
+        <button id="captureBtn" disabled onclick="captureFace()" class="mt-6 w-full dar-green text-white font-black py-4 rounded-xl shadow-lg transition-all opacity-50 cursor-not-allowed uppercase tracking-widest text-sm">
+            Capture Face Profile
+        </button>
+    </div>
+
+    <!-- SUCCESS VIEW -->
+    <div id="success-view" class="hidden w-full max-w-sm bg-white rounded-2xl shadow-xl p-8 border-t-4 border-green-500 text-center">
+        <div class="text-6xl mb-4">✅</div>
+        <h2 class="font-black text-green-700 text-xl uppercase tracking-widest mb-2">Registration Complete</h2>
+        <p class="text-sm font-bold text-gray-600 mb-6">Your facial profile has been safely encoded and linked to your Employee ID.</p>
+        <button onclick="location.reload()" class="w-full bg-gray-200 text-gray-800 font-black py-3 rounded-xl shadow hover:bg-gray-300 transition-all uppercase tracking-widest text-xs">
+            Return to Login
+        </button>
+    </div>
+
+    <script>
+        const supabaseClient = window.supabaseClient;
+        const video = document.getElementById('video');
+        const statusText = document.getElementById('statusText');
+        const captureBtn = document.getElementById('captureBtn');
+        
+        let loggedInEmpId = null;
+        let modelsLoaded = false;
+        let isDetecting = false;
+
+        // 1. Load AI Models immediately in background
+        Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
+            faceapi.nets.faceRecognitionNet.loadFromUri('./models')
+        ]).then(() => {
+            modelsLoaded = true;
+            console.log("AI Models loaded.");
+        }).catch(err => console.error("Model load error:", err));
+
+        // 2. Handle Login
+        async function handleLogin() {
+            const empId = document.getElementById('loginEmpId').value.trim();
+            const pass = document.getElementById('loginPass').value;
+            const errorDiv = document.getElementById('loginError');
+            const loginBtn = document.getElementById('loginBtn');
+
+            if (!empId || !pass) {
+                errorDiv.innerText = "Please enter Employee ID and Password.";
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            loginBtn.innerText = "VERIFYING...";
+            loginBtn.disabled = true;
+            errorDiv.classList.add('hidden');
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('employees')
+                    .select('emp_id, full_name')
+                    .eq('emp_id', empId)
+                    .eq('pass', pass)
+                    .single();
+
+                if (error || !data) {
+                    throw new Error("Invalid Credentials.");
+                }
+
+                loggedInEmpId = data.emp_id;
+                document.getElementById('welcomeName').innerText = data.full_name;
+                
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('camera-view').classList.remove('hidden');
+                
+                startCamera();
+
+            } catch (err) {
+                errorDiv.innerText = err.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                loginBtn.innerText = "VERIFY & PROCEED";
+                loginBtn.disabled = false;
+            }
+        }
+
+        // 3. Start Camera (Front-facing)
+        async function startCamera() {
+            if (!modelsLoaded) {
+                statusText.innerText = "Waiting for AI Models...";
+                setTimeout(startCamera, 1000);
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
+                });
+                video.srcObject = stream;
+                
+                video.onplaying = () => {
+                    statusText.innerText = "Position face in oval";
+                    statusText.classList.replace('text-[#003811]', 'text-orange-600');
+                    isDetecting = true;
+                    scanLoop();
+                };
+            } catch (err) {
+                statusText.innerText = "Camera Access Denied";
+                statusText.classList.replace('text-[#003811]', 'text-red-600');
+                alert("Please allow camera permissions and ensure you are using HTTPS.");
+            }
+        }
+
+        // 4. Continuous Scanning Loop to enable/disable button
+        async function scanLoop() {
+            if (!isDetecting) return;
+
+            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224 }));
+
+            if (detection && detection.score > 0.6) {
+                statusText.innerText = "FACE DETECTED - HOLD STILL";
+                statusText.classList.replace('text-orange-600', 'text-green-600');
+                captureBtn.disabled = false;
+                captureBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                statusText.innerText = "Position face in oval";
+                statusText.classList.replace('text-green-600', 'text-orange-600');
+                captureBtn.disabled = true;
+                captureBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+
+            setTimeout(scanLoop, 500); // Check every half second to save battery
+        }
+
+        // 5. Capture and Save
+        async function captureFace() {
+            isDetecting = false; // Pause scanner
+            captureBtn.disabled = true;
+            captureBtn.innerText = "EXTRACTING DATA...";
+            statusText.innerText = "Processing...";
+
+            try {
+                // Get full descriptor
+                const fullFaceDescription = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+
+                if (!fullFaceDescription) throw new Error("Face lost during capture. Try again.");
+
+                // For Kiosk consistency, wrap it in an array so it matches the [descriptor] format expected by the kiosk
+                const descriptorArray = [Array.from(fullFaceDescription.descriptor)];
+
+                captureBtn.innerText = "UPLOADING TO SECURE SERVER...";
+
+                const { error } = await supabaseClient
+                    .from('employee_biometrics')
+                    .upsert({ 
+                        emp_id: loggedInEmpId, 
+                        face_encoding: descriptorArray 
+                    }, { onConflict: 'emp_id' });
+
+                if (error) throw error;
+
+                // Stop Camera
+                const stream = video.srcObject;
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+
+                // Show Success
+                document.getElementById('camera-view').classList.add('hidden');
+                document.getElementById('success-view').classList.remove('hidden');
+
+            } catch (err) {
+                console.error(err);
+                alert("Error: " + err.message);
+                captureBtn.innerText = "CAPTURE FACE PROFILE";
+                isDetecting = true;
+                scanLoop();
+            }
+        }
+    </script>
+</body>
+</html>
