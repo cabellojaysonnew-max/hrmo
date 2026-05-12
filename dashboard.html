@@ -342,22 +342,34 @@
                 countTravel++;
                 const style = isConflict ? conflictStyle : 'bg-blue-50 border-blue-500 text-[#1F2937]';
                 
-                let mobileIcon = '';
+                let statusIcon = '';
                 const userLog = logDataMap[eId];
+                const destination = (travelMap[eId] || '').toUpperCase();
                 
-                if (userLog && userLog.device_type === 'MOBILE_WEB') {
-                    const destination = (travelMap[eId] || '').toUpperCase();
+                if (!userLog) {
+                    // No log found for this employee
+                    statusIcon = `
+                        <span title="No attendance log yet" class="ml-1 inline-flex items-center text-gray-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </span>`;
+                } else if (userLog.device_type === 'MOBILE_WEB') {
+                    // Logged via mobile, evaluate location
                     const logLocation = (userLog.place_name || userLog.address || '').toUpperCase();
-                    
                     const isInside = logLocation && (logLocation.includes(destination) || destination.includes(logLocation));
                     const iconColor = isInside ? 'text-green-600' : 'text-red-500';
                     const titleText = isInside ? 'Logged inside destination' : `Logged outside: ${userLog.place_name || userLog.address || 'Unknown'}`;
 
-                    mobileIcon = `
-                        <span title="${titleText}" class="ml-1 inline-flex items-center">
-                            <svg class="w-3 h-3 ${iconColor}" fill="currentColor" viewBox="0 0 20 20">
+                    statusIcon = `
+                        <span title="${titleText}" class="ml-1 inline-flex items-center ${iconColor}">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm3 1a1 1 0 100 2 1 1 0 000-2zM8 4a1 1 0 112 0 1 1 0 01-2 0z"></path>
                             </svg>
+                        </span>`;
+                } else {
+                    // Logged via Desktop or elsewhere
+                    statusIcon = `
+                        <span title="Logged via Desktop/Office" class="ml-1 inline-flex items-center text-blue-500">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"></path></svg>
                         </span>`;
                 }
 
@@ -366,7 +378,7 @@
                         <div class="truncate">
                             <span class="font-bold">${e.full_name}</span> - ${travelMap[eId]}
                         </div>
-                        ${mobileIcon}
+                        ${statusIcon}
                     </div>`;
             }
             if (psoMap[eId]) {
