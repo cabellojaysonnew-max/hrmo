@@ -266,7 +266,7 @@
             fetchSafe(supabaseClient.from('itinerary').select('to_no, destination').eq('travel_date', todayStr)),
             fetchSafe(supabaseClient.from('pso_records').select('emp_id, pso_no, subject').lte('start_date', todayStr).gte('end_date', todayStr)),
             fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, type').eq('start_date', todayStr).eq('transaction_type', 'APPROVED')),
-            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59')),
+            fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time, device_type, place_name, address').gte('log_time', todayStr + 'T00:00:00').lte('log_time', todayStr + 'T23:59:59')),
             fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_time, end_time, working_days').lte('start_date', todayStr).gte('end_date', todayStr))
         ]);
 
@@ -304,10 +304,15 @@
         });
 
         const logMap = {}; 
+        const logDataMap = {};
         (logs.data || []).forEach(l => { 
             const eId = String(l.emp_id).trim();
             if (empIds.has(eId)) {
-                if (!logMap[eId] || new Date(l.log_time) < logMap[eId]) logMap[eId] = new Date(l.log_time); 
+                const lDate = new Date(l.log_time);
+                if (!logMap[eId] || lDate < logMap[eId]) {
+                    logMap[eId] = lDate; 
+                    logDataMap[eId] = l;
+                }
             }
         });
 
@@ -336,7 +341,33 @@
             if (travelMap[eId]) {
                 countTravel++;
                 const style = isConflict ? conflictStyle : 'bg-blue-50 border-blue-500 text-[#1F2937]';
-                htmlTravel += `<div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style}"><span class="font-bold">${e.full_name}</span> - ${travelMap[eId]}</div>`;
+                
+                let mobileIcon = '';
+                const userLog = logDataMap[eId];
+                
+                if (userLog && userLog.device_type === 'MOBILE_WEB') {
+                    const destination = (travelMap[eId] || '').toUpperCase();
+                    const logLocation = (userLog.place_name || userLog.address || '').toUpperCase();
+                    
+                    const isInside = logLocation && (logLocation.includes(destination) || destination.includes(logLocation));
+                    const iconColor = isInside ? 'text-green-600' : 'text-red-500';
+                    const titleText = isInside ? 'Logged inside destination' : `Logged outside: ${userLog.place_name || userLog.address || 'Unknown'}`;
+
+                    mobileIcon = `
+                        <span title="${titleText}" class="ml-1 inline-flex items-center">
+                            <svg class="w-3 h-3 ${iconColor}" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm3 1a1 1 0 100 2 1 1 0 000-2zM8 4a1 1 0 112 0 1 1 0 01-2 0z"></path>
+                            </svg>
+                        </span>`;
+                }
+
+                htmlTravel += `
+                    <div class="p-2 border-l-4 rounded mb-1 text-[11px] truncate ${style} flex justify-between items-center">
+                        <div class="truncate">
+                            <span class="font-bold">${e.full_name}</span> - ${travelMap[eId]}
+                        </div>
+                        ${mobileIcon}
+                    </div>`;
             }
             if (psoMap[eId]) {
                 countPSO++;
