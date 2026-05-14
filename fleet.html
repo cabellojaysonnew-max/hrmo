@@ -526,8 +526,7 @@
                     applicant: passengers,
                     travel_date: date,
                     action: v === 'LAND' ? 'ASSIGNED - LAND' : 'ASSIGNED - VEHICLE',
-                    schedule: v === 'LAND' ? 'WITHOUT VEHICLE' : 'WITH VEHICLE',
-                    destination: i.destination
+                    schedule: v === 'LAND' ? 'WITHOUT VEHICLE' : 'WITH VEHICLE'
                 });
             }
 
@@ -562,8 +561,7 @@
                     applicant: passengers,
                     travel_date: i.travel_date,
                     action: 'CANCELLED',
-                    schedule: 'WITHOUT VEHICLE',
-                    destination: i.destination
+                    schedule: 'WITHOUT VEHICLE'
                 });
             }
 
@@ -893,16 +891,11 @@
         async function cancelDailyItem(ref, date, type) {
             if(!confirm(`Cancel vehicle dispatch for ${date}?`)) return;
 
-            let dest = 'N/A';
             let passStr = '';
             
             if(type === 'TO') {
-                const itin = itins.find(i => i.to_no === ref && i.travel_date === date);
-                if(itin) dest = itin.destination;
                 passStr = orders.filter(o => o.to_no === ref).map(o => o.emp_name).join(', ');
             } else {
-                const bk = bookings.find(b => b.ref_no === ref && b.travel_date === date);
-                if(bk) dest = bk.destination;
                 passStr = bookings.filter(b => b.ref_no === ref && b.travel_date === date).map(b => b.emp_name).join(', ');
             }
 
@@ -911,8 +904,7 @@
                 applicant: passStr,
                 travel_date: date,
                 action: 'CANCELLED',
-                schedule: 'WITHOUT VEHICLE',
-                destination: dest
+                schedule: 'WITHOUT VEHICLE'
             });
 
             if (type === 'TO') {
@@ -955,20 +947,13 @@
                 }
             }
 
-            let finalDest = dest;
-            if (type === 'TO') {
-                const itin = itins.find(i => i.to_no === ref && i.travel_date === date);
-                if (itin) finalDest = itin.destination;
-            }
-
             // 2. Insert to vehicle_logs to record the specific schedule block and hide TOs
             await db.from('vehicle_logs').insert({
                 to_no: ref,
                 applicant: passengerStr,
                 travel_date: date,
                 action: 'COMPLETED',
-                schedule: 'WITH VEHICLE',
-                destination: finalDest
+                schedule: 'WITH VEHICLE'
             });
 
             sync();
@@ -977,19 +962,12 @@
         async function cancelScheduleTrip(ref, type, date, passengerStr, scheduleStr, dest, veh) {
             if(!confirm("Are you sure you want to CANCEL this trip? It will be logged as Cancelled and the vehicle assignment will be set to LAND.")) return;
 
-            let finalDest = dest;
-            if (type === 'TO') {
-                const itin = itins.find(i => i.to_no === ref && i.travel_date === date);
-                if (itin) finalDest = itin.destination;
-            }
-
             await db.from('vehicle_logs').insert({
                 to_no: ref,
                 applicant: passengerStr,
                 travel_date: date,
                 action: 'CANCELLED',
-                schedule: 'WITHOUT VEHICLE',
-                destination: finalDest
+                schedule: 'WITHOUT VEHICLE'
             });
 
             if (type === 'TO') {
@@ -1523,8 +1501,7 @@
                 applicant: activeVehForMaint,
                 travel_date: today,
                 action: 'ISSUE: ' + desc,
-                schedule: 'N/A',
-                destination: 'N/A'
+                schedule: 'N/A'
             });
             
             closeModal('issueModal');
