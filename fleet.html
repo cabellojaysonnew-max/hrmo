@@ -213,14 +213,14 @@
                     </div>
                 </header>
                 
-                <nav class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 flex items-center justify-between p-2 no-print shrink-0 overflow-x-auto">
-                    <div class="flex space-x-1 min-w-max">
-                        <button onclick="switchTab('inbox')" class="whitespace-nowrap px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='inbox'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📥 Pending Dispatch (TOs)</button>
-                        <button onclick="switchTab('reservations')" class="whitespace-nowrap px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='reservations'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📋 Daily Active Trips</button>
-                        <button onclick="switchTab('schedule')" class="whitespace-nowrap px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='schedule'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📅 Fleet Availability</button>
-                        <button onclick="switchTab('logs')" class="whitespace-nowrap px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='logs'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📊 Trip & Fleet Logs</button>
+                <nav class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 flex items-center justify-between p-2 no-print shrink-0">
+                    <div class="flex space-x-1">
+                        <button onclick="switchTab('inbox')" class="px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='inbox'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📥 Pending Dispatch (TOs)</button>
+                        <button onclick="switchTab('reservations')" class="px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='reservations'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📋 Daily Active Trips</button>
+                        <button onclick="switchTab('schedule')" class="px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='schedule'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📅 Fleet Availability</button>
+                        <button onclick="switchTab('logs')" class="px-5 py-2.5 rounded font-bold text-sm transition-colors ${currentTab==='logs'?'bg-[#003811] text-white':'text-gray-600 hover:bg-gray-100'}">📊 Trip & Fleet Logs</button>
                     </div>
-                    <button onclick="openModal('bookModal')" class="whitespace-nowrap ml-4 shrink-0 bg-[#D4AF37] text-black px-6 py-2 rounded font-bold text-sm hover:brightness-110 transition-colors shadow-sm flex items-center gap-2">
+                    <button onclick="openModal('bookModal')" class="bg-[#D4AF37] text-black px-6 py-2 rounded font-bold text-sm hover:brightness-110 transition-colors shadow-sm flex items-center gap-2">
                         <span class="text-lg leading-none">+</span> Special Booking
                     </button>
                 </nav>
@@ -262,7 +262,7 @@
                                 <select id="resS" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold">
                                     <option>WHOLE DAY</option><option>AM</option><option>PM</option><option class="text-red-600 font-bold">DROP-OFF ONLY</option><option class="text-blue-600 font-bold">PICK-UP ONLY</option>
                                 </select>
-                                </div>
+                            </div>
                             <div><label class="block text-sm font-bold text-[#003811] mb-1">Vehicle</label><select id="resV" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold">${VEHICLES.map(v=>`<option>${v}</option>`).join('')}</select></div>
                         </div>
                         <div><label class="block text-sm font-bold text-[#003811] mb-1">Driver (Editable)</label><input id="resDr" list="drivers" value="Driver 1" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-[#003811] text-sm font-semibold"></div>
@@ -525,9 +525,9 @@
                     to_no: to,
                     applicant: passengers,
                     travel_date: date,
-                    destination: i.destination,
                     action: v === 'LAND' ? 'ASSIGNED - LAND' : 'ASSIGNED - VEHICLE',
-                    schedule: v === 'LAND' ? 'WITHOUT VEHICLE' : 'WITH VEHICLE'
+                    schedule: v === 'LAND' ? 'WITHOUT VEHICLE' : 'WITH VEHICLE',
+                    destination: i.destination
                 });
             }
 
@@ -561,9 +561,9 @@
                     to_no: to,
                     applicant: passengers,
                     travel_date: i.travel_date,
-                    destination: i.destination,
                     action: 'CANCELLED',
-                    schedule: 'WITHOUT VEHICLE'
+                    schedule: 'WITHOUT VEHICLE',
+                    destination: i.destination
                 });
             }
 
@@ -894,25 +894,25 @@
             if(!confirm(`Cancel vehicle dispatch for ${date}?`)) return;
 
             let passStr = '';
-            let destStr = '';
+            let destStr = 'N/A';
             
             if(type === 'TO') {
                 passStr = orders.filter(o => o.to_no === ref).map(o => o.emp_name).join(', ');
-                const itinMatch = itins.find(i => i.to_no === ref && i.travel_date === date);
-                destStr = itinMatch ? itinMatch.destination : '';
+                const itinObj = itins.find(i => i.to_no === ref && i.travel_date === date);
+                if (itinObj) destStr = itinObj.destination;
             } else {
-                const bksForDay = bookings.filter(b => b.ref_no === ref && b.travel_date === date);
-                passStr = bksForDay.map(b => b.emp_name).join(', ');
-                destStr = bksForDay.length > 0 ? bksForDay[0].destination : '';
+                passStr = bookings.filter(b => b.ref_no === ref && b.travel_date === date).map(b => b.emp_name).join(', ');
+                const bkObj = bookings.find(b => b.ref_no === ref && b.travel_date === date);
+                if (bkObj) destStr = bkObj.destination;
             }
 
             await db.from('vehicle_logs').insert({
                 to_no: ref,
                 applicant: passStr,
                 travel_date: date,
-                destination: destStr,
                 action: 'CANCELLED',
-                schedule: 'WITHOUT VEHICLE'
+                schedule: 'WITHOUT VEHICLE',
+                destination: destStr
             });
 
             if (type === 'TO') {
@@ -960,9 +960,9 @@
                 to_no: ref,
                 applicant: passengerStr,
                 travel_date: date,
-                destination: dest,
                 action: 'COMPLETED',
-                schedule: 'WITH VEHICLE'
+                schedule: 'WITH VEHICLE',
+                destination: dest
             });
 
             sync();
@@ -975,9 +975,9 @@
                 to_no: ref,
                 applicant: passengerStr,
                 travel_date: date,
-                destination: dest,
                 action: 'CANCELLED',
-                schedule: 'WITHOUT VEHICLE'
+                schedule: 'WITHOUT VEHICLE',
+                destination: dest
             });
 
             if (type === 'TO') {
