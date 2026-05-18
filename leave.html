@@ -992,10 +992,14 @@
                     const c = parseFloat(t.credit || 0);
                     const d = parseFloat(t.debit || 0);
                     
-                    if(tDate < startOfMonth) {
-                        beg[cat] += c;
-                        beg[cat] -= d;
-                    } else if(tDate >= startOfMonth && tDate <= endOfMonth) {
+                    // Fixed logical bug: We must reverse transactions that happened ON OR AFTER the start of the month 
+                    // to step backwards from the true CURRENT balance and correctly find the beginning balance.
+                    if(tDate >= startOfMonth) {
+                        beg[cat] -= c;
+                        beg[cat] += d;
+                    } 
+                    
+                    if(tDate >= startOfMonth && tDate <= endOfMonth) {
                         cred[cat] += c;
                         used[cat] += d;
                     }
@@ -1161,7 +1165,6 @@
                 
                 updates.push( supabaseClient.from('employees').update({ vl_balance: newVl, sl_balance: newSl }).eq('emp_id', emp.emp_id) );
                 
-                // Splitting ledger insertion to prevent VL/SL EARNED being entirely caught by 'VL' filter
                 ledgers.push({
                     emp_id: emp.emp_id,
                     type: 'VL EARNED',
@@ -1197,7 +1200,7 @@
         
         // Prevent double crediting
         const { data: existing } = await supabaseClient.from('leave_ledger')
-            .select('id').eq('type', 'SPL/WL GRANTED').eq('start_date', `${yearVal}-01-01`).limit(1);
+            .select('id').eq('type', 'SPL GRANTED').eq('start_date', `${yearVal}-01-01`).limit(1);
         if(existing && existing.length > 0) {
             alert(`Yearly credits for ${yearVal} have already been granted in the ledger!`);
             return;
@@ -1215,12 +1218,22 @@
             emps.forEach(emp => {
                 updates.push( supabaseClient.from('employees').update({ spl_balance: 3, wl_balance: 5 }).eq('emp_id', emp.emp_id) );
                 
+                // Fixed logical bug: We must split the insertion to ensure the portal's `getLeaveCategory` parses SPL and WL accurately.
                 ledgers.push({
                     emp_id: emp.emp_id,
-                    type: 'SPL/WL GRANTED',
-                    credit: 8,
+                    type: 'SPL GRANTED',
+                    credit: 3,
                     transaction_type: 'CREDIT',
-                    remarks: `Yearly Granted Credits (3 SPL / 5 WL) - ${yearVal}`,
+                    remarks: `Yearly Granted Credits (SPL) - ${yearVal}`,
+                    start_date: `${yearVal}-01-01`
+                });
+
+                ledgers.push({
+                    emp_id: emp.emp_id,
+                    type: 'WL GRANTED',
+                    credit: 5,
+                    transaction_type: 'CREDIT',
+                    remarks: `Yearly Granted Credits (WL) - ${yearVal}`,
                     start_date: `${yearVal}-01-01`
                 });
             });
@@ -1764,13 +1777,14 @@
                 return cat === ledgType;
             });
             
-            // Sort OLDEST TO NEWEST for forwards calculation based on initial balances
-            relevantData.sort((a,b) => new Date(a.start_date || a.created_at) - new Date(b.start_date || b.created_at));
+            // Fixed logical bug: To properly display the history matching the true current balance, we must sort NEWEST to OLDEST 
+            // and mathematically walk BACKWARDS from the current active balance.
+            relevantData.sort((a,b) => new Date(b.start_date || b.created_at) - new Date(a.start_date || a.created_at));
 
             const dtEnd = new Date(`${endDate}T23:59:59`);
             const dtStart = new Date(`${startDate}T00:00:00`);
 
-            // Initialize tracker for all balances from Employees table
+            // Initialize tracker based on CURRENT balances from the Employees table
             let balances = {
                 VL: parseFloat(emp.vl_balance || 0),
                 SL: parseFloat(emp.sl_balance || 0),
@@ -1779,19 +1793,22 @@
                 CTO: parseFloat(emp.cto_balance || 0)
             };
 
-            // Compute forwards for all historical transactions to get the accurate running balance for each
+            // Compute backwards for all historical transactions to get the accurate running balance at that point in time
             relevantData.forEach(t => {
                 const isDisapproved = t.transaction_type === 'DISAPPROVED';
                 const cat = getLeaveCategory(t.type);
-                if (cat && !isDisapproved) {
-                    balances[cat] += parseFloat(t.credit || 0);
-                    balances[cat] -= parseFloat(t.debit || 0);
-                }
-                // Store the computed balance right onto the transaction object
+
+                // Assign the balance BEFORE we reverse the transaction
                 t.computedBal = (cat && !isDisapproved) ? balances[cat].toFixed(3) : '-';
+
+                // Reverse the transaction to step backwards in time
+                if (cat && !isDisapproved) {
+                    balances[cat] -= parseFloat(t.credit || 0);
+                    balances[cat] += parseFloat(t.debit || 0);
+                }
             });
 
-            // Set UI headers based on INITIAL values from Employees Table
+            // Set UI headers based on exact boundaries of the period selected
             if (ledgType === 'ALL') {
                 document.getElementById('lblAllVl').innerText = parseFloat(emp.vl_balance || 0).toFixed(3);
                 document.getElementById('lblAllSl').innerText = parseFloat(emp.sl_balance || 0).toFixed(3);
@@ -1802,34 +1819,50 @@
                 sumDiv.classList.add('hidden');
             } else {
                 let balField = ledgType.toLowerCase() + '_balance';
-                let initialBal = parseFloat(emp[balField] || 0);
+                let periodEndBal = parseFloat(emp[balField] || 0);
                 
-                document.getElementById('lblBegBal').innerText = initialBal.toFixed(3);
+                // Reconstruct exactly what the balance was strictly at the end of the selected period
+                relevantData.filter(t => new Date(t.start_date || t.created_at) > dtEnd).forEach(t => {
+                    if(t.transaction_type !== 'DISAPPROVED' && getLeaveCategory(t.type) === ledgType) {
+                        periodEndBal -= parseFloat(t.credit || 0);
+                        periodEndBal += parseFloat(t.debit || 0);
+                    }
+                });
+
+                let periodBegBal = periodEndBal;
+                let totalC = 0, totalD = 0;
                 
+                // Filter for the chosen date range
                 let rangeData = relevantData.filter(t => {
                     const tDate = new Date(t.start_date || t.created_at);
                     return tDate >= dtStart && tDate <= dtEnd;
                 });
                 
-                let totalC = 0, totalD = 0;
+                // Reverse anything strictly INSIDE the period to get the period's precise beginning balance
                 rangeData.forEach(t => {
                     if (t.transaction_type !== 'DISAPPROVED') {
                         totalC += parseFloat(t.credit || 0);
                         totalD += parseFloat(t.debit || 0);
+                        if(getLeaveCategory(t.type) === ledgType) {
+                            periodBegBal -= parseFloat(t.credit || 0);
+                            periodBegBal += parseFloat(t.debit || 0);
+                        }
                     }
                 });
+
+                document.getElementById('lblBegBal').innerText = periodBegBal.toFixed(3);
                 
                 const net = totalC - totalD;
                 const netEl = document.getElementById('lblMovement');
                 netEl.innerText = (net > 0 ? '+' : '') + net.toFixed(3);
                 netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
                 
-                document.getElementById('lblEndBal').innerText = (initialBal + net).toFixed(3);
+                document.getElementById('lblEndBal').innerText = periodEndBal.toFixed(3);
                 sumDiv.classList.remove('hidden');
                 allBalDiv.classList.add('hidden');
             }
 
-            // Filter for the chosen date range
+            // Filter for the chosen date range for table display
             let rangeData = relevantData.filter(t => {
                 const tDate = new Date(t.start_date || t.created_at);
                 return tDate >= dtStart && tDate <= dtEnd;
@@ -1839,9 +1872,6 @@
                 list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this range.</td></tr>`;
                 return;
             }
-
-            // Reverse the array to display NEWEST to OLDEST on the UI
-            rangeData.sort((a,b) => new Date(b.start_date || b.created_at) - new Date(a.start_date || a.created_at));
 
             let html = '';
             
