@@ -603,7 +603,8 @@
 
         const { data, error } = await supabaseClient.from('leave_ledger')
             .select('*')
-            .eq('transaction_type', 'pending_hrmo')
+            .eq('transaction_type', 'APPLICATION')
+            .eq('remarks', 'pending_hrmo')
             .order('created_at', { ascending: false });
 
         if (error) { list.innerHTML = `<tr><td colspan="9" class="table-td text-center text-red-500">Error loading applications.</td></tr>`; return; }
