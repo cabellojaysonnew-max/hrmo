@@ -2019,11 +2019,10 @@
     async function saveManualCredits() {
         const monthVal = document.getElementById('manualMonth').value;
         if(!monthVal) { alert("Please select an 'As of Month'."); return; }
-        if(!confirm("Are you sure you want to update all these balances? This will permanently override their current records.")) return;
+        if(!confirm("Are you sure you want to update all these balances? This will permanently override their current records and WILL NOT create a ledger log.")) return;
 
         const emps = Object.values(empDataMap);
         const updates = [];
-        const ledgers = [];
 
         for (const emp of emps) {
             const vl = document.getElementById(`man_vl_${emp.emp_id}`).value;
@@ -2041,16 +2040,6 @@
                     cto_balance: String(cto)
                 }).eq('emp_id', emp.emp_id)
             );
-
-            ledgers.push({
-                emp_id: emp.emp_id,
-                type: 'MANUAL INPUT',
-                credit: 0,
-                debit: 0,
-                transaction_type: 'CREDIT',
-                remarks: `Manual Balance Setting (As of ${monthVal}): VL:${vl}, SL:${sl}, SPL:${spl}, WL:${wl}, CTO:${cto}`,
-                start_date: `${monthVal}-01`
-            });
         }
 
         try {
@@ -2059,7 +2048,6 @@
             saveBtn.disabled = true;
 
             await Promise.all(updates);
-            await supabaseClient.from('leave_ledger').insert(ledgers);
             
             alert("Balances updated successfully!");
             await loadEmployeeMaps();
