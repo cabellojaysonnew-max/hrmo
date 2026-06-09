@@ -37,8 +37,6 @@
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
-            <a href="#" onclick="switchTab('dashboard')" id="navDashboard" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
-            <a href="#" onclick="switchTab('biometrics')" id="navBiometrics" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REGISTER BIOMETRICS</a>
             <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
             <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
             <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
@@ -54,6 +52,11 @@
     </nav>
     
     <main class="flex-1 overflow-y-auto p-8 relative">
+
+        <div class="flex gap-2 mb-6 border-b-2 border-[#003811] pb-0">
+            <button onclick="switchTab('dashboard')" id="tabDashboard" class="px-6 py-3 text-sm font-bold bg-[#003811] text-white rounded-t-lg transition-colors">DASHBOARD</button>
+            <button onclick="switchTab('biometrics')" id="tabBiometrics" class="px-6 py-3 text-sm font-bold bg-gray-200 text-gray-600 hover:bg-gray-300 rounded-t-lg transition-colors">REGISTER BIOMETRICS</button>
+        </div>
         
         <div id="dashboard-tab" class="block">
             <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
@@ -194,7 +197,7 @@
                         <video id="video" autoplay muted playsinline></video>
                         <div class="absolute inset-0 border-[3px] border-dashed border-white/40 pointer-events-none rounded-xl m-8"></div>
                     </div>
-                    <p id="cameraStatus" class="mt-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Loading AI Models...</p>
+                    <p id="cameraStatus" class="mt-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Loading AI Models...</p>
                     
                     <div class="flex gap-4 mt-5 w-full max-w-[300px] justify-center">
                         <div id="dot1" class="h-3 w-1/3 rounded-full bg-gray-300 transition-colors duration-300 shadow-inner"></div>
@@ -211,9 +214,6 @@
                                 <h1 class="text-4xl font-serif text-[#003811] font-black leading-none">DAR</h1>
                                 <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Biometric Enrollment</p>
                             </div>
-                            <button onclick="switchTab('dashboard')" class="text-[10px] font-bold text-gray-600 hover:text-white hover:bg-[#003811] uppercase tracking-widest transition-colors flex items-center gap-1.5 bg-gray-100 px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                                ◀ BACK TO DASHBOARD
-                            </button>
                         </div>
 
                         <div class="space-y-4">
@@ -353,24 +353,19 @@
         document.getElementById('dashboard-tab').classList.add('hidden');
         document.getElementById('biometrics-tab').classList.add('hidden');
 
-        document.getElementById('navDashboard').classList.replace('bg-[#006400]', 'hover:bg-[#006400]');
-        document.getElementById('navDashboard').classList.remove('border-[#D4AF37]');
-        document.getElementById('navDashboard').classList.add('border-transparent');
-
-        document.getElementById('navBiometrics').classList.replace('bg-[#006400]', 'hover:bg-[#006400]');
-        document.getElementById('navBiometrics').classList.remove('border-[#D4AF37]');
-        document.getElementById('navBiometrics').classList.add('border-transparent');
+        document.getElementById('tabDashboard').classList.replace('bg-[#003811]', 'bg-gray-200');
+        document.getElementById('tabDashboard').classList.replace('text-white', 'text-gray-600');
+        document.getElementById('tabBiometrics').classList.replace('bg-[#003811]', 'bg-gray-200');
+        document.getElementById('tabBiometrics').classList.replace('text-white', 'text-gray-600');
 
         if (tabName === 'dashboard') {
             document.getElementById('dashboard-tab').classList.remove('hidden');
-            document.getElementById('navDashboard').classList.replace('hover:bg-[#006400]', 'bg-[#006400]');
-            document.getElementById('navDashboard').classList.remove('border-transparent');
-            document.getElementById('navDashboard').classList.add('border-[#D4AF37]');
+            document.getElementById('tabDashboard').classList.replace('bg-gray-200', 'bg-[#003811]');
+            document.getElementById('tabDashboard').classList.replace('text-gray-600', 'text-white');
         } else if (tabName === 'biometrics') {
             document.getElementById('biometrics-tab').classList.remove('hidden');
-            document.getElementById('navBiometrics').classList.replace('hover:bg-[#006400]', 'bg-[#006400]');
-            document.getElementById('navBiometrics').classList.remove('border-transparent');
-            document.getElementById('navBiometrics').classList.add('border-[#D4AF37]');
+            document.getElementById('tabBiometrics').classList.replace('bg-gray-200', 'bg-[#003811]');
+            document.getElementById('tabBiometrics').classList.replace('text-gray-600', 'text-white');
             
             if (!biometricsInitialized) {
                 initBiometricsSystem();
@@ -1544,6 +1539,7 @@
     let capturedDescriptors = []; 
 
     function initBiometricsSystem() {
+        cameraStatus.innerText = "Loading AI Models...";
         Promise.all([
             faceapi.nets.ssdMobilenetv1.loadFromUri('./models'),
             faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
@@ -1551,6 +1547,10 @@
         ]).then(() => {
             cameraStatus.innerText = "Models loaded. Starting camera...";
             startVideo();
+        }).catch(err => {
+            console.error("Model Error:", err);
+            cameraStatus.innerText = "Error: Models missing or blocked. Check console.";
+            cameraStatus.classList.replace('text-gray-500', 'text-red-600');
         });
     }
 
@@ -1598,7 +1598,8 @@
                 };
             })
             .catch(err => { 
-                cameraStatus.innerText = "Camera access denied."; 
+                console.error("Camera Error:", err);
+                cameraStatus.innerText = "Camera access denied or file:// protocol blocked."; 
                 cameraStatus.classList.replace('text-gray-500', 'text-red-600');
             });
     }
