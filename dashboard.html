@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - DAR HRMO</title>
+    <title>Dashboard & Biometrics - DAR HRMO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <script src="supabase-config.js"></script>
     <style>
         :root {
@@ -21,6 +22,11 @@
         .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
         .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
         .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+        /* Biometrics specific styles */
+        .dar-green { background-color: #003811; }
+        .video-wrapper { position: relative; width: 100%; aspect-ratio: 4/3; margin: 0 auto; border-radius: 1rem; overflow: hidden; background: #000; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+        video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
@@ -31,7 +37,8 @@
             <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
-            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
+            <a href="#" onclick="switchTab('dashboard')" id="navDashboard" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">DASHBOARD</a>
+            <a href="#" onclick="switchTab('biometrics')" id="navBiometrics" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REGISTER BIOMETRICS</a>
             <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
             <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">ATTENDANCE</a>
             <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
@@ -47,131 +54,236 @@
     </nav>
     
     <main class="flex-1 overflow-y-auto p-8 relative">
-        <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
-            <div>
-                <h2 class="text-3xl font-bold text-[#003811]">Operations Dashboard</h2>
-                <p id="scopeLabel" class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide"></p>
-            </div>
-            <p id="dashDate" class="text-[#D4AF37] font-bold text-lg bg-white px-4 py-2 rounded shadow-sm border border-gray-200"></p>
-        </div>
         
-        <div id="notificationsPanel" class="mb-8 hidden">
-            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded shadow-sm flex flex-col">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-sm font-bold text-yellow-800">Unread Notifications</h3>
-                    <button onclick="markNotificationsRead()" class="text-xs text-yellow-700 hover:text-yellow-900 underline font-bold transition-colors">Mark all as read</button>
-                </div>
-                <ul id="notificationsList" class="text-xs text-yellow-800 space-y-2 max-h-32 overflow-y-auto scroll-list"></ul>
-            </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="card p-6 border-l-4 border-[#003811] flex justify-between items-center">
+        <div id="dashboard-tab" class="block">
+            <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
                 <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Staff</p>
-                    <h3 id="statTotal" class="text-4xl font-bold text-[#003811] mt-1">0</h3>
+                    <h2 class="text-3xl font-bold text-[#003811]">Operations Dashboard</h2>
+                    <p id="scopeLabel" class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide"></p>
                 </div>
-                <div class="bg-green-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#003811]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
+                <p id="dashDate" class="text-[#D4AF37] font-bold text-lg bg-white px-4 py-2 rounded shadow-sm border border-gray-200"></p>
             </div>
-            <div class="card p-6 border-l-4 border-[#1976D2] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On Travel</p>
-                    <h3 id="statTravel" class="text-4xl font-bold text-[#1976D2] mt-1">0</h3>
+            
+            <div id="notificationsPanel" class="mb-8 hidden">
+                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-sm font-bold text-yellow-800">Unread Notifications</h3>
+                        <button onclick="markNotificationsRead()" class="text-xs text-yellow-700 hover:text-yellow-900 underline font-bold transition-colors">Mark all as read</button>
+                    </div>
+                    <ul id="notificationsList" class="text-xs text-yellow-800 space-y-2 max-h-32 overflow-y-auto scroll-list"></ul>
                 </div>
-                <div class="bg-blue-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#1976D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
             </div>
-            <div class="card p-6 border-l-4 border-[#C62828] flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
-                    <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="card p-6 border-l-4 border-[#003811] flex justify-between items-center">
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Staff</p>
+                        <h3 id="statTotal" class="text-4xl font-bold text-[#003811] mt-1">0</h3>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#003811]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
                 </div>
-                <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+                <div class="card p-6 border-l-4 border-[#1976D2] flex justify-between items-center">
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On Travel</p>
+                        <h3 id="statTravel" class="text-4xl font-bold text-[#1976D2] mt-1">0</h3>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#1976D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                </div>
+                <div class="card p-6 border-l-4 border-[#C62828] flex justify-between items-center">
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">On PSO</p>
+                        <h3 id="statPSO" class="text-4xl font-bold text-[#C62828] mt-1">0</h3>
+                    </div>
+                    <div class="bg-red-100 p-3 rounded-full"><svg class="w-6 h-6 text-[#C62828]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="card bg-white flex flex-col h-[400px]">
+                    <div class="bg-[#1976D2] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON TRAVEL</h4></div>
+                    <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - DESTINATION</div></div>
+                    <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+                </div>
+                <div class="card bg-white flex flex-col h-[400px]">
+                    <div class="bg-[#C62828] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4></div>
+                    <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">PSO NUMBER, DETAILS OF PSO</div></div>
+                    <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+                </div>
+                <div class="card bg-white flex flex-col h-[400px]">
+                    <div class="bg-[#006400] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON LEAVE</h4></div>
+                    <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - LEAVE TYPE</div></div>
+                    <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+                </div>
+                <div class="card bg-white flex flex-col h-[400px]">
+                    <div class="bg-gray-700 text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4></div>
+                    <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - STATUS</div></div>
+                    <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
+                </div>
+            </div>
+
+            <div class="card mt-8 p-6">
+                <h3 class="text-xl font-bold text-[#003811] border-b pb-2 mb-4">Incoming / Future Leaves</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-700">
+                            <tr>
+                                <th class="p-3 font-bold border-b">Employee Name</th>
+                                <th class="p-3 font-bold border-b">Leave Type</th>
+                                <th class="p-3 font-bold border-b text-center">Date</th>
+                                <th class="p-3 font-bold border-b text-center">No. of Days</th>
+                                <th class="p-3 font-bold border-b text-center">Status</th>
+                                <th class="p-3 font-bold border-b text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listIncomingLeaves" class="divide-y">
+                            <tr><td colspan="6" class="p-4 text-center text-gray-400 text-xs italic">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card mt-8 p-6">
+                <h3 class="text-xl font-bold text-red-700 border-b pb-2 mb-4">Habitual Tardiness & Absenteeism Monitoring (Civil Service Rules)</h3>
+                <p class="text-xs text-gray-500 mb-4">Under Civil Service rules, employees incurring 10 or more late arrivals within a month for two consecutive months, or excessive unauthorized absent days, are subject to disciplinary action. <strong>(Target: DARPO-CS1 Personnel Only)</strong></p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-red-50 text-red-800">
+                            <tr>
+                                <th class="p-3 font-bold border-b">Employee Name</th>
+                                <th class="p-3 font-bold border-b text-center">Lates (Prev / Curr)</th>
+                                <th class="p-3 font-bold border-b text-center">Total Late/UT (Curr)</th>
+                                <th class="p-3 font-bold border-b text-center">Absent Days (Curr)</th>
+                                <th class="p-3 font-bold border-b text-center">Status/Warning Level</th>
+                                <th class="p-3 font-bold border-b text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listHabitual" class="divide-y">
+                            <tr><td colspan="6" class="p-4 text-center text-gray-400 text-xs italic">Calculating...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card mt-8 p-6">
+                <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1 Mondays Only)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-blue-50 text-blue-800">
+                            <tr>
+                                <th class="p-3 font-bold border-b">Employee Name</th>
+                                <th class="p-3 font-bold border-b text-center">Attendance (Present / Total)</th>
+                                <th class="p-3 font-bold border-b text-center">Missed Dates</th>
+                                <th class="p-3 font-bold border-b text-center">Status</th>
+                                <th class="p-3 font-bold border-b text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listFlagAttendance" class="divide-y">
+                            <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Scanning Flag Ceremony Logs...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-[#1976D2] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON TRAVEL</h4></div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - DESTINATION</div></div>
-                <div id="listTravel" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
-            </div>
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-[#C62828] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON PSO</h4></div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">PSO NUMBER, DETAILS OF PSO</div></div>
-                <div id="listPSO" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
-            </div>
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-[#006400] text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">ON LEAVE</h4></div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - LEAVE TYPE</div></div>
-                <div id="listLeave" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
-            </div>
-            <div class="card bg-white flex flex-col h-[400px]">
-                <div class="bg-gray-700 text-white p-3 rounded-t-lg"><h4 class="font-bold text-sm text-center tracking-wider">LATE & ABSENT</h4></div>
-                <div class="flex text-[10px] font-bold text-gray-500 bg-gray-50 p-2 border-b"><div class="w-full">NAME - STATUS</div></div>
-                <div id="listLateAbsent" class="scroll-list flex-1 overflow-y-auto p-2 space-y-1"><div class="text-center text-gray-400 text-xs mt-10">Loading...</div></div>
-            </div>
-        </div>
+        <div id="biometrics-tab" class="hidden h-full">
+            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 h-full grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch">
+                
+                <div class="flex flex-col items-center justify-center w-full h-full bg-gray-50 rounded-2xl p-5 border border-gray-200 shadow-inner">
+                    <h2 class="font-black text-gray-800 mb-4 uppercase tracking-widest text-sm border-b-2 border-gray-200 pb-2 w-full text-center">Live Camera Feed</h2>
+                    <div class="video-wrapper border-[6px] border-white shadow-lg w-full">
+                        <video id="video" autoplay muted playsinline></video>
+                        <div class="absolute inset-0 border-[3px] border-dashed border-white/40 pointer-events-none rounded-xl m-8"></div>
+                    </div>
+                    <p id="cameraStatus" class="mt-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Loading AI Models...</p>
+                    
+                    <div class="flex gap-4 mt-5 w-full max-w-[300px] justify-center">
+                        <div id="dot1" class="h-3 w-1/3 rounded-full bg-gray-300 transition-colors duration-300 shadow-inner"></div>
+                        <div id="dot2" class="h-3 w-1/3 rounded-full bg-gray-300 transition-colors duration-300 shadow-inner"></div>
+                        <div id="dot3" class="h-3 w-1/3 rounded-full bg-gray-300 transition-colors duration-300 shadow-inner"></div>
+                    </div>
+                    <p id="angleInstruction" class="mt-3 text-sm font-black text-[#003811] uppercase tracking-widest text-center">Look straight at camera</p>
+                </div>
 
-        <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-[#003811] border-b pb-2 mb-4">Incoming / Future Leaves</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-gray-50 text-gray-700">
-                        <tr>
-                            <th class="p-3 font-bold border-b">Employee Name</th>
-                            <th class="p-3 font-bold border-b">Leave Type</th>
-                            <th class="p-3 font-bold border-b text-center">Date</th>
-                            <th class="p-3 font-bold border-b text-center">No. of Days</th>
-                            <th class="p-3 font-bold border-b text-center">Status</th>
-                            <th class="p-3 font-bold border-b text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listIncomingLeaves" class="divide-y">
-                        <tr><td colspan="6" class="p-4 text-center text-gray-400 text-xs italic">Loading...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                <div class="flex flex-col h-full justify-between w-full">
+                    <div>
+                        <div class="mb-4 border-b-2 border-gray-100 pb-3 flex justify-between items-end">
+                            <div>
+                                <h1 class="text-4xl font-serif text-[#003811] font-black leading-none">DAR</h1>
+                                <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Biometric Enrollment</p>
+                            </div>
+                            <button onclick="switchTab('dashboard')" class="text-[10px] font-bold text-gray-600 hover:text-white hover:bg-[#003811] uppercase tracking-widest transition-colors flex items-center gap-1.5 bg-gray-100 px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                                ◀ BACK TO DASHBOARD
+                            </button>
+                        </div>
 
-        <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-red-700 border-b pb-2 mb-4">Habitual Tardiness & Absenteeism Monitoring (Civil Service Rules)</h3>
-            <p class="text-xs text-gray-500 mb-4">Under Civil Service rules, employees incurring 10 or more late arrivals within a month for two consecutive months, or excessive unauthorized absent days, are subject to disciplinary action. <strong>(Target: DARPO-CS1 Personnel Only)</strong></p>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-red-50 text-red-800">
-                        <tr>
-                            <th class="p-3 font-bold border-b">Employee Name</th>
-                            <th class="p-3 font-bold border-b text-center">Lates (Prev / Curr)</th>
-                            <th class="p-3 font-bold border-b text-center">Total Late/UT (Curr)</th>
-                            <th class="p-3 font-bold border-b text-center">Absent Days (Curr)</th>
-                            <th class="p-3 font-bold border-b text-center">Status/Warning Level</th>
-                            <th class="p-3 font-bold border-b text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listHabitual" class="divide-y">
-                        <tr><td colspan="6" class="p-4 text-center text-gray-400 text-xs italic">Calculating...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                        <div class="space-y-4">
+                            <div class="bg-blue-50/60 p-4 rounded-xl border border-blue-100 shadow-sm">
+                                <button onclick="fetchBioEmployees()" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg shadow-md hover:bg-blue-700 text-xs uppercase tracking-widest mb-3 transition-transform active:scale-[0.98]">
+                                    ⬇️ Fetch Employee Database
+                                </button>
+                                <label class="block text-[10px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Select Employee</label>
+                                <input list="employee-list" id="empSearch" placeholder="Search by name or ID..." class="w-full px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#003811]/50 shadow-inner">
+                                <datalist id="employee-list"></datalist>
+                            </div>
 
-        <div class="card mt-8 p-6">
-            <h3 class="text-xl font-bold text-blue-800 border-b pb-2 mb-4">Flag Ceremony Attendance Monitoring (DARPO-CS1 Mondays Only)</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-blue-50 text-blue-800">
-                        <tr>
-                            <th class="p-3 font-bold border-b">Employee Name</th>
-                            <th class="p-3 font-bold border-b text-center">Attendance (Present / Total)</th>
-                            <th class="p-3 font-bold border-b text-center">Missed Dates</th>
-                            <th class="p-3 font-bold border-b text-center">Status</th>
-                            <th class="p-3 font-bold border-b text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listFlagAttendance" class="divide-y">
-                        <tr><td colspan="5" class="p-4 text-center text-gray-400 text-xs italic">Scanning Flag Ceremony Logs...</td></tr>
-                    </tbody>
-                </table>
+                            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
+                                <p class="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-widest">Optional Information Update</p>
+                                
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-[9px] font-bold text-gray-700 mb-1 uppercase">Date of Birth</label>
+                                        <input type="date" id="empDob" class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#003811]/50 shadow-inner">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[9px] font-bold text-gray-700 mb-1 uppercase">Mobile Number</label>
+                                        <input type="text" id="empMobile" placeholder="09123456789" class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#003811]/50 shadow-inner">
+                                    </div>
+                                    <div class="col-span-2">
+                                        <label class="block text-[9px] font-bold text-gray-700 mb-1 uppercase">Email Address</label>
+                                        <input type="email" id="empEmail" placeholder="employee@dar.gov.ph" class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#003811]/50 shadow-inner">
+                                    </div>
+                                    
+                                    <div class="col-span-2 grid grid-cols-2 gap-2 border-t border-gray-200 pt-2 mt-1">
+                                        <div class="col-span-2">
+                                            <label class="block text-[9px] font-bold text-red-700 mb-1 uppercase">Emergency Contact Name</label>
+                                            <input type="text" id="empEmergencyName" placeholder="Full Name" class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700/50 shadow-inner">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[9px] font-bold text-red-700 mb-1 uppercase">Relation</label>
+                                            <input type="text" id="empEmergencyRelation" placeholder="e.g. Spouse" class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700/50 shadow-inner">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[9px] font-bold text-red-700 mb-1 uppercase">Contact Number</label>
+                                            <input type="text" id="empEmergencyNumber" placeholder="09123456789" class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700/50 shadow-inner">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="pt-2 flex gap-3 w-full">
+                        <button id="captureBtn" disabled class="w-full dar-green text-white font-black py-4 rounded-xl shadow-lg transition-all opacity-50 cursor-not-allowed uppercase tracking-widest text-sm hover:shadow-xl active:scale-[0.98]">
+                            CAPTURE ANGLE 1
+                        </button>
+                        <button id="resetBtn" onclick="resetCapture()" class="hidden w-1/3 bg-gray-300 text-gray-800 font-bold py-4 rounded-xl shadow transition-all duration-300 uppercase tracking-widest text-xs hover:bg-gray-400 active:scale-[0.98]">
+                            RESET
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col h-full w-full bg-blue-50/30 rounded-2xl p-5 border border-blue-100 shadow-inner">
+                    <h2 class="font-black text-blue-900 mb-4 uppercase tracking-widest text-sm border-b-2 border-blue-200 pb-2 w-full text-center">System Verification</h2>
+                    
+                    <button id="testBtn" disabled class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-all uppercase tracking-widest text-xs opacity-50 cursor-not-allowed hover:bg-blue-700 active:scale-[0.98] mb-4">
+                        TEST FACIAL RECOGNITION
+                    </button>
+
+                    <div id="resultBox" class="flex-grow p-4 rounded-xl border-2 border-dashed border-gray-300 bg-white w-full flex flex-col items-center justify-center transition-all duration-300">
+                        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Waiting for scan...</span>
+                    </div>
+                </div>
+
             </div>
         </div>
     </main>
@@ -233,6 +345,39 @@
         } catch(e) { console.error("Error downloading bg_memo.jpg", e); }
         return null;
     }
+
+    // --- TAB NAVIGATION LOGIC ---
+    let biometricsInitialized = false;
+
+    window.switchTab = function(tabName) {
+        document.getElementById('dashboard-tab').classList.add('hidden');
+        document.getElementById('biometrics-tab').classList.add('hidden');
+
+        document.getElementById('navDashboard').classList.replace('bg-[#006400]', 'hover:bg-[#006400]');
+        document.getElementById('navDashboard').classList.remove('border-[#D4AF37]');
+        document.getElementById('navDashboard').classList.add('border-transparent');
+
+        document.getElementById('navBiometrics').classList.replace('bg-[#006400]', 'hover:bg-[#006400]');
+        document.getElementById('navBiometrics').classList.remove('border-[#D4AF37]');
+        document.getElementById('navBiometrics').classList.add('border-transparent');
+
+        if (tabName === 'dashboard') {
+            document.getElementById('dashboard-tab').classList.remove('hidden');
+            document.getElementById('navDashboard').classList.replace('hover:bg-[#006400]', 'bg-[#006400]');
+            document.getElementById('navDashboard').classList.remove('border-transparent');
+            document.getElementById('navDashboard').classList.add('border-[#D4AF37]');
+        } else if (tabName === 'biometrics') {
+            document.getElementById('biometrics-tab').classList.remove('hidden');
+            document.getElementById('navBiometrics').classList.replace('hover:bg-[#006400]', 'bg-[#006400]');
+            document.getElementById('navBiometrics').classList.remove('border-transparent');
+            document.getElementById('navBiometrics').classList.add('border-[#D4AF37]');
+            
+            if (!biometricsInitialized) {
+                initBiometricsSystem();
+                biometricsInitialized = true;
+            }
+        }
+    };
 
     window.onload = async () => {
         const todayDate = new Date();
@@ -347,13 +492,11 @@
                 const destination = (travelMap[eId] || '').toUpperCase();
                 
                 if (!userLog) {
-                    // No log found for this employee
                     statusIcon = `
                         <span title="No attendance log yet" class="flex-shrink-0 text-gray-400">
                             <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg>
                         </span>`;
                 } else if (userLog.device_type === 'MOBILE_WEB') {
-                    // Logged via mobile, evaluate location
                     const logLocation = (userLog.place_name || userLog.address || '').toUpperCase();
                     const explicitOutside = logLocation.includes('(OUTSIDE DESTINATION)');
                     const isInside = !explicitOutside && logLocation && (logLocation.includes(destination) || destination.includes(logLocation));
@@ -368,7 +511,6 @@
                             </svg>
                         </span>`;
                 } else {
-                    // Logged via Desktop or elsewhere
                     statusIcon = `
                         <span title="Logged via Desktop/Office" class="flex-shrink-0 text-blue-500">
                             <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"></path></svg>
@@ -1386,6 +1528,333 @@
             console.error(error);
             alert("Error generating PDF: " + error.message);
         }
+    }
+
+
+    // --- BIOMETRICS INITIALIZATION & LOGIC ---
+
+    const video = document.getElementById('video');
+    const captureBtn = document.getElementById('captureBtn');
+    const testBtn = document.getElementById('testBtn');
+    const cameraStatus = document.getElementById('cameraStatus');
+    const resultBox = document.getElementById('resultBox');
+    const angleInstruction = document.getElementById('angleInstruction');
+    
+    let employeeDatabase = [];
+    let capturedDescriptors = []; 
+
+    function initBiometricsSystem() {
+        Promise.all([
+            faceapi.nets.ssdMobilenetv1.loadFromUri('./models'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
+            faceapi.nets.faceRecognitionNet.loadFromUri('./models')
+        ]).then(() => {
+            cameraStatus.innerText = "Models loaded. Starting camera...";
+            startVideo();
+        });
+    }
+
+    async function fetchBioEmployees() {
+        try {
+            showSimpleResult("Fetching employees...", "success");
+            
+            const { data, error } = await supabaseClient.from('employees').select('emp_id, full_name, position');
+            if (error) throw error;
+            
+            employeeDatabase = data;
+            const datalist = document.getElementById('employee-list');
+            datalist.innerHTML = ''; 
+            
+            data.forEach(emp => {
+                let option = document.createElement('option');
+                option.value = emp.emp_id;
+                option.text = `${emp.full_name} (${emp.position || 'No Position'})`;
+                datalist.appendChild(option);
+            });
+
+            showSimpleResult(`Loaded ${data.length} employees. Ready to search.`, "success");
+            setTimeout(() => { resetResultBox(); }, 3000);
+        } catch (err) {
+            console.error(err);
+            showSimpleResult("Failed to fetch DB: " + err.message, "error");
+        }
+    }
+
+    function startVideo() {
+        navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
+            .then(stream => { 
+                video.srcObject = stream; 
+                cameraStatus.innerText = "Camera Active. Ready.";
+                cameraStatus.classList.replace('text-gray-500', 'text-[#003811]');
+                
+                video.onplaying = () => {
+                    captureBtn.disabled = false;
+                    captureBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    captureBtn.classList.add('hover:scale-[1.02]', 'active:scale-[0.98]');
+
+                    testBtn.disabled = false;
+                    testBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    testBtn.classList.add('hover:bg-blue-700', 'active:scale-[0.98]');
+                };
+            })
+            .catch(err => { 
+                cameraStatus.innerText = "Camera access denied."; 
+                cameraStatus.classList.replace('text-gray-500', 'text-red-600');
+            });
+    }
+
+    video.addEventListener('play', () => {
+        const canvas = faceapi.createCanvasFromMedia(video);
+        document.querySelector('.video-wrapper').append(canvas);
+        const displaySize = { width: video.videoWidth || 640, height: video.videoHeight || 480 };
+        faceapi.matchDimensions(canvas, displaySize);
+
+        setInterval(async () => {
+            const detections = await faceapi.detectSingleFace(video).withFaceLandmarks();
+            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+            if (detections) {
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+            }
+        }, 100);
+    });
+
+    function resetCapture() {
+        capturedDescriptors = [];
+        captureBtn.innerText = "CAPTURE ANGLE 1";
+        captureBtn.disabled = false;
+        
+        captureBtn.classList.remove('w-2/3');
+        captureBtn.classList.add('w-full');
+        document.getElementById('resetBtn').classList.add('hidden');
+        
+        document.getElementById('dot1').classList.replace('bg-[#003811]', 'bg-gray-300');
+        document.getElementById('dot2').classList.replace('bg-[#003811]', 'bg-gray-300');
+        document.getElementById('dot3').classList.replace('bg-[#003811]', 'bg-gray-300');
+        angleInstruction.innerText = "Look straight at camera";
+        resetResultBox();
+    }
+
+    // Silent Photo Capture Logic
+    function captureAndDownloadProfile(empId) {
+        const img = new Image();
+        img.src = `./employee_photos/${empId}.png`;
+        
+        img.onload = () => {
+            console.log(`Profile photo for ${empId} already exists.`);
+        };
+        
+        img.onerror = () => {
+            console.log(`No profile photo found for ${empId}. Capturing from webcam...`);
+            try {
+                const captureCanvas = document.createElement('canvas');
+                captureCanvas.width = video.videoWidth || 640;
+                captureCanvas.height = video.videoHeight || 480;
+                const ctx = captureCanvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+                
+                const dataURL = captureCanvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataURL;
+                link.download = `${empId}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                console.error("Failed to capture image:", err);
+            }
+        };
+    }
+
+    testBtn.addEventListener('click', async () => {
+        testBtn.disabled = true;
+        testBtn.innerText = "TESTING MATCH...";
+
+        try {
+            const { data: bioData, error: bioError } = await supabaseClient
+                .from('employee_biometrics')
+                .select('emp_id, face_encoding');
+            
+            if (bioError) throw bioError;
+
+            if (!bioData || bioData.length === 0) {
+                showSimpleResult("No enrolled biometrics found.", "error");
+                setTimeout(() => { testBtn.disabled = false; testBtn.innerText = "TEST FACIAL RECOGNITION"; resetResultBox(); }, 3000);
+                return;
+            }
+
+            const labeledDescriptors = bioData.map(record => {
+                const descriptors = record.face_encoding.map(desc => new Float32Array(desc));
+                return new faceapi.LabeledFaceDescriptors(record.emp_id, descriptors);
+            });
+
+            const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.5);
+            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+
+            if (detection) {
+                const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+                
+                if (bestMatch.label === 'unknown') {
+                    showSimpleResult("No Match Found! Face not recognized.", "error");
+                } else {
+                    const { data: empDetails, error: empErr } = await supabaseClient
+                        .from('employees')
+                        .select('*')
+                        .eq('emp_id', bestMatch.label)
+                        .single();
+
+                    if (empErr || !empDetails) {
+                        showSimpleResult(`Match Found (ID: ${bestMatch.label}) but details failed to load.`, "success");
+                    } else {
+                        const officialPhoto = `./employee_photos/${empDetails.emp_id}.png`;
+                        const fallbackAvatar = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzljYTNhZiI+PHBhdGggZD0iTTEyIDEyYzIuMjEgMCA0LTEuNzkgNC00cy0xLjc5LTQtNC00LTQgMS43OS00IDQgMS43OSA0IDQgNHptMCAyYy0yLjY3IDAtOCAxLjM0LTggNHYyaDE2di0yYzAtMi42Ni01LjMzLTQtOC00eiIvPjwvc3ZnPg==';
+                        
+                        // Vertical ID Card layout updated for new emergency contacts
+                        const profileHtml = `
+                            <img src="${officialPhoto}" onerror="this.onerror=null; this.src='${fallbackAvatar}';" class="w-32 h-32 object-cover rounded-full border-[4px] border-green-500 shadow-md mb-4 bg-white" />
+                            <div class="text-xs font-black text-green-700 tracking-widest leading-none mb-2">✅ VERIFIED MATCH</div>
+                            <div class="text-2xl font-black text-gray-800 leading-tight text-center w-full truncate px-2">${empDetails.full_name}</div>
+                            <div class="text-xs text-gray-600 uppercase tracking-widest text-center mt-1">${empDetails.emp_id} • ${empDetails.position || 'N/A'}</div>
+                            <div class="w-full bg-white rounded-lg p-3 mt-4 border border-green-100 shadow-sm text-left space-y-1.5">
+                                <div class="text-[10px] text-gray-600 font-bold truncate">🏢 ${empDetails.station || 'DARPO-CS1'} ${empDetails.division ? '— ' + empDetails.division : ''}</div>
+                                <div class="text-[10px] text-gray-600 font-bold truncate">🎂 ${empDetails.date_of_birth || 'N/A'}</div>
+                                <div class="text-[10px] text-gray-600 font-bold truncate">📱 ${empDetails.mobile_number || 'N/A'}</div>
+                                <div class="text-[10px] text-gray-600 font-bold truncate text-red-600 mt-1">🚨 ${empDetails.emergency_contact_name || 'N/A'} ${empDetails.emergency_contact_relation ? '(' + empDetails.emergency_contact_relation + ')' : ''}</div>
+                                <div class="text-[10px] text-gray-600 font-bold truncate text-red-600">📞 ${empDetails.emergency_contact_number || 'N/A'}</div>
+                            </div>
+                        `;
+                        showProfileResult(profileHtml);
+                    }
+                }
+            } else {
+                showSimpleResult("Test Failed: No face detected. Ensure good lighting.", "error");
+            }
+        } catch (err) {
+            console.error(err);
+            showSimpleResult("Test Error: " + err.message, "error");
+        }
+
+        setTimeout(() => {
+            testBtn.disabled = false;
+            testBtn.innerText = "TEST FACIAL RECOGNITION";
+        }, 6000);
+    });
+
+    captureBtn.addEventListener('click', async () => {
+        const empSearchValue = document.getElementById('empSearch').value.trim();
+        const empId = empSearchValue.split(' ')[0]; 
+
+        if (!empId) {
+            showSimpleResult("Please search and select an Employee ID.", "error");
+            return;
+        }
+
+        captureBtn.disabled = true;
+        captureBtn.innerText = "DETECTING FACE...";
+
+        const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+
+        if (!detection) {
+            showSimpleResult("No face detected. Please ensure good lighting.", "error");
+            setTimeout(() => { captureBtn.disabled = false; captureBtn.innerText = `CAPTURE ANGLE ${capturedDescriptors.length + 1}`; resetResultBox(); }, 2000);
+            return;
+        }
+
+        capturedDescriptors.push(Array.from(detection.descriptor));
+        const currentStep = capturedDescriptors.length;
+
+        if (currentStep === 1) {
+            document.getElementById('dot1').classList.replace('bg-gray-300', 'bg-[#003811]');
+            angleInstruction.innerText = "Slightly turn your head to the LEFT";
+            captureBtn.innerText = "CAPTURE ANGLE 2";
+            captureBtn.disabled = false;
+            
+            captureBtn.classList.remove('w-full');
+            captureBtn.classList.add('w-2/3');
+            document.getElementById('resetBtn').classList.remove('hidden');
+        } 
+        else if (currentStep === 2) {
+            document.getElementById('dot2').classList.replace('bg-gray-300', 'bg-[#003811]');
+            angleInstruction.innerText = "Slightly turn your head to the RIGHT";
+            captureBtn.innerText = "CAPTURE ANGLE 3";
+            captureBtn.disabled = false;
+        } 
+        else if (currentStep === 3) {
+            document.getElementById('dot3').classList.replace('bg-gray-300', 'bg-[#003811]');
+            angleInstruction.innerText = "Processing Data...";
+            captureBtn.innerText = "SAVING DATA TO DB...";
+            
+            try {
+                // Triggers the silent image capture if photo is missing
+                captureAndDownloadProfile(empId);
+
+                const { error: bioError } = await supabaseClient
+                    .from('employee_biometrics')
+                    .upsert({ 
+                        emp_id: empId, 
+                        face_encoding: capturedDescriptors 
+                    }, { onConflict: 'emp_id' });
+
+                if (bioError) throw bioError;
+
+                const empDob = document.getElementById('empDob').value.trim();
+                const empMobile = document.getElementById('empMobile').value.trim();
+                const empEmail = document.getElementById('empEmail').value.trim();
+                
+                const empEmergencyName = document.getElementById('empEmergencyName').value.trim();
+                const empEmergencyRelation = document.getElementById('empEmergencyRelation').value.trim();
+                const empEmergencyNumber = document.getElementById('empEmergencyNumber').value.trim();
+                
+                let updates = {};
+                if (empDob) updates.date_of_birth = empDob;
+                if (empMobile) updates.mobile_number = empMobile;
+                if (empEmail) updates.email_address = empEmail;
+                if (empEmergencyName) updates.emergency_contact_name = empEmergencyName;
+                if (empEmergencyRelation) updates.emergency_contact_relation = empEmergencyRelation;
+                if (empEmergencyNumber) updates.emergency_contact_number = empEmergencyNumber;
+
+                if (Object.keys(updates).length > 0) {
+                    const { error: empError } = await supabaseClient
+                        .from('employees')
+                        .update(updates)
+                        .eq('emp_id', empId);
+                    
+                    if (empError) throw new Error("Biometrics saved, but failed to update details: " + empError.message);
+                }
+
+                showSimpleResult(`Success! Record updated for ${empId}.`, "success");
+                
+                document.getElementById('empSearch').value = '';
+                document.getElementById('empDob').value = '';
+                document.getElementById('empMobile').value = '';
+                document.getElementById('empEmail').value = '';
+                document.getElementById('empEmergencyName').value = '';
+                document.getElementById('empEmergencyRelation').value = '';
+                document.getElementById('empEmergencyNumber').value = '';
+            } catch (err) {
+                console.error(err);
+                showSimpleResult("Save Failed: " + err.message, "error");
+            }
+            
+            setTimeout(() => { resetCapture(); }, 3000);
+        }
+    });
+
+    // UI Management for the 3rd Column Result Box
+    function resetResultBox() {
+        resultBox.innerHTML = '<span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Waiting for scan...</span>';
+        resultBox.className = "flex-grow p-4 rounded-xl border-2 border-dashed border-gray-300 bg-white w-full flex flex-col items-center justify-center transition-all duration-300";
+    }
+
+    function showSimpleResult(msg, type) {
+        let colorClass = type === 'error' ? 'border-red-400 bg-red-50 text-red-700' : 'border-green-400 bg-green-50 text-green-800';
+        resultBox.innerHTML = `<span class="text-xs font-bold uppercase tracking-widest text-center">${msg}</span>`;
+        resultBox.className = `flex-grow p-4 rounded-xl border-2 border-solid ${colorClass} w-full flex flex-col items-center justify-center transition-all duration-300 shadow-inner`;
+    }
+
+    function showProfileResult(htmlMsg) {
+        resultBox.innerHTML = htmlMsg;
+        resultBox.className = "flex-grow p-6 rounded-xl border-2 border-solid border-green-500 bg-green-50 shadow-inner w-full flex flex-col items-center justify-center transition-all duration-300";
     }
 </script>
 </body>
