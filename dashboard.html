@@ -290,18 +290,36 @@
         
         <div id="status-tab" class="hidden h-full">
             <div class="card p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 h-full flex flex-col">
-                <div class="flex justify-between items-center border-b pb-4 mb-6">
-                    <div>
-                        <h2 class="text-2xl font-bold text-[#003811]">Biometric Registration Status</h2>
-                        <p class="text-xs text-gray-500 font-bold mt-1 uppercase tracking-wide">Overview of all personnel enrollment</p>
+               <div class="flex justify-between items-center border-b pb-4 mb-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-[#003811]">Biometric Registration Status</h2>
+                            <p class="text-xs text-gray-500 font-bold mt-1 uppercase tracking-wide">Overview of all personnel enrollment</p>
+                        </div>
+                        <button onclick="fetchBiometricStatus()" class="bg-[#003811] text-white px-6 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-[#006400] transition-colors active:scale-[0.98]">
+                            REFRESH STATUS
+                        </button>
                     </div>
-                    <button onclick="fetchBiometricStatus()" class="bg-[#003811] text-white px-6 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-[#006400] transition-colors active:scale-[0.98]">
-                        REFRESH STATUS
-                    </button>
-                </div>
-                
-                <div class="flex-1 overflow-y-auto border border-gray-200 rounded-lg shadow-inner bg-gray-50 p-1">
-                    <table class="w-full text-sm text-left bg-white">
+
+                    <div class="flex flex-col md:flex-row gap-4 mb-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                        <div class="flex flex-col w-full md:w-1/2">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Scope / Division</label>
+                            <select id="bioFilterDivision" onchange="window.renderBiometricTable()" class="px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003811]">
+                                <option value="ALL">Whole Province (All Divisions)</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col w-full md:w-1/2">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Employee Type</label>
+                            <select id="bioFilterType" onchange="window.renderBiometricTable()" class="px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003811]">
+                                <option value="ALL">All Types</option>
+                                <option value="REGULAR">REGULAR</option>
+                                <option value="SPLIT">SPLIT</option>
+                                <option value="COS">COS</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto border border-gray-200 rounded-lg shadow-inner bg-gray-50 p-1">
+                <table class="w-full text-sm text-left bg-white">
                         <thead class="bg-gray-100 text-gray-700 sticky top-0 shadow-sm">
                             <tr>
                                 <th class="p-4 font-bold border-b w-1/4">Employee ID</th>
@@ -413,37 +431,41 @@
         }
     };
     
-    // --- BIOMETRIC STATUS LOGIC ---
+// --- BIOMETRIC STATUS LOGIC ---
+    window.globalEmps = [];
+    window.globalRegisteredIds = new Set();
+
     window.fetchBiometricStatus = async function() {
         const listEl = document.getElementById('listBiometricStatus');
         listEl.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-gray-500 text-sm italic font-bold">Loading data... Please wait.</td></tr>';
 
         try {
-            // Fetch all employees
-            const { data: emps, error: empErr } = await supabaseClient.from('employees').select('emp_id, full_name').order('full_name', { ascending: true });
+            // Fetch all employees (now including division and type)
+            const { data: emps, error: empErr } = await supabaseClient.from('employees').select('emp_id, full_name, division, type').order('full_name', { ascending: true });
             if (empErr) throw empErr;
 
             // Fetch all registered biometrics IDs
             const { data: bios, error: bioErr } = await supabaseClient.from('employee_biometrics').select('emp_id');
             if (bioErr) throw bioErr;
 
-            const registeredIds = new Set((bios || []).map(b => String(b.emp_id).trim()));
+            window.globalEmps = emps || [];
+            window.globalRegisteredIds = new Set((bios || []).map(b => String(b.emp_id).trim()));
 
-            let html = '';
-            (emps || []).forEach(emp => {
-                const isRegistered = registeredIds.has(String(emp.emp_id).trim());
-                const statusBadge = isRegistered 
-                    ? '<span class="bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest border border-green-200 shadow-sm">REGISTERED</span>' 
-                    : '<span class="bg-red-50 text-red-700 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest border border-red-200 shadow-sm">NOT REGISTERED</span>';
-                
-                html += `<tr class="hover:bg-gray-50 transition-colors">
-                    <td class="p-4 text-gray-500 text-xs font-bold font-mono">${emp.emp_id}</td>
-                    <td class="p-4 font-bold text-gray-800">${emp.full_name}</td>
-                    <td class="p-4 text-center">${statusBadge}</td>
-                </tr>`;
-            });
+            // Populate Division Dropdown dynamically
+            const divSelect = document.getElementById('bioFilterDivision');
+            const currentDivVal = divSelect ? divSelect.value : 'ALL';
+            const uniqueDivs = [...new Set(window.globalEmps.map(e => e.division ? e.division.split(',')[0].trim() : 'Unassigned'))].filter(d => d).sort();
+            
+            if (divSelect) {
+                divSelect.innerHTML = '<option value="ALL">Whole Province (All Divisions)</option>';
+                uniqueDivs.forEach(div => {
+                    divSelect.innerHTML += `<option value="${div}">${div}</option>`;
+                });
+                if (uniqueDivs.includes(currentDivVal)) divSelect.value = currentDivVal;
+            }
 
-            listEl.innerHTML = html || '<tr><td colspan="3" class="p-8 text-center text-gray-500 italic">No employee records found.</td></tr>';
+            // Call the rendering function
+            window.renderBiometricTable();
 
         } catch (err) {
             console.error("Error fetching biometric status:", err);
@@ -451,6 +473,44 @@
         }
     };
 
+    window.renderBiometricTable = function() {
+        const listEl = document.getElementById('listBiometricStatus');
+        if (!listEl) return;
+
+        const filterDiv = document.getElementById('bioFilterDivision').value;
+        const filterType = document.getElementById('bioFilterType').value;
+
+        let filteredEmps = window.globalEmps;
+
+        // Apply Filters
+        if (filterDiv !== 'ALL') {
+            filteredEmps = filteredEmps.filter(e => e.division && e.division.includes(filterDiv));
+        }
+        if (filterType !== 'ALL') {
+            filteredEmps = filteredEmps.filter(e => e.type && String(e.type).toUpperCase().includes(filterType));
+        }
+
+        let html = '';
+        filteredEmps.forEach(emp => {
+            const isRegistered = window.globalRegisteredIds.has(String(emp.emp_id).trim());
+            const statusBadge = isRegistered 
+                ? '<span class="bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest border border-green-200 shadow-sm">REGISTERED</span>' 
+                : '<span class="bg-red-50 text-red-700 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest border border-red-200 shadow-sm">NOT REGISTERED</span>';
+            
+            const typeLabel = emp.type ? String(emp.type).toUpperCase() : 'N/A';
+            const divLabel = emp.division ? emp.division.split(',')[0].trim() : 'N/A';
+
+            html += `<tr class="hover:bg-gray-50 transition-colors">
+                <td class="p-4 text-gray-500 text-xs font-bold font-mono">${emp.emp_id}</td>
+                <td class="p-4 font-bold text-gray-800">${emp.full_name}<br><span class="text-[9px] text-gray-400 font-normal uppercase tracking-wider">${divLabel} | ${typeLabel}</span></td>
+                <td class="p-4 text-center">${statusBadge}</td>
+            </tr>`;
+        });
+
+        listEl.innerHTML = html || '<tr><td colspan="3" class="p-8 text-center text-gray-500 italic">No employee records match the selected filters.</td></tr>';
+    };
+
+    
     window.onload = async () => {
         const todayDate = new Date();
         const todayStr = todayDate.toISOString().split('T')[0];
