@@ -56,6 +56,7 @@
         <div class="flex gap-2 mb-6 border-b-2 border-[#003811] pb-0">
             <button onclick="switchTab('dashboard')" id="tabDashboard" class="px-6 py-3 text-sm font-bold bg-[#003811] text-white rounded-t-lg transition-colors">DASHBOARD</button>
             <button onclick="switchTab('biometrics')" id="tabBiometrics" class="px-6 py-3 text-sm font-bold bg-gray-200 text-gray-600 hover:bg-gray-300 rounded-t-lg transition-colors">REGISTER BIOMETRICS</button>
+            <button onclick="switchTab('status')" id="tabStatus" class="px-6 py-3 text-sm font-bold bg-gray-200 text-gray-600 hover:bg-gray-300 rounded-t-lg transition-colors">STATUS</button>
         </div>
         
         <div id="dashboard-tab" class="block">
@@ -286,6 +287,36 @@
 
             </div>
         </div>
+        
+        <div id="status-tab" class="hidden h-full">
+            <div class="card p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 h-full flex flex-col">
+                <div class="flex justify-between items-center border-b pb-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-[#003811]">Biometric Registration Status</h2>
+                        <p class="text-xs text-gray-500 font-bold mt-1 uppercase tracking-wide">Overview of all personnel enrollment</p>
+                    </div>
+                    <button onclick="fetchBiometricStatus()" class="bg-[#003811] text-white px-6 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-[#006400] transition-colors active:scale-[0.98]">
+                        REFRESH STATUS
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto border border-gray-200 rounded-lg shadow-inner bg-gray-50 p-1">
+                    <table class="w-full text-sm text-left bg-white">
+                        <thead class="bg-gray-100 text-gray-700 sticky top-0 shadow-sm">
+                            <tr>
+                                <th class="p-4 font-bold border-b w-1/4">Employee ID</th>
+                                <th class="p-4 font-bold border-b w-2/4">Employee Name</th>
+                                <th class="p-4 font-bold border-b text-center w-1/4">Registration Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listBiometricStatus" class="divide-y">
+                            <tr><td colspan="3" class="p-8 text-center text-gray-400 text-sm italic">Click "Refresh Status" to load data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </main>
 
 <script>
@@ -352,11 +383,14 @@
     window.switchTab = function(tabName) {
         document.getElementById('dashboard-tab').classList.add('hidden');
         document.getElementById('biometrics-tab').classList.add('hidden');
+        document.getElementById('status-tab').classList.add('hidden');
 
         document.getElementById('tabDashboard').classList.replace('bg-[#003811]', 'bg-gray-200');
         document.getElementById('tabDashboard').classList.replace('text-white', 'text-gray-600');
         document.getElementById('tabBiometrics').classList.replace('bg-[#003811]', 'bg-gray-200');
         document.getElementById('tabBiometrics').classList.replace('text-white', 'text-gray-600');
+        document.getElementById('tabStatus').classList.replace('bg-[#003811]', 'bg-gray-200');
+        document.getElementById('tabStatus').classList.replace('text-white', 'text-gray-600');
 
         if (tabName === 'dashboard') {
             document.getElementById('dashboard-tab').classList.remove('hidden');
@@ -371,6 +405,49 @@
                 initBiometricsSystem();
                 biometricsInitialized = true;
             }
+        } else if (tabName === 'status') {
+            document.getElementById('status-tab').classList.remove('hidden');
+            document.getElementById('tabStatus').classList.replace('bg-gray-200', 'bg-[#003811]');
+            document.getElementById('tabStatus').classList.replace('text-gray-600', 'text-white');
+            fetchBiometricStatus();
+        }
+    };
+    
+    // --- BIOMETRIC STATUS LOGIC ---
+    window.fetchBiometricStatus = async function() {
+        const listEl = document.getElementById('listBiometricStatus');
+        listEl.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-gray-500 text-sm italic font-bold">Loading data... Please wait.</td></tr>';
+
+        try {
+            // Fetch all employees
+            const { data: emps, error: empErr } = await supabaseClient.from('employees').select('emp_id, full_name').order('full_name', { ascending: true });
+            if (empErr) throw empErr;
+
+            // Fetch all registered biometrics IDs
+            const { data: bios, error: bioErr } = await supabaseClient.from('employee_biometrics').select('emp_id');
+            if (bioErr) throw bioErr;
+
+            const registeredIds = new Set((bios || []).map(b => String(b.emp_id).trim()));
+
+            let html = '';
+            (emps || []).forEach(emp => {
+                const isRegistered = registeredIds.has(String(emp.emp_id).trim());
+                const statusBadge = isRegistered 
+                    ? '<span class="bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest border border-green-200 shadow-sm">REGISTERED</span>' 
+                    : '<span class="bg-red-50 text-red-700 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest border border-red-200 shadow-sm">NOT REGISTERED</span>';
+                
+                html += `<tr class="hover:bg-gray-50 transition-colors">
+                    <td class="p-4 text-gray-500 text-xs font-bold font-mono">${emp.emp_id}</td>
+                    <td class="p-4 font-bold text-gray-800">${emp.full_name}</td>
+                    <td class="p-4 text-center">${statusBadge}</td>
+                </tr>`;
+            });
+
+            listEl.innerHTML = html || '<tr><td colspan="3" class="p-8 text-center text-gray-500 italic">No employee records found.</td></tr>';
+
+        } catch (err) {
+            console.error("Error fetching biometric status:", err);
+            listEl.innerHTML = `<tr><td colspan="3" class="p-8 text-center text-red-600 text-sm italic font-bold">Error loading data: ${err.message}</td></tr>`;
         }
     };
 
