@@ -196,7 +196,7 @@
                     
                     <div class="card p-6">
                         <h3 class="font-bold text-[#003811] mb-4">Yearly Credits (SPL & WL)</h3>
-                        <p class="text-sm text-gray-600 mb-6">Grants strictly 3 days Special Privilege Leave and 5 days Wellness Leave for all REGULAR employees. Overwrites current balances.</p>
+                        <p class="text-sm text-gray-600 mb-6">Grants strictly 3 days Special Privilege Leave and 5 days Wellness Leave for all REGULAR employees via Ledger.</p>
                         <div class="flex gap-2 items-end">
                             <div class="flex-1">
                                 <label class="form-label">Select Year</label>
@@ -208,7 +208,7 @@
                     
                     <div class="card p-6 col-span-1 md:col-span-2 border-t-4 border-orange-500">
                         <h3 class="font-bold text-orange-700 mb-4">Strict CTO Forfeiture (1-Year Expiration)</h3>
-                        <p class="text-sm text-gray-600 mb-6">Compensatory Time-Off (CTO) credits automatically expire exactly 1 year after they were earned based on their specific issuance date (e.g., April 1, 2025 expires on April 2, 2026). This system dynamically applies FIFO usage. Click 'Scan' to check for expired records, then HR can manually forfeit.</p>
+                        <p class="text-sm text-gray-600 mb-6">Compensatory Time-Off (CTO) credits automatically expire exactly 1 year after they were earned based on their specific issuance date. This generates forfeiture records in the ledger.</p>
                         
                         <div class="flex gap-2 items-end mb-4">
                             <div class="flex-1">
@@ -449,11 +449,10 @@
             <div id="manualTab" class="tab-content">
                 <div class="card">
                     <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                        <h3 class="font-bold text-[#003811]">Manual Leave Credits Input (Temporary)</h3>
+                        <h3 class="font-bold text-[#003811]">Manual Baseline Credits Input</h3>
                         <div class="flex gap-4 items-center">
-                            <label class="font-bold text-sm text-[#003811] uppercase">As of Month:</label>
-                            <input type="month" id="manualMonth" class="form-input w-48">
-                            <button onclick="saveManualCredits()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow">Save All</button>
+                            <label class="font-bold text-sm text-[#003811] uppercase text-right leading-tight">These set the starting baseline<br>and update the employees table directly.</label>
+                            <button onclick="saveManualCredits()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow">Save All Modified</button>
                         </div>
                     </div>
                     <div class="overflow-y-auto max-h-[60vh]">
@@ -462,11 +461,11 @@
                                 <tr>
                                     <th class="table-th">Emp ID</th>
                                     <th class="table-th">Name</th>
-                                    <th class="table-th">VL Bal</th>
-                                    <th class="table-th">SL Bal</th>
-                                    <th class="table-th">SPL Bal</th>
-                                    <th class="table-th">WL Bal</th>
-                                    <th class="table-th">CTO Bal</th>
+                                    <th class="table-th">VL Base</th>
+                                    <th class="table-th">SL Base</th>
+                                    <th class="table-th">SPL Base</th>
+                                    <th class="table-th">WL Base</th>
+                                    <th class="table-th">CTO Base</th>
                                 </tr>
                             </thead>
                             <tbody id="manual-list">
@@ -502,7 +501,6 @@
     document.getElementById('genMonth').value = currMonthStr;
     document.getElementById('gpMonth').value = currMonthStr;
     document.getElementById('ctoMonth').value = currMonthStr;
-    document.getElementById('manualMonth').value = currMonthStr;
     document.getElementById('genYear').value = d.getFullYear();
     document.getElementById('scanCtoDate').value = todayStr;
     document.getElementById('approvedDateDisplay').innerText = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -514,6 +512,7 @@
     document.getElementById('ledgEndDate').value = lastDay;
 
     let empDataMap = {};
+    let empBalances = {}; // Stores dynamically calculated real-time balances
     let currentGatePasses = [];
     let currentCTOs = [];
     let currentForceLeaveStatus = {}; 
@@ -521,20 +520,73 @@
     let currentLedgerDataToPrint = [];
     let scannedCTOExpirations = [];
 
-    // Ensure we process REGULAR employees only
-    async function loadEmployeeMaps() {
-        const { data } = await supabaseClient.from('employees')
-            .select('*')
-            .eq('type', 'REGULAR')
-            .order('full_name');
+    // Helper: Categorize Leave Types
+    function getLeaveCategory(typeStr) {
+        typeStr = (typeStr || '').toUpperCase();
+        if (typeStr.includes('VL') || typeStr.includes('VACATION') || typeStr.includes('GATE PASS') || typeStr.includes('FORCE') || typeStr.includes('MANDATORY')) return 'VL';
+        if (typeStr.includes('SL') || typeStr.includes('SICK')) return 'SL';
+        if (typeStr.includes('SPL') || typeStr.includes('SPECIAL') || typeStr.includes('PRIVILEGE') || typeStr.includes('PREVELEGE')) return 'SPL';
+        if (typeStr.includes('WL') || typeStr.includes('WELLNESS')) return 'WL';
+        if (typeStr.includes('CTO') || typeStr.includes('COMPENSATORY') || typeStr.includes('EXPIRATION')) return 'CTO';
+        return null;
+    }
+
+    // Calculates real balances using Baseline (Employees) + All applicable Ledger Transactions
+    function calculateRealBalances(emp, ledgers, currentYear) {
+        let bal = {
+            VL: parseFloat(emp.vl_balance || 0),
+            SL: parseFloat(emp.sl_balance || 0),
+            SPL: parseFloat(emp.spl_balance || 0),
+            WL: parseFloat(emp.wl_balance || 0),
+            CTO: parseFloat(emp.cto_balance || 0)
+        };
+
+        ledgers.forEach(t => {
+            if (t.emp_id !== emp.emp_id) return;
+            if (t.transaction_type === 'DISAPPROVED' || t.transaction_type === 'APPLICATION' || t.transaction_type === 'MANUAL INPUT') return;
+
+            const cat = getLeaveCategory(t.type);
+            if (!cat) return;
+
+            const c = parseFloat(t.credit || 0);
+            const d = parseFloat(t.debit || 0);
+            const tDate = new Date(t.start_date || t.created_at);
             
-        if(data) {
-            empSearchList = [];
-            data.forEach(e => {
+            // Yearly reset strategy for SPL and WL
+            if (cat === 'SPL' || cat === 'WL') {
+                if (tDate.getFullYear() === currentYear) {
+                    bal[cat] += (c - d);
+                }
+            } else {
+                bal[cat] += (c - d);
+            }
+        });
+
+        return bal;
+    }
+
+    // Fetches employees and calculates global balances
+    async function loadEmployeeMaps() {
+        const { data: emps } = await supabaseClient.from('employees').select('*').eq('type', 'REGULAR').order('full_name');
+        
+        // Fetch all finalized ledger transactions
+        const { data: ledgers } = await supabaseClient.from('leave_ledger')
+            .select('emp_id, type, credit, debit, start_date, created_at, transaction_type')
+            .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'FORFEITURE']);
+
+        empSearchList = [];
+        empDataMap = {};
+        empBalances = {};
+
+        const currentYear = new Date().getFullYear();
+
+        if (emps) {
+            emps.forEach(e => {
                 empDataMap[e.emp_id] = e;
                 if(e.full_name) {
                     empSearchList.push({ id: e.emp_id, name: e.full_name.toUpperCase() });
                 }
+                empBalances[e.emp_id] = calculateRealBalances(e, ledgers || [], currentYear);
             });
         }
     }
@@ -617,19 +669,13 @@
             const dates = app.end_date ? `${app.start_date} to ${app.end_date}` : app.start_date;
             
             const tType = (app.type || '').toUpperCase();
-            let currentBal = 0;
-            if (emp) {
-                if(tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE')) currentBal = parseFloat(emp.vl_balance || 0);
-                else if(tType.includes('SL') || tType.includes('SICK')) currentBal = parseFloat(emp.sl_balance || 0);
-                else if(tType.includes('SPL') || tType.includes('SPECIAL') || tType.includes('PRIVILEGE') || tType.includes('PREVELEGE')) currentBal = parseFloat(emp.spl_balance || 0);
-                else if(tType.includes('WL') || tType.includes('WELLNESS')) currentBal = parseFloat(emp.wl_balance || 0);
-                else if(tType.includes('CTO') || tType.includes('COMPENSATORY')) currentBal = parseFloat(emp.cto_balance || 0);
-            }
+            const cat = getLeaveCategory(tType);
+            let currentBal = (empBalances[app.emp_id] && cat) ? empBalances[app.emp_id][cat] : 0;
             
             const baseDays = parseFloat(app.debit || 0);
             let multiplier = 1;
 
-            // Check Schedule Override for Multiplier before rendering the list
+            // Check Schedule Override for Multiplier
             const sDate = app.start_date;
             const eDate = app.end_date || app.start_date;
 
@@ -640,12 +686,11 @@
                 .gte('end_date', sDate);
 
             if(over && over.length > 0) {
-                // Prioritize specific employee override over the global 'ALL' override
                 const activeOverride = over.find(o => o.emp_id === app.emp_id) || over.find(o => o.emp_id === 'ALL');
                 if (activeOverride && activeOverride.working_days) {
                     const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
                     if (wDays.length === 4) {
-                        if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK') || tType.includes('CTO') || tType.includes('COMPENSATORY')) {
+                        if (['VL', 'SL', 'CTO'].includes(cat)) {
                             multiplier = 1.25;
                         }
                     }
@@ -660,7 +705,7 @@
                 <button onclick="disapproveLeave('${app.id}', '${app.emp_id}', '${app.type}', ${app.debit})" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 transition-all duration-200 shadow mt-1 xl:mt-0 ml-0 xl:ml-1">Disapprove</button>
             `;
 
-            if (balanceAfter < 0 && !tType.includes('VL') && !tType.includes('VACATION') && !tType.includes('FORCE')) {
+            if (balanceAfter < 0 && cat !== 'VL') {
                 actionHtml += `
                     <button onclick="chargeToVL('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all duration-200 shadow mt-1 w-full">Charge to VL</button>
                 `;
@@ -723,13 +768,13 @@
     }
 
     async function chargeToVL(id, emp_id, start_date, end_date, base_debit, type) {
-        if(!confirm(`This will zero out the available ${type} and charge the remaining to Vacation Leave. Proceed?`)) return;
+        if(!confirm(`This will charge the deficit to Vacation Leave. Proceed?`)) return;
 
         try {
             let multiplier = 1;
             const sDate = start_date;
             const eDate = end_date || start_date;
-            const tType = type.toUpperCase();
+            const cat = getLeaveCategory(type);
 
             const { data: over } = await supabaseClient.from('schedule_overrides')
                 .select('*')
@@ -738,45 +783,19 @@
                 .gte('end_date', sDate);
 
             if(over && over.length > 0) {
-                // Prioritize specific employee override over the global 'ALL' override
                 const activeOverride = over.find(o => o.emp_id === emp_id) || over.find(o => o.emp_id === 'ALL');
                 if (activeOverride && activeOverride.working_days) {
                     const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
                     if (wDays.length === 4) {
-                        if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK') || tType.includes('CTO') || tType.includes('COMPENSATORY')) {
-                            multiplier = 1.25;
-                        }
+                        if (['VL', 'SL', 'CTO'].includes(cat)) multiplier = 1.25;
                     }
                 }
             }
 
             const final_debit = base_debit * multiplier;
-
-            const empData = empDataMap[emp_id];
-            if (!empData) throw new Error("Employee not found in registry (Ensure type=REGULAR).");
-
-            let updates = {};
             let remarks = multiplier > 1 ? `Approved (Multiplier ${multiplier}x applied)` : 'Approved';
 
-            let current_bal = 0;
-            let field_to_zero = '';
-
-            if(tType.includes('SL') || tType.includes('SICK')) { current_bal = parseFloat(empData.sl_balance || 0); field_to_zero = 'sl_balance'; }
-            else if(tType.includes('SPL') || tType.includes('SPECIAL')) { current_bal = parseFloat(empData.spl_balance || 0); field_to_zero = 'spl_balance'; }
-            else if(tType.includes('WL') || tType.includes('WELLNESS')) { current_bal = parseFloat(empData.wl_balance || 0); field_to_zero = 'wl_balance'; }
-            else if(tType.includes('CTO') || tType.includes('COMPENSATORY')) { current_bal = parseFloat(empData.cto_balance || 0); field_to_zero = 'cto_balance'; }
-
-            if(current_bal < 0) current_bal = 0; 
-            
-            let rem = final_debit - current_bal;
-
-            updates[field_to_zero] = (0).toFixed(3);
-            updates.vl_balance = (parseFloat(empData.vl_balance || 0) - rem).toFixed(3);
-            remarks += ` - Insufficient balance. ${rem.toFixed(3)} days charged to VL.`;
-
-            if(Object.keys(updates).length > 0) {
-                await supabaseClient.from('employees').update(updates).eq('emp_id', emp_id);
-            }
+            remarks += ` - Notice: Charged to VL due to insufficient balance.`;
 
             await supabaseClient.from('leave_ledger')
                 .update({ 
@@ -786,7 +805,7 @@
                 })
                 .eq('id', id);
             
-            alert(`Leave Approved. Deducted ${current_bal.toFixed(3)} from ${type} and ${rem.toFixed(3)} from VL.`);
+            alert(`Leave Approved and marked as Charged to VL.`);
             await loadEmployeeMaps(); 
             loadApplications();
             loadApprovedLeavesToday();
@@ -802,7 +821,7 @@
             let multiplier = 1;
             const sDate = start_date;
             const eDate = end_date || start_date;
-            const tType = type.toUpperCase();
+            const cat = getLeaveCategory(type);
             
             const { data: over } = await supabaseClient.from('schedule_overrides')
                 .select('*')
@@ -811,33 +830,16 @@
                 .gte('end_date', sDate);
                 
             if(over && over.length > 0) {
-                // Prioritize specific employee override over the global 'ALL' override
                 const activeOverride = over.find(o => o.emp_id === emp_id) || over.find(o => o.emp_id === 'ALL');
                 if (activeOverride && activeOverride.working_days) {
                     const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
                     if (wDays.length === 4) {
-                        if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK') || tType.includes('CTO') || tType.includes('COMPENSATORY')) {
-                            multiplier = 1.25;
-                        }
+                        if (['VL', 'SL', 'CTO'].includes(cat)) multiplier = 1.25;
                     }
                 }
             }
 
             const final_debit = base_debit * multiplier;
-
-            const empData = empDataMap[emp_id];
-            if (!empData) throw new Error("Employee not found in registry (Ensure type=REGULAR).");
-
-            let updates = {};
-            if(tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE')) updates.vl_balance = (parseFloat(empData.vl_balance || 0) - final_debit).toFixed(3);
-            else if(tType.includes('SL') || tType.includes('SICK')) updates.sl_balance = (parseFloat(empData.sl_balance || 0) - final_debit).toFixed(3);
-            else if(tType.includes('SPL') || tType.includes('SPECIAL') || tType.includes('PRIVILEGE') || tType.includes('PREVELEGE')) updates.spl_balance = (parseFloat(empData.spl_balance || 0) - final_debit).toFixed(3);
-            else if(tType.includes('WL') || tType.includes('WELLNESS')) updates.wl_balance = (parseFloat(empData.wl_balance || 0) - final_debit).toFixed(3);
-            else if(tType.includes('CTO') || tType.includes('COMPENSATORY')) updates.cto_balance = (parseFloat(empData.cto_balance || 0) - final_debit).toFixed(3);
-
-            if(Object.keys(updates).length > 0) {
-                await supabaseClient.from('employees').update(updates).eq('emp_id', emp_id);
-            }
 
             await supabaseClient.from('leave_ledger')
                 .update({ 
@@ -895,18 +897,17 @@
 
             if(vlData) {
                 vlData.forEach(fl => {
-                    const tType = (fl.type || '').toUpperCase();
-                    if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE')) {
-                        if (['APPROVED', 'DISAPPROVED'].includes(fl.transaction_type)) {
-                            if(!currentForceLeaveStatus[fl.emp_id]) currentForceLeaveStatus[fl.emp_id] = 0;
-                            currentForceLeaveStatus[fl.emp_id] += Math.abs(parseFloat(fl.debit || 0));
-                        }
+                    const cat = getLeaveCategory(fl.type);
+                    if (cat === 'VL' && ['APPROVED', 'DISAPPROVED'].includes(fl.transaction_type)) {
+                        if(!currentForceLeaveStatus[fl.emp_id]) currentForceLeaveStatus[fl.emp_id] = 0;
+                        currentForceLeaveStatus[fl.emp_id] += Math.abs(parseFloat(fl.debit || 0));
                     }
                 });
             }
 
             let html = '';
             emps.forEach(emp => {
+                const bal = empBalances[emp.emp_id];
                 const flCount = currentForceLeaveStatus[emp.emp_id] || 0;
                 const flProgress = Math.min(flCount, 5); 
                 const flColor = flProgress >= 5 ? 'text-green-600 font-bold' : 'text-red-600 font-bold';
@@ -915,11 +916,11 @@
                     <tr>
                         <td class="table-td">${emp.emp_id}</td>
                         <td class="table-td font-bold">${emp.full_name ? emp.full_name.toUpperCase() : ''}</td>
-                        <td class="table-td">${parseFloat(emp.vl_balance || 0).toFixed(3)}</td>
-                        <td class="table-td">${parseFloat(emp.sl_balance || 0).toFixed(3)}</td>
-                        <td class="table-td">${parseFloat(emp.spl_balance || 0).toFixed(3)}</td>
-                        <td class="table-td">${parseFloat(emp.wl_balance || 0).toFixed(3)}</td>
-                        <td class="table-td">${parseFloat(emp.cto_balance || 0).toFixed(3)}</td>
+                        <td class="table-td">${bal.VL.toFixed(3)}</td>
+                        <td class="table-td">${bal.SL.toFixed(3)}</td>
+                        <td class="table-td">${bal.SPL.toFixed(3)}</td>
+                        <td class="table-td">${bal.WL.toFixed(3)}</td>
+                        <td class="table-td">${bal.CTO.toFixed(3)}</td>
                         <td class="table-td ${flColor}">${flProgress.toFixed(3)} / 5 Days</td>
                     </tr>
                 `;
@@ -955,7 +956,7 @@
             
             const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
-                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'DISAPPROVED', 'FORFEITURE']);
+                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'FORFEITURE']);
             
             if(error) throw error;
             
@@ -964,12 +965,14 @@
             const y = parseInt(parts[0]);
             const m = parseInt(parts[1]);
             const endOfMonth = new Date(y, m, 0, 23, 59, 59);
+            const currentYear = new Date().getFullYear();
             
             let html = '';
             let currentStation = null;
             
             emps.forEach(emp => {
-                let base = {
+                // Beg represents the manual baseline entry from the employees table
+                let beg = {
                     VL: parseFloat(emp.vl_balance || 0),
                     SL: parseFloat(emp.sl_balance || 0),
                     SPL: parseFloat(emp.spl_balance || 0),
@@ -977,30 +980,37 @@
                     CTO: parseFloat(emp.cto_balance || 0)
                 };
                 
-                let beg = { VL: base.VL, SL: base.SL, SPL: base.SPL, WL: base.WL, CTO: base.CTO };
                 let cred = { VL: 0, SL: 0, SPL: 0, WL: 0, CTO: 0 };
                 let used = { VL: 0, SL: 0, SPL: 0, WL: 0, CTO: 0 };
                 
-                const empTx = (allData || []).filter(t => t.emp_id === emp.emp_id && t.transaction_type !== 'DISAPPROVED');
+                const empTx = (allData || []).filter(t => t.emp_id === emp.emp_id);
                 
+                // Walking Forward from Baseline
                 empTx.forEach(t => {
                     const cat = getLeaveCategory(t.type);
                     if(!cat) return;
                     
                     const tDate = new Date(t.start_date || t.created_at);
+                    const tYear = tDate.getFullYear();
                     const c = parseFloat(t.credit || 0);
                     const d = parseFloat(t.debit || 0);
                     
-                    // Fixed logical bug: We must reverse transactions that happened ON OR AFTER the start of the month 
-                    // to step backwards from the true CURRENT balance and correctly find the beginning balance.
-                    if(tDate >= startOfMonth) {
-                        beg[cat] -= c;
-                        beg[cat] += d;
-                    } 
-                    
-                    if(tDate >= startOfMonth && tDate <= endOfMonth) {
-                        cred[cat] += c;
-                        used[cat] += d;
+                    if (cat === 'SPL' || cat === 'WL') {
+                        if (tYear === currentYear) {
+                            if (tDate < startOfMonth) {
+                                beg[cat] += c - d;
+                            } else if (tDate >= startOfMonth && tDate <= endOfMonth) {
+                                cred[cat] += c;
+                                used[cat] += d;
+                            }
+                        }
+                    } else {
+                        if (tDate < startOfMonth) {
+                            beg[cat] += c - d;
+                        } else if (tDate >= startOfMonth && tDate <= endOfMonth) {
+                            cred[cat] += c;
+                            used[cat] += d;
+                        }
                     }
                 });
                 
@@ -1095,19 +1105,15 @@
 
     async function processForceLeaveForfeiture() {
         const year = new Date().getFullYear();
-        if(!confirm(`This will DEDUCT lacking force leave days from VL balances for all employees who have less than 5 days VL recorded for ${year}. Are you sure you want to proceed?`)) return;
+        if(!confirm(`This will generate ledger deductions for lacking force leave days for all employees who have less than 5 days VL recorded for ${year}. Are you sure you want to proceed?`)) return;
 
         try {
-            const updates = [];
             const ledgers = [];
 
             for (const emp of Object.values(empDataMap)) {
                 let taken = currentForceLeaveStatus[emp.emp_id] || 0;
                 if (taken < 5) {
                     let deficiency = 5 - taken;
-                    let newVl = (parseFloat(emp.vl_balance || 0) - deficiency).toFixed(3);
-
-                    updates.push( supabaseClient.from('employees').update({ vl_balance: newVl }).eq('emp_id', emp.emp_id) );
                     
                     ledgers.push({
                         emp_id: emp.emp_id,
@@ -1120,15 +1126,14 @@
                 }
             }
 
-            if (updates.length === 0) {
+            if (ledgers.length === 0) {
                 alert("All employees have met the 5-day requirement. No deductions needed.");
                 return;
             }
 
-            await Promise.all(updates);
             await supabaseClient.from('leave_ledger').insert(ledgers);
             
-            alert(`Successfully deducted unused force leave for ${updates.length} employees.`);
+            alert(`Successfully processed unused force leave forfeiture for ${ledgers.length} employees.`);
             await loadEmployeeMaps();
             loadCreditsMonitor();
         } catch(e) {
@@ -1149,21 +1154,15 @@
             return;
         }
 
-        if(!confirm(`Are you sure you want to add 1.25 VL and 1.25 SL credits for ALL REGULAR employees for ${monthVal}?`)) return;
+        if(!confirm(`Are you sure you want to add 1.25 VL and 1.25 SL credits to the ledger for ALL REGULAR employees for ${monthVal}?`)) return;
 
         try {
             const emps = Object.values(empDataMap);
             if(emps.length === 0) { alert("No regular employees found."); return; }
 
-            const updates = [];
             const ledgers = [];
 
             emps.forEach(emp => {
-                const newVl = (parseFloat(emp.vl_balance || 0) + 1.25).toFixed(3);
-                const newSl = (parseFloat(emp.sl_balance || 0) + 1.25).toFixed(3);
-                
-                updates.push( supabaseClient.from('employees').update({ vl_balance: newVl, sl_balance: newSl }).eq('emp_id', emp.emp_id) );
-                
                 ledgers.push({
                     emp_id: emp.emp_id,
                     type: 'VL EARNED',
@@ -1183,7 +1182,6 @@
                 });
             });
 
-            await Promise.all(updates);
             await supabaseClient.from('leave_ledger').insert(ledgers);
             
             alert("Monthly credits generated successfully.");
@@ -1205,19 +1203,15 @@
             return;
         }
 
-        if(!confirm(`Are you sure you want to GRANT 3 SPL and 5 WL credits for ALL REGULAR employees for the year ${yearVal}? This will OVERWRITE their current balances.`)) return;
+        if(!confirm(`Are you sure you want to add 3 SPL and 5 WL credits to the ledger for ALL REGULAR employees for the year ${yearVal}?`)) return;
 
         try {
             const emps = Object.values(empDataMap);
             if(emps.length === 0) { alert("No regular employees found."); return; }
 
-            const updates = [];
             const ledgers = [];
 
             emps.forEach(emp => {
-                updates.push( supabaseClient.from('employees').update({ spl_balance: 3, wl_balance: 5 }).eq('emp_id', emp.emp_id) );
-                
-                // Fixed logical bug: We must split the insertion to ensure the portal's `getLeaveCategory` parses SPL and WL accurately.
                 ledgers.push({
                     emp_id: emp.emp_id,
                     type: 'SPL GRANTED',
@@ -1237,7 +1231,6 @@
                 });
             });
 
-            await Promise.all(updates);
             await supabaseClient.from('leave_ledger').insert(ledgers);
             
             alert("Yearly credits granted successfully.");
@@ -1316,9 +1309,9 @@
                             const expiredAmount = credit - totalUsed;
                             totalUsed = 0; 
                             
-                            // Make sure employee actually has balance to forfeit
-                            const emp = empDataMap[empId];
-                            if (emp && parseFloat(emp.cto_balance || 0) >= expiredAmount) {
+                            // Check true calculated balance to forfeit
+                            const empBal = empBalances[empId];
+                            if (empBal && empBal.CTO >= expiredAmount) {
                                 employeeExpirations.push({
                                     id: issuance.id,
                                     dateEarned: issuance.start_date,
@@ -1405,15 +1398,11 @@
 
     async function applyCtoForfeiture(forfeitArray, recordDate) {
         await loadEmployeeMaps();
-        const updates = [];
         const ledgers = [];
 
         forfeitArray.forEach(f => {
             const emp = empDataMap[f.emp_id];
             if (emp) {
-                const newBal = (parseFloat(emp.cto_balance || 0) - f.totalAmount).toFixed(3);
-                updates.push( supabaseClient.from('employees').update({ cto_balance: newBal }).eq('emp_id', f.emp_id) );
-                
                 ledgers.push({
                     emp_id: f.emp_id,
                     type: 'CTO EXPIRATION',
@@ -1425,8 +1414,7 @@
             }
         });
 
-        if (updates.length > 0) {
-            await Promise.all(updates);
+        if (ledgers.length > 0) {
             await supabaseClient.from('leave_ledger').insert(ledgers);
             await loadEmployeeMaps();
         }
@@ -1512,7 +1500,7 @@
     }
 
     async function postSingleGatePass(gp_id, emp_id, deduction, date, purpose) {
-        if(!confirm(`Deduct ${deduction} VL credits from ${empDataMap[emp_id]?.full_name || emp_id}?`)) return;
+        if(!confirm(`Post this Gate Pass and deduct ${deduction} VL credits from the ledger?`)) return;
         try {
             await applyGatePassDeduction([{ id: gp_id, emp_id, deduction_credit: deduction, date, purpose }]);
             alert("Gate pass posted successfully.");
@@ -1522,14 +1510,14 @@
 
     async function postAllGatePasses() {
         if(currentGatePasses.length === 0) return;
-        if(!confirm(`Are you sure you want to deduct VL balances and post ${currentGatePasses.length} gate passes to the ledger?`)) return;
+        if(!confirm(`Are you sure you want to post ${currentGatePasses.length} gate passes to the ledger?`)) return;
 
         const btn = document.getElementById('btnPostAllGp');
         btn.innerText = "Posting..."; btn.disabled = true;
 
         try {
             await applyGatePassDeduction(currentGatePasses);
-            alert("All gate passes successfully posted and deducted from VL balances.");
+            alert("All gate passes successfully posted and deducted from the ledger.");
             loadGatePasses(); 
         } catch(e) {
             alert("Error posting gate passes: " + e.message);
@@ -1540,15 +1528,11 @@
 
     async function applyGatePassDeduction(gpArray) {
         await loadEmployeeMaps(); 
-        let empDeductions = {};
         let ledgers = [];
         let gpIdsToUpdate = [];
 
         gpArray.forEach(gp => {
-            if(!empDeductions[gp.emp_id]) empDeductions[gp.emp_id] = 0;
-            empDeductions[gp.emp_id] += parseFloat(gp.deduction_credit);
             gpIdsToUpdate.push(gp.id);
-
             ledgers.push({
                 emp_id: gp.emp_id,
                 type: 'VL (GATE PASS)',
@@ -1559,17 +1543,7 @@
             });
         });
 
-        const updates = [];
-        for (const [eId, amount] of Object.entries(empDeductions)) {
-            const emp = empDataMap[eId];
-            if (emp) {
-                const newBal = (parseFloat(emp.vl_balance || 0) - amount).toFixed(3);
-                updates.push( supabaseClient.from('employees').update({ vl_balance: newBal }).eq('emp_id', eId) );
-            }
-        }
-        await Promise.all(updates);
         await supabaseClient.from('leave_ledger').insert(ledgers);
-
         const gpUpdates = gpIdsToUpdate.map(id => supabaseClient.from('gate_pass_logs').update({ status: 'POSTED' }).eq('id', id));
         await Promise.all(gpUpdates);
         
@@ -1659,7 +1633,7 @@
     }
 
     async function postSingleCTO(id, emp_id, val, date, desc) {
-        if(!confirm(`Are you sure you want to credit ${val.toFixed(3)} CTO to ${empDataMap[emp_id]?.full_name || emp_id}?`)) return;
+        if(!confirm(`Are you sure you want to credit ${val.toFixed(3)} CTO to the ledger?`)) return;
         try {
             await applyCTORecords([{ id: id, emp_id: emp_id, creditVal: val, date: date, base_type: desc }]);
             alert(`CTO posted successfully.`);
@@ -1687,13 +1661,9 @@
 
     async function applyCTORecords(arr) {
         await loadEmployeeMaps(); 
-        let empUpdates = {}; 
         let ledgers = [];
 
         arr.forEach(rec => {
-            if(!empUpdates[rec.emp_id]) empUpdates[rec.emp_id] = 0;
-            empUpdates[rec.emp_id] += parseFloat(rec.creditVal);
-            
             ledgers.push({
                 transaction_id: String(rec.id), 
                 emp_id: rec.emp_id,
@@ -1705,32 +1675,11 @@
             });
         });
 
-        const updates = [];
-        for (const [eId, val] of Object.entries(empUpdates)) {
-            const emp = empDataMap[eId];
-            if (emp) {
-                let newBal = (parseFloat(emp.cto_balance || 0) + val).toFixed(3);
-                updates.push( supabaseClient.from('employees').update({ cto_balance: newBal }).eq('emp_id', eId) );
-            }
-        }
-        
-        await Promise.all(updates);
         if(ledgers.length > 0) await supabaseClient.from('leave_ledger').insert(ledgers);
-        
         await loadEmployeeMaps(); 
     }
 
     // --- TAB 6: DETAILED LEDGER MONITORING ---
-    function getLeaveCategory(typeStr) {
-        typeStr = (typeStr || '').toUpperCase();
-        if (typeStr.includes('VL') || typeStr.includes('VACATION') || typeStr.includes('GATE PASS') || typeStr.includes('FORCE LEAVE')) return 'VL';
-        if (typeStr.includes('SL') || typeStr.includes('SICK')) return 'SL';
-        if (typeStr.includes('SPL') || typeStr.includes('SPECIAL') || typeStr.includes('PRIVILEGE') || typeStr.includes('PREVELEGE')) return 'SPL';
-        if (typeStr.includes('WL') || typeStr.includes('WELLNESS') || typeStr.includes('MANDATORY')) return 'WL';
-        if (typeStr.includes('CTO') || typeStr.includes('COMPENSATORY') || typeStr.includes('EXPIRATION')) return 'CTO';
-        return null;
-    }
-
     async function loadLedgerStatement() {
         const empId = document.getElementById('ledgEmpId').value;
         const startDate = document.getElementById('ledgStartDate').value;
@@ -1765,148 +1714,131 @@
             const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
                 .eq('emp_id', empId)
-                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'DISAPPROVED', 'FORFEITURE']);
+                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'FORFEITURE', 'MANUAL INPUT']);
 
             if (error) throw error;
 
             let relevantData = (allData || []).filter(t => {
-                if ((t.type || '').toUpperCase() === 'MANUAL INPUT') return false; // Hide Manual Input from detailed ledger
                 const cat = getLeaveCategory(t.type);
                 if (ledgType === 'ALL') return true;
                 return cat === ledgType;
             });
-            
-            // Fixed logical bug: To properly display the history matching the true current balance, we must sort NEWEST to OLDEST 
-            // and mathematically walk BACKWARDS from the current active balance.
-            relevantData.sort((a,b) => new Date(b.start_date || b.created_at) - new Date(a.start_date || a.created_at));
 
             const dtEnd = new Date(`${endDate}T23:59:59`);
             const dtStart = new Date(`${startDate}T00:00:00`);
 
-            // Initialize tracker based on CURRENT balances from the Employees table
-            let balances = {
-                VL: parseFloat(emp.vl_balance || 0),
-                SL: parseFloat(emp.sl_balance || 0),
-                SPL: parseFloat(emp.spl_balance || 0),
-                WL: parseFloat(emp.wl_balance || 0),
-                CTO: parseFloat(emp.cto_balance || 0)
-            };
-
-            // Compute backwards for all historical transactions to get the accurate running balance at that point in time
-            relevantData.forEach(t => {
-                const isDisapproved = t.transaction_type === 'DISAPPROVED';
-                const cat = getLeaveCategory(t.type);
-
-                // Assign the balance BEFORE we reverse the transaction
-                t.computedBal = (cat && !isDisapproved) ? balances[cat].toFixed(3) : '-';
-
-                // Reverse the transaction to step backwards in time
-                if (cat && !isDisapproved) {
-                    balances[cat] -= parseFloat(t.credit || 0);
-                    balances[cat] += parseFloat(t.debit || 0);
-                }
-            });
-
-            // Set UI headers based on exact boundaries of the period selected
             if (ledgType === 'ALL') {
-                document.getElementById('lblAllVl').innerText = parseFloat(emp.vl_balance || 0).toFixed(3);
-                document.getElementById('lblAllSl').innerText = parseFloat(emp.sl_balance || 0).toFixed(3);
-                document.getElementById('lblAllSpl').innerText = parseFloat(emp.spl_balance || 0).toFixed(3);
-                document.getElementById('lblAllWl').innerText = parseFloat(emp.wl_balance || 0).toFixed(3);
-                document.getElementById('lblAllCto').innerText = parseFloat(emp.cto_balance || 0).toFixed(3);
+                document.getElementById('lblAllVl').innerText = empBalances[empId].VL.toFixed(3);
+                document.getElementById('lblAllSl').innerText = empBalances[empId].SL.toFixed(3);
+                document.getElementById('lblAllSpl').innerText = empBalances[empId].SPL.toFixed(3);
+                document.getElementById('lblAllWl').innerText = empBalances[empId].WL.toFixed(3);
+                document.getElementById('lblAllCto').innerText = empBalances[empId].CTO.toFixed(3);
                 allBalDiv.classList.remove('hidden');
                 sumDiv.classList.add('hidden');
             } else {
+                // Forward math algorithm: Start from the Baseline in the `employees` table.
                 let balField = ledgType.toLowerCase() + '_balance';
-                let periodEndBal = parseFloat(emp[balField] || 0);
-                
-                // Reconstruct exactly what the balance was strictly at the end of the selected period
-                relevantData.filter(t => new Date(t.start_date || t.created_at) > dtEnd).forEach(t => {
-                    if(t.transaction_type !== 'DISAPPROVED' && getLeaveCategory(t.type) === ledgType) {
-                        periodEndBal -= parseFloat(t.credit || 0);
-                        periodEndBal += parseFloat(t.debit || 0);
-                    }
-                });
+                let periodBegBal = parseFloat(emp[balField] || 0);
 
-                let periodBegBal = periodEndBal;
-                let totalC = 0, totalD = 0;
-                
-                // Filter for the chosen date range
-                let rangeData = relevantData.filter(t => {
+                // Add up all transactions BEFORE the start date
+                relevantData.forEach(t => {
                     const tDate = new Date(t.start_date || t.created_at);
-                    return tDate >= dtStart && tDate <= dtEnd;
-                });
-                
-                // Reverse anything strictly INSIDE the period to get the period's precise beginning balance
-                rangeData.forEach(t => {
-                    if (t.transaction_type !== 'DISAPPROVED') {
-                        totalC += parseFloat(t.credit || 0);
-                        totalD += parseFloat(t.debit || 0);
-                        if(getLeaveCategory(t.type) === ledgType) {
-                            periodBegBal -= parseFloat(t.credit || 0);
-                            periodBegBal += parseFloat(t.debit || 0);
+                    const c = parseFloat(t.credit || 0);
+                    const d = parseFloat(t.debit || 0);
+
+                    if (getLeaveCategory(t.type) === ledgType) {
+                        if (ledgType === 'SPL' || ledgType === 'WL') {
+                            // Yearly reset - only sum if the transaction occurred in the same year as our start date
+                            if (tDate.getFullYear() === dtStart.getFullYear() && tDate < dtStart) {
+                                periodBegBal += (c - d);
+                            }
+                        } else {
+                            if (tDate < dtStart) {
+                                periodBegBal += (c - d);
+                            }
                         }
                     }
                 });
 
                 document.getElementById('lblBegBal').innerText = periodBegBal.toFixed(3);
+
+                // Filter transactions that fall INSIDE the requested date range
+                let rangeData = relevantData.filter(t => {
+                    const tDate = new Date(t.start_date || t.created_at);
+                    if (ledgType === 'SPL' || ledgType === 'WL') {
+                        return tDate >= dtStart && tDate <= dtEnd && tDate.getFullYear() === dtStart.getFullYear();
+                    }
+                    return tDate >= dtStart && tDate <= dtEnd;
+                });
+
+                // Calculate Running Balances walking forward
+                rangeData.sort((a,b) => new Date(a.start_date || a.created_at) - new Date(b.start_date || b.created_at));
                 
+                let runningBal = periodBegBal;
+                let totalC = 0, totalD = 0;
+
+                rangeData.forEach(t => {
+                    totalC += parseFloat(t.credit || 0);
+                    totalD += parseFloat(t.debit || 0);
+                    runningBal += parseFloat(t.credit || 0) - parseFloat(t.debit || 0);
+                    t.computedBal = runningBal.toFixed(3);
+                });
+
                 const net = totalC - totalD;
                 const netEl = document.getElementById('lblMovement');
                 netEl.innerText = (net > 0 ? '+' : '') + net.toFixed(3);
                 netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
                 
-                document.getElementById('lblEndBal').innerText = periodEndBal.toFixed(3);
+                document.getElementById('lblEndBal').innerText = runningBal.toFixed(3);
                 sumDiv.classList.remove('hidden');
                 allBalDiv.classList.add('hidden');
-            }
 
-            // Filter for the chosen date range for table display
-            let rangeData = relevantData.filter(t => {
-                const tDate = new Date(t.start_date || t.created_at);
-                return tDate >= dtStart && tDate <= dtEnd;
-            });
-
-            if (rangeData.length === 0) {
-                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this range.</td></tr>`;
-                return;
-            }
-
-            let html = '';
-            
-            rangeData.forEach(t => {
-                const isDisapproved = t.transaction_type === 'DISAPPROVED';
-                const cred = parseFloat(t.credit || 0);
-                const deb = parseFloat(t.debit || 0);
-                const displayType = t.type ? t.type.toUpperCase() : '-';
-                const dateStr = new Date(t.start_date || t.created_at).toLocaleDateString('en-US');
+                // Reverse for display (Newest on top)
+                rangeData.reverse();
                 
-                let credColor = cred > 0 ? 'text-green-600' : 'text-gray-400';
-                let debColor = deb > 0 ? 'text-red-600' : 'text-gray-400';
+                if (rangeData.length === 0) {
+                    list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this range.</td></tr>`;
+                    return;
+                }
 
-                html += `
-                    <tr class="${isDisapproved ? 'bg-red-50 opacity-70' : 'hover:bg-gray-50'}">
-                        <td class="table-td">${dateStr}</td>
-                        <td class="table-td">
-                            <span class="font-bold">${t.transaction_type.replace(/_/g, ' ')}</span><br>
-                            <span class="text-xs text-gray-500">${displayType} | ${t.remarks || ''}</span>
-                        </td>
-                        <td class="table-td font-bold ${credColor}">${cred > 0 ? '+'+cred.toFixed(3) : '-'}</td>
-                        <td class="table-td font-bold ${debColor}">${deb > 0 ? '-'+deb.toFixed(3) : '-'}</td>
-                        <td class="table-td font-bold">${t.computedBal}</td>
-                    </tr>
-                `;
-                
-                currentLedgerDataToPrint.push({
-                    date: dateStr,
-                    particulars: `${t.transaction_type.replace(/_/g, ' ')}: ${displayType}`,
-                    credit: cred > 0 ? `+${cred.toFixed(3)}` : '-',
-                    debit: deb > 0 ? `-${deb.toFixed(3)}` : '-',
-                    runningBal: t.computedBal
+                let html = '';
+                rangeData.forEach(t => {
+                    const cred = parseFloat(t.credit || 0);
+                    const deb = parseFloat(t.debit || 0);
+                    const displayType = t.type ? t.type.toUpperCase() : '-';
+                    const dateStr = new Date(t.start_date || t.created_at).toLocaleDateString('en-US');
+                    
+                    let credColor = cred > 0 ? 'text-green-600' : 'text-gray-400';
+                    let debColor = deb > 0 ? 'text-red-600' : 'text-gray-400';
+
+                    html += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="table-td">${dateStr}</td>
+                            <td class="table-td">
+                                <span class="font-bold">${t.transaction_type.replace(/_/g, ' ')}</span><br>
+                                <span class="text-xs text-gray-500">${displayType} | ${t.remarks || ''}</span>
+                            </td>
+                            <td class="table-td font-bold ${credColor}">${cred > 0 ? '+'+cred.toFixed(3) : '-'}</td>
+                            <td class="table-td font-bold ${debColor}">${deb > 0 ? '-'+deb.toFixed(3) : '-'}</td>
+                            <td class="table-td font-bold">${t.computedBal}</td>
+                        </tr>
+                    `;
+                    
+                    currentLedgerDataToPrint.push({
+                        date: dateStr,
+                        particulars: `${t.transaction_type.replace(/_/g, ' ')}: ${displayType}`,
+                        credit: cred > 0 ? `+${cred.toFixed(3)}` : '-',
+                        debit: deb > 0 ? `-${deb.toFixed(3)}` : '-',
+                        runningBal: t.computedBal
+                    });
                 });
-            });
-            list.innerHTML = html;
-            btnPrint.classList.remove('hidden'); 
+                list.innerHTML = html;
+                btnPrint.classList.remove('hidden'); 
+            }
+
+            if (ledgType === 'ALL') {
+                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">Please select a specific Leave Type to view detailed ledger entries.</td></tr>`;
+            }
 
         } catch (e) {
             list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
@@ -1939,19 +1871,6 @@
 
         let y = 50;
 
-        if (isAllTypes && emp) {
-            doc.setFont("helvetica", "bold");
-            doc.text("CURRENT BALANCES:", 14, y);
-            y += 6;
-            doc.setFont("helvetica", "normal");
-            doc.text(`VL: ${parseFloat(emp.vl_balance || 0).toFixed(3)}`, 14, y);
-            doc.text(`SL: ${parseFloat(emp.sl_balance || 0).toFixed(3)}`, 40, y);
-            doc.text(`SPL: ${parseFloat(emp.spl_balance || 0).toFixed(3)}`, 66, y);
-            doc.text(`WL: ${parseFloat(emp.wl_balance || 0).toFixed(3)}`, 92, y);
-            doc.text(`CTO: ${parseFloat(emp.cto_balance || 0).toFixed(3)}`, 118, y);
-            y += 10;
-        }
-        
         // Table Header
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
@@ -2022,7 +1941,7 @@
     async function saveManualCredits() {
         const monthVal = document.getElementById('manualMonth').value;
         if(!monthVal) { alert("Please select an 'As of Month'."); return; }
-        if(!confirm("Are you sure you want to update all these balances? This will permanently override their current records and WILL NOT create a ledger log.")) return;
+        if(!confirm("Are you sure you want to update these baseline balances? This will permanently override their baseline records in the employees table.")) return;
 
         const emps = Object.values(empDataMap);
         const updates = [];
@@ -2034,15 +1953,29 @@
             const wl = document.getElementById(`man_wl_${emp.emp_id}`).value;
             const cto = document.getElementById(`man_cto_${emp.emp_id}`).value;
 
-            updates.push(
-                supabaseClient.from('employees').update({
-                    vl_balance: String(vl),
-                    sl_balance: String(sl),
-                    spl_balance: String(spl),
-                    wl_balance: String(wl),
-                    cto_balance: String(cto)
-                }).eq('emp_id', emp.emp_id)
-            );
+            // Dirty Check: Only issue updates if the HR officer explicitly changed the text box
+            if (
+                parseFloat(vl).toFixed(3) !== parseFloat(emp.vl_balance||0).toFixed(3) ||
+                parseFloat(sl).toFixed(3) !== parseFloat(emp.sl_balance||0).toFixed(3) ||
+                parseFloat(spl).toFixed(3) !== parseFloat(emp.spl_balance||0).toFixed(3) ||
+                parseFloat(wl).toFixed(3) !== parseFloat(emp.wl_balance||0).toFixed(3) ||
+                parseFloat(cto).toFixed(3) !== parseFloat(emp.cto_balance||0).toFixed(3)
+            ) {
+                updates.push(
+                    supabaseClient.from('employees').update({
+                        vl_balance: String(vl),
+                        sl_balance: String(sl),
+                        spl_balance: String(spl),
+                        wl_balance: String(wl),
+                        cto_balance: String(cto)
+                    }).eq('emp_id', emp.emp_id)
+                );
+            }
+        }
+
+        if (updates.length === 0) {
+            alert("No changes detected. Nothing to save.");
+            return;
         }
 
         try {
@@ -2052,15 +1985,15 @@
 
             await Promise.all(updates);
             
-            alert("Balances updated successfully!");
+            alert(`Base Balances updated successfully for ${updates.length} employee(s)!`);
             await loadEmployeeMaps();
             loadManualCredits();
             
-            saveBtn.innerText = "Save All";
+            saveBtn.innerText = "Save All Modified";
             saveBtn.disabled = false;
         } catch(e) {
             alert("Error saving: " + e.message);
-            event.target.innerText = "Save All";
+            event.target.innerText = "Save All Modified";
             event.target.disabled = false;
         }
     }
