@@ -520,9 +520,90 @@
         } catch (e) { alert("Delete failed."); }
     }
 
-    function toggleHalfDay() { /* Logic for schedule automation */ }
-    async function checkActiveSetup() { /* Fetch overrides */ }
-    async function applySchedule() { /* Insert to schedule_overrides */ }
+    function toggleHalfDay() { 
+        const schedType = document.getElementById('s_schedule_type').value;
+        const startTime = document.getElementById('s_start_time');
+        const endTime = document.getElementById('s_end_time');
+
+        if (schedType === 'Suspension') {
+            startTime.disabled = true;
+            endTime.disabled = true;
+            startTime.value = '';
+            endTime.value = '';
+        } else if (schedType === 'Half-Day (AM)') {
+            startTime.disabled = false;
+            endTime.disabled = false;
+            startTime.value = '08:00';
+            endTime.value = '12:00';
+        } else if (schedType === 'Half-Day (PM)') {
+            startTime.disabled = false;
+            endTime.disabled = false;
+            startTime.value = '13:00';
+            endTime.value = '17:00';
+        } else {
+            startTime.disabled = false;
+            endTime.disabled = false;
+        }
+    }
+    
+    async function checkActiveSetup() { 
+        const target = document.getElementById('s_target').value;
+        const statusLbl = document.getElementById('sched_current_setup');
+        
+        if (target === 'ALL') {
+            statusLbl.innerText = 'Status: Global override selected. This configuration will apply to all employees.';
+            return;
+        }
+        statusLbl.innerText = `Status: Configuring override for Employee ID: ${target}.`;
+    }
+    
+    async function applySchedule() { 
+        const btn = document.getElementById('btnApplySched');
+        const target = document.getElementById('s_target').value;
+        const startDate = document.getElementById('s_start_date').value;
+        const endDate = document.getElementById('s_end_date').value;
+        const schedType = document.getElementById('s_schedule_type').value;
+        const startTime = document.getElementById('s_start_time').value;
+        const endTime = document.getElementById('s_end_time').value;
+
+        const workDays = [];
+        document.querySelectorAll('input[name="s_work_days"]:checked').forEach(cb => {
+            workDays.push(parseInt(cb.value));
+        });
+
+        if (!startDate || !endDate) {
+            alert('Please select start and end dates.');
+            return;
+        }
+
+        btn.innerText = "UPDATING...";
+        btn.disabled = true;
+
+        try {
+            const payload = {
+                emp_id: target === 'ALL' ? 'ALL' : target,
+                start_date: startDate,
+                end_date: endDate,
+                schedule_type: schedType,
+                time_in: startTime || null,
+                time_out: endTime || null,
+                active_days: workDays
+            };
+
+            const { error } = await supabaseClient.from('schedule_overrides').insert([payload]);
+
+            if (error) throw error;
+
+            document.getElementById('sched_status_lbl').innerText = 'Schedule Configuration Successfully Applied!';
+            setTimeout(() => { document.getElementById('sched_status_lbl').innerText = ''; }, 3000);
+            
+        } catch (e) {
+            alert(`Error updating schedule: ${e.message}`);
+        } finally {
+            btn.innerText = "UPDATE SCHEDULE";
+            btn.disabled = false;
+        }
+    }
 
     // --- GENERATE LIST LOGIC ---
     let currentListData = []; 
