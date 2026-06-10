@@ -579,7 +579,8 @@
         btn.innerText = "UPDATING...";
         btn.disabled = true;
 
-        const payload = {
+        try {
+            const payload = {
                 emp_id: target === 'ALL' ? 'ALL' : target,
                 start_date: startDate,
                 end_date: endDate,
