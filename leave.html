@@ -184,7 +184,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="card p-6">
                         <h3 class="font-bold text-[#003811] mb-4">Monthly Credits (VL & SL)</h3>
-                        <p class="text-sm text-gray-600 mb-6">Generates 1.25 credits each for Vacation Leave and Sick Leave for all REGULAR employees based on Civil Service Rules.</p>
+                        <p class="text-sm text-gray-600 mb-6">Generates 1.25 credits each for Vacation Leave and Sick Leave into the Ledger for all REGULAR employees.</p>
                         <div class="flex gap-2 items-end">
                             <div class="flex-1">
                                 <label class="form-label">Select Month</label>
@@ -196,7 +196,7 @@
                     
                     <div class="card p-6">
                         <h3 class="font-bold text-[#003811] mb-4">Yearly Credits (SPL & WL)</h3>
-                        <p class="text-sm text-gray-600 mb-6">Grants strictly 3 days Special Privilege Leave and 5 days Wellness Leave for all REGULAR employees via Ledger.</p>
+                        <p class="text-sm text-gray-600 mb-6">Grants 3 days SPL and 5 days WL into the Ledger for all REGULAR employees. Real-time balance calculations automatically track yearly limits.</p>
                         <div class="flex gap-2 items-end">
                             <div class="flex-1">
                                 <label class="form-label">Select Year</label>
@@ -795,15 +795,33 @@
             const final_debit = base_debit * multiplier;
             let remarks = multiplier > 1 ? `Approved (Multiplier ${multiplier}x applied)` : 'Approved';
 
-            remarks += ` - Notice: Charged to VL due to insufficient balance.`;
+            // To maintain a pure ledger, we deduct whatever is left of the targeted leave type, 
+            // and we insert a new VL deduction for the remaining deficit.
+            const current_bal = (empBalances[emp_id] && empBalances[emp_id][cat]) ? empBalances[emp_id][cat] : 0;
+            const availableToDeduct = current_bal > 0 ? current_bal : 0;
+            const deficit = final_debit - availableToDeduct;
 
+            // 1. Approve the original application but only for the available balance
             await supabaseClient.from('leave_ledger')
                 .update({ 
                     transaction_type: 'APPROVED', 
-                    debit: final_debit, 
-                    remarks: remarks 
+                    debit: availableToDeduct, 
+                    remarks: remarks + ` - Notice: Remaining ${deficit.toFixed(3)} days charged to VL.`
                 })
                 .eq('id', id);
+
+            // 2. Insert the deficit directly to the ledger as a VL deduction
+            if (deficit > 0) {
+                await supabaseClient.from('leave_ledger').insert([{
+                    emp_id: emp_id,
+                    type: 'VL (CHARGED FROM DEFICIT)',
+                    debit: deficit,
+                    transaction_type: 'APPROVED',
+                    remarks: `Charged to VL due to insufficient ${cat} balance.`,
+                    start_date: sDate,
+                    end_date: eDate
+                }]);
+            }
             
             alert(`Leave Approved and marked as Charged to VL.`);
             await loadEmployeeMaps(); 
@@ -1714,7 +1732,7 @@
             const { data: allData, error } = await supabaseClient.from('leave_ledger')
                 .select('*')
                 .eq('emp_id', empId)
-                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'FORFEITURE', 'MANUAL INPUT']);
+                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'FORFEITURE']);
 
             if (error) throw error;
 
@@ -1726,6 +1744,7 @@
 
             const dtEnd = new Date(`${endDate}T23:59:59`);
             const dtStart = new Date(`${startDate}T00:00:00`);
+            const currentYear = new Date().getFullYear();
 
             if (ledgType === 'ALL') {
                 document.getElementById('lblAllVl').innerText = empBalances[empId].VL.toFixed(3);
@@ -1871,6 +1890,19 @@
 
         let y = 50;
 
+        if (isAllTypes && emp) {
+            doc.setFont("helvetica", "bold");
+            doc.text("CURRENT BALANCES:", 14, y);
+            y += 6;
+            doc.setFont("helvetica", "normal");
+            doc.text(`VL: ${empBalances[empId].VL.toFixed(3)}`, 14, y);
+            doc.text(`SL: ${empBalances[empId].SL.toFixed(3)}`, 40, y);
+            doc.text(`SPL: ${empBalances[empId].SPL.toFixed(3)}`, 66, y);
+            doc.text(`WL: ${empBalances[empId].WL.toFixed(3)}`, 92, y);
+            doc.text(`CTO: ${empBalances[empId].CTO.toFixed(3)}`, 118, y);
+            y += 10;
+        }
+        
         // Table Header
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
