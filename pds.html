@@ -579,15 +579,14 @@
         btn.innerText = "UPDATING...";
         btn.disabled = true;
 
-        try {
-            const payload = {
+        const payload = {
                 emp_id: target === 'ALL' ? 'ALL' : target,
                 start_date: startDate,
                 end_date: endDate,
                 schedule_type: schedType,
                 time_in: startTime || null,
                 time_out: endTime || null,
-                active_days: workDays
+                working_days: workDays.join(',')
             };
 
             const { error } = await supabaseClient.from('schedule_overrides').insert([payload]);
