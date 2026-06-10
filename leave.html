@@ -597,95 +597,80 @@
     loadEmployeeMaps().then(() => { loadApprovedLeavesToday(); });
 
     // --- TAB 1: APPLICATIONS ---
-    async function loadApplications() {
-        const list = document.getElementById('app-list');
-        list.innerHTML = `<tr><td colspan="9" class="table-td text-center">Loading...</td></tr>`;
+   async function chargeToVL(id, emp_id, start_date, end_date, base_debit, type) {
+        if(!confirm(`This will zero out the available ${type} and charge the remaining to Vacation Leave. Proceed?`)) return;
 
-        const { data, error } = await supabaseClient.from('leave_ledger')
-            .select('*')
-            .eq('transaction_type', 'APPLICATION')
-            .ilike('remarks', '%pending_hrmo%')
-            .order('created_at', { ascending: false });
-
-        if (error) { list.innerHTML = `<tr><td colspan="9" class="table-td text-center text-red-500">Error loading applications.</td></tr>`; return; }
-        if (!data || data.length === 0) { list.innerHTML = `<tr><td colspan="9" class="table-td text-center text-gray-500">No pending leave applications found.</td></tr>`; return; }
-
-        let html = '';
-        for (const app of data) {
-            const emp = empDataMap[app.emp_id];
-            const name = emp ? emp.full_name : app.emp_id;
-            const dates = app.end_date ? `${app.start_date} to ${app.end_date}` : app.start_date;
-            
-            const tType = (app.type || '').toUpperCase();
-            let currentBal = 0;
-            if (emp) {
-                if(tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE')) currentBal = parseFloat(emp.vl_balance || 0);
-                else if(tType.includes('SL') || tType.includes('SICK')) currentBal = parseFloat(emp.sl_balance || 0);
-                else if(tType.includes('SPL') || tType.includes('SPECIAL') || tType.includes('PRIVILEGE') || tType.includes('PREVELEGE')) currentBal = parseFloat(emp.spl_balance || 0);
-                else if(tType.includes('WL') || tType.includes('WELLNESS')) currentBal = parseFloat(emp.wl_balance || 0);
-                else if(tType.includes('CTO') || tType.includes('COMPENSATORY')) currentBal = parseFloat(emp.cto_balance || 0);
-            }
-            
-            const baseDays = parseFloat(app.debit || 0);
+        try {
             let multiplier = 1;
-
-            // Check Schedule Override for Multiplier before rendering the list
-            const sDate = app.start_date;
-            const eDate = app.end_date || app.start_date;
+            const sDate = start_date;
+            const eDate = end_date || start_date;
+            const tType = type.toUpperCase();
 
             const { data: over } = await supabaseClient.from('schedule_overrides')
                 .select('*')
-                .eq('emp_id', app.emp_id)
+                .in('emp_id', [emp_id, 'ALL'])
                 .lte('start_date', eDate)
                 .gte('end_date', sDate);
 
             if(over && over.length > 0) {
-                const activeOverride = over[0];
-                if (activeOverride.working_days) {
+                // Prioritize specific employee override over the global 'ALL' override
+                const activeOverride = over.find(o => o.emp_id === emp_id) || over.find(o => o.emp_id === 'ALL');
+                if (activeOverride && activeOverride.working_days) {
                     const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
                     if (wDays.length === 4) {
-                        if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK') || tType.includes('CTO') || tType.includes('COMPENSATORY')) {
+                        // UPDATED: Removed CTO from the 1.25 multiplier condition
+                        if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK')) {
                             multiplier = 1.25;
                         }
                     }
                 }
             }
 
-            const creditableDays = baseDays * multiplier;
-            const balanceAfter = currentBal - creditableDays;
+            const final_debit = base_debit * multiplier;
 
-            let actionHtml = `
-                <button onclick="approveLeave('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500 transition-all duration-200 shadow">Approve</button>
-                <button onclick="disapproveLeave('${app.id}', '${app.emp_id}', '${app.type}', ${app.debit})" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 transition-all duration-200 shadow mt-1 xl:mt-0 ml-0 xl:ml-1">Disapprove</button>
-            `;
+            const empData = empDataMap[emp_id];
+            if (!empData) throw new Error("Employee not found in registry (Ensure type=REGULAR).");
 
-            if (balanceAfter < 0 && !tType.includes('VL') && !tType.includes('VACATION') && !tType.includes('FORCE')) {
-                actionHtml += `
-                    <button onclick="chargeToVL('${app.id}', '${app.emp_id}', '${app.start_date}', '${app.end_date}', ${app.debit}, '${app.type}')" class="inline-flex items-center justify-center px-4 py-1.5 border border-transparent text-xs font-semibold rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all duration-200 shadow mt-1 w-full">Charge to VL</button>
-                `;
+            let updates = {};
+            let remarks = multiplier > 1 ? `Approved (Multiplier ${multiplier}x applied)` : 'Approved';
+
+            let current_bal = 0;
+            let field_to_zero = '';
+
+            if(tType.includes('SL') || tType.includes('SICK')) { current_bal = parseFloat(empData.sl_balance || 0); field_to_zero = 'sl_balance'; }
+            else if(tType.includes('SPL') || tType.includes('SPECIAL')) { current_bal = parseFloat(empData.spl_balance || 0); field_to_zero = 'spl_balance'; }
+            else if(tType.includes('WL') || tType.includes('WELLNESS')) { current_bal = parseFloat(empData.wl_balance || 0); field_to_zero = 'wl_balance'; }
+            else if(tType.includes('CTO') || tType.includes('COMPENSATORY')) { current_bal = parseFloat(empData.cto_balance || 0); field_to_zero = 'cto_balance'; }
+
+            if(current_bal < 0) current_bal = 0; 
+            
+            let rem = final_debit - current_bal;
+
+            updates[field_to_zero] = (0).toFixed(3);
+            updates.vl_balance = (parseFloat(empData.vl_balance || 0) - rem).toFixed(3);
+            remarks += ` - Insufficient balance. ${rem.toFixed(3)} days charged to VL.`;
+
+            if(Object.keys(updates).length > 0) {
+                await supabaseClient.from('employees').update(updates).eq('emp_id', emp_id);
             }
 
-            html += `
-                <tr>
-                    <td class="table-td font-mono font-bold text-xs">${app.emp_id}</td>
-                    <td class="table-td font-bold">${name.toUpperCase()}</td>
-                    <td class="table-td">${(app.type || '').toUpperCase()}</td>
-                    <td class="table-td">${dates}</td>
-                    <td class="table-td font-bold">${currentBal.toFixed(3)}</td>
-                    <td class="table-td font-bold">${baseDays.toFixed(3)}</td>
-                    <td class="table-td font-bold text-blue-600">${creditableDays.toFixed(3)}</td>
-                    <td class="table-td font-bold ${balanceAfter < 0 ? 'text-red-600' : 'text-green-600'}">${balanceAfter.toFixed(3)}</td>
-                    <td class="table-td text-center">
-                        <div class="flex flex-col justify-center items-center gap-1 xl:flex-row flex-wrap">
-                            ${actionHtml}
-                        </div>
-                    </td>
-                </tr>
-            `;
+            await supabaseClient.from('leave_ledger')
+                .update({ 
+                    transaction_type: 'APPROVED', 
+                    debit: final_debit, 
+                    remarks: remarks 
+                })
+                .eq('id', id);
+            
+            alert(`Leave Approved. Deducted ${current_bal.toFixed(3)} from ${type} and ${rem.toFixed(3)} from VL.`);
+            await loadEmployeeMaps(); 
+            loadApplications();
+            loadApprovedLeavesToday();
+        } catch(e) {
+            alert("Error: " + e.message);
         }
-        list.innerHTML = html;
     }
-
+    
     async function loadApprovedLeavesToday() {
         const list = document.getElementById('approved-today-list');
         list.innerHTML = `<tr><td colspan="3" class="table-td text-center">Loading...</td></tr>`;
@@ -732,13 +717,14 @@
 
             const { data: over } = await supabaseClient.from('schedule_overrides')
                 .select('*')
-                .eq('emp_id', emp_id)
+                .in('emp_id', [emp_id, 'ALL'])
                 .lte('start_date', eDate)
                 .gte('end_date', sDate);
 
             if(over && over.length > 0) {
-                const activeOverride = over[0];
-                if (activeOverride.working_days) {
+                // Prioritize specific employee override over the global 'ALL' override
+                const activeOverride = over.find(o => o.emp_id === emp_id) || over.find(o => o.emp_id === 'ALL');
+                if (activeOverride && activeOverride.working_days) {
                     const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
                     if (wDays.length === 4) {
                         if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK') || tType.includes('CTO') || tType.includes('COMPENSATORY')) {
@@ -804,13 +790,14 @@
             
             const { data: over } = await supabaseClient.from('schedule_overrides')
                 .select('*')
-                .eq('emp_id', emp_id)
+                .in('emp_id', [emp_id, 'ALL'])
                 .lte('start_date', eDate)
                 .gte('end_date', sDate);
                 
             if(over && over.length > 0) {
-                const activeOverride = over[0];
-                if (activeOverride.working_days) {
+                // Prioritize specific employee override over the global 'ALL' override
+                const activeOverride = over.find(o => o.emp_id === emp_id) || over.find(o => o.emp_id === 'ALL');
+                if (activeOverride && activeOverride.working_days) {
                     const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
                     if (wDays.length === 4) {
                         if (tType.includes('VL') || tType.includes('VACATION') || tType.includes('FORCE') || tType.includes('SL') || tType.includes('SICK') || tType.includes('CTO') || tType.includes('COMPENSATORY')) {
