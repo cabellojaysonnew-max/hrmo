@@ -194,19 +194,7 @@
                         </div>
                     </div>
                     
-                    <div class="card p-6">
-                        <h3 class="font-bold text-[#003811] mb-4">Yearly Credits (SPL & WL)</h3>
-                        <p class="text-sm text-gray-600 mb-6">Grants 3 days SPL and 5 days WL into the Ledger for all REGULAR employees. Real-time balance calculations automatically track yearly limits.</p>
-                        <div class="flex gap-2 items-end">
-                            <div class="flex-1">
-                                <label class="form-label">Select Year</label>
-                                <input type="number" id="genYear" class="form-input" value="2026">
-                            </div>
-                            <button onclick="generateYearlyCredits()" class="bg-[#D4AF37] text-black font-bold py-2 px-4 rounded hover:brightness-110 shadow">Grant Yearly Credits</button>
-                        </div>
-                    </div>
-                    
-                    <div class="card p-6 col-span-1 md:col-span-2 border-t-4 border-orange-500">
+                    <div class="card p-6 border-t-4 border-orange-500">
                         <h3 class="font-bold text-orange-700 mb-4">Strict CTO Forfeiture (1-Year Expiration)</h3>
                         <p class="text-sm text-gray-600 mb-6">Compensatory Time-Off (CTO) credits automatically expire exactly 1 year after they were earned based on their specific issuance date. This generates forfeiture records in the ledger.</p>
                         
@@ -463,13 +451,11 @@
                                     <th class="table-th">Name</th>
                                     <th class="table-th">VL Base</th>
                                     <th class="table-th">SL Base</th>
-                                    <th class="table-th">SPL Base</th>
-                                    <th class="table-th">WL Base</th>
                                     <th class="table-th">CTO Base</th>
                                 </tr>
                             </thead>
                             <tbody id="manual-list">
-                                <tr><td colspan="7" class="table-td text-center text-gray-500">Loading...</td></tr>
+                                <tr><td colspan="5" class="table-td text-center text-gray-500">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -501,7 +487,6 @@
     document.getElementById('genMonth').value = currMonthStr;
     document.getElementById('gpMonth').value = currMonthStr;
     document.getElementById('ctoMonth').value = currMonthStr;
-    document.getElementById('genYear').value = d.getFullYear();
     document.getElementById('scanCtoDate').value = todayStr;
     document.getElementById('approvedDateDisplay').innerText = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
@@ -536,8 +521,8 @@
         let bal = {
             VL: parseFloat(emp.vl_balance || 0),
             SL: parseFloat(emp.sl_balance || 0),
-            SPL: parseFloat(emp.spl_balance || 0),
-            WL: parseFloat(emp.wl_balance || 0),
+            SPL: 3, // Fixed Base Yearly Strategy
+            WL: 5,  // Fixed Base Yearly Strategy
             CTO: parseFloat(emp.cto_balance || 0)
         };
 
@@ -554,8 +539,9 @@
             
             // Yearly reset strategy for SPL and WL
             if (cat === 'SPL' || cat === 'WL') {
-                if (tDate.getFullYear() === currentYear) {
-                    bal[cat] += (c - d);
+                // Only subtract usage from the current year. They are strictly capped at base 3 and 5.
+                if (tDate.getFullYear() === currentYear && t.transaction_type !== 'CREDIT') {
+                    bal[cat] -= d;
                 }
             } else {
                 bal[cat] += (c - d);
@@ -801,7 +787,7 @@
             const availableToDeduct = current_bal > 0 ? current_bal : 0;
             const deficit = final_debit - availableToDeduct;
 
-            // 1. Approve the original application but only for the available balance
+            // 1. Approve the original application but only deduct the available balance
             await supabaseClient.from('leave_ledger')
                 .update({ 
                     transaction_type: 'APPROVED', 
@@ -993,8 +979,8 @@
                 let beg = {
                     VL: parseFloat(emp.vl_balance || 0),
                     SL: parseFloat(emp.sl_balance || 0),
-                    SPL: parseFloat(emp.spl_balance || 0),
-                    WL: parseFloat(emp.wl_balance || 0),
+                    SPL: 3, // Base SPL
+                    WL: 5,  // Base WL
                     CTO: parseFloat(emp.cto_balance || 0)
                 };
                 
@@ -1016,15 +1002,14 @@
                     if (cat === 'SPL' || cat === 'WL') {
                         if (tYear === currentYear) {
                             if (tDate < startOfMonth) {
-                                beg[cat] += c - d;
+                                beg[cat] -= d; // Deduct usage before the month
                             } else if (tDate >= startOfMonth && tDate <= endOfMonth) {
-                                cred[cat] += c;
-                                used[cat] += d;
+                                used[cat] += d; // Usage during the month
                             }
                         }
                     } else {
                         if (tDate < startOfMonth) {
-                            beg[cat] += c - d;
+                            beg[cat] += (c - d);
                         } else if (tDate >= startOfMonth && tDate <= endOfMonth) {
                             cred[cat] += c;
                             used[cat] += d;
@@ -1035,8 +1020,8 @@
                 let end = {
                     VL: beg.VL + cred.VL - used.VL,
                     SL: beg.SL + cred.SL - used.SL,
-                    SPL: beg.SPL + cred.SPL - used.SPL,
-                    WL: beg.WL + cred.WL - used.WL,
+                    SPL: beg.SPL - used.SPL, // Fixed credit, so end is just beg - used
+                    WL: beg.WL - used.WL,
                     CTO: beg.CTO + cred.CTO - used.CTO
                 };
 
@@ -1059,8 +1044,8 @@
                         
                         <td class="p-2 border-r bg-blue-50/30">${beg.VL.toFixed(3)}</td><td class="p-2 border-r bg-blue-50/30 text-green-600">${cred.VL.toFixed(3)}</td><td class="p-2 border-r bg-blue-50/30 text-red-600">${used.VL.toFixed(3)}</td><td class="p-2 border-r bg-blue-50/30 font-bold">${end.VL.toFixed(3)}</td>
                         <td class="p-2 border-r bg-red-50/30">${beg.SL.toFixed(3)}</td><td class="p-2 border-r bg-red-50/30 text-green-600">${cred.SL.toFixed(3)}</td><td class="p-2 border-r bg-red-50/30 text-red-600">${used.SL.toFixed(3)}</td><td class="p-2 border-r bg-red-50/30 font-bold">${end.SL.toFixed(3)}</td>
-                        <td class="p-2 border-r bg-yellow-50/30">${beg.SPL.toFixed(3)}</td><td class="p-2 border-r bg-yellow-50/30 text-green-600">${cred.SPL.toFixed(3)}</td><td class="p-2 border-r bg-yellow-50/30 text-red-600">${used.SPL.toFixed(3)}</td><td class="p-2 border-r bg-yellow-50/30 font-bold">${end.SPL.toFixed(3)}</td>
-                        <td class="p-2 border-r bg-green-50/30">${beg.WL.toFixed(3)}</td><td class="p-2 border-r bg-green-50/30 text-green-600">${cred.WL.toFixed(3)}</td><td class="p-2 border-r bg-green-50/30 text-red-600">${used.WL.toFixed(3)}</td><td class="p-2 border-r bg-green-50/30 font-bold">${end.WL.toFixed(3)}</td>
+                        <td class="p-2 border-r bg-yellow-50/30">${beg.SPL.toFixed(3)}</td><td class="p-2 border-r bg-yellow-50/30 text-green-600">-</td><td class="p-2 border-r bg-yellow-50/30 text-red-600">${used.SPL.toFixed(3)}</td><td class="p-2 border-r bg-yellow-50/30 font-bold">${end.SPL.toFixed(3)}</td>
+                        <td class="p-2 border-r bg-green-50/30">${beg.WL.toFixed(3)}</td><td class="p-2 border-r bg-green-50/30 text-green-600">-</td><td class="p-2 border-r bg-green-50/30 text-red-600">${used.WL.toFixed(3)}</td><td class="p-2 border-r bg-green-50/30 font-bold">${end.WL.toFixed(3)}</td>
                         <td class="p-2 border-r bg-purple-50/30">${beg.CTO.toFixed(3)}</td><td class="p-2 border-r bg-purple-50/30 text-green-600">${cred.CTO.toFixed(3)}</td><td class="p-2 border-r bg-purple-50/30 text-red-600">${used.CTO.toFixed(3)}</td><td class="p-2 bg-purple-50/30 font-bold">${end.CTO.toFixed(3)}</td>
                     </tr>
                 `;
@@ -1203,55 +1188,6 @@
             await supabaseClient.from('leave_ledger').insert(ledgers);
             
             alert("Monthly credits generated successfully.");
-            await loadEmployeeMaps();
-        } catch(e) {
-            alert("Error: " + e.message);
-        }
-    }
-
-    async function generateYearlyCredits() {
-        const yearVal = document.getElementById('genYear').value;
-        if(!yearVal) { alert("Please enter a year."); return; }
-        
-        // Prevent double crediting
-        const { data: existing } = await supabaseClient.from('leave_ledger')
-            .select('id').eq('type', 'SPL GRANTED').eq('start_date', `${yearVal}-01-01`).limit(1);
-        if(existing && existing.length > 0) {
-            alert(`Yearly credits for ${yearVal} have already been granted in the ledger!`);
-            return;
-        }
-
-        if(!confirm(`Are you sure you want to add 3 SPL and 5 WL credits to the ledger for ALL REGULAR employees for the year ${yearVal}?`)) return;
-
-        try {
-            const emps = Object.values(empDataMap);
-            if(emps.length === 0) { alert("No regular employees found."); return; }
-
-            const ledgers = [];
-
-            emps.forEach(emp => {
-                ledgers.push({
-                    emp_id: emp.emp_id,
-                    type: 'SPL GRANTED',
-                    credit: 3,
-                    transaction_type: 'CREDIT',
-                    remarks: `Yearly Granted Credits (SPL) - ${yearVal}`,
-                    start_date: `${yearVal}-01-01`
-                });
-
-                ledgers.push({
-                    emp_id: emp.emp_id,
-                    type: 'WL GRANTED',
-                    credit: 5,
-                    transaction_type: 'CREDIT',
-                    remarks: `Yearly Granted Credits (WL) - ${yearVal}`,
-                    start_date: `${yearVal}-01-01`
-                });
-            });
-
-            await supabaseClient.from('leave_ledger').insert(ledgers);
-            
-            alert("Yearly credits granted successfully.");
             await loadEmployeeMaps();
         } catch(e) {
             alert("Error: " + e.message);
@@ -1437,7 +1373,6 @@
             await loadEmployeeMaps();
         }
     }
-
 
     // --- TAB 4: GATE PASS PROCESSING ---
     async function loadGatePasses() {
@@ -1757,27 +1692,29 @@
             } else {
                 // Forward math algorithm: Start from the Baseline in the `employees` table.
                 let balField = ledgType.toLowerCase() + '_balance';
-                let periodBegBal = parseFloat(emp[balField] || 0);
-
-                // Add up all transactions BEFORE the start date
-                relevantData.forEach(t => {
-                    const tDate = new Date(t.start_date || t.created_at);
-                    const c = parseFloat(t.credit || 0);
-                    const d = parseFloat(t.debit || 0);
-
-                    if (getLeaveCategory(t.type) === ledgType) {
-                        if (ledgType === 'SPL' || ledgType === 'WL') {
-                            // Yearly reset - only sum if the transaction occurred in the same year as our start date
-                            if (tDate.getFullYear() === dtStart.getFullYear() && tDate < dtStart) {
-                                periodBegBal += (c - d);
-                            }
-                        } else {
-                            if (tDate < dtStart) {
-                                periodBegBal += (c - d);
-                            }
+                
+                let periodBegBal = 0;
+                
+                if (ledgType === 'SPL' || ledgType === 'WL') {
+                    periodBegBal = ledgType === 'SPL' ? 3 : 5;
+                    // Subtract usage in the current year, strictly BEFORE the start date
+                    relevantData.forEach(t => {
+                        const tDate = new Date(t.start_date || t.created_at);
+                        if (tDate.getFullYear() === dtStart.getFullYear() && tDate < dtStart) {
+                            periodBegBal -= parseFloat(t.debit || 0);
                         }
-                    }
-                });
+                    });
+                } else {
+                    periodBegBal = parseFloat(emp[balField] || 0);
+                    // Add up all transactions BEFORE the start date
+                    relevantData.forEach(t => {
+                        const tDate = new Date(t.start_date || t.created_at);
+                        if (tDate < dtStart) {
+                            periodBegBal += parseFloat(t.credit || 0);
+                            periodBegBal -= parseFloat(t.debit || 0);
+                        }
+                    });
+                }
 
                 document.getElementById('lblBegBal').innerText = periodBegBal.toFixed(3);
 
@@ -1950,7 +1887,7 @@
         const list = document.getElementById('manual-list');
         const emps = Object.values(empDataMap);
         if(emps.length === 0) {
-            list.innerHTML = `<tr><td colspan="7" class="table-td text-center">No regular employees found.</td></tr>`;
+            list.innerHTML = `<tr><td colspan="5" class="table-td text-center">No regular employees found.</td></tr>`;
             return;
         }
         let html = '';
@@ -1959,11 +1896,9 @@
                 <tr class="hover:bg-gray-50">
                     <td class="table-td font-mono font-bold text-xs">${emp.emp_id}</td>
                     <td class="table-td font-bold text-xs">${emp.full_name ? emp.full_name.toUpperCase() : ''}</td>
-                    <td class="table-td p-2"><input type="number" step="0.001" id="man_vl_${emp.emp_id}" value="${parseFloat(emp.vl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
-                    <td class="table-td p-2"><input type="number" step="0.001" id="man_sl_${emp.emp_id}" value="${parseFloat(emp.sl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
-                    <td class="table-td p-2"><input type="number" step="0.001" id="man_spl_${emp.emp_id}" value="${parseFloat(emp.spl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
-                    <td class="table-td p-2"><input type="number" step="0.001" id="man_wl_${emp.emp_id}" value="${parseFloat(emp.wl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
-                    <td class="table-td p-2"><input type="number" step="0.001" id="man_cto_${emp.emp_id}" value="${parseFloat(emp.cto_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-24"></td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_vl_${emp.emp_id}" value="${parseFloat(emp.vl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-32"></td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_sl_${emp.emp_id}" value="${parseFloat(emp.sl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-32"></td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_cto_${emp.emp_id}" value="${parseFloat(emp.cto_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-32"></td>
                 </tr>
             `;
         });
@@ -1971,35 +1906,45 @@
     }
 
     async function saveManualCredits() {
-        const monthVal = document.getElementById('manualMonth').value;
-        if(!monthVal) { alert("Please select an 'As of Month'."); return; }
+        const btn = event.target;
+        const originalText = btn.innerText;
+        
         if(!confirm("Are you sure you want to update these baseline balances? This will permanently override their baseline records in the employees table.")) return;
+
+        btn.innerText = "Saving...";
+        btn.disabled = true;
 
         const emps = Object.values(empDataMap);
         const updates = [];
 
         for (const emp of emps) {
-            const vl = document.getElementById(`man_vl_${emp.emp_id}`).value;
-            const sl = document.getElementById(`man_sl_${emp.emp_id}`).value;
-            const spl = document.getElementById(`man_spl_${emp.emp_id}`).value;
-            const wl = document.getElementById(`man_wl_${emp.emp_id}`).value;
-            const cto = document.getElementById(`man_cto_${emp.emp_id}`).value;
+            const vlEl = document.getElementById(`man_vl_${emp.emp_id}`);
+            const slEl = document.getElementById(`man_sl_${emp.emp_id}`);
+            const ctoEl = document.getElementById(`man_cto_${emp.emp_id}`);
 
-            // Dirty Check: Only issue updates if the HR officer explicitly changed the text box
-            if (
-                parseFloat(vl).toFixed(3) !== parseFloat(emp.vl_balance||0).toFixed(3) ||
-                parseFloat(sl).toFixed(3) !== parseFloat(emp.sl_balance||0).toFixed(3) ||
-                parseFloat(spl).toFixed(3) !== parseFloat(emp.spl_balance||0).toFixed(3) ||
-                parseFloat(wl).toFixed(3) !== parseFloat(emp.wl_balance||0).toFixed(3) ||
-                parseFloat(cto).toFixed(3) !== parseFloat(emp.cto_balance||0).toFixed(3)
-            ) {
+            if (!vlEl || !slEl || !ctoEl) continue;
+
+            const newVl = parseFloat(vlEl.value || 0);
+            const newSl = parseFloat(slEl.value || 0);
+            const newCto = parseFloat(ctoEl.value || 0);
+
+            const oldVl = parseFloat(emp.vl_balance || 0);
+            const oldSl = parseFloat(emp.sl_balance || 0);
+            const oldCto = parseFloat(emp.cto_balance || 0);
+
+            // Safe mathematical dirty-check (prevents false positives from trailing zeros like '0' vs '0.000')
+            const isChanged = (
+                Math.abs(newVl - oldVl) > 0.001 ||
+                Math.abs(newSl - oldSl) > 0.001 ||
+                Math.abs(newCto - oldCto) > 0.001
+            );
+
+            if (isChanged) {
                 updates.push(
                     supabaseClient.from('employees').update({
-                        vl_balance: String(vl),
-                        sl_balance: String(sl),
-                        spl_balance: String(spl),
-                        wl_balance: String(wl),
-                        cto_balance: String(cto)
+                        vl_balance: newVl.toFixed(3),
+                        sl_balance: newSl.toFixed(3),
+                        cto_balance: newCto.toFixed(3)
                     }).eq('emp_id', emp.emp_id)
                 );
             }
@@ -2007,26 +1952,26 @@
 
         if (updates.length === 0) {
             alert("No changes detected. Nothing to save.");
+            btn.innerText = originalText;
+            btn.disabled = false;
             return;
         }
 
         try {
-            const saveBtn = event.target;
-            saveBtn.innerText = "Saving...";
-            saveBtn.disabled = true;
-
-            await Promise.all(updates);
+            // Execute sequentially to prevent payload drops or rate limiting
+            for (const updateQuery of updates) {
+                const { error } = await updateQuery;
+                if (error) throw error;
+            }
             
             alert(`Base Balances updated successfully for ${updates.length} employee(s)!`);
             await loadEmployeeMaps();
             loadManualCredits();
-            
-            saveBtn.innerText = "Save All Modified";
-            saveBtn.disabled = false;
         } catch(e) {
             alert("Error saving: " + e.message);
-            event.target.innerText = "Save All Modified";
-            event.target.disabled = false;
+        } finally {
+            btn.innerText = "Save All Modified";
+            btn.disabled = false;
         }
     }
 
