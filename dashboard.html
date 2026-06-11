@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="supabase-config.js"></script>
     <style>
         :root {
@@ -345,6 +346,30 @@
     document.getElementById('activeUser').innerText = currentUser.full_name;
     document.getElementById('userRoleBadge').innerText = currentUser.role;
 
+    // Secure Biometric Encryption Key
+    const BIO_SECRET_KEY = "DAR_HRMO_BIO_SECURE_KEY_2026";
+
+    // Helper Functions for Data Encryption
+    function secureBiometricData(data) {
+        return CryptoJS.AES.encrypt(JSON.stringify(data), BIO_SECRET_KEY).toString();
+    }
+
+    function readBiometricData(data) {
+        if (!data) return [];
+        try {
+            if (typeof data === 'string') {
+                const bytes = CryptoJS.AES.decrypt(data, BIO_SECRET_KEY);
+                const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+                if (decryptedStr) {
+                    return JSON.parse(decryptedStr);
+                }
+            }
+        } catch (e) {
+            // Not encrypted or decryption failed (handled gracefully below)
+        }
+        return typeof data === 'string' ? JSON.parse(data) : data;
+    }
+
     // RBAC: PARPO and HRMO are ADMIN. Everyone else is limited to their division/unit.
     const rawRole = (currentUser.role || '').toUpperCase();
     const userRoles = rawRole.replace(/_/g, ' ').split(',').map(r => r.trim());
@@ -360,48 +385,6 @@
     const SYSTEM_START_DATE = "2026-05-01";
 
     function logout() { sessionStorage.removeItem('currentUser'); window.location.href = 'index.html'; }
-
-    // --- NATIVE WEB CRYPTO ENCRYPTION HELPERS ---
-    // Note: In a production environment, this key should be fetched securely from a backend.
-    const BIO_ENCRYPTION_KEY = "DAR-HRMO-SECURE-KEY-2026-X1Y2Z3!"; 
-
-    async function encryptBiometrics(dataObj) {
-        const enc = new TextEncoder();
-        const keyMaterial = await window.crypto.subtle.importKey(
-            "raw", enc.encode(BIO_ENCRYPTION_KEY.padEnd(32, '0').slice(0,32)),
-            { name: "AES-GCM" }, false, ["encrypt"]
-        );
-        const iv = window.crypto.getRandomValues(new Uint8Array(12));
-        const encrypted = await window.crypto.subtle.encrypt(
-            { name: "AES-GCM", iv: iv }, keyMaterial, enc.encode(JSON.stringify(dataObj))
-        );
-        const combined = new Uint8Array(iv.length + encrypted.byteLength);
-        combined.set(iv, 0);
-        combined.set(new Uint8Array(encrypted), iv.length);
-        return btoa(String.fromCharCode.apply(null, combined));
-    }
-
-    async function decryptBiometrics(b64Str) {
-        try {
-            const dec = new TextDecoder();
-            const binaryStr = atob(b64Str);
-            const bytes = new Uint8Array(binaryStr.length);
-            for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-            
-            const iv = bytes.slice(0, 12);
-            const data = bytes.slice(12);
-            
-            const keyMaterial = await window.crypto.subtle.importKey(
-                "raw", new TextEncoder().encode(BIO_ENCRYPTION_KEY.padEnd(32, '0').slice(0,32)),
-                { name: "AES-GCM" }, false, ["decrypt"]
-            );
-            const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, keyMaterial, data);
-            return JSON.parse(dec.decode(decrypted));
-        } catch (e) {
-            console.error("Decryption failed. Data might be corrupted.", e);
-            return null;
-        }
-    }
 
     function formatMinutesToHours(totalMinutes) {
         if (!totalMinutes || totalMinutes <= 0) return "0m";
@@ -1863,27 +1846,13 @@
                 return;
             }
 
-            const labeledDescriptors = [];
-            for (let record of bioData) {
-                let parsedEncodings = [];
-                
-                // Backward Compatibility Check: Determine if data is new (encrypted string) or old (raw array)
-                if (typeof record.face_encoding === 'string') {
-                    const decryptedData = await decryptBiometrics(record.face_encoding);
-                    if (decryptedData) parsedEncodings = decryptedData;
-                } else if (Array.isArray(record.face_encoding)) {
-                    parsedEncodings = record.face_encoding;
-                }
+            const labeledDescriptors = bioData.map(record => {
+                const rawEncoding = readBiometricData(record.face_encoding);
+                const descriptors = rawEncoding.map(desc => new Float32Array(Object.values(desc)));
+                return new faceapi.LabeledFaceDescriptors(record.emp_id, descriptors);
+            });
 
-                if (parsedEncodings.length > 0) {
-                    // Object.values ensures safely formatted arrays for Float32 conversion
-                    const descriptors = parsedEncodings.map(desc => new Float32Array(Object.values(desc)));
-                    labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(record.emp_id, descriptors));
-                }
-            }
-
-            // Threshold tightened from 0.5 to 0.42 to strictly prevent misrecognitions
-            const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.42);
+            const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.5);
             const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
 
             if (detection) {
@@ -1982,15 +1951,12 @@
             try {
                 // Triggers the silent image capture if photo is missing
                 captureAndDownloadProfile(empId);
-                
-                // Encrypt the biometric array into a secure hash string
-                const encryptedPayload = await encryptBiometrics(capturedDescriptors);
 
                 const { error: bioError } = await supabaseClient
                     .from('employee_biometrics')
                     .upsert({ 
                         emp_id: empId, 
-                        face_encoding: encryptedPayload 
+                        face_encoding: secureBiometricData(capturedDescriptors)
                     }, { onConflict: 'emp_id' });
 
                 if (bioError) throw bioError;
