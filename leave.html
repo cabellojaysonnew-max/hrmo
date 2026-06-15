@@ -451,11 +451,13 @@
                                     <th class="table-th">Name</th>
                                     <th class="table-th">VL Base</th>
                                     <th class="table-th">SL Base</th>
+                                    <th class="table-th">SPL Base</th>
+                                    <th class="table-th">WL Base</th>
                                     <th class="table-th">CTO Base</th>
                                 </tr>
                             </thead>
                             <tbody id="manual-list">
-                                <tr><td colspan="5" class="table-td text-center text-gray-500">Loading...</td></tr>
+                                <tr><td colspan="7" class="table-td text-center text-gray-500">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1887,7 +1889,7 @@
         const list = document.getElementById('manual-list');
         const emps = Object.values(empDataMap);
         if(emps.length === 0) {
-            list.innerHTML = `<tr><td colspan="5" class="table-td text-center">No regular employees found.</td></tr>`;
+            list.innerHTML = `<tr><td colspan="7" class="table-td text-center">No regular employees found.</td></tr>`;
             return;
         }
         let html = '';
@@ -1898,6 +1900,8 @@
                     <td class="table-td font-bold text-xs">${emp.full_name ? emp.full_name.toUpperCase() : ''}</td>
                     <td class="table-td p-2"><input type="number" step="0.001" id="man_vl_${emp.emp_id}" value="${parseFloat(emp.vl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-32"></td>
                     <td class="table-td p-2"><input type="number" step="0.001" id="man_sl_${emp.emp_id}" value="${parseFloat(emp.sl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-32"></td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_spl_${emp.emp_id}" value="${parseFloat(emp.spl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-32"></td>
+                    <td class="table-td p-2"><input type="number" step="0.001" id="man_wl_${emp.emp_id}" value="${parseFloat(emp.wl_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-32"></td>
                     <td class="table-td p-2"><input type="number" step="0.001" id="man_cto_${emp.emp_id}" value="${parseFloat(emp.cto_balance||0).toFixed(3)}" class="form-input py-1 px-2 text-sm w-32"></td>
                 </tr>
             `;
@@ -1920,22 +1924,30 @@
         for (const emp of emps) {
             const vlEl = document.getElementById(`man_vl_${emp.emp_id}`);
             const slEl = document.getElementById(`man_sl_${emp.emp_id}`);
+            const splEl = document.getElementById(`man_spl_${emp.emp_id}`);
+            const wlEl = document.getElementById(`man_wl_${emp.emp_id}`);
             const ctoEl = document.getElementById(`man_cto_${emp.emp_id}`);
 
-            if (!vlEl || !slEl || !ctoEl) continue;
+            if (!vlEl || !slEl || !splEl || !wlEl || !ctoEl) continue;
 
             const newVl = parseFloat(vlEl.value || 0);
             const newSl = parseFloat(slEl.value || 0);
+            const newSpl = parseFloat(splEl.value || 0);
+            const newWl = parseFloat(wlEl.value || 0);
             const newCto = parseFloat(ctoEl.value || 0);
 
             const oldVl = parseFloat(emp.vl_balance || 0);
             const oldSl = parseFloat(emp.sl_balance || 0);
+            const oldSpl = parseFloat(emp.spl_balance || 0);
+            const oldWl = parseFloat(emp.wl_balance || 0);
             const oldCto = parseFloat(emp.cto_balance || 0);
 
             // Safe mathematical dirty-check (prevents false positives from trailing zeros like '0' vs '0.000')
             const isChanged = (
                 Math.abs(newVl - oldVl) > 0.001 ||
                 Math.abs(newSl - oldSl) > 0.001 ||
+                Math.abs(newSpl - oldSpl) > 0.001 ||
+                Math.abs(newWl - oldWl) > 0.001 ||
                 Math.abs(newCto - oldCto) > 0.001
             );
 
@@ -1944,6 +1956,8 @@
                     supabaseClient.from('employees').update({
                         vl_balance: newVl.toFixed(3),
                         sl_balance: newSl.toFixed(3),
+                        spl_balance: newSpl.toFixed(3),
+                        wl_balance: newWl.toFixed(3),
                         cto_balance: newCto.toFixed(3)
                     }).eq('emp_id', emp.emp_id)
                 );
