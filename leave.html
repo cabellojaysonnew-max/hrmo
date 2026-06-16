@@ -53,6 +53,7 @@
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('genTab')">Generate Credits</button>
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('gpTab')">Gate Pass Posting</button>
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('ctoTab')">CTO Posting</button>
+                <button class="tab-btn whitespace-nowrap" onclick="switchTab('utTab')">Undertime Posting</button>
                 <button class="tab-btn whitespace-nowrap" onclick="switchTab('ledgerTab')">Detailed Ledger</button>
                 <button id="navManualTab" class="tab-btn whitespace-nowrap" onclick="switchTab('manualTab')">Manual Input</button>
             </div>
@@ -341,6 +342,55 @@
                 </div>
             </div>
 
+            <div id="utTab" class="tab-content">
+                <div class="card mb-6">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 items-end flex-wrap">
+                        <div class="flex-1 min-w-[200px] relative">
+                            <label class="form-label">Search Employee</label>
+                            <input type="text" id="utEmpSearch" class="form-input" placeholder="Type to search employee..." autocomplete="off">
+                            <div id="utEmpSearchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
+                            <input type="hidden" id="utEmpId">
+                        </div>
+                        <div>
+                            <label class="form-label">Select Month</label>
+                            <input type="month" id="utMonth" class="form-input">
+                        </div>
+                        <button onclick="loadUndertime()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow">Check DTR Record</button>
+                    </div>
+
+                    <div class="p-4 bg-yellow-50 border-b flex justify-between items-center flex-wrap gap-4">
+                        <div class="text-sm">
+                            <span class="font-bold text-gray-700">Total LATE/UT (Minutes):</span>
+                            <span id="utTotalMins" class="font-bold text-red-600 text-lg ml-2">0</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="form-label mb-0 text-gray-700">Equivalent Day Deduction (Manual Override Allowed):</label>
+                            <input type="number" step="0.001" id="utEquivDay" class="form-input w-32 font-bold text-red-600" value="0.000">
+                            <button onclick="postUndertimeDeduction()" id="utPostBtn" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-6 rounded shadow hidden">Post Deduction to VL</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto max-h-96">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="sticky top-0 bg-[#f9fafb] shadow-sm">
+                                <tr>
+                                    <th class="table-th">Date</th>
+                                    <th class="table-th">Schedule</th>
+                                    <th class="table-th">First IN</th>
+                                    <th class="table-th">Last OUT</th>
+                                    <th class="table-th text-red-600">Late (Mins)</th>
+                                    <th class="table-th text-red-600">UT (Mins)</th>
+                                    <th class="table-th">Total (Mins)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ut-list">
+                                <tr><td colspan="7" class="table-td text-center text-gray-500">Search employee and check DTR.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div id="ledgerTab" class="tab-content">
                 <div class="card mb-6">
                     <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-4 gap-4 items-end flex-wrap">
@@ -489,6 +539,7 @@
     document.getElementById('genMonth').value = currMonthStr;
     document.getElementById('gpMonth').value = currMonthStr;
     document.getElementById('ctoMonth').value = currMonthStr;
+    document.getElementById('utMonth').value = currMonthStr;
     document.getElementById('scanCtoDate').value = todayStr;
     document.getElementById('approvedDateDisplay').innerText = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
@@ -510,7 +561,7 @@
     // Helper: Categorize Leave Types
     function getLeaveCategory(typeStr) {
         typeStr = (typeStr || '').toUpperCase();
-        if (typeStr.includes('VL') || typeStr.includes('VACATION') || typeStr.includes('GATE PASS') || typeStr.includes('FORCE') || typeStr.includes('MANDATORY')) return 'VL';
+        if (typeStr.includes('VL') || typeStr.includes('VACATION') || typeStr.includes('GATE PASS') || typeStr.includes('FORCE') || typeStr.includes('MANDATORY') || typeStr.includes('UNDERTIME')) return 'VL';
         if (typeStr.includes('SL') || typeStr.includes('SICK')) return 'SL';
         if (typeStr.includes('SPL') || typeStr.includes('SPECIAL') || typeStr.includes('PRIVILEGE') || typeStr.includes('PREVELEGE')) return 'SPL';
         if (typeStr.includes('WL') || typeStr.includes('WELLNESS')) return 'WL';
@@ -612,6 +663,42 @@
     document.addEventListener('click', function(e) {
         if (e.target !== searchInput && e.target !== searchResults) {
             searchResults.classList.add('hidden');
+        }
+    });
+
+    // Custom Search Setup for Undertime
+    const utSearchInput = document.getElementById('utEmpSearch');
+    const utSearchResults = document.getElementById('utEmpSearchResults');
+    const utHiddenEmpId = document.getElementById('utEmpId');
+
+    utSearchInput.addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        utSearchResults.innerHTML = '';
+        if (!val) { utSearchResults.classList.add('hidden'); return; }
+        
+        const filtered = empSearchList.filter(e => e.name.toLowerCase().includes(val) || e.id.toLowerCase().includes(val));
+        
+        if (filtered.length > 0) {
+            filtered.forEach(e => {
+                const div = document.createElement('div');
+                div.className = 'p-2 hover:bg-gray-100 cursor-pointer text-sm';
+                div.innerText = `${e.name} (${e.id})`;
+                div.onclick = () => {
+                    utSearchInput.value = e.name;
+                    utHiddenEmpId.value = e.id;
+                    utSearchResults.classList.add('hidden');
+                };
+                utSearchResults.appendChild(div);
+            });
+            utSearchResults.classList.remove('hidden');
+        } else {
+            utSearchResults.classList.add('hidden');
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target !== utSearchInput && e.target !== utSearchResults) {
+            utSearchResults.classList.add('hidden');
         }
     });
 
@@ -1632,6 +1719,143 @@
 
         if(ledgers.length > 0) await supabaseClient.from('leave_ledger').insert(ledgers);
         await loadEmployeeMaps(); 
+    }
+
+    // --- TAB: UNDERTIME POSTING ---
+    async function loadUndertime() {
+        const empId = document.getElementById('utEmpId').value;
+        const monthVal = document.getElementById('utMonth').value;
+        if (!empId || !monthVal) return alert("Select employee and month from the search.");
+
+        const list = document.getElementById('ut-list');
+        list.innerHTML = `<tr><td colspan="7" class="table-td text-center">Fetching DTR...</td></tr>`;
+        
+        try {
+            const { data: over } = await supabaseClient.from('schedule_overrides').select('*').eq('emp_id', empId);
+
+            const startStr = `${monthVal}-01T00:00:00.000Z`;
+            const endMonth = new Date(new Date(monthVal + "-01").getFullYear(), new Date(monthVal + "-01").getMonth() + 1, 0).getDate();
+            const endStr = `${monthVal}-${endMonth}T23:59:59.999Z`;
+
+            const { data: logs } = await supabaseClient.from('attendance_logs')
+                .select('*')
+                .eq('emp_id', empId)
+                .gte('log_time', startStr)
+                .lte('log_time', endStr)
+                .order('log_time', { ascending: true });
+
+            let dtr = {};
+            (logs || []).forEach(log => {
+                let d = new Date(log.log_time);
+                let localDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                if (!dtr[localDate]) dtr[localDate] = [];
+                dtr[localDate].push(log);
+            });
+
+            let totalLateUT = 0;
+            let html = '';
+
+            for (let day = 1; day <= endMonth; day++) {
+                let dStr = `${monthVal}-${String(day).padStart(2, '0')}`;
+                let dayLogs = dtr[dStr] || [];
+
+                let schedStart = "08:00:00";
+                let schedEnd = "17:00:00";
+
+                if (over) {
+                    let active = over.find(o => dStr >= o.start_date && dStr <= o.end_date);
+                    if (active) {
+                        schedStart = active.start_time;
+                        schedEnd = active.end_time;
+                    }
+                }
+
+                if (dayLogs.length > 0) {
+                    let firstIn = dayLogs.find(l => l.status.includes('IN'));
+                    let lastOut = [...dayLogs].reverse().find(l => l.status.includes('OUT'));
+
+                    let lateMins = 0;
+                    let utMins = 0;
+
+                    let inTime = firstIn ? new Date(firstIn.log_time) : null;
+                    let outTime = lastOut ? new Date(lastOut.log_time) : null;
+
+                    if (inTime) {
+                        let sInParts = schedStart.split(':');
+                        let expectedIn = new Date(inTime);
+                        expectedIn.setHours(parseInt(sInParts[0]), parseInt(sInParts[1]), 0, 0);
+                        if (inTime > expectedIn) {
+                            lateMins = Math.floor((inTime - expectedIn) / 60000);
+                        }
+                    }
+
+                    if (outTime) {
+                        let sOutParts = schedEnd.split(':');
+                        let expectedOut = new Date(outTime);
+                        expectedOut.setHours(parseInt(sOutParts[0]), parseInt(sOutParts[1]), 0, 0);
+                        if (outTime < expectedOut) {
+                            utMins = Math.floor((expectedOut - outTime) / 60000);
+                        }
+                    }
+
+                    if (lateMins > 0 || utMins > 0) {
+                        totalLateUT += (lateMins + utMins);
+                        html += `
+                            <tr class="hover:bg-gray-50">
+                                <td class="table-td">${dStr}</td>
+                                <td class="table-td">${schedStart} - ${schedEnd}</td>
+                                <td class="table-td">${inTime ? inTime.toLocaleTimeString() : '-'}</td>
+                                <td class="table-td">${outTime ? outTime.toLocaleTimeString() : '-'}</td>
+                                <td class="table-td text-red-600">${lateMins > 0 ? lateMins : '-'}</td>
+                                <td class="table-td text-red-600">${utMins > 0 ? utMins : '-'}</td>
+                                <td class="table-td font-bold">${lateMins + utMins}</td>
+                            </tr>
+                        `;
+                    }
+                }
+            }
+
+            if (html === '') html = `<tr><td colspan="7" class="table-td text-center text-gray-500">No Late/Undertime records found for this month based on schedule.</td></tr>`;
+            list.innerHTML = html;
+
+            let equivDay = Math.round((totalLateUT / 480) * 1000) / 1000;
+            document.getElementById('utTotalMins').innerText = totalLateUT;
+            document.getElementById('utEquivDay').value = equivDay.toFixed(3);
+            document.getElementById('utPostBtn').classList.remove('hidden');
+
+        } catch (e) {
+            list.innerHTML = `<tr><td colspan="7" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+        }
+    }
+
+    async function postUndertimeDeduction() {
+        const empId = document.getElementById('utEmpId').value;
+        const monthVal = document.getElementById('utMonth').value;
+        const deductVal = parseFloat(document.getElementById('utEquivDay').value);
+
+        if (!empId || !monthVal) return alert("Missing details.");
+        if (deductVal <= 0) return alert("Deduction must be greater than 0.");
+
+        if (!confirm(`Are you sure you want to officially post a ${deductVal} equivalent day deduction for Late/Undertime (${monthVal}) to the Leave Ledger?`)) return;
+
+        const endMonth = new Date(new Date(monthVal + "-01").getFullYear(), new Date(monthVal + "-01").getMonth() + 1, 0).getDate();
+        const postDate = `${monthVal}-${endMonth}`;
+
+        try {
+            await supabaseClient.from('leave_ledger').insert([{
+                emp_id: empId,
+                type: 'VL (LATE/UNDERTIME)',
+                debit: deductVal,
+                transaction_type: 'APPROVED',
+                remarks: `LATE/UNDERTIME DEDUCTION - ${monthVal}`,
+                start_date: postDate
+            }]);
+            alert("Undertime deduction posted successfully.");
+            await loadEmployeeMaps();
+            loadUndertime(); 
+        } catch (e) {
+            alert("Error: " + e.message);
+        }
     }
 
     // --- TAB 6: DETAILED LEDGER MONITORING ---
