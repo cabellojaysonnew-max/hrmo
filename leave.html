@@ -392,98 +392,101 @@
                 </div>
             </div>
 
-            <div id="ledgerTab" class="tab-content">
-                <div class="card mb-6">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-4 gap-4 items-end flex-wrap">
-                        <div class="flex-1 min-w-[200px] relative">
-                            <label class="form-label">Search Employee</label>
-                            <input type="text" id="ledgEmpSearch" class="form-input" placeholder="Type to search employee..." autocomplete="off">
-                            <div id="empSearchResults" class="absolute z-50 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>                            <input type="hidden" id="ledgEmpId">
-                        </div>
-                        <div>
-                            <label class="form-label">Leave Type</label>
-                            <select id="ledgType" class="form-input">
-                                <option value="ALL">All Leave Types</option>
-                                <option value="VL">Vacation Leave (VL)</option>
-                                <option value="SL">Sick Leave (SL)</option>
-                                <option value="SPL">Special Privilege Leave (SPL)</option>
-                                <option value="WL">Wellness Leave (WL)</option>
-                                <option value="CTO">Compensatory Time-Off (CTO)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label">Start Date</label>
-                            <input type="date" id="ledgStartDate" class="form-input">
-                        </div>
-                        <div>
-                            <label class="form-label">End Date</label>
-                            <input type="date" id="ledgEndDate" class="form-input">
-                        </div>
-                    </div>
-                    <div class="p-4 bg-gray-50 border-b flex justify-end gap-2">
-                        <button onclick="loadLedgerStatement()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow w-full">View Statement</button>
-                        <button onclick="printDetailedLedger()" id="btnPrintLedger" class="bg-[#D4AF37] hover:brightness-110 text-black font-bold py-2 px-6 rounded shadow hidden">Print Ledger</button>
-                    </div>
-                    
-                    <div class="p-6">
-                        <div id="ledgerSummary" class="mb-4 grid grid-cols-3 gap-4 text-center hidden">
-                            <div class="bg-gray-100 p-4 rounded border">
-                                <span class="block text-xs font-bold text-gray-500 uppercase">Beginning Balance</span>
-                                <span id="lblBegBal" class="text-xl font-bold text-[#003811]">-</span>
-                            </div>
-                            <div class="bg-gray-100 p-4 rounded border">
-                                <span class="block text-xs font-bold text-gray-500 uppercase">Net Movement</span>
-                                <span id="lblMovement" class="text-xl font-bold text-gray-800">-</span>
-                            </div>
-                            <div class="bg-[#f0fdf4] p-4 rounded border border-green-200">
-                                <span class="block text-xs font-bold text-green-700 uppercase">Ending Balance</span>
-                                <span id="lblEndBal" class="text-xl font-bold text-green-800">-</span>
-                            </div>
-                        </div>
-
-                        <div id="allBalancesSummary" class="mb-4 grid grid-cols-5 gap-2 text-center hidden">
-                            <div class="bg-gray-100 p-3 rounded border">
-                                <span class="block text-[10px] font-bold text-gray-500 uppercase">VL</span>
-                                <span id="lblAllVl" class="text-lg font-bold text-[#003811]">-</span>
-                            </div>
-                            <div class="bg-gray-100 p-3 rounded border">
-                                <span class="block text-[10px] font-bold text-gray-500 uppercase">SL</span>
-                                <span id="lblAllSl" class="text-lg font-bold text-[#003811]">-</span>
-                            </div>
-                            <div class="bg-gray-100 p-3 rounded border">
-                                <span class="block text-[10px] font-bold text-gray-500 uppercase">SPL</span>
-                                <span id="lblAllSpl" class="text-lg font-bold text-[#003811]">-</span>
-                            </div>
-                            <div class="bg-gray-100 p-3 rounded border">
-                                <span class="block text-[10px] font-bold text-gray-500 uppercase">WL</span>
-                                <span id="lblAllWl" class="text-lg font-bold text-[#003811]">-</span>
-                            </div>
-                            <div class="bg-gray-100 p-3 rounded border">
-                                <span class="block text-[10px] font-bold text-gray-500 uppercase">CTO</span>
-                                <span id="lblAllCto" class="text-lg font-bold text-[#003811]">-</span>
-                            </div>
-                        </div>
-
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr>
-                                        <th class="table-th">Date</th>
-                                        <th class="table-th">Particulars / Type</th>
-                                        <th class="table-th">Earned (Credit)</th>
-                                        <th class="table-th">Leave w/ Pay (Debit)</th>
-                                        <th class="table-th">Running Bal</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ledger-list">
-                                    <tr><td colspan="5" class="table-td text-center text-gray-500">Select an employee, leave type, and date range to view ledger.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+       <div id="ledgerTab" class="tab-content">
+    <div class="card mb-6">
+        <div class="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-4 gap-4 items-end flex-wrap">
+            <div class="flex-1 min-w-[200px] relative">
+                <label class="form-label">Search Employee</label>
+                <input type="text" id="ledgEmpSearch" class="form-input" placeholder="Type to search employee..." autocomplete="off">
+                <div id="empSearchResults" class="absolute z-50 w-full bg-white border border-gray-300 rounded mt-1 shadow-lg hidden max-h-48 overflow-y-auto"></div>
+                <input type="hidden" id="ledgEmpId">
+            </div>
+            <div>
+                <label class="form-label">Leave Type</label>
+                <select id="ledgType" class="form-input">
+                    <option value="ALL">All Leave Types</option>
+                    <option value="VL">Vacation Leave (VL)</option>
+                    <option value="SL">Sick Leave (SL)</option>
+                    <option value="SPL">Special Privilege Leave (SPL)</option>
+                    <option value="WL">Wellness Leave (WL)</option>
+                    <option value="CTO">Compensatory Time-Off (CTO)</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Start Date</label>
+                <input type="date" id="ledgStartDate" class="form-input">
+            </div>
+            <div>
+                <label class="form-label">End Date</label>
+                <input type="date" id="ledgEndDate" class="form-input">
+            </div>
+        </div>
+        
+        <div class="p-4 bg-gray-50 border-b flex justify-end gap-2">
+            <button onclick="loadLedgerStatement()" class="bg-[#003811] hover:bg-[#002200] text-white font-bold py-2 px-6 rounded shadow w-full">View Statement</button>
+            <button onclick="printDetailedLedger()" id="btnPrintLedger" class="bg-[#D4AF37] hover:brightness-110 text-black font-bold py-2 px-6 rounded shadow hidden">Print Ledger</button>
+        </div>
+        
+        <div class="p-6">
+            <div id="ledgerSummary" class="mb-4 grid grid-cols-3 gap-4 text-center hidden">
+                <div class="bg-gray-100 p-4 rounded border">
+                    <span class="block text-xs font-bold text-gray-500 uppercase">Beginning Balance</span>
+                    <span id="lblBegBal" class="text-xl font-bold text-[#003811]">-</span>
+                </div>
+                <div class="bg-gray-100 p-4 rounded border">
+                    <span class="block text-xs font-bold text-gray-500 uppercase">Net Movement</span>
+                    <span id="lblMovement" class="text-xl font-bold text-gray-800">-</span>
+                </div>
+                <div class="bg-[#f0fdf4] p-4 rounded border border-green-200">
+                    <span class="block text-xs font-bold text-green-700 uppercase">Ending Balance</span>
+                    <span id="lblEndBal" class="text-xl font-bold text-green-800">-</span>
                 </div>
             </div>
 
+            <div id="allBalancesSummary" class="mb-4 grid grid-cols-5 gap-2 text-center hidden">
+                <div class="bg-gray-100 p-3 rounded border">
+                    <span class="block text-[10px] font-bold text-gray-500 uppercase">VL</span>
+                    <span id="lblAllVl" class="text-lg font-bold text-[#003811]">-</span>
+                </div>
+                <div class="bg-gray-100 p-3 rounded border">
+                    <span class="block text-[10px] font-bold text-gray-500 uppercase">SL</span>
+                    <span id="lblAllSl" class="text-lg font-bold text-[#003811]">-</span>
+                </div>
+                <div class="bg-gray-100 p-3 rounded border">
+                    <span class="block text-[10px] font-bold text-gray-500 uppercase">SPL</span>
+                    <span id="lblAllSpl" class="text-lg font-bold text-[#003811]">-</span>
+                </div>
+                <div class="bg-gray-100 p-3 rounded border">
+                    <span class="block text-[10px] font-bold text-gray-500 uppercase">WL</span>
+                    <span id="lblAllWl" class="text-lg font-bold text-[#003811]">-</span>
+                </div>
+                <div class="bg-gray-100 p-3 rounded border">
+                    <span class="block text-[10px] font-bold text-gray-500 uppercase">CTO</span>
+                    <span id="lblAllCto" class="text-lg font-bold text-[#003811]">-</span>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr>
+                            <th class="table-th">Date</th>
+                            <th class="table-th">Particulars / Type</th>
+                            <th class="table-th">Earned (Credit)</th>
+                            <th class="table-th">Leave w/ Pay (Debit)</th>
+                            <th class="table-th">Running Bal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ledger-list">
+                        <tr><td colspan="5" class="table-td text-center text-gray-500">Select an employee, leave type, and date range to view ledger.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+            
             <div id="manualTab" class="tab-content">
                 <div class="card">
                     <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
@@ -1911,174 +1914,184 @@
     }
 
     // --- TAB 6: DETAILED LEDGER MONITORING ---
-    async function loadLedgerStatement() {
-        const empId = document.getElementById('ledgEmpId').value;
-        const startDate = document.getElementById('ledgStartDate').value;
-        const endDate = document.getElementById('ledgEndDate').value;
-        const ledgType = document.getElementById('ledgType').value;
-        const list = document.getElementById('ledger-list');
-        const sumDiv = document.getElementById('ledgerSummary');
-        const allBalDiv = document.getElementById('allBalancesSummary');
-        const btnPrint = document.getElementById('btnPrintLedger');
+async function loadLedgerStatement() {
+    const empId = document.getElementById('ledgEmpId').value;
+    const startDate = document.getElementById('ledgStartDate').value;
+    const endDate = document.getElementById('ledgEndDate').value;
+    const ledgType = document.getElementById('ledgType').value;
+    
+    const list = document.getElementById('ledger-list');
+    const sumDiv = document.getElementById('ledgerSummary');
+    const allBalDiv = document.getElementById('allBalancesSummary');
+    const btnPrint = document.getElementById('btnPrintLedger');
 
-        if (!empId || !startDate || !endDate) {
-            alert("Please select an Employee and a valid Date Range.");
-            return;
-        }
-
-        if (new Date(endDate) < new Date(startDate)) {
-            alert("End Date cannot be before Start Date.");
-            return;
-        }
-
-        list.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching ledger data...</td></tr>`;
-        sumDiv.classList.add('hidden');
-        allBalDiv.classList.add('hidden');
-        btnPrint.classList.add('hidden');
-        currentLedgerDataToPrint = []; 
-
-        try {
-            await loadEmployeeMaps();
-            const emp = empDataMap[empId];
-            if(!emp) throw new Error("Employee data missing.");
-
-            const { data: allData, error } = await supabaseClient.from('leave_ledger')
-                .select('*')
-                .eq('emp_id', empId)
-                .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'FORFEITURE']);
-
-            if (error) throw error;
-
-            let relevantData = (allData || []).filter(t => {
-                const cat = getLeaveCategory(t.type);
-                if (ledgType === 'ALL') return true;
-                return cat === ledgType;
-            });
-
-            const dtEnd = new Date(`${endDate}T23:59:59`);
-            const dtStart = new Date(`${startDate}T00:00:00`);
-            const currentYear = new Date().getFullYear();
-
-            if (ledgType === 'ALL') {
-                document.getElementById('lblAllVl').innerText = empBalances[empId].VL.toFixed(3);
-                document.getElementById('lblAllSl').innerText = empBalances[empId].SL.toFixed(3);
-                document.getElementById('lblAllSpl').innerText = empBalances[empId].SPL.toFixed(3);
-                document.getElementById('lblAllWl').innerText = empBalances[empId].WL.toFixed(3);
-                document.getElementById('lblAllCto').innerText = empBalances[empId].CTO.toFixed(3);
-                allBalDiv.classList.remove('hidden');
-                sumDiv.classList.add('hidden');
-            } else {
-                // Forward math algorithm: Start from the Baseline in the `employees` table.
-                let balField = ledgType.toLowerCase() + '_balance';
-                
-                let periodBegBal = 0;
-                
-                if (ledgType === 'SPL' || ledgType === 'WL') {
-                    periodBegBal = ledgType === 'SPL' ? 3 : 5;
-                    // Subtract usage in the current year, strictly BEFORE the start date
-                    relevantData.forEach(t => {
-                        const tDate = new Date(t.start_date || t.created_at);
-                        if (tDate.getFullYear() === dtStart.getFullYear() && tDate < dtStart) {
-                            periodBegBal -= parseFloat(t.debit || 0);
-                        }
-                    });
-                } else {
-                    periodBegBal = parseFloat(emp[balField] || 0);
-                    // Add up all transactions BEFORE the start date
-                    relevantData.forEach(t => {
-                        const tDate = new Date(t.start_date || t.created_at);
-                        if (tDate < dtStart) {
-                            periodBegBal += parseFloat(t.credit || 0);
-                            periodBegBal -= parseFloat(t.debit || 0);
-                        }
-                    });
-                }
-
-                document.getElementById('lblBegBal').innerText = periodBegBal.toFixed(3);
-
-                // Filter transactions that fall INSIDE the requested date range
-                let rangeData = relevantData.filter(t => {
-                    const tDate = new Date(t.start_date || t.created_at);
-                    if (ledgType === 'SPL' || ledgType === 'WL') {
-                        return tDate >= dtStart && tDate <= dtEnd && tDate.getFullYear() === dtStart.getFullYear();
-                    }
-                    return tDate >= dtStart && tDate <= dtEnd;
-                });
-
-                // Calculate Running Balances walking forward
-                rangeData.sort((a,b) => new Date(a.start_date || a.created_at) - new Date(b.start_date || b.created_at));
-                
-                let runningBal = periodBegBal;
-                let totalC = 0, totalD = 0;
-
-                rangeData.forEach(t => {
-                    totalC += parseFloat(t.credit || 0);
-                    totalD += parseFloat(t.debit || 0);
-                    runningBal += parseFloat(t.credit || 0) - parseFloat(t.debit || 0);
-                    t.computedBal = runningBal.toFixed(3);
-                });
-
-                const net = totalC - totalD;
-                const netEl = document.getElementById('lblMovement');
-                netEl.innerText = (net > 0 ? '+' : '') + net.toFixed(3);
-                netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
-                
-                document.getElementById('lblEndBal').innerText = runningBal.toFixed(3);
-                sumDiv.classList.remove('hidden');
-                allBalDiv.classList.add('hidden');
-
-                // Reverse for display (Newest on top)
-                rangeData.reverse();
-                
-                if (rangeData.length === 0) {
-                    list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this range.</td></tr>`;
-                    return;
-                }
-
-                let html = '';
-                rangeData.forEach(t => {
-                    const cred = parseFloat(t.credit || 0);
-                    const deb = parseFloat(t.debit || 0);
-                    const displayType = t.type ? t.type.toUpperCase() : '-';
-                    const dateStr = new Date(t.start_date || t.created_at).toLocaleDateString('en-US');
-                    
-                    let credColor = cred > 0 ? 'text-green-600' : 'text-gray-400';
-                    let debColor = deb > 0 ? 'text-red-600' : 'text-gray-400';
-
-                    html += `
-                        <tr class="hover:bg-gray-50">
-                            <td class="table-td">${dateStr}</td>
-                            <td class="table-td">
-                                <span class="font-bold">${t.transaction_type.replace(/_/g, ' ')}</span><br>
-                                <span class="text-xs text-gray-500">${displayType} | ${t.remarks || ''}</span>
-                            </td>
-                            <td class="table-td font-bold ${credColor}">${cred > 0 ? '+'+cred.toFixed(3) : '-'}</td>
-                            <td class="table-td font-bold ${debColor}">${deb > 0 ? '-'+deb.toFixed(3) : '-'}</td>
-                            <td class="table-td font-bold">${t.computedBal}</td>
-                        </tr>
-                    `;
-                    
-                    currentLedgerDataToPrint.push({
-                        date: dateStr,
-                        particulars: `${t.transaction_type.replace(/_/g, ' ')}: ${displayType}`,
-                        credit: cred > 0 ? `+${cred.toFixed(3)}` : '-',
-                        debit: deb > 0 ? `-${deb.toFixed(3)}` : '-',
-                        runningBal: t.computedBal
-                    });
-                });
-                list.innerHTML = html;
-                btnPrint.classList.remove('hidden'); 
-            }
-
-            if (ledgType === 'ALL') {
-                list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">Please select a specific Leave Type to view detailed ledger entries.</td></tr>`;
-            }
-
-        } catch (e) {
-            list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
-        }
+    if (!empId || !startDate || !endDate) {
+        alert("Please select an Employee and a valid Date Range.");
+        return;
+    }
+    if (new Date(endDate) < new Date(startDate)) {
+        alert("End Date cannot be before Start Date.");
+        return;
     }
 
+    list.innerHTML = `<tr><td colspan="5" class="table-td text-center">Fetching ledger data...</td></tr>`;
+    sumDiv.classList.add('hidden');
+    allBalDiv.classList.add('hidden');
+    btnPrint.classList.add('hidden');
+    currentLedgerDataToPrint = []; 
+
+    try {
+        // 1. Fetch Employee Baseline Data
+        await loadEmployeeMaps();
+        const emp = empDataMap[empId];
+        if(!emp) throw new Error("Employee data missing.");
+
+        // 2. Fetch all valid transactions from the ledger for this employee
+        const { data: allData, error } = await supabaseClient.from('leave_ledger')
+            .select('*')
+            .eq('emp_id', empId)
+            .in('transaction_type', ['APPROVED', 'CREDIT', 'GATE_PASS_DEDUCTION', 'FORFEITURE']);
+
+        if (error) throw error;
+
+        // 3. Filter down to the specific selected Leave Category
+        let relevantData = (allData || []).filter(t => {
+            const cat = getLeaveCategory(t.type);
+            if (ledgType === 'ALL') return true;
+            return cat === ledgType;
+        });
+
+        const dtEnd = new Date(`${endDate}T23:59:59`);
+        const dtStart = new Date(`${startDate}T00:00:00`);
+
+        // ==========================================
+        // SCENARIO A: ALL LEAVE TYPES SELECTED
+        // ==========================================
+        if (ledgType === 'ALL') {
+            document.getElementById('lblAllVl').innerText = empBalances[empId].VL.toFixed(3);
+            document.getElementById('lblAllSl').innerText = empBalances[empId].SL.toFixed(3);
+            document.getElementById('lblAllSpl').innerText = empBalances[empId].SPL.toFixed(3);
+            document.getElementById('lblAllWl').innerText = empBalances[empId].WL.toFixed(3);
+            document.getElementById('lblAllCto').innerText = empBalances[empId].CTO.toFixed(3);
+            
+            allBalDiv.classList.remove('hidden');
+            sumDiv.classList.add('hidden');
+            list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">Please select a specific Leave Type to view detailed ledger entries.</td></tr>`;
+            return;
+        } 
+        
+        // ==========================================
+        // SCENARIO B: SPECIFIC LEAVE TYPE SELECTED
+        // ==========================================
+        
+        // 4. Calculate Beginning Balance (Baseline ± Historical Transactions BEFORE Start Date)
+        let balField = ledgType.toLowerCase() + '_balance';
+        let periodBegBal = 0;
+        
+        if (ledgType === 'SPL' || ledgType === 'WL') {
+            // SPL and WL usually reset yearly
+            periodBegBal = ledgType === 'SPL' ? 3 : 5;
+            relevantData.forEach(t => {
+                const tDate = new Date(t.start_date || t.created_at);
+                if (tDate.getFullYear() === dtStart.getFullYear() && tDate < dtStart) {
+                    periodBegBal -= parseFloat(t.debit || 0);
+                }
+            });
+        } else {
+            // VL, SL, CTO: Continuous tracking from the 'employees' table baseline
+            periodBegBal = parseFloat(emp[balField] || 0);
+            relevantData.forEach(t => {
+                const tDate = new Date(t.start_date || t.created_at);
+                if (tDate < dtStart) {
+                    periodBegBal += parseFloat(t.credit || 0);
+                    periodBegBal -= parseFloat(t.debit || 0);
+                }
+            });
+        }
+
+        document.getElementById('lblBegBal').innerText = periodBegBal.toFixed(3);
+
+        // 5. Isolate transactions that fall INSIDE the requested date range
+        let rangeData = relevantData.filter(t => {
+            const tDate = new Date(t.start_date || t.created_at);
+            if (ledgType === 'SPL' || ledgType === 'WL') {
+                return tDate >= dtStart && tDate <= dtEnd && tDate.getFullYear() === dtStart.getFullYear();
+            }
+            return tDate >= dtStart && tDate <= dtEnd;
+        });
+
+        // 6. Calculate Running Balances walking forward through time
+        rangeData.sort((a,b) => new Date(a.start_date || a.created_at) - new Date(b.start_date || b.created_at));
+        
+        let runningBal = periodBegBal;
+        let totalC = 0, totalD = 0;
+
+        rangeData.forEach(t => {
+            totalC += parseFloat(t.credit || 0);
+            totalD += parseFloat(t.debit || 0);
+            runningBal += parseFloat(t.credit || 0) - parseFloat(t.debit || 0);
+            t.computedBal = runningBal.toFixed(3);
+        });
+
+        // 7. Update UI Summary Cards
+        const net = totalC - totalD;
+        const netEl = document.getElementById('lblMovement');
+        netEl.innerText = (net > 0 ? '+' : '') + net.toFixed(3);
+        netEl.className = `text-xl font-bold ${net > 0 ? 'text-green-600' : (net < 0 ? 'text-red-600' : 'text-gray-800')}`;
+        
+        document.getElementById('lblEndBal').innerText = runningBal.toFixed(3);
+        sumDiv.classList.remove('hidden');
+        allBalDiv.classList.add('hidden');
+
+        // 8. Render the Table (Newest transactions on top)
+        rangeData.reverse();
+        
+        if (rangeData.length === 0) {
+            list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-gray-500">No transactions recorded for this range.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        rangeData.forEach(t => {
+            const cred = parseFloat(t.credit || 0);
+            const deb = parseFloat(t.debit || 0);
+            const displayType = t.type ? t.type.toUpperCase() : '-';
+            const dateStr = new Date(t.start_date || t.created_at).toLocaleDateString('en-US');
+            
+            let credColor = cred > 0 ? 'text-green-600' : 'text-gray-400';
+            let debColor = deb > 0 ? 'text-red-600' : 'text-gray-400';
+
+            html += `
+                <tr class="hover:bg-gray-50">
+                    <td class="table-td">${dateStr}</td>
+                    <td class="table-td">
+                        <span class="font-bold">${t.transaction_type.replace(/_/g, ' ')}</span><br>
+                        <span class="text-xs text-gray-500">${displayType} | ${t.remarks || ''}</span>
+                    </td>
+                    <td class="table-td font-bold ${credColor}">${cred > 0 ? '+'+cred.toFixed(3) : '-'}</td>
+                    <td class="table-td font-bold ${debColor}">${deb > 0 ? '-'+deb.toFixed(3) : '-'}</td>
+                    <td class="table-td font-bold">${t.computedBal}</td>
+                </tr>
+            `;
+            
+            // Build payload for PDF printing
+            currentLedgerDataToPrint.push({
+                date: dateStr,
+                particulars: `${t.transaction_type.replace(/_/g, ' ')}: ${displayType}`,
+                credit: cred > 0 ? `+${cred.toFixed(3)}` : '-',
+                debit: deb > 0 ? `-${deb.toFixed(3)}` : '-',
+                runningBal: t.computedBal
+            });
+        });
+        
+        list.innerHTML = html;
+        btnPrint.classList.remove('hidden'); 
+
+    } catch (e) {
+        list.innerHTML = `<tr><td colspan="5" class="table-td text-center text-red-500">Error: ${e.message}</td></tr>`;
+    }
+}
+    
     function printDetailedLedger() {
         if (currentLedgerDataToPrint.length === 0) return;
 
