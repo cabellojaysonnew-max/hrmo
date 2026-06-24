@@ -520,11 +520,11 @@
 
             const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, holRes] = await Promise.all([
                 fetchSafe(supabaseClient.from('attendance_logs').select('id, emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
-                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')), // Fetch ALL uncancelled TOs (including pending)
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')), 
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
-                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr)),
+                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days, start_time, end_time').lte('start_date', endDtStr).gte('end_date', startDtStr).order('created_at', { ascending: false })),
                 fetchSafe(supabaseClient.from('holidays').select('date, description').gte('date', startDtStr).lte('date', endDtStr))
             ]);
 
@@ -537,7 +537,6 @@
             });
 
             const toSet = new Set();
-            // Map itinerary details accurately supporting multiple employees per TO.
             (itinRes.data || []).forEach(i => {
                 const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
                 empsOnTO.forEach(t => {
@@ -574,7 +573,7 @@
                     if (eType !== selectedViewType) return;
 
                     let expectedDays = ['1', '2', '3', '4', '5'];
-                    const override = ovrList.find(o => e.emp_id === o.emp_id && dateStr >= o.start_date && dateStr <= o.end_date);
+                    const override = ovrList.find(o => (o.emp_id === e.emp_id || o.emp_id === 'ALL') && dateStr >= o.start_date && dateStr <= o.end_date);
                     if (override && override.working_days) {
                         expectedDays = override.working_days.split(',');
                     }
@@ -1073,18 +1072,18 @@
             const { data: allLogs } = await fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', empIds).gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59"));
             
             status.innerText = "Fetching schedule overrides...";
-            const { data: allOverrides } = await fetchSafe(supabaseClient.from('schedule_overrides').select('*').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr).order('created_at', { ascending: false }));
+            const empIdsWithAll = [...empIds, 'ALL'];
+            const { data: allOverrides } = await fetchSafe(supabaseClient.from('schedule_overrides').select('*').in('emp_id', empIdsWithAll).lte('start_date', endDtStr).gte('end_date', startDtStr).order('created_at', { ascending: false }));
 
             status.innerText = "Fetching TO, PSO, Leaves and Holidays...";
             const [toRes, itinRes, psoRes, leaveRes, holRes] = await Promise.all([
-                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')), // Fix 1: Removed restrictive APPROVED check for TOs mapping
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')), 
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date, destination').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date, pso_no').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type').eq('transaction_t', 'APPROVED').in('emp_id', empIds).gte('date', startDtStr).lte('date', endDtStr)),
                 fetchSafe(supabaseClient.from('holidays').select('date, description').gte('date', startDtStr).lte('date', endDtStr))
             ]);
 
-            // Fix 2: Dynamically map dates to all correct employees under a shared Travel Order Group
             const toDateMap = {};
             (itinRes.data || []).forEach(i => {
                 const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
@@ -1115,7 +1114,7 @@
                     logsByDate[isoStr].push(dateObj);
                 });
 
-                const schedOverrides = (allOverrides || []).filter(o => o.emp_id === emp.emp_id);
+                const schedOverrides = (allOverrides || []).filter(o => o.emp_id === emp.emp_id || o.emp_id === 'ALL');
 
                 let chiefName = "_________________________";
                 let chiefPos = "DIVISION CHIEF";
@@ -1352,7 +1351,7 @@
 
             const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, gpRes, holRes] = await Promise.all([
                 fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
-                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')), // Modified filtering here
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')), 
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
@@ -1404,7 +1403,7 @@
                 let gatepass = gpByEmp[emp.emp_id] || 0;
 
                 const myLogs = logsByEmp[emp.emp_id] || {};
-                const schedOverrides = (ovrRes.data || []).filter(o => o.emp_id === emp.emp_id);
+                const schedOverrides = (ovrRes.data || []).filter(o => o.emp_id === emp.emp_id || o.emp_id === 'ALL');
 
                 for (let d = 1; d <= endDt.getDate(); d++) {
                     const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
