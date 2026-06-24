@@ -1089,7 +1089,7 @@
             (itinRes.data || []).forEach(i => {
                 const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
                 empsOnTO.forEach(t => {
-                    toDateMap[`${t.emp_id}_${i.travel_date}`] = i.destination ? `TO - ${i.destination}` : `TO - ${i.to_no}`;
+                    toDateMap[`${t.emp_id}_${i.travel_date}`] = `TO - ${i.to_no}`;
                 });
             });
 
