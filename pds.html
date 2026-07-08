@@ -367,14 +367,27 @@
     </main>
 
 <script>
-    // --- SESSION & RBAC ---
+    // --- SESSION & RBAC (Updated for Multi-Role Compatibility) ---
     const userData = sessionStorage.getItem('currentUser');
     if (!userData) { window.location.href = 'index.html'; }
     const currentUser = JSON.parse(userData);
-    const role = currentUser.role.toUpperCase();
-    if (!role.includes('HR') && !role.includes('ADMIN')) { window.location.href = 'dashboard.html'; }
-    document.getElementById('activeUser').innerText = currentUser.full_name;
-    document.getElementById('userRoleBadge').innerText = currentUser.role;
+
+    // Safely parse roles whether the session stored it as a string ("HRMO, UNIT_HEAD") or an array (["HRMO", "UNIT_HEAD"])
+    const rawRole = currentUser.role || currentUser.roles || "";
+    const rolesArray = Array.isArray(rawRole) 
+        ? rawRole.map(r => r.toUpperCase()) 
+        : rawRole.split(',').map(r => r.trim().toUpperCase());
+
+    // Check if ANY of the user's parsed roles grant them access to this HR page
+    const hasAccess = rolesArray.some(r => r.includes('HR') || r.includes('ADMIN'));
+    
+    if (!hasAccess) { window.location.href = 'dashboard.html'; }
+    
+    // Safely pull in name based on how the login script named the key
+    document.getElementById('activeUser').innerText = currentUser.full_name || currentUser.fullName || "Unknown User";
+    
+    // Display all multi-roles cleanly in the UI Badge
+    document.getElementById('userRoleBadge').innerText = rolesArray.join(', ');
 
     function logout() { sessionStorage.removeItem('currentUser'); window.location.href = 'index.html'; }
 
