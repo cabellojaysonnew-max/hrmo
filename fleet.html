@@ -95,7 +95,7 @@
         const SB_KEY = "sb_publishable_poSZUQ9HI4wcY9poEo5b1w_Z-pAJbKo"; 
         const db = window.supabase.createClient(SB_URL, SB_KEY);
 
-        const VEHICLES = ["MAZDA", "REVO", "INNOVA", "SKY", "BLACK"];
+        const VEHICLES = ["MAZDA", "REVO", "INNOVA", "SKY", "BLACK", "Tamaraw FL 306", "Tamaraw 250"];
         const DRIVERS = ["Driver 1", "Driver 2", "Driver 3", "Driver 4", "Driver 5"];
 
         let user = null, currentTab = 'inbox', scheduleFilter = 'day'; 
@@ -452,6 +452,11 @@
                     <div class="mb-4 text-sm text-gray-700 font-semibold leading-relaxed pl-2 border-l-2 border-[#D4AF37]">
                         • ${allNames}
                     </div>
+
+                    <div class="mb-4 text-[11px] text-gray-600 bg-gray-50 p-3 rounded border border-gray-200">
+                        <span class="font-bold uppercase text-[#003811] mb-1 block">Purpose & Requested Time:</span>
+                        ${o.remarks || 'No remarks provided.'}
+                    </div>
                     
                     <div class="mb-5 flex-1">
                         <h4 class="text-[10px] font-bold text-gray-500 mb-3 uppercase tracking-widest">Day-by-Day Vehicle Assignment</h4>
@@ -504,6 +509,7 @@
 
             let receivedObj = {}, driverObj = {}, scheduleObj = {}, allLand = true;
             const passengers = orders.filter(o => o.to_no === to).map(o => o.emp_name).join(', ');
+            const toRec = orders.find(ord => ord.to_no === to);
 
             for (let i of tripItins) {
                 const date = i.travel_date;
@@ -527,7 +533,8 @@
                     travel_date: date,
                     action: v === 'LAND' ? 'ASSIGNED - LAND' : 'ASSIGNED - VEHICLE',
                     schedule: v === 'LAND' ? 'WITHOUT VEHICLE' : 'WITH VEHICLE',
-                    destination: i.destination
+                    destination: i.destination,
+                    remarks: toRec ? toRec.remarks : ''
                 });
             }
 
@@ -555,6 +562,7 @@
             
             const passengers = orders.filter(o => o.to_no === to).map(o => o.emp_name).join(', ');
             const tripItins = itins.filter(i => i.to_no === to);
+            const toRec = orders.find(ord => ord.to_no === to);
             
             for (let i of tripItins) {
                 await db.from('vehicle_logs').insert({
@@ -563,7 +571,8 @@
                     travel_date: i.travel_date,
                     action: 'CANCELLED',
                     schedule: 'WITHOUT VEHICLE',
-                    destination: i.destination
+                    destination: i.destination,
+                    remarks: toRec ? toRec.remarks : ''
                 });
             }
 
@@ -895,11 +904,14 @@
 
             let passStr = '';
             let destStr = 'N/A';
+            let remarksStr = '';
             
             if(type === 'TO') {
                 passStr = orders.filter(o => o.to_no === ref).map(o => o.emp_name).join(', ');
                 const itinObj = itins.find(i => i.to_no === ref && i.travel_date === date);
                 if (itinObj) destStr = itinObj.destination;
+                const oRec = orders.find(o => o.to_no === ref);
+                if (oRec) remarksStr = oRec.remarks || '';
             } else {
                 passStr = bookings.filter(b => b.ref_no === ref && b.travel_date === date).map(b => b.emp_name).join(', ');
                 const bkObj = bookings.find(b => b.ref_no === ref && b.travel_date === date);
@@ -912,7 +924,8 @@
                 travel_date: date,
                 action: 'CANCELLED',
                 schedule: 'WITHOUT VEHICLE',
-                destination: destStr
+                destination: destStr,
+                remarks: remarksStr
             });
 
             if (type === 'TO') {
@@ -945,24 +958,27 @@
             if(!confirm("Mark this trip as HAPPENED? This will finalize it, hide it from the board, and move it to the Logs.")) return;
             
             const tag = '[COMPLETED]';
+            let remarksStr = '';
             
-            // 1. Tag in bookings to hide it
             if (type === 'BK') {
                 const bkList = bookings.filter(b => b.ref_no === ref && b.travel_date === date);
                 if (bkList.length > 0) {
                     let baseText = cleanText(bkList[0].schedule || '');
                     await db.from('fleet_bookings').update({ schedule: `${tag} ${baseText}` }).eq('ref_no', ref).eq('travel_date', date);
                 }
+            } else if (type === 'TO') {
+                const oRec = orders.find(o => o.to_no === ref);
+                if (oRec) remarksStr = oRec.remarks || '';
             }
 
-            // 2. Insert to vehicle_logs to record the specific schedule block and hide TOs
             await db.from('vehicle_logs').insert({
                 to_no: ref,
                 applicant: passengerStr,
                 travel_date: date,
                 action: 'COMPLETED',
                 schedule: 'WITH VEHICLE',
-                destination: dest
+                destination: dest,
+                remarks: remarksStr
             });
 
             sync();
@@ -971,13 +987,20 @@
         async function cancelScheduleTrip(ref, type, date, passengerStr, scheduleStr, dest, veh) {
             if(!confirm("Are you sure you want to CANCEL this trip? It will be logged as Cancelled and the vehicle assignment will be set to LAND.")) return;
 
+            let remarksStr = '';
+            if (type === 'TO') {
+                const oRec = orders.find(o => o.to_no === ref);
+                if (oRec) remarksStr = oRec.remarks || '';
+            }
+
             await db.from('vehicle_logs').insert({
                 to_no: ref,
                 applicant: passengerStr,
                 travel_date: date,
                 action: 'CANCELLED',
                 schedule: 'WITHOUT VEHICLE',
-                destination: dest
+                destination: dest,
+                remarks: remarksStr
             });
 
             if (type === 'TO') {
@@ -1215,7 +1238,7 @@
                                 <th class="p-4 w-32 border-b border-gray-700">Date Logged</th>
                                 <th class="p-4 w-32 border-b border-gray-700">Travel Date</th>
                                 <th class="p-4 w-40 border-b border-gray-700">Ref No.</th>
-                                <th class="p-4 border-b border-gray-700">Action / Details</th>
+                                <th class="p-4 border-b border-gray-700 w-64">Action / Remarks</th>
                                 <th class="p-4 border-b border-gray-700 w-64">Passengers / Vehicle</th>
                                 <th class="p-4 border-b border-gray-700 w-48">Destination</th>
                                 <th class="p-4 border-b border-gray-700 w-48">Schedule</th>
@@ -1237,7 +1260,10 @@
                         <td class="p-4 text-xs font-semibold text-gray-600">${dLogged}</td>
                         <td class="p-4 text-sm font-bold text-gray-800">${l.travel_date}</td>
                         <td class="p-4 text-[11px] font-bold text-[#003811] uppercase">${l.to_no}</td>
-                        <td class="p-4">${actionBadge}</td>
+                        <td class="p-4">
+                            ${actionBadge}
+                            ${l.remarks ? `<div class="mt-1.5 text-[10px] text-gray-600 italic leading-tight">Remarks: ${l.remarks}</div>` : ''}
+                        </td>
                         <td class="p-4 text-xs font-semibold text-gray-700 leading-relaxed">${l.applicant}</td>
                         <td class="p-4 text-xs font-semibold text-gray-700 leading-relaxed">${l.destination || 'N/A'}</td>
                         <td class="p-4 text-[10px] font-bold text-gray-600 uppercase">${l.schedule || 'N/A'}</td>
@@ -1511,7 +1537,8 @@
                 applicant: activeVehForMaint,
                 travel_date: today,
                 action: 'ISSUE: ' + desc,
-                schedule: 'N/A'
+                schedule: 'N/A',
+                remarks: desc
             });
             
             closeModal('issueModal');
