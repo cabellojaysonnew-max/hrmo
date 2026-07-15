@@ -454,7 +454,7 @@
                     </div>
 
                     <div class="mb-4 text-[11px] text-gray-600 bg-gray-50 p-3 rounded border border-gray-200">
-                        <span class="font-bold uppercase text-[#003811] mb-1 block">Purpose & Requested Time:</span>
+                        <span class="font-bold uppercase text-[#003811] mb-1 block">General Remarks & Requested Time:</span>
                         ${o.remarks || 'No remarks provided.'}
                     </div>
                     
@@ -463,7 +463,13 @@
                         <div class="space-y-3">
                             ${tripItins.map(i => `
                                 <div class="bg-gray-50 p-4 rounded border border-gray-200">
-                                    <p class="text-xs font-bold text-[#003811] mb-3">${i.travel_date} <span class="text-gray-500 font-medium ml-1">(${i.destination})</span></p>
+                                    <p class="text-xs font-bold text-[#003811] mb-1">${i.travel_date} <span class="text-gray-500 font-medium ml-1">(${i.destination})</span></p>
+                                    
+                                    <!-- DISPLAY ITINERARY PURPOSE HERE -->
+                                    <p class="text-[10px] text-gray-700 italic mb-3 bg-white p-1.5 rounded border border-gray-100 shadow-sm">
+                                        <span class="font-bold text-[#003811] uppercase tracking-wider not-italic">Purpose:</span> 
+                                        ${i.purpose || 'No specific itinerary purpose provided.'}
+                                    </p>
                                     
                                     <div class="grid grid-cols-2 gap-3 mb-3">
                                         <div>
