@@ -121,6 +121,11 @@
                     <button onclick="generateMonthlyView()" id="btnGenerateView" class="bg-[#003811] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-[#006400] h-[36px]">GENERATE VIEW</button>
                     
                     <div class="flex-1"></div>
+                    <div class="flex items-center mr-4 border-r border-gray-300 pr-4">
+                        <label class="form-label mb-0 mr-2 text-[10px]">Daily Summary:</label>
+                        <input type="date" id="printDailyDate" class="form-input py-1.5 w-32 h-[36px] mr-2 text-xs">
+                        <button onclick="printDailySummary()" id="btnDailySummary" class="bg-[#1976D2] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-blue-800 shadow-sm h-[36px]">PRINT</button>
+                    </div>
                     <button onclick="printMissingLogs()" class="bg-[#C62828] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-red-800 shadow-sm mr-2 h-[36px]">PRINT MISSING LOGS</button>
                     <button onclick="openManualEntryModal()" class="bg-[#D4AF37] text-[#003811] px-4 py-1.5 rounded text-sm font-bold hover:bg-yellow-500 shadow-sm h-[36px]">+ MANUAL ENTRY</button>
                 </div>
@@ -407,6 +412,7 @@
     window.onload = async () => {
         const today = new Date();
         document.getElementById('mDate').value = today.toISOString().split('T')[0];
+        document.getElementById('printDailyDate').value = today.toISOString().split('T')[0];
 
         const currYear = today.getFullYear();
         const yHtml = `<option value="${currYear}">${currYear}</option><option value="${currYear-1}">${currYear-1}</option>`;
@@ -774,6 +780,194 @@
             if (data.length > 1) document.getElementById('mAmOut').value = formatTime12(new Date(data[1].log_time));
             if (data.length > 2) document.getElementById('mPmIn').value = formatTime12(new Date(data[2].log_time));
             if (data.length > 3) document.getElementById('mPmOut').value = formatTime12(new Date(data[3].log_time));
+        }
+    }
+
+    async function printDailySummary() {
+        const dStr = document.getElementById('printDailyDate').value;
+        if (!dStr) return alert("Please select a date for the Daily Summary.");
+
+        const btn = document.getElementById('btnDailySummary');
+        const origText = btn.innerText;
+        btn.disabled = true; btn.innerText = "PRINTING...";
+
+        try {
+            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, holRes] = await Promise.all([
+                fetchSafe(supabaseClient.from('attendance_logs').select('id, emp_id, log_time').gte('log_time', dStr + "T00:00:00").lte('log_time', dStr + "T23:59:59")),
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')),
+                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').eq('travel_date', dStr)),
+                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', dStr).gte('end_date', dStr)),
+                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').eq('date', dStr)),
+                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days, start_time, end_time').lte('start_date', dStr).gte('end_date', dStr).order('created_at', { ascending: false })),
+                fetchSafe(supabaseClient.from('holidays').select('date, description').eq('date', dStr))
+            ]);
+
+            const logMap = {};
+            (logsRes.data || []).forEach(l => {
+                if(!logMap[l.emp_id]) logMap[l.emp_id] = [];
+                logMap[l.emp_id].push({ time: new Date(l.log_time), id: l.id });
+            });
+
+            const toSet = new Set();
+            (itinRes.data || []).forEach(i => {
+                const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
+                empsOnTO.forEach(t => toSet.add(t.emp_id));
+            });
+
+            const psoList = psoRes.data || [];
+            const leaveSet = new Set((leaveRes.data || []).map(l => l.emp_id));
+            const ovrList = ovrRes.data || [];
+            const isHoliday = (holRes.data || []).length > 0;
+
+            const dailyData = [];
+            const dObj = new Date(dStr);
+            const dayOfWeek = dObj.getDay().toString();
+
+            allEmployees.forEach(e => {
+                let expectedDays = ['1', '2', '3', '4', '5'];
+                const override = ovrList.find(o => (o.emp_id === e.emp_id || o.emp_id === 'ALL'));
+                if (override && override.working_days) {
+                    expectedDays = override.working_days.split(',');
+                }
+
+                if (!expectedDays.includes(dayOfWeek)) return;
+
+                let status = "PRESENT";
+                let amIn = "-", amOut = "-", pmIn = "-", pmOut = "-", ud = "0:00";
+                let overrideLogs = false;
+
+                const isTO = toSet.has(e.emp_id);
+                const isLeave = leaveSet.has(e.emp_id);
+                const isPSO = psoList.some(p => p.emp_id === e.emp_id);
+
+                if (isLeave) { status = "ON LEAVE"; overrideLogs = true; }
+                else if (isPSO) { status = "ON PSO"; overrideLogs = true; }
+                else if (isTO) { status = "ON TO"; overrideLogs = true; }
+
+                const dayLogs = (logMap[e.emp_id] || []).sort((a,b) => a.time - b.time);
+
+                if (isHoliday && dayLogs.length === 0 && !overrideLogs) {
+                    status = "HOLIDAY"; overrideLogs = true;
+                }
+
+                if (!overrideLogs) {
+                    if (dayLogs.length === 0) {
+                        status = "ABSENT";
+                    } else {
+                        if (dayLogs.length > 0) amIn = formatTime12(dayLogs[0].time);
+                        if (dayLogs.length > 1) amOut = formatTime12(dayLogs[1].time);
+                        if (dayLogs.length > 2) pmIn = formatTime12(dayLogs[2].time);
+                        if (dayLogs.length > 3) pmOut = formatTime12(dayLogs[3].time);
+
+                        let reqIn = e.flexi_range_start || '08:00:00';
+                        let reqOut = e.flexi_range_end || '17:00:00';
+                        if (override) {
+                            if (override.start_time) reqIn = override.start_time;
+                            if (override.end_time) reqOut = override.end_time;
+                        }
+
+                        const firstLog = dayLogs[0].time;
+                        const lastLog = dayLogs[dayLogs.length - 1].time;
+                        const reqStart = new Date(`${dStr}T${reqIn}`);
+                        const reqEnd = new Date(`${dStr}T${reqOut}`);
+
+                        let utMins = 0;
+                        if (firstLog > reqStart) utMins += Math.floor((firstLog - reqStart) / 60000);
+                        if (dayLogs.length > 1 && lastLog < reqEnd) utMins += Math.floor((reqEnd - lastLog) / 60000);
+
+                        if (utMins > 0) {
+                            let h = Math.floor(utMins / 60);
+                            let m = utMins % 60;
+                            ud = `${h}:${m.toString().padStart(2, '0')}`;
+                        }
+
+                        if (amIn === "-" || pmOut === "-") {
+                            status = "INCOMPLETE";
+                        }
+                    }
+                }
+
+                dailyData.push({
+                    emp_id: e.emp_id,
+                    full_name: e.full_name,
+                    division: e.division,
+                    type: e.type,
+                    amIn, amOut, pmIn, pmOut, ud, status
+                });
+            });
+
+            if (dailyData.length === 0) return alert("No expected attendance for this date.");
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+
+            const byDiv = {};
+            dailyData.forEach(r => {
+                let div = String(r.division || 'UNASSIGNED').toUpperCase();
+                let type = String(r.type || '').toUpperCase();
+                if (div.includes('SPLIT') || type === 'SPLIT') div = 'SPLIT';
+                else if (!div) div = 'UNASSIGNED';
+
+                if(!byDiv[div]) byDiv[div] = [];
+                byDiv[div].push(r);
+            });
+
+            let isFirst = true;
+            for (const div in byDiv) {
+                if (!isFirst) doc.addPage();
+                isFirst = false;
+
+                doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+                doc.text(`DAILY ATTENDANCE SUMMARY - ${div}`, 148.5, 15, { align: "center" });
+                doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+                const formattedDate = new Date(dStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                doc.text(`Date: ${formattedDate}`, 148.5, 22, { align: "center" });
+
+                let yPos = 35;
+                doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+                doc.rect(10, yPos, 20, 6); doc.text("ID", 20, yPos + 4, { align: "center" });
+                doc.rect(30, yPos, 70, 6); doc.text("NAME", 65, yPos + 4, { align: "center" });
+                doc.rect(100, yPos, 25, 6); doc.text("AM IN", 112.5, yPos + 4, { align: "center" });
+                doc.rect(125, yPos, 25, 6); doc.text("AM OUT", 137.5, yPos + 4, { align: "center" });
+                doc.rect(150, yPos, 25, 6); doc.text("PM IN", 162.5, yPos + 4, { align: "center" });
+                doc.rect(175, yPos, 25, 6); doc.text("PM OUT", 187.5, yPos + 4, { align: "center" });
+                doc.rect(200, yPos, 25, 6); doc.text("UNDERTIME", 212.5, yPos + 4, { align: "center" });
+                doc.rect(225, yPos, 30, 6); doc.text("STATUS", 240, yPos + 4, { align: "center" });
+
+                yPos += 6;
+                doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+
+                byDiv[div].forEach(r => {
+                    doc.rect(10, yPos, 20, 6); doc.text(r.emp_id, 20, yPos + 4, { align: "center" });
+                    doc.rect(30, yPos, 70, 6); doc.text(r.full_name.substring(0,40), 32, yPos + 4);
+                    doc.rect(100, yPos, 25, 6); doc.text(r.amIn, 112.5, yPos + 4, { align: "center" });
+                    doc.rect(125, yPos, 25, 6); doc.text(r.amOut, 137.5, yPos + 4, { align: "center" });
+                    doc.rect(150, yPos, 25, 6); doc.text(r.pmIn, 162.5, yPos + 4, { align: "center" });
+                    doc.rect(175, yPos, 25, 6); doc.text(r.pmOut, 187.5, yPos + 4, { align: "center" });
+                    doc.rect(200, yPos, 25, 6); doc.text(r.ud, 212.5, yPos + 4, { align: "center" });
+                    doc.rect(225, yPos, 30, 6); doc.text(r.status, 240, yPos + 4, { align: "center" });
+
+                    yPos += 6;
+                    if (yPos > 185) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                });
+
+                yPos += 15;
+                doc.text("Certified Correct:", 15, yPos);
+                yPos += 15;
+                doc.text("_______________________", 15, yPos);
+                doc.text("HR Officer Signature", 15, yPos + 5);
+            }
+
+            doc.save(`Daily_Summary_${dStr}.pdf`);
+
+        } catch (error) {
+            console.error(error);
+            alert("Error generating summary: " + error.message);
+        } finally {
+            btn.disabled = false; btn.innerText = origText;
         }
     }
 
