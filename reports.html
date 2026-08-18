@@ -284,6 +284,7 @@
             let maxLines = 1;
             rowData.forEach((val, i) => {
                 let vStr = (val !== null && val !== undefined && val !== "") ? String(val) : "-";
+                // Only blank out fields intended for manual filling
                 if (["RECEIVED", "SIGNATURE", "DATE"].includes(headers[i])) vStr = "";
                 let lines = doc.splitTextToSize(vStr, widths[i] - 2);
                 if (lines.length > maxLines) maxLines = lines.length;
@@ -303,8 +304,12 @@
                 if (["PURPOSE", "DESTINATION", "NAME", "NAME OF EMPLOYEE", "INCLUSIVE DATES", "DATE/S", "DATES & EXACT TIME IN", "DETAILS (DATE: STATUS [TIME IN])", "REPORT TO"].includes(headers[i])) align = 'left';
                 const tx = align === 'center' ? cx + (widths[i]/2) : cx + 2;
                 
+                // Color PENDING remarks red
+                if (headers[i] === "STATUS / REMARKS" && vStr !== "APPROVED") doc.setTextColor(220, 38, 38);
+                
                 let textLines = doc.splitTextToSize(vStr, widths[i] - 2);
                 doc.text(textLines, tx, cy + 4, {align: align});
+                doc.setTextColor(0, 0, 0); // reset
                 cx += widths[i];
             });
             cy += rowH;
@@ -439,14 +444,15 @@
 
             // 1. TRAVEL ORDER BATCH PRINTING 
             if (type === "Travel Order Batch Printing") {
-                const { data: tosData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
+                // Fetch ALL TOs regardless of approval to allow printing pending ones if requested
+                const { data: tosData } = await supabaseClient.from('travel_orders').select('*');
                 const tos = tosData || [];
                 const { data: itinData } = await supabaseClient.from('itinerary').select('*').gte('travel_date', startIso.split('T')[0]).lte('travel_date', endIso.split('T')[0]);
                 const itins = itinData || [];
                 
                 const activeToNos = [...new Set(itins.map(i => i.to_no))];
                 const activeTOs = tos.filter(t => activeToNos.includes(t.to_no) && validEmpIds.has(cleanId(t.emp_id)));
-                if(!activeTOs.length) throw new Error("No Approved Travel Orders found for this period in the selected division.");
+                if(!activeTOs.length) throw new Error("No Travel Orders found for this period in the selected division.");
                 
                 const bgForm = await getAssetBase64('bg_form.jpg');
                 const p2 = await getAssetBase64('P2.png');
@@ -476,22 +482,31 @@
                     const isMARPO = currentUser.position && currentUser.position.toUpperCase().includes("MARPO");
 
                     if (bgForm) { try { doc.addImage(bgForm, 'JPEG', 0, 0, 215.9, 330.2); } catch(e){} }
-                    if (qr) { try { doc.addImage(qr, 'PNG', 185, 12.7, 20, 20); if(typeLabel){ doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.text(typeLabel, 195, 35.7, {align: 'center'}); } } catch(e){} }
+                    
+                    // QR Code at the top right, respecting 12.7mm margin (215.9 - 12.7 - 20 = 183.2)
+                    if (qr) { try { doc.addImage(qr, 'PNG', 183.2, 12.7, 20, 20); if(typeLabel){ doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.text(typeLabel, 193.2, 35.7, {align: 'center'}); } } catch(e){} }
+
+                    // PENDING / UNAPPROVED REMARK
+                    if (t.status && t.status.toUpperCase() !== 'APPROVED') {
+                        doc.setFont("helvetica", "bolditalic"); doc.setFontSize(14); doc.setTextColor(220, 38, 38);
+                        doc.text(`* ${t.status.toUpperCase()} *`, 107.95, 22, { align: 'center' });
+                        doc.setTextColor(0, 0, 0); // Reset color
+                    }
 
                     if (t.transport === "GOV'T VEHICLE") {
                         doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-                        doc.text("NOT VALID FOR TRANSPORTATION REIMBURSEMENT CLAIM", 108, 48, { align: 'center' });
+                        doc.text("NOT VALID FOR TRANSPORTATION REIMBURSEMENT CLAIM", 107.95, 48, { align: 'center' });
                     }
                     if (t.remarks && t.remarks.includes("EXISTING PSO")) {
                         doc.setFont("helvetica", "bold"); doc.setFontSize(9);
-                        doc.text("WITH EXISTING PSO/RSO, subject for PARPO's FINAL APPROVAL", 108, 28, { align: 'center' });
+                        doc.text("WITH EXISTING PSO/RSO, subject for PARPO's FINAL APPROVAL", 107.95, 28, { align: 'center' });
                     }
 
                     doc.setFont("helvetica", "bold"); doc.setFontSize(14);
-                    doc.text(`TRAVEL ORDER NO. ${toNo}`, 108, 35, { align: 'center' });
+                    doc.text(`TRAVEL ORDER NO. ${toNo}`, 107.95, 35, { align: 'center' });
                     const fDate = new Date(t.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
                     doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-                    doc.text(`Date: ${fDate}`, 108, 42, { align: 'center' });
+                    doc.text(`Date: ${fDate}`, 107.95, 42, { align: 'center' });
 
                     const renderFlexibleText = (text, x, y, maxWidth, defaultSize) => {
                         let currentSize = defaultSize;
@@ -506,12 +521,12 @@
 
                     doc.setFontSize(10); 
                     doc.setFont("helvetica", "bold"); doc.text("NAME:", 12.7, 48); 
-                    renderFlexibleText(names, 32.7, 48, 120, 10); doc.line(32.7, 49, 160, 49);
+                    renderFlexibleText(names, 32.7, 48, 170, 10); doc.line(32.7, 49, 203.2, 49);
 
                     doc.setFont("helvetica", "bold"); doc.text("POSITION:", 12.7, 54);
-                    doc.setFont("helvetica", "normal"); renderFlexibleText(positions, 32.7, 54, 45, 10); doc.line(32.7, 55, 85, 55);
-                    doc.setFont("helvetica", "bold"); doc.text("STATION:", 90, 54);
-                    doc.setFont("helvetica", "normal"); renderFlexibleText(stations, 110, 54, 50, 10); doc.line(110, 55, 160, 55);
+                    doc.setFont("helvetica", "normal"); renderFlexibleText(positions, 32.7, 54, 65, 10); doc.line(32.7, 55, 100, 55);
+                    doc.setFont("helvetica", "bold"); doc.text("STATION:", 105, 54);
+                    doc.setFont("helvetica", "normal"); renderFlexibleText(stations, 125, 54, 75, 10); doc.line(125, 55, 203.2, 55);
 
                     doc.setFont("helvetica", "bold"); doc.text("MEANS OF TRANSPORTATION:", 12.7, 61);
                     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
@@ -521,9 +536,9 @@
                         doc.text(label, x + 5, y);
                     };
                     drawCheck("AIR", 12.7, 66, t.transport === "AIR");
-                    drawCheck("GOV'T VEHICLE", 62.7, 66, t.transport === "GOV'T VEHICLE");
+                    drawCheck("GOV'T VEHICLE", 72.7, 66, t.transport === "GOV'T VEHICLE");
                     drawCheck("LAND", 12.7, 71, t.transport === "LAND");
-                    drawCheck("OTHERS, PLEASE SPECIFY", 62.7, 71, t.transport === "OTHERS");
+                    drawCheck("OTHERS, PLEASE SPECIFY", 72.7, 71, t.transport === "OTHERS");
 
                     doc.setFontSize(10); doc.setFont("helvetica", "bold");
                     doc.text("DESTINATION:", 12.7, 78);
@@ -539,20 +554,20 @@
 
                     doc.setFont("helvetica", "bold"); doc.setFontSize(10);
                     doc.text("DEPARTURE DATE:", 12.7, curY);
-                    doc.setFont("helvetica", "normal"); doc.text(toItins[0]?.travel_date || "", 47.7, curY); doc.line(47.7, curY+1, 82.7, curY+1);
-                    doc.setFont("helvetica", "bold"); doc.text("RETURN DATE:", 87.7, curY);
-                    doc.setFont("helvetica", "normal"); doc.text(toItins[toItins.length-1]?.travel_date || "", 117.7, curY); doc.line(117.7, curY+1, 160, curY+1);
+                    doc.setFont("helvetica", "normal"); doc.text(toItins[0]?.travel_date || "", 47.7, curY); doc.line(47.7, curY+1, 97.7, curY+1);
+                    doc.setFont("helvetica", "bold"); doc.text("RETURN DATE:", 107.7, curY);
+                    doc.setFont("helvetica", "normal"); doc.text(toItins[toItins.length-1]?.travel_date || "", 137.7, curY); doc.line(137.7, curY+1, 203.2, curY+1);
 
                     curY += 6;
                     doc.setFont("helvetica", "bold"); doc.text("REPORT TO:", 12.7, curY);
-                    doc.setFont("helvetica", "normal"); doc.text(t.report_to || "", 42.7, curY); doc.line(42.7, curY+1, 160, curY+1);
+                    doc.setFont("helvetica", "normal"); doc.text(t.report_to || "", 42.7, curY); doc.line(42.7, curY+1, 203.2, curY+1);
                     
                     curY += 6;
                     doc.setFont("helvetica", "bold"); doc.text("PURPOSE OF TRAVEL:", 12.7, curY);
                     curY += 4;
                     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-                    const purpLines = doc.splitTextToSize(toItins[0]?.purpose || "", 147.3);
-                    doc.text(purpLines, 12.7, curY); doc.line(12.7, curY+1, 160, curY+1);
+                    const purpLines = doc.splitTextToSize(toItins[0]?.purpose || "", 190.5);
+                    doc.text(purpLines, 12.7, curY); doc.line(12.7, curY+1, 203.2, curY+1);
                     curY += Math.max(5, purpLines.length * 4);
 
                     doc.setFont("helvetica", "italic"); doc.setFontSize(8);
@@ -571,7 +586,7 @@
                         for (let j = 0; j < count; j++) {
                             let cx = startX + (step * j) + (step / 2) - 10; 
                             if (imgs[j]) { try { doc.addImage(imgs[j], 'PNG', cx, 153, 20, 20); } catch(e){} }
-                            doc.text(list[j].full_name.toUpperCase(), cx, 166);
+                            doc.text(list[j].full_name.toUpperCase(), cx, 166, {align: 'center'});
                         }
                     };
 
@@ -580,17 +595,17 @@
                     const dList = dc ? [{full_name: dc}] : [];
                     const dImgs = dSign ? [dSign] : [];
 
-                    if (!isMARPO) renderSigs(uList, uImgs, 12.7, 60);
-                    renderSigs(dList, dImgs, 95, 60);
+                    if (!isMARPO) renderSigs(uList, uImgs, 12.7, 70);
+                    renderSigs(dList, dImgs, 133.2, 70);
 
-                    doc.line(17.7, 168, 72.7, 168); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(isMARPO ? "" : "MARPO/UNIT HEAD", 45.2, 172, {align: 'center'});
-                    doc.line(100, 168, 155, 168); doc.text("DIVISION CHIEF", 127.5, 172, {align: 'center'});
+                    doc.line(12.7, 168, 82.7, 168); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(isMARPO ? "" : "MARPO/UNIT HEAD", 47.7, 172, {align: 'center'});
+                    doc.line(133.2, 168, 203.2, 168); doc.text("DIVISION CHIEF", 168.2, 172, {align: 'center'});
 
-                    if(p2) { try { doc.addImage(p2, 'PNG', 122, 187, 20, 20); } catch(e){} }
+                    if(p2) { try { doc.addImage(p2, 'PNG', 158.2, 187, 20, 20); } catch(e){} }
                     doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-                    doc.text("RICARDO C. GARCIA", 114, 202);
+                    doc.text("RICARDO C. GARCIA", 168.2, 202, {align: 'center'});
                     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-                    doc.text("PARPO II", 128, 206);
+                    doc.text("PARPO II", 168.2, 206, {align: 'center'});
                 }
                 doc.save(`Batch_HR_Files_TravelOrders_${titleSuffix.replace(/ /g, '_')}.pdf`);
             }
@@ -928,7 +943,8 @@
                 }
 
                 if (type === "Travel Order Summary") {
-                    const { data: tosData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
+                    // Fetch ALL TOs regardless of approval for summary reporting with remarks
+                    const { data: tosData } = await supabaseClient.from('travel_orders').select('*');
                     const tos = tosData || [];
                     const { data: itinData } = await supabaseClient.from('itinerary').select('*');
                     const itin = itinData || [];
@@ -951,8 +967,8 @@
                         empGroups[div].push(t);
                     });
 
-                    const headers = ["EMP NUMBER", "TO NUMBER", "NAME", "INCLUSIVE DATES", "NO. OF DAYS", "DESTINATION", "PURPOSE", "DATE", "SIGNATURE"];
-                    const widths = [20, 25, 40, 30, 18, 55, 60, 20, 36.8]; 
+                    const headers = ["EMP NUMBER", "TO NUMBER", "NAME", "INCLUSIVE DATES", "NO. OF DAYS", "DESTINATION", "PURPOSE", "DATE", "STATUS / REMARKS"];
+                    const widths = [20, 25, 40, 28, 15, 55, 65, 20, 36.8]; 
 
                     Object.keys(empGroups).sort().forEach(div => {
                         if(currY > 180) { doc.addPage(); currY = 15; }
@@ -972,7 +988,7 @@
                                 dests, 
                                 purps,
                                 '', 
-                                ''
+                                (r.status || 'PENDING').toUpperCase()
                             ];
                         }, isAppend, levelNum, currY);
                     });
@@ -1009,7 +1025,6 @@
                         }, isAppend, levelNum, currY);
                     });
 
-                // STRICT LEAVE SUMMARY FIX
                 } else if (type === "Leave Summary") {
                     const { data: llData } = await supabaseClient.from('leave_ledger').select('*').in('transaction_type', ['APPROVED', 'PROCESSED']).gte('created_at', startIso).lte('created_at', endIso);
                     const ll = llData || [];
@@ -1143,7 +1158,8 @@
                     });
 
                 } else if (type === "PSO / TO Conflicts") {
-                    const { data: tosData } = await supabaseClient.from('travel_orders').select('*').eq('status', 'APPROVED');
+                    // Fetch ALL TOs so pending TOs correctly warn of conflicts too
+                    const { data: tosData } = await supabaseClient.from('travel_orders').select('*');
                     const tos = tosData || [];
                     const { data: itinData } = await supabaseClient.from('itinerary').select('*');
                     const itin = itinData || [];
