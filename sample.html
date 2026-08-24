@@ -3,224 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DAT File Attendance Uploader</title>
-    <!-- Supabase SDK -->
+    <title>Upload Attendance | ARBO Management</title>
+    <!-- Use your existing scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="common.js"></script>
     <style>
-        :root {
-            --bg-dark: #1c1c1c;
-            --bg-panel: #2a2a2a;
-            --text-main: #e0e0e0;
-            --text-muted: #9e9e9e;
-            --accent: #24b47e;
-            --accent-hover: #1e996a;
-            --border: #444;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-        .header {
-            background-color: var(--bg-panel);
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            margin-bottom: 20px;
-        }
-        h2 {
-            margin-top: 0;
-            font-size: 1.25rem;
-            color: #fff;
-        }
-        .instructions {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            margin-bottom: 15px;
-        }
-        .file-upload-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        input[type="file"] {
-            color: var(--text-main);
-        }
-        button {
-            background-color: var(--accent);
-            color: #fff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        button:hover {
-            background-color: var(--accent-hover);
-        }
-        button:disabled {
-            background-color: #555;
-            color: #888;
-            cursor: not-allowed;
-        }
-        .table-container {
-            background-color: var(--bg-panel);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            overflow: auto;
-            max-height: 600px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-        th {
-            background-color: #333;
-            color: var(--text-muted);
-            position: sticky;
-            top: 0;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.05em;
-        }
-        tbody tr:hover {
-            background-color: #333;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: bold;
-        }
-        .status-in { background-color: #1a4d2e; color: #4ade80; }
-        .status-out { background-color: #451a1a; color: #f87171; }
-        .status-other { background-color: #422006; color: #fbbf24; }
+        /* YOUR EXACT DASHBOARD CSS */
+        :root{--navy:#0a3d62;--green:#066b4f;--blue:#1769a0;--amber:#b45309;--red:#b91c1c;--line:#dbe3ea;--soft:#f8fafc;--text:#1e293b;--muted:#64748b}
+        *{box-sizing:border-box}
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f9; color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { margin: 0 0 15px; color: var(--navy); font-size: 1.5rem; }
+        h1 small { color: var(--muted); font-size: 1rem; font-weight: normal; margin-left: 10px; }
         
-        .upload-action {
-            margin-top: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .log-count {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-        #alertBox {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            display: none;
-            font-size: 0.9rem;
-        }
-        .alert-success { background-color: #1a4d2e; border: 1px solid #24b47e; }
-        .alert-error { background-color: #451a1a; border: 1px solid #ef4444; }
-
-        /* Edit Input styles for human checking */
-        input.edit-input {
-            background: #1c1c1c;
-            border: 1px solid #444;
-            color: white;
-            padding: 5px;
-            border-radius: 4px;
-            width: 90%;
-        }
+        .nav { display: flex; gap: 10px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid var(--amber); }
+        .nav a { text-decoration: none; color: var(--navy); font-weight: 700; padding: 8px 12px; border-radius: 6px; }
+        .nav a.active { background: var(--navy); color: #fff; }
+        
+        .section { background: #fff; padding: 20px; border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 4px 15px rgba(15,23,42,.03); }
+        .module-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .module-heading h2 { margin: 0; color: var(--navy); font-size: 1.25rem; }
+        .module-heading p { margin: 4px 0 0; color: var(--muted); font-size: .85rem; }
+        
+        .filter-grid { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; margin-bottom: 20px; padding: 15px; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; }
+        .filter-grid label { display: block; margin-bottom: 5px; color: #475569; font-size: .76rem; font-weight: 700; text-transform: uppercase; }
+        .control { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #0f172a; font: inherit; }
+        .control:focus { outline: 0; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(23,105,160,.1); }
+        .compact-input { min-height: 32px; padding: 5px 8px; font-size: 0.85rem; }
+        
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border: 0; border-radius: 7px; font: inherit; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .btn-primary { background: var(--navy); color: #fff; }
+        .btn-primary:hover { background: #082d4a; }
+        .btn-success { background: var(--green); color: #fff; }
+        .btn-success:hover { background: #04523c; }
+        .btn-danger { background: var(--red); color: #fff; }
+        .btn-danger:hover { background: #991b1b; }
+        .btn-sm { padding: 5px 10px; font-size: .8rem; border-radius: 5px; }
+        
+        .table-wrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #fff; max-height: 600px; }
+        .monitor-table { width: 100%; min-width: 900px; border-collapse: collapse; }
+        .monitor-table th, .monitor-table td { padding: 10px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; }
+        .monitor-table th { background: #f8fafc; color: #475569; font-size: .76rem; text-transform: uppercase; letter-spacing: .025em; white-space: nowrap; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--line); }
+        .monitor-table tbody tr:hover { background: #fbfdff; }
+        
+        .status { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; font-size: .68rem; font-weight: 800; white-space: nowrap; }
+        .status-green { background: #dcfce7; color: #166534; }
+        .status-red { background: #fee2e2; color: #991b1b; }
+        .status-amber { background: #fef3c7; color: #92400e; }
+        .status-gray { background: #e2e8f0; color: #475569; }
+        
+        .access-note { margin: 0 0 20px; padding: 12px 15px; border-left: 4px solid var(--blue); border-radius: 6px; background: #eff6ff; color: #1e3a5f; }
+        .error-note { border-left-color: var(--red); background: #fff1f2; color: #881337; }
+        .success-note { border-left-color: var(--green); background: #f0fdf4; color: #166534; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="alertBox"></div>
+    <h1>&#128338; Attendance Logs <small>DAT File Extraction</small></h1>
+    
+    <nav class="nav" id="mainNav">
+        <a href="dashboard.html">&#128202; Dashboard</a>
+        <a href="arbo.html">&#127970; ARBO Management</a>
+        <a href="#" class="active">&#128338; Upload Attendance</a>
+    </nav>
 
-    <div class="header">
-        <h2>Upload DAT Attendance File</h2>
-        <div class="instructions">
-            Automated extraction: Select your biometric .dat file. Review the logs below to ensure accuracy before pushing to the <strong>attendance_logs</strong> database table.
+    <div id="alertBox" class="access-note" style="display:none;"></div>
+
+    <section class="section">
+        <div class="module-heading">
+            <div>
+                <h2>Extract & Upload DAT File</h2>
+                <p>Select the biometric .dat file, review the logs for accuracy, and push directly to the attendance_logs table.</p>
+            </div>
         </div>
-        
-        <div class="file-upload-wrapper">
-            <input type="file" id="fileInput" accept=".dat,.txt">
-            <button id="parseBtn">Extract & Preview Data</button>
+
+        <div class="filter-grid">
+            <div>
+                <label for="fileInput">Biometric File (.dat)</label>
+                <input type="file" id="fileInput" class="control" accept=".dat,.txt" style="padding: 7px 12px;">
+            </div>
+            <button class="btn btn-primary" id="parseBtn" type="button" style="height: 42px; min-width: 150px;">Extract Data</button>
         </div>
-    </div>
 
-    <div class="table-container" id="tableWrapper" style="display: none;">
-        <table id="previewTable">
-            <thead>
-                <tr>
-                    <th>Row</th>
-                    <th>Employee ID (emp_id)</th>
-                    <th>Log Time (log_time)</th>
-                    <th>Device ID (device_id)</th>
-                    <th>Status Code (status)</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="previewBody">
-                <!-- Data populated here -->
-            </tbody>
-        </table>
-    </div>
+        <div class="module-heading" id="uploadAction" style="display:none; margin-top: 25px; padding-top: 20px; border-top: 1px dashed var(--line);">
+            <div>
+                <h3 style="margin:0; color: var(--navy);" id="logCount">0 logs ready</h3>
+            </div>
+            <button class="btn btn-success" id="uploadBtn" type="button">Confirm & Upload to Database</button>
+        </div>
 
-    <div class="upload-action" id="uploadAction" style="display: none;">
-        <div class="log-count" id="logCount">0 logs ready for upload.</div>
-        <button id="uploadBtn">Confirm & Upload to Database</button>
-    </div>
+        <div class="table-wrap" id="tableWrapper" style="display:none;">
+            <table class="monitor-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">Row</th>
+                        <th style="width: 150px;">Employee ID</th>
+                        <th>Log Time (YYYY-MM-DD HH:MM:SS)</th>
+                        <th style="width: 120px;">Device ID</th>
+                        <th style="width: 180px;">Status Code</th>
+                        <th style="width: 80px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="previewBody">
+                    <!-- Data populated here -->
+                </tbody>
+            </table>
+        </div>
+    </section>
 </div>
 
 <script>
     // ==========================================
-    // SUPABASE CONFIGURATION
-    // Replace these with your actual Supabase keys
+    // SUPABASE CONFIGURATION (Use from your config.js)
     // ==========================================
-    const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
-    const SUPABASE_KEY = 'YOUR_ANON_OR_SERVICE_KEY';
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const dbClient = window.supabase?.createClient 
+        ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY) 
+        : null;
 
     let parsedData = [];
 
-    // Map ZKTeco / Biometric standard state codes to human readable statuses
+    // Map ZKTeco / Biometric standard state codes to your dashboard's status badges
     const getStatusLabel = (code) => {
         const strCode = String(code);
         switch(strCode) {
-            case '0': return { label: '0 (IN)', class: 'status-in' };
-            case '1': return { label: '1 (OUT)', class: 'status-out' };
-            case '2': return { label: '2 (BREAK OUT)', class: 'status-other' };
-            case '3': return { label: '3 (BREAK IN)', class: 'status-other' };
-            case '4': return { label: '4 (OT IN)', class: 'status-in' };
-            case '5': return { label: '5 (OT OUT)', class: 'status-out' };
-            default: return { label: `${strCode} (UNKNOWN)`, class: 'status-other' };
+            case '0': return { label: '0 (IN)', class: 'status-green' };
+            case '1': return { label: '1 (OUT)', class: 'status-red' };
+            case '2': return { label: '2 (BREAK OUT)', class: 'status-amber' };
+            case '3': return { label: '3 (BREAK IN)', class: 'status-amber' };
+            case '4': return { label: '4 (OT IN)', class: 'status-green' };
+            case '5': return { label: '5 (OT OUT)', class: 'status-red' };
+            default: return { label: `${strCode} (UNKNOWN)`, class: 'status-gray' };
         }
     };
 
-    // Show alerts
-    const showAlert = (message, isError = false) => {
+    // Show alerts using dashboard styling
+    const showAlert = (message, type = 'error') => {
         const box = document.getElementById('alertBox');
         box.style.display = 'block';
-        box.className = isError ? 'alert-error' : 'alert-success';
-        box.textContent = message;
+        box.className = type === 'error' ? 'access-note error-note' : 'access-note success-note';
+        box.innerHTML = `<strong>${type === 'error' ? 'Notice:' : 'Success!'}</strong> ${message}`;
     };
 
-    // Parse the file
+    // Parse the file safely (handles weird spacing/tabs in .dat files)
     document.getElementById('parseBtn').addEventListener('click', () => {
         const fileInput = document.getElementById('fileInput');
         if (!fileInput.files.length) {
-            showAlert('Please select a file first.', true);
+            showAlert('Please select a .dat file first.', 'error');
             return;
         }
 
@@ -259,34 +189,36 @@
         reader.readAsText(file);
     });
 
-    // Render Table for human checking (Optimized for thousands of rows)
+    // Render Table (Optimized for thousands of rows)
     const renderTable = () => {
         const tbody = document.getElementById('previewBody');
         
         if (parsedData.length === 0) {
             tbody.innerHTML = '';
-            showAlert('No valid data found in the file. Please check the format.', true);
+            showAlert('No valid data found in the file. Please check the format.', 'error');
             document.getElementById('tableWrapper').style.display = 'none';
             document.getElementById('uploadAction').style.display = 'none';
             return;
         }
 
-        // Build HTML string first (Massive performance boost over appendChild)
+        // Build HTML string first (Massive performance boost for long .dat files)
         let htmlContent = '';
         parsedData.forEach((row, index) => {
             const statusInfo = getStatusLabel(row.status);
             
             htmlContent += `
                 <tr>
-                    <td style="color: #666;">${row.rowId}</td>
-                    <td><input class="edit-input" type="text" value="${row.emp_id}" data-index="${index}" data-field="emp_id"></td>
-                    <td><input class="edit-input" type="text" value="${row.log_time}" data-index="${index}" data-field="log_time"></td>
-                    <td><input class="edit-input" type="text" value="${row.device_id}" data-index="${index}" data-field="device_id"></td>
+                    <td><span style="color: var(--muted); font-size: 0.8rem;">${row.rowId}</span></td>
+                    <td><input class="control compact-input" type="text" value="${row.emp_id}" data-index="${index}" data-field="emp_id"></td>
+                    <td><input class="control compact-input" type="text" value="${row.log_time}" data-index="${index}" data-field="log_time"></td>
+                    <td><input class="control compact-input" type="text" value="${row.device_id}" data-index="${index}" data-field="device_id"></td>
                     <td>
-                        <span class="status-badge ${statusInfo.class}">${statusInfo.label}</span>
-                        <input class="edit-input" type="text" value="${row.status}" style="width: 40px; margin-left: 10px;" data-index="${index}" data-field="status" title="Edit Raw Status Code">
+                        <div style="display:flex; align-items:center; gap: 8px;">
+                            <input class="control compact-input" type="text" value="${row.status}" style="width: 45px; text-align:center;" data-index="${index}" data-field="status" title="Raw Code">
+                            <span class="status ${statusInfo.class}">${statusInfo.label}</span>
+                        </div>
                     </td>
-                    <td><button type="button" style="padding: 5px 10px; background: #b91c1c;" onclick="removeRow(${index})">Remove</button></td>
+                    <td><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(${index})">Remove</button></td>
                 </tr>
             `;
         });
@@ -294,7 +226,7 @@
         tbody.innerHTML = htmlContent;
 
         // Add event listeners to update array on edit dynamically
-        document.querySelectorAll('.edit-input').forEach(input => {
+        document.querySelectorAll('input[data-field]').forEach(input => {
             input.addEventListener('input', (e) => {
                 const idx = e.target.dataset.index;
                 const field = e.target.dataset.field;
@@ -302,15 +234,15 @@
                 
                 // Live update badge if status changes
                 if(field === 'status') {
-                    const badge = e.target.previousElementSibling;
+                    const badge = e.target.nextElementSibling;
                     const info = getStatusLabel(e.target.value);
-                    badge.className = `status-badge ${info.class}`;
+                    badge.className = `status ${info.class}`;
                     badge.textContent = info.label;
                 }
             });
         });
 
-        document.getElementById('logCount').innerHTML = `<strong>${parsedData.length}</strong> logs validated and ready.`;
+        document.getElementById('logCount').textContent = `${parsedData.length} Valid Logs Ready`;
         document.getElementById('tableWrapper').style.display = 'block';
         document.getElementById('uploadAction').style.display = 'flex';
         document.getElementById('alertBox').style.display = 'none';
@@ -324,14 +256,18 @@
 
     // Upload to Supabase
     document.getElementById('uploadBtn').addEventListener('click', async () => {
+        if (!dbClient) {
+            showAlert('Supabase client not initialized. Check config.js', 'error');
+            return;
+        }
+
         if (parsedData.length === 0) return;
 
         const btn = document.getElementById('uploadBtn');
         btn.disabled = true;
         btn.textContent = 'Uploading...';
 
-        // Prepare mapped payload based on the attendance_logs layout
-        // spoof_flag, device_type, and created_at will use DB defaults naturally
+        // Prepare mapped payload matching the attendance_logs layout exactly
         const payload = parsedData.map(log => ({
             emp_id: log.emp_id,
             log_time: log.log_time,
@@ -340,13 +276,13 @@
         }));
 
         try {
-            const { data, error } = await supabase
+            const { data, error } = await dbClient
                 .from('attendance_logs')
                 .insert(payload);
 
             if (error) throw error;
 
-            showAlert(`Successfully inserted ${parsedData.length} logs into the database!`);
+            showAlert(`Successfully inserted ${parsedData.length} logs into the database!`, 'success');
             
             // Clean up UI after success
             parsedData = [];
@@ -357,7 +293,7 @@
 
         } catch (error) {
             console.error("Upload error:", error);
-            showAlert(`Failed to upload: ${error.message}`, true);
+            showAlert(`Failed to upload: ${error.message}`, 'error');
         } finally {
             btn.disabled = false;
             btn.textContent = 'Confirm & Upload to Database';
