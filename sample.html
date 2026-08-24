@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAT File Attendance Uploader</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-dark: #1c1c1c;
+            --bg-panel: #2a2a2a;
+            --text-main: #e0e0e0;
+            --text-muted: #9e9e9e;
+            --accent: #24b47e;
+            --accent-hover: #1e996a;
+            --border: #444;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: var(--bg-panel);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            color: #fff;
+        }
+        .instructions {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+        }
+        .file-upload-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        input[type="file"] {
+            color: var(--text-main);
+        }
+        button {
+            background-color: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+        button:disabled {
+            background-color: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
+        .table-container {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: auto;
+            max-height: 600px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background-color: #333;
+            color: var(--text-muted);
+            position: sticky;
+            top: 0;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+        tbody tr:hover {
+            background-color: #333;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .status-in { background-color: #1a4d2e; color: #4ade80; }
+        .status-out { background-color: #451a1a; color: #f87171; }
+        .status-other { background-color: #422006; color: #fbbf24; }
+        
+        .upload-action {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .log-count {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        #alertBox {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            display: none;
+            font-size: 0.9rem;
+        }
+        .alert-success { background-color: #1a4d2e; border: 1px solid #24b47e; }
+        .alert-error { background-color: #451a1a; border: 1px solid #ef4444; }
+
+        /* Edit Input styles for human checking */
+        input.edit-input {
+            background: #1c1c1c;
+            border: 1px solid #444;
+            color: white;
+            padding: 5px;
+            border-radius: 4px;
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="alertBox"></div>
+
+    <div class="header">
+        <h2>Upload DAT Attendance File</h2>
+        <div class="instructions">
+            Automated extraction: Select your biometric .dat file. Review the logs below to ensure accuracy before pushing to the <strong>attendance_logs</strong> database table.
+        </div>
+        
+        <div class="file-upload-wrapper">
+            <input type="file" id="fileInput" accept=".dat,.txt">
+            <button id="parseBtn">Extract & Preview Data</button>
+        </div>
+    </div>
+
+    <div class="table-container" id="tableWrapper" style="display: none;">
+        <table id="previewTable">
+            <thead>
+                <tr>
+                    <th>Row</th>
+                    <th>Employee ID (emp_id)</th>
+                    <th>Log Time (log_time)</th>
+                    <th>Device ID (device_id)</th>
+                    <th>Status Code (status)</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="previewBody">
+                <!-- Data populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="upload-action" id="uploadAction" style="display: none;">
+        <div class="log-count" id="logCount">0 logs ready for upload.</div>
+        <button id="uploadBtn">Confirm & Upload to Database</button>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // SUPABASE CONFIGURATION
+    // Replace these with your actual Supabase keys
+    // ==========================================
+    const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
+    const SUPABASE_KEY = 'YOUR_ANON_OR_SERVICE_KEY';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let parsedData = [];
+
+    // Map ZKTeco / Biometric standard state codes to human readable statuses
+    const getStatusLabel = (code) => {
+        const strCode = String(code);
+        switch(strCode) {
+            case '0': return { label: '0 (IN)', class: 'status-in' };
+            case '1': return { label: '1 (OUT)', class: 'status-out' };
+            case '2': return { label: '2 (BREAK OUT)', class: 'status-other' };
+            case '3': return { label: '3 (BREAK IN)', class: 'status-other' };
+            case '4': return { label: '4 (OT IN)', class: 'status-in' };
+            case '5': return { label: '5 (OT OUT)', class: 'status-out' };
+            default: return { label: `${strCode} (UNKNOWN)`, class: 'status-other' };
+        }
+    };
+
+    // Show alerts
+    const showAlert = (message, isError = false) => {
+        const box = document.getElementById('alertBox');
+        box.style.display = 'block';
+        box.className = isError ? 'alert-error' : 'alert-success';
+        box.textContent = message;
+    };
+
+    // Parse the file
+    document.getElementById('parseBtn').addEventListener('click', () => {
+        const fileInput = document.getElementById('fileInput');
+        if (!fileInput.files.length) {
+            showAlert('Please select a file first.', true);
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            const content = e.target.result;
+            const lines = content.split('\n');
+            parsedData = [];
+
+            lines.forEach((line, index) => {
+                line = line.trim();
+                if (!line) return;
+
+                // Regex matches: EmpID(1) LogTime(2) DeviceID(3) State/Status(4)
+                const match = line.match(/^(\d+)\s+(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s+(\d+)\s+(\d+)/);
+                
+                if (match) {
+                    parsedData.push({
+                        rowId: index + 1,
+                        emp_id: match[1],
+                        log_time: match[2],
+                        device_id: match[3],
+                        status: match[4]
+                    });
+                }
+            });
+
+            renderTable();
+        };
+
+        reader.readAsText(file);
+    });
+
+    // Render Table for human checking
+    const renderTable = () => {
+        const tbody = document.getElementById('previewBody');
+        tbody.innerHTML = '';
+
+        if (parsedData.length === 0) {
+            showAlert('No valid data found in the file. Please check the format.', true);
+            document.getElementById('tableWrapper').style.display = 'none';
+            document.getElementById('uploadAction').style.display = 'none';
+            return;
+        }
+
+        parsedData.forEach((row, index) => {
+            const statusInfo = getStatusLabel(row.status);
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="color: #666;">${row.rowId}</td>
+                <td><input class="edit-input" type="text" value="${row.emp_id}" data-index="${index}" data-field="emp_id"></td>
+                <td><input class="edit-input" type="text" value="${row.log_time}" data-index="${index}" data-field="log_time"></td>
+                <td><input class="edit-input" type="text" value="${row.device_id}" data-index="${index}" data-field="device_id"></td>
+                <td>
+                    <span class="status-badge ${statusInfo.class}">${statusInfo.label}</span>
+                    <input class="edit-input" type="text" value="${row.status}" style="width: 40px; margin-left: 10px;" data-index="${index}" data-field="status" title="Edit Raw Status Code">
+                </td>
+                <td><button type="button" style="padding: 5px 10px; background: #b91c1c;" onclick="removeRow(${index})">Remove</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Add event listeners to update array on edit
+        document.querySelectorAll('.edit-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const idx = e.target.dataset.index;
+                const field = e.target.dataset.field;
+                parsedData[idx][field] = e.target.value;
+                
+                // Update badge if status changes
+                if(field === 'status') {
+                    const badge = e.target.previousElementSibling;
+                    const info = getStatusLabel(e.target.value);
+                    badge.className = `status-badge ${info.class}`;
+                    badge.textContent = info.label;
+                }
+            });
+        });
+
+        document.getElementById('logCount').innerHTML = `<strong>${parsedData.length}</strong> logs validated and ready.`;
+        document.getElementById('tableWrapper').style.display = 'block';
+        document.getElementById('uploadAction').style.display = 'flex';
+        document.getElementById('alertBox').style.display = 'none';
+    };
+
+    // Remove row function
+    window.removeRow = (index) => {
+        parsedData.splice(index, 1);
+        renderTable();
+    };
+
+    // Upload to Supabase
+    document.getElementById('uploadBtn').addEventListener('click', async () => {
+        if (parsedData.length === 0) return;
+
+        const btn = document.getElementById('uploadBtn');
+        btn.disabled = true;
+        btn.textContent = 'Uploading...';
+
+        // Prepare exact mapped payload based on your table layout
+        // spoof_flag, device_type, created_at will use DB defaults
+        const payload = parsedData.map(log => ({
+            emp_id: log.emp_id,
+            log_time: log.log_time,
+            device_id: log.device_id,
+            status: log.status
+        }));
+
+        try {
+            const { data, error } = await supabase
+                .from('attendance_logs')
+                .insert(payload);
+
+            if (error) throw error;
+
+            showAlert(`Successfully inserted ${parsedData.length} logs into the database!`);
+            
+            // Clean up UI after success
+            parsedData = [];
+            renderTable();
+            document.getElementById('fileInput').value = '';
+            document.getElementById('tableWrapper').style.display = 'none';
+            document.getElementById('uploadAction').style.display = 'none';
+
+        } catch (error) {
+            console.error("Upload error:", error);
+            showAlert(`Failed to upload: ${error.message}`, true);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Confirm & Upload to Database';
+        }
+    });
+</script>
+</body>
+</html>
