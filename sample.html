@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Attendance | ARBO Management</title>
-    <!-- Use your existing scripts -->
+    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="common.js"></script>
     <style>
-        /* YOUR EXACT DASHBOARD CSS */
+        /* DASHBOARD CSS SYSTEM */
         :root{--navy:#0a3d62;--green:#066b4f;--blue:#1769a0;--amber:#b45309;--red:#b91c1c;--line:#dbe3ea;--soft:#f8fafc;--text:#1e293b;--muted:#64748b}
         *{box-sizing:border-box}
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f9; color: var(--text); margin: 0; padding: 20px; }
@@ -41,11 +41,15 @@
         .btn-danger:hover { background: #991b1b; }
         .btn-sm { padding: 5px 10px; font-size: .8rem; border-radius: 5px; }
         
-        .table-wrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #fff; max-height: 600px; }
+        .table-wrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #fff; max-height: 650px; }
         .monitor-table { width: 100%; min-width: 900px; border-collapse: collapse; }
-        .monitor-table th, .monitor-table td { padding: 10px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; }
-        .monitor-table th { background: #f8fafc; color: #475569; font-size: .76rem; text-transform: uppercase; letter-spacing: .025em; white-space: nowrap; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--line); }
-        .monitor-table tbody tr:hover { background: #fbfdff; }
+        .monitor-table th, .monitor-table td { padding: 8px 10px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; }
+        .monitor-table th { background: #f8fafc; color: #475569; font-size: .76rem; text-transform: uppercase; letter-spacing: .025em; white-space: nowrap; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--line); box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
+        .monitor-table tbody tr:hover:not(.group-header) { background: #fbfdff; }
+        
+        /* Employee Grouping Headers */
+        .group-header { background: #eef4f8 !important; border-top: 2px solid var(--blue); }
+        .group-header td { font-weight: 800; color: var(--navy); padding: 12px 10px; font-size: 0.95rem; }
         
         .status { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; font-size: .68rem; font-weight: 800; white-space: nowrap; }
         .status-green { background: #dcfce7; color: #166534; }
@@ -56,6 +60,8 @@
         .access-note { margin: 0 0 20px; padding: 12px 15px; border-left: 4px solid var(--blue); border-radius: 6px; background: #eff6ff; color: #1e3a5f; }
         .error-note { border-left-color: var(--red); background: #fff1f2; color: #881337; }
         .success-note { border-left-color: var(--green); background: #f0fdf4; color: #166534; }
+
+        .auth-bar { display: flex; align-items: center; gap: 10px; background: #fffbeb; padding: 12px 15px; border-radius: 8px; border: 1px solid #fcd34d; }
     </style>
 </head>
 <body>
@@ -75,7 +81,7 @@
         <div class="module-heading">
             <div>
                 <h2>Extract & Upload DAT File</h2>
-                <p>Select the biometric .dat file, review the logs for accuracy, and push directly to the attendance_logs table.</p>
+                <p>Upload biometric logs. Data will be grouped by employee for HR checking prior to database authorization.</p>
             </div>
         </div>
 
@@ -87,18 +93,24 @@
             <button class="btn btn-primary" id="parseBtn" type="button" style="height: 42px; min-width: 150px;">Extract Data</button>
         </div>
 
+        <!-- HR Authorization Bar -->
         <div class="module-heading" id="uploadAction" style="display:none; margin-top: 25px; padding-top: 20px; border-top: 1px dashed var(--line);">
             <div>
                 <h3 style="margin:0; color: var(--navy);" id="logCount">0 logs ready</h3>
+                <p style="margin:0; color: var(--muted); font-size: 0.8rem;">Arranged by Employee ID</p>
             </div>
-            <button class="btn btn-success" id="uploadBtn" type="button">Confirm & Upload to Database</button>
+            <div class="auth-bar">
+                <label style="font-size: 0.8rem; font-weight: 700; color: var(--amber);">HR AUTHORIZATION:</label>
+                <input type="password" id="hrPassword" class="control compact-input" placeholder="Enter HR Password" style="width: 200px; border-color: #fcd34d;">
+                <button class="btn btn-success" id="uploadBtn" type="button">Authorize & Post to Database</button>
+            </div>
         </div>
 
         <div class="table-wrap" id="tableWrapper" style="display:none;">
             <table class="monitor-table">
                 <thead>
                     <tr>
-                        <th style="width: 60px;">Row</th>
+                        <th style="width: 60px;">Original Row</th>
                         <th style="width: 150px;">Employee ID</th>
                         <th>Log Time (YYYY-MM-DD HH:MM:SS)</th>
                         <th style="width: 120px;">Device ID</th>
@@ -107,7 +119,7 @@
                     </tr>
                 </thead>
                 <tbody id="previewBody">
-                    <!-- Data populated here -->
+                    <!-- Grouped Data populated here -->
                 </tbody>
             </table>
         </div>
@@ -116,7 +128,7 @@
 
 <script>
     // ==========================================
-    // SUPABASE CONFIGURATION (Use from your config.js)
+    // SUPABASE CONFIGURATION 
     // ==========================================
     const dbClient = window.supabase?.createClient 
         ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY) 
@@ -124,7 +136,7 @@
 
     let parsedData = [];
 
-    // Map ZKTeco / Biometric standard state codes to your dashboard's status badges
+    // Map ZKTeco / Biometric standard state codes to dashboard badges
     const getStatusLabel = (code) => {
         const strCode = String(code);
         switch(strCode) {
@@ -138,15 +150,15 @@
         }
     };
 
-    // Show alerts using dashboard styling
     const showAlert = (message, type = 'error') => {
         const box = document.getElementById('alertBox');
         box.style.display = 'block';
         box.className = type === 'error' ? 'access-note error-note' : 'access-note success-note';
         box.innerHTML = `<strong>${type === 'error' ? 'Notice:' : 'Success!'}</strong> ${message}`;
+        if(type === 'success') { setTimeout(() => { box.style.display = 'none'; }, 5000); }
     };
 
-    // Parse the file safely (handles weird spacing/tabs in .dat files)
+    // Robust Parser
     document.getElementById('parseBtn').addEventListener('click', () => {
         const fileInput = document.getElementById('fileInput');
         if (!fileInput.files.length) {
@@ -159,28 +171,41 @@
 
         reader.onload = function(e) {
             const content = e.target.result;
-            // Split line by line, handling both \r\n and \n
+            // Split by line breaks safely
             const lines = content.split(/\r?\n/);
             parsedData = [];
 
             lines.forEach((line, index) => {
-                // Trim leading/trailing whitespace to clean up rows like "   312742..."
-                line = line.trim();
+                // Aggressively clean up tabs and multiple spaces
+                line = line.replace(/\t/g, ' ').trim();
                 if (!line) return;
 
-                // Safely split by any amount of spaces or tabs
                 const parts = line.split(/\s+/);
                 
-                // A valid log requires at least 5 parts: EmpID, Date, Time, DeviceID, Status
+                // ZKTeco standard: [0]EmpID, [1]Date, [2]Time, [3]DeviceID, [4]Status
                 if (parts.length >= 5) {
                     parsedData.push({
-                        rowId: index + 1,
+                        id: crypto.randomUUID(), // unique ID for UI tracking
+                        originalRow: index + 1,
                         emp_id: parts[0],
-                        log_time: `${parts[1]} ${parts[2]}`,
+                        log_time: `${parts[1]} ${parts[2]}`, // Combines Date and Time
                         device_id: parts[3],
                         status: parts[4]
                     });
                 }
+            });
+
+            if (parsedData.length === 0) {
+                showAlert('No valid data found. File might be corrupted or in wrong format.', 'error');
+                return;
+            }
+
+            // GROUPING LOGIC: Sort by Employee ID, then by chronological Log Time
+            parsedData.sort((a, b) => {
+                if (a.emp_id === b.emp_id) {
+                    return new Date(a.log_time) - new Date(b.log_time);
+                }
+                return a.emp_id.localeCompare(b.emp_id, undefined, {numeric: true});
             });
 
             renderTable();
@@ -189,85 +214,120 @@
         reader.readAsText(file);
     });
 
-    // Render Table (Optimized for thousands of rows)
     const renderTable = () => {
         const tbody = document.getElementById('previewBody');
-        
         if (parsedData.length === 0) {
             tbody.innerHTML = '';
-            showAlert('No valid data found in the file. Please check the format.', 'error');
             document.getElementById('tableWrapper').style.display = 'none';
             document.getElementById('uploadAction').style.display = 'none';
             return;
         }
 
-        // Build HTML string first (Massive performance boost for long .dat files)
         let htmlContent = '';
+        let currentEmpId = null;
+
         parsedData.forEach((row, index) => {
+            // Check if we need to insert an Employee Group Header
+            if (row.emp_id !== currentEmpId) {
+                currentEmpId = row.emp_id;
+                htmlContent += `
+                    <tr class="group-header">
+                        <td colspan="6">
+                            &#128100; Employee ID: <span style="font-size: 1.1rem;">${currentEmpId}</span>
+                        </td>
+                    </tr>
+                `;
+            }
+
             const statusInfo = getStatusLabel(row.status);
-            
             htmlContent += `
                 <tr>
-                    <td><span style="color: var(--muted); font-size: 0.8rem;">${row.rowId}</span></td>
-                    <td><input class="control compact-input" type="text" value="${row.emp_id}" data-index="${index}" data-field="emp_id"></td>
-                    <td><input class="control compact-input" type="text" value="${row.log_time}" data-index="${index}" data-field="log_time"></td>
-                    <td><input class="control compact-input" type="text" value="${row.device_id}" data-index="${index}" data-field="device_id"></td>
+                    <td><span style="color: var(--muted); font-size: 0.8rem;">Line ${row.originalRow}</span></td>
+                    <td><input class="control compact-input" type="text" value="${row.emp_id}" data-id="${row.id}" data-field="emp_id"></td>
+                    <td><input class="control compact-input" type="text" value="${row.log_time}" data-id="${row.id}" data-field="log_time"></td>
+                    <td><input class="control compact-input" type="text" value="${row.device_id}" data-id="${row.id}" data-field="device_id"></td>
                     <td>
                         <div style="display:flex; align-items:center; gap: 8px;">
-                            <input class="control compact-input" type="text" value="${row.status}" style="width: 45px; text-align:center;" data-index="${index}" data-field="status" title="Raw Code">
+                            <input class="control compact-input" type="text" value="${row.status}" style="width: 45px; text-align:center;" data-id="${row.id}" data-field="status" title="Raw Code">
                             <span class="status ${statusInfo.class}">${statusInfo.label}</span>
                         </div>
                     </td>
-                    <td><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(${index})">Remove</button></td>
+                    <td><button type="button" class="btn btn-danger btn-sm" onclick="removeRow('${row.id}')">Drop</button></td>
                 </tr>
             `;
         });
         
         tbody.innerHTML = htmlContent;
 
-        // Add event listeners to update array on edit dynamically
+        // Dynamic event listeners for edits
         document.querySelectorAll('input[data-field]').forEach(input => {
             input.addEventListener('input', (e) => {
-                const idx = e.target.dataset.index;
+                const targetId = e.target.dataset.id;
                 const field = e.target.dataset.field;
-                parsedData[idx][field] = e.target.value;
                 
-                // Live update badge if status changes
-                if(field === 'status') {
-                    const badge = e.target.nextElementSibling;
-                    const info = getStatusLabel(e.target.value);
-                    badge.className = `status ${info.class}`;
-                    badge.textContent = info.label;
+                // Find matching row in our data array
+                const rowIndex = parsedData.findIndex(r => r.id === targetId);
+                if(rowIndex > -1) {
+                    parsedData[rowIndex][field] = e.target.value;
+                    
+                    // Live update status badge if edited
+                    if(field === 'status') {
+                        const badge = e.target.nextElementSibling;
+                        const info = getStatusLabel(e.target.value);
+                        badge.className = `status ${info.class}`;
+                        badge.textContent = info.label;
+                    }
                 }
             });
+            
+            // If they modify an employee ID, we force a re-render on blur so it moves to the right group
+            if(input.dataset.field === 'emp_id') {
+                input.addEventListener('blur', () => {
+                    parsedData.sort((a, b) => {
+                        if (a.emp_id === b.emp_id) return new Date(a.log_time) - new Date(b.log_time);
+                        return a.emp_id.localeCompare(b.emp_id, undefined, {numeric: true});
+                    });
+                    renderTable();
+                });
+            }
         });
 
-        document.getElementById('logCount').textContent = `${parsedData.length} Valid Logs Ready`;
+        // Calculate unique employees mapped
+        const uniqueEmps = new Set(parsedData.map(d => d.emp_id)).size;
+        document.getElementById('logCount').innerHTML = `${parsedData.length} Logs <small style="color:var(--muted); font-weight:normal;">(${uniqueEmps} Employees)</small>`;
+        
         document.getElementById('tableWrapper').style.display = 'block';
         document.getElementById('uploadAction').style.display = 'flex';
         document.getElementById('alertBox').style.display = 'none';
+        document.getElementById('hrPassword').value = ''; // Reset password field
     };
 
-    // Remove row function
-    window.removeRow = (index) => {
-        parsedData.splice(index, 1);
+    window.removeRow = (idToRemove) => {
+        parsedData = parsedData.filter(row => row.id !== idToRemove);
         renderTable();
     };
 
-    // Upload to Supabase
+    // Upload & HR Authorization Logic
     document.getElementById('uploadBtn').addEventListener('click', async () => {
-        if (!dbClient) {
-            showAlert('Supabase client not initialized. Check config.js', 'error');
+        const hrPass = document.getElementById('hrPassword').value;
+        
+        // HR PASSWORD REQUIREMENT (Change 'HR2026' to whatever your company protocol is)
+        if (hrPass !== 'HR2026') {
+            showAlert('Unauthorized. Incorrect HR Password.', 'error');
+            document.getElementById('hrPassword').focus();
             return;
         }
 
-        if (parsedData.length === 0) return;
+        if (!dbClient) {
+            showAlert('Database connection missing. Make sure config.js is loaded.', 'error');
+            return;
+        }
 
         const btn = document.getElementById('uploadBtn');
         btn.disabled = true;
-        btn.textContent = 'Uploading...';
+        btn.textContent = 'Posting to Database...';
 
-        // Prepare mapped payload matching the attendance_logs layout exactly
+        // Prepare mapped payload (removes our temporary 'id' and 'originalRow' trackers)
         const payload = parsedData.map(log => ({
             emp_id: log.emp_id,
             log_time: log.log_time,
@@ -282,21 +342,19 @@
 
             if (error) throw error;
 
-            showAlert(`Successfully inserted ${parsedData.length} logs into the database!`, 'success');
+            showAlert(`Success! ${parsedData.length} attendance logs have been securely posted to the database.`, 'success');
             
-            // Clean up UI after success
+            // Clean up UI
             parsedData = [];
-            renderTable();
             document.getElementById('fileInput').value = '';
-            document.getElementById('tableWrapper').style.display = 'none';
-            document.getElementById('uploadAction').style.display = 'none';
+            renderTable();
 
         } catch (error) {
             console.error("Upload error:", error);
-            showAlert(`Failed to upload: ${error.message}`, 'error');
+            showAlert(`Database Error: ${error.message}`, 'error');
         } finally {
             btn.disabled = false;
-            btn.textContent = 'Confirm & Upload to Database';
+            btn.textContent = 'Authorize & Post to Database';
         }
     });
 </script>
