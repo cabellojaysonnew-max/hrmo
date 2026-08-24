@@ -229,23 +229,26 @@
 
         reader.onload = function(e) {
             const content = e.target.result;
-            const lines = content.split('\n');
+            // Split line by line, handling both \r\n and \n
+            const lines = content.split(/\r?\n/);
             parsedData = [];
 
             lines.forEach((line, index) => {
+                // Trim leading/trailing whitespace to clean up rows like "   312742..."
                 line = line.trim();
                 if (!line) return;
 
-                // Regex matches: EmpID(1) LogTime(2) DeviceID(3) State/Status(4)
-                const match = line.match(/^(\d+)\s+(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s+(\d+)\s+(\d+)/);
+                // Safely split by any amount of spaces or tabs
+                const parts = line.split(/\s+/);
                 
-                if (match) {
+                // A valid log requires at least 5 parts: EmpID, Date, Time, DeviceID, Status
+                if (parts.length >= 5) {
                     parsedData.push({
                         rowId: index + 1,
-                        emp_id: match[1],
-                        log_time: match[2],
-                        device_id: match[3],
-                        status: match[4]
+                        emp_id: parts[0],
+                        log_time: `${parts[1]} ${parts[2]}`,
+                        device_id: parts[3],
+                        status: parts[4]
                     });
                 }
             });
@@ -256,44 +259,48 @@
         reader.readAsText(file);
     });
 
-    // Render Table for human checking
+    // Render Table for human checking (Optimized for thousands of rows)
     const renderTable = () => {
         const tbody = document.getElementById('previewBody');
-        tbody.innerHTML = '';
-
+        
         if (parsedData.length === 0) {
+            tbody.innerHTML = '';
             showAlert('No valid data found in the file. Please check the format.', true);
             document.getElementById('tableWrapper').style.display = 'none';
             document.getElementById('uploadAction').style.display = 'none';
             return;
         }
 
+        // Build HTML string first (Massive performance boost over appendChild)
+        let htmlContent = '';
         parsedData.forEach((row, index) => {
             const statusInfo = getStatusLabel(row.status);
             
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="color: #666;">${row.rowId}</td>
-                <td><input class="edit-input" type="text" value="${row.emp_id}" data-index="${index}" data-field="emp_id"></td>
-                <td><input class="edit-input" type="text" value="${row.log_time}" data-index="${index}" data-field="log_time"></td>
-                <td><input class="edit-input" type="text" value="${row.device_id}" data-index="${index}" data-field="device_id"></td>
-                <td>
-                    <span class="status-badge ${statusInfo.class}">${statusInfo.label}</span>
-                    <input class="edit-input" type="text" value="${row.status}" style="width: 40px; margin-left: 10px;" data-index="${index}" data-field="status" title="Edit Raw Status Code">
-                </td>
-                <td><button type="button" style="padding: 5px 10px; background: #b91c1c;" onclick="removeRow(${index})">Remove</button></td>
+            htmlContent += `
+                <tr>
+                    <td style="color: #666;">${row.rowId}</td>
+                    <td><input class="edit-input" type="text" value="${row.emp_id}" data-index="${index}" data-field="emp_id"></td>
+                    <td><input class="edit-input" type="text" value="${row.log_time}" data-index="${index}" data-field="log_time"></td>
+                    <td><input class="edit-input" type="text" value="${row.device_id}" data-index="${index}" data-field="device_id"></td>
+                    <td>
+                        <span class="status-badge ${statusInfo.class}">${statusInfo.label}</span>
+                        <input class="edit-input" type="text" value="${row.status}" style="width: 40px; margin-left: 10px;" data-index="${index}" data-field="status" title="Edit Raw Status Code">
+                    </td>
+                    <td><button type="button" style="padding: 5px 10px; background: #b91c1c;" onclick="removeRow(${index})">Remove</button></td>
+                </tr>
             `;
-            tbody.appendChild(tr);
         });
+        
+        tbody.innerHTML = htmlContent;
 
-        // Add event listeners to update array on edit
+        // Add event listeners to update array on edit dynamically
         document.querySelectorAll('.edit-input').forEach(input => {
             input.addEventListener('input', (e) => {
                 const idx = e.target.dataset.index;
                 const field = e.target.dataset.field;
                 parsedData[idx][field] = e.target.value;
                 
-                // Update badge if status changes
+                // Live update badge if status changes
                 if(field === 'status') {
                     const badge = e.target.previousElementSibling;
                     const info = getStatusLabel(e.target.value);
@@ -323,8 +330,8 @@
         btn.disabled = true;
         btn.textContent = 'Uploading...';
 
-        // Prepare exact mapped payload based on your table layout
-        // spoof_flag, device_type, created_at will use DB defaults
+        // Prepare mapped payload based on the attendance_logs layout
+        // spoof_flag, device_type, and created_at will use DB defaults naturally
         const payload = parsedData.map(log => ({
             emp_id: log.emp_id,
             log_time: log.log_time,
