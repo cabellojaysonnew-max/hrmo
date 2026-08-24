@@ -45,7 +45,11 @@
         .monitor-table { width: 100%; min-width: 900px; border-collapse: collapse; }
         .monitor-table th, .monitor-table td { padding: 12px 10px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; }
         .monitor-table th { background: #f8fafc; color: #475569; font-size: .76rem; text-transform: uppercase; letter-spacing: .025em; white-space: nowrap; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--line); box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
-        .monitor-table tbody tr:hover { background: #fbfdff; }
+        .monitor-table tbody tr:hover:not(.group-header) { background: #fbfdff; }
+        
+        /* Employee Grouping Headers */
+        .group-header { background: #eef4f8 !important; border-top: 2px solid var(--blue); }
+        .group-header td { font-weight: 800; color: var(--navy); padding: 12px 10px; font-size: 0.95rem; }
         
         .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; }
         .status-green { background: #dcfce7; color: #166534; }
@@ -78,8 +82,8 @@
     <section class="section">
         <div class="module-heading">
             <div>
-                <h2>Extract & Group DAT File</h2>
-                <p>Upload biometric logs. Data is arranged per employee and date. 4 punches = Whole Day.</p>
+                <h2>Extract & Group DAT File <span style="color: var(--amber); font-size: 1rem;">(Current Month Only)</span></h2>
+                <p>Upload biometric logs. Data is automatically filtered for the current month, arranged per employee, per date. 4 punches = Whole Day.</p>
             </div>
         </div>
 
@@ -95,12 +99,12 @@
         <div class="module-heading" id="uploadAction" style="display:none; margin-top: 25px; padding-top: 20px; border-top: 1px dashed var(--line);">
             <div>
                 <h3 style="margin:0; color: var(--navy);" id="logCount">0 Days processed</h3>
-                <p style="margin:0; color: var(--muted); font-size: 0.8rem;">Arranged by Employee ID</p>
+                <p style="margin:0; color: var(--muted); font-size: 0.8rem;" id="currentMonthLabel">Arranged by Employee ID</p>
             </div>
             <div class="auth-bar">
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--amber);">HR AUTHORIZATION:</label>
                 <input type="password" id="hrPassword" class="control compact-input" placeholder="Enter HR Password" style="width: 200px; border-color: #fcd34d;">
-                <button class="btn btn-success" id="uploadBtn" type="button">Authorize & Post to Database</button>
+                <button class="btn btn-success" id="uploadBtn" type="button">Authorize & Post</button>
             </div>
         </div>
 
@@ -128,88 +132,128 @@
 
 <script>
     // ==========================================
-    // SUPABASE CONFIGURATION 
+    // SAFELY INITIALIZE SUPABASE
     // ==========================================
-    const dbClient = window.supabase?.createClient 
-        ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY) 
-        : null;
+    let dbClient = null;
+    try {
+        if (window.supabase && typeof window.SUPABASE_URL !== 'undefined') {
+            dbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        }
+    } catch (err) {
+        console.warn('Supabase not yet fully configured in common.js', err);
+    }
 
     let groupedData = [];
+
+    // Fallback ID generator if running on a local file
+    const generateId = () => {
+        return (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') 
+            ? crypto.randomUUID() 
+            : 'id_' + Math.random().toString(36).substr(2, 9);
+    };
 
     const showAlert = (message, type = 'error') => {
         const box = document.getElementById('alertBox');
         box.style.display = 'block';
         box.className = type === 'error' ? 'access-note error-note' : 'access-note success-note';
         box.innerHTML = `<strong>${type === 'error' ? 'Notice:' : 'Success!'}</strong> ${message}`;
-        if(type === 'success') { setTimeout(() => { box.style.display = 'none'; }, 5000); }
+        if(type === 'success') { setTimeout(() => { box.style.display = 'none'; }, 6000); }
     };
 
-    // The Bulletproof DAT Parser
+    // The Bulletproof DAT Parser with CURRENT MONTH FILTER
     document.getElementById('parseBtn').addEventListener('click', () => {
         const fileInput = document.getElementById('fileInput');
+        const parseBtn = document.getElementById('parseBtn');
+
         if (!fileInput.files.length) {
             showAlert('Please select a .dat file first.', 'error');
             return;
         }
 
+        parseBtn.textContent = 'Extracting...';
+        parseBtn.disabled = true;
+
         const file = fileInput.files[0];
         const reader = new FileReader();
 
+        // Calculate the current month in YYYY-MM format dynamically
+        const now = new Date();
+        const currentYYYYMM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
         reader.onload = function(e) {
-            const content = e.target.result;
-            const lines = content.split(/\r?\n/);
-            
-            const tempMap = {};
-            let rawLogsCount = 0;
-
-            lines.forEach(line => {
-                // Aggressively clean spaces/tabs
-                const cleanLine = line.trim();
-                if (!cleanLine) return;
-
-                const parts = cleanLine.split(/\s+/);
+            try {
+                const content = e.target.result;
+                const lines = content.split(/\r?\n/);
                 
-                // ZKTeco standard: [0]EmpID, [1]Date, [2]Time, [3]DeviceID, [4]Status
-                if (parts.length >= 5) {
-                    rawLogsCount++;
-                    const emp_id = parts[0];
-                    const date = parts[1];
-                    const time = parts[2];
-                    const device_id = parts[3];
-                    const status = parts[4];
+                const tempMap = {};
+                let rawLogsCount = 0;
+                let ignoredLogsCount = 0;
+
+                lines.forEach(line => {
+                    const cleanLine = line.trim();
+                    if (!cleanLine) return;
+
+                    const parts = cleanLine.split(/\s+/);
                     
-                    const groupKey = `${emp_id}_${date}`;
-                    if (!tempMap[groupKey]) {
-                        tempMap[groupKey] = {
-                            id: crypto.randomUUID(), // For UI tracking
-                            emp_id: emp_id,
-                            date: date,
-                            logs: []
-                        };
+                    if (parts.length >= 5) {
+                        const emp_id = parts[0];
+                        const date = parts[1]; // Format: YYYY-MM-DD
+                        const time = parts[2];
+                        const device_id = parts[3];
+                        const status = parts[4];
+                        
+                        // CURRENT MONTH FILTER LOGIC
+                        if (!date.startsWith(currentYYYYMM)) {
+                            ignoredLogsCount++;
+                            return; // Skip this loop iteration if it doesn't match current YYYY-MM
+                        }
+
+                        rawLogsCount++;
+                        const groupKey = `${emp_id}_${date}`;
+                        if (!tempMap[groupKey]) {
+                            tempMap[groupKey] = {
+                                id: generateId(),
+                                emp_id: emp_id,
+                                date: date,
+                                logs: []
+                            };
+                        }
+                        tempMap[groupKey].logs.push({ time, device_id, status });
                     }
-                    tempMap[groupKey].logs.push({ time, device_id, status });
+                });
+
+                if (rawLogsCount === 0) {
+                    showAlert(`No data found for the current month (${currentYYYYMM}). Ignored ${ignoredLogsCount} logs from previous/other months.`, 'error');
+                    parseBtn.textContent = 'Extract Data';
+                    parseBtn.disabled = false;
+                    return;
                 }
-            });
 
-            if (rawLogsCount === 0) {
-                showAlert('No valid data found. File might be corrupted or in wrong format.', 'error');
-                return;
+                // Update UI hint to show exactly what month we filtered
+                document.getElementById('currentMonthLabel').textContent = `Filtered explicitly for ${currentYYYYMM} | Arranged by Employee`;
+
+                // Convert map to array and sort by Employee ID, then by Date
+                groupedData = Object.values(tempMap);
+                groupedData.sort((a, b) => {
+                    const empCompare = a.emp_id.localeCompare(b.emp_id, undefined, {numeric: true});
+                    if (empCompare !== 0) return empCompare;
+                    return a.date.localeCompare(b.date);
+                });
+
+                // Ensure times within each day are sorted chronologically
+                groupedData.forEach(group => {
+                    group.logs.sort((a, b) => a.time.localeCompare(b.time));
+                });
+
+                renderTable();
+
+            } catch (error) {
+                console.error(error);
+                showAlert('An unexpected error occurred during extraction.', 'error');
+            } finally {
+                parseBtn.textContent = 'Extract Data';
+                parseBtn.disabled = false;
             }
-
-            // Convert map to array and sort by Employee ID, then by Date
-            groupedData = Object.values(tempMap);
-            groupedData.sort((a, b) => {
-                const empCompare = a.emp_id.localeCompare(b.emp_id, undefined, {numeric: true});
-                if (empCompare !== 0) return empCompare;
-                return a.date.localeCompare(b.date);
-            });
-
-            // Ensure times within each day are sorted chronologically
-            groupedData.forEach(group => {
-                group.logs.sort((a, b) => a.time.localeCompare(b.time));
-            });
-
-            renderTable();
         };
 
         reader.readAsText(file);
@@ -227,10 +271,22 @@
 
         let htmlContent = '';
         let totalPunches = 0;
+        let currentEmpId = null;
 
         groupedData.forEach((group) => {
             const logs = group.logs;
             totalPunches += logs.length;
+
+            if (group.emp_id !== currentEmpId) {
+                currentEmpId = group.emp_id;
+                htmlContent += `
+                    <tr class="group-header">
+                        <td colspan="8">
+                            &#128100; Employee ID: <span style="font-size: 1.1rem; margin-left: 5px;">${currentEmpId}</span>
+                        </td>
+                    </tr>
+                `;
+            }
 
             const t1 = logs[0] ? `<span class="time-box">${logs[0].time}</span>` : `<span class="empty-time">--:--:--</span>`;
             const t2 = logs[1] ? `<span class="time-box">${logs[1].time}</span>` : `<span class="empty-time">--:--:--</span>`;
@@ -262,7 +318,7 @@
         
         tbody.innerHTML = htmlContent;
 
-        document.getElementById('logCount').innerHTML = `${groupedData.length} Total Working Days <span style="color:var(--muted); font-size: 0.8rem; margin-left: 10px;">(${totalPunches} individual punches)</span>`;
+        document.getElementById('logCount').innerHTML = `${groupedData.length} Working Days <span style="color:var(--muted); font-size: 0.8rem; margin-left: 10px; font-weight:normal;">(${totalPunches} total punches)</span>`;
         document.getElementById('tableWrapper').style.display = 'block';
         document.getElementById('uploadAction').style.display = 'flex';
         document.getElementById('alertBox').style.display = 'none';
@@ -274,11 +330,10 @@
         renderTable();
     };
 
-    // Un-group and Upload to Supabase[cite: 1]
+    // Un-group and Upload
     document.getElementById('uploadBtn').addEventListener('click', async () => {
         const hrPass = document.getElementById('hrPassword').value;
         
-        // HR PASSWORD REQUIREMENT 
         if (hrPass !== 'HR2026') {
             showAlert('Unauthorized. Incorrect HR Password.', 'error');
             document.getElementById('hrPassword').focus();
@@ -286,7 +341,7 @@
         }
 
         if (!dbClient) {
-            showAlert('Database connection missing. Make sure config.js is loaded.', 'error');
+            showAlert('Database connection missing. Make sure your config.js is properly loading the Supabase keys.', 'error');
             return;
         }
 
@@ -296,7 +351,6 @@
         btn.disabled = true;
         btn.textContent = 'Posting to Database...';
 
-        // Flatten the groups back into individual logs for the attendance_logs table[cite: 1]
         const payload = [];
         groupedData.forEach(group => {
             group.logs.forEach(log => {
@@ -318,7 +372,6 @@
 
             showAlert(`Success! ${payload.length} attendance logs have been authorized and securely posted.`, 'success');
             
-            // Clean up UI
             groupedData = [];
             document.getElementById('fileInput').value = '';
             renderTable();
@@ -328,7 +381,7 @@
             showAlert(`Database Error: ${error.message}`, 'error');
         } finally {
             btn.disabled = false;
-            btn.textContent = 'Authorize & Post to Database';
+            btn.textContent = 'Authorize & Post';
         }
     });
 </script>
