@@ -7,7 +7,7 @@
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
-    <!-- Link to your config file -->
+    <!-- Link to your exact config file -->
     <script src="supabase-config.js"></script>
     <script src="common.js"></script>
     
@@ -29,7 +29,7 @@
         .module-heading h2 { margin: 0; color: var(--navy); font-size: 1.25rem; }
         .module-heading p { margin: 4px 0 0; color: var(--muted); font-size: .85rem; }
         
-        .filter-grid { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; margin-bottom: 20px; padding: 15px; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; }
+        .filter-grid { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: end; margin-bottom: 20px; padding: 15px; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; }
         .filter-grid label { display: block; margin-bottom: 5px; color: #475569; font-size: .76rem; font-weight: 700; text-transform: uppercase; }
         .control { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #0f172a; font: inherit; }
         .control:focus { outline: 0; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(23,105,160,.1); }
@@ -45,7 +45,7 @@
         .btn-sm { padding: 5px 10px; font-size: .8rem; border-radius: 5px; }
         
         .table-wrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #fff; max-height: 700px; }
-        .monitor-table { width: 100%; min-width: 1000px; border-collapse: collapse; }
+        .monitor-table { width: 100%; min-width: 1100px; border-collapse: collapse; }
         .monitor-table th, .monitor-table td { padding: 10px 15px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; font-size: 0.9rem; }
         .monitor-table th { background: #f8fafc; color: #475569; font-size: .76rem; text-transform: uppercase; letter-spacing: .025em; white-space: nowrap; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--line); box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
         .monitor-table tbody tr:hover:not(.division-header):not(.group-header) { background: #fbfdff; }
@@ -72,7 +72,7 @@
         /* Interactive Time Inputs */
         input[type="time"] { font-family: monospace; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; width: 110px; font-size: 0.85rem; color: var(--text); }
         input[type="time"]:focus { border-color: var(--blue); outline: none; }
-        input[type="time"].manual-entry { background: #fff7ed; border-color: #fcd34d; }
+        input[type="time"].manual-entry { background: #fff7ed; border-color: #fcd34d; border-width: 2px; }
     </style>
 </head>
 <body>
@@ -91,12 +91,16 @@
     <section class="section">
         <div class="module-heading">
             <div>
-                <h2>Extract & Group DAT File <span style="color: var(--amber); font-size: 1rem;">(Current Month Only)</span></h2>
-                <p>Upload biometric logs. Fetches names, flags Travel Orders/PSOs using actual subjects, filters explicitly for the current month, and groups by Division > Employee.</p>
+                <h2>Extract & Sync DAT File</h2>
+                <p>Upload biometric logs. Fetches names, flags Travel Orders/PSOs, filters for target month, and groups by Division > Employee.</p>
             </div>
         </div>
 
         <div class="filter-grid">
+            <div>
+                <label for="targetMonth">Target Month</label>
+                <input type="month" id="targetMonth" class="control" style="padding: 7px 12px;">
+            </div>
             <div>
                 <label for="fileInput">Biometric File (.dat)</label>
                 <input type="file" id="fileInput" class="control" accept=".dat,.txt" style="padding: 7px 12px;">
@@ -112,7 +116,7 @@
             </div>
             <div class="auth-bar">
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--amber);">HR AUTHORIZATION:</label>
-                <input type="text" id="hrName" class="control compact-input" placeholder="HR Staff Name" style="width: 160px; border-color: #fcd34d;">
+                <input type="text" id="hrName" class="control compact-input" placeholder="HR Username" style="width: 160px; border-color: #fcd34d;">
                 <input type="password" id="hrPassword" class="control compact-input" placeholder="Password" style="width: 140px; border-color: #fcd34d;">
                 <button class="btn btn-success" id="uploadBtn" type="button">Authorize & Post to DB</button>
             </div>
@@ -140,18 +144,24 @@
 
 <script>
     // ==========================================
-    // SAFELY INITIALIZE SUPABASE
+    // DATABASE CLIENT (Uses your supabase-config.js directly)
     // ==========================================
-    let dbClient = null;
-    try {
-        if (window.supabase && typeof window.SUPABASE_URL !== 'undefined') {
-            dbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        }
-    } catch (err) {
-        console.warn('Supabase not fully configured in config files.', err);
-    }
+    const dbClient = window.supabaseClient;
 
-    let hierarchyData = {}; // Structured as: { divisionName: { empId: { full_name, dates: { dateString: { logs:[], to:null, pso:null } } } } }
+    // Set Default Month to Current Month
+    window.addEventListener('DOMContentLoaded', () => {
+        const now = new Date();
+        const yyyymm = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        document.getElementById('targetMonth').value = yyyymm;
+    });
+
+    let hierarchyData = {}; 
+
+    const generateId = () => {
+        return (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') 
+            ? crypto.randomUUID() 
+            : 'id_' + Math.random().toString(36).substr(2, 9);
+    };
 
     const showAlert = (message, type = 'error') => {
         const box = document.getElementById('alertBox');
@@ -172,6 +182,7 @@
         return dates;
     };
 
+    // Formats dynamic remarks
     const calculateRemarks = (slots, toInfo, psoInfo) => {
         let marks = [];
         const filledSlots = slots.filter(s => s && s.time !== '').length;
@@ -190,7 +201,7 @@
         }
 
         if (psoInfo) {
-            marks.push(`<span class="status status-blue">&#128221; ${psoInfo}</span>`);
+            marks.push(`<span class="status status-blue">&#128221; PSO: ${psoInfo}</span>`);
         }
 
         return marks.join(' ');
@@ -206,9 +217,15 @@
     document.getElementById('parseBtn').addEventListener('click', async () => {
         const fileInput = document.getElementById('fileInput');
         const parseBtn = document.getElementById('parseBtn');
+        const targetMonth = document.getElementById('targetMonth').value; // e.g. "2026-08"
 
         if (!fileInput.files.length) {
             showAlert('Please select a .dat file first.', 'error');
+            return;
+        }
+
+        if (!targetMonth) {
+            showAlert('Please select a target month.', 'error');
             return;
         }
 
@@ -220,14 +237,13 @@
         parseBtn.textContent = 'Syncing Database...';
         parseBtn.disabled = true;
 
-        const now = new Date();
-        const currentYYYYMM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-
         hierarchyData = {}; 
         let empMap = {};
+        let toLookup = {};
+        let psoLookup = {};
 
         try {
-            // Concurrent DB Fetches
+            // Concurrent DB Fetches based on your table schemas
             const [empRes, psoRes, toRes, itinRes] = await Promise.all([
                 dbClient.from('employees').select('emp_id, full_name, division'),
                 dbClient.from('pso_records').select('emp_id, start_date, end_date, subject, status'),
@@ -239,6 +255,35 @@
             if (empRes.data) {
                 empRes.data.forEach(emp => {
                     empMap[emp.emp_id] = { full_name: emp.full_name, division: emp.division || 'UNASSIGNED' };
+                });
+            }
+
+            // Map PSOs into lookup based on valid dates
+            if (psoRes.data) {
+                psoRes.data.forEach(pso => {
+                    if(!pso.start_date || !pso.end_date) return;
+                    const dates = getDatesInRange(pso.start_date, pso.end_date);
+                    dates.forEach(d => {
+                        if (d.startsWith(targetMonth)) {
+                            psoLookup[`${pso.emp_id}_${d}`] = pso.subject;
+                        }
+                    });
+                });
+            }
+
+            // Map Travel Orders joining the itinerary
+            if (toRes.data && itinRes.data) {
+                const toReference = {};
+                toRes.data.forEach(t => { toReference[t.to_no] = t; });
+
+                itinRes.data.forEach(itin => {
+                    const parentTo = toReference[itin.to_no];
+                    if (parentTo && itin.travel_date && itin.travel_date.startsWith(targetMonth)) {
+                        toLookup[`${parentTo.emp_id}_${itin.travel_date}`] = { 
+                            status: parentTo.status, 
+                            destination: itin.destination || 'Field' 
+                        };
+                    }
                 });
             }
 
@@ -266,7 +311,7 @@
                     const device_id = parts[3];
                     const status = parts[4];
                     
-                    if (!date.startsWith(currentYYYYMM)) {
+                    if (!date.startsWith(targetMonth)) {
                         ignoredLogsCount++;
                         return; 
                     }
@@ -279,47 +324,42 @@
                 }
             });
 
-            // Map PSOs into the hierarchy 
-            if (psoRes.data) {
-                psoRes.data.forEach(pso => {
-                    if(!pso.start_date || !pso.end_date) return;
-                    const dates = getDatesInRange(pso.start_date, pso.end_date);
-                    dates.forEach(d => {
-                        if (d.startsWith(currentYYYYMM)) {
-                            const rosterInfo = empMap[pso.emp_id] || { full_name: 'Unknown Employee', division: 'UNMAPPED' };
-                            ensureHierarchy(rosterInfo.division, pso.emp_id, rosterInfo.full_name, d);
-                            hierarchyData[rosterInfo.division][pso.emp_id].dates[d].pso = pso.subject;
+            // Inject missing rows for employees who are on TO/PSO in this month but didn't Biometric punch
+            const activeEmpIds = Object.keys(empMap);
+            activeEmpIds.forEach(emp_id => {
+                const rosterInfo = empMap[emp_id];
+                
+                // Add missing TO dates
+                Object.keys(toLookup).forEach(toKey => {
+                    if (toKey.startsWith(`${emp_id}_`)) {
+                        const date = toKey.split('_')[1];
+                        if (date.startsWith(targetMonth)) {
+                            ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
+                            hierarchyData[rosterInfo.division][emp_id].dates[date].to = toLookup[toKey];
                         }
-                    });
-                });
-            }
-
-            // Map Travel Orders into the hierarchy 
-            if (toRes.data && itinRes.data) {
-                const toReference = {};
-                toRes.data.forEach(t => { toReference[t.to_no] = t; });
-
-                itinRes.data.forEach(itin => {
-                    const parentTo = toReference[itin.to_no];
-                    if (parentTo && itin.travel_date && itin.travel_date.startsWith(currentYYYYMM)) {
-                        const rosterInfo = empMap[parentTo.emp_id] || { full_name: 'Unknown Employee', division: 'UNMAPPED' };
-                        ensureHierarchy(rosterInfo.division, parentTo.emp_id, rosterInfo.full_name, itin.travel_date);
-                        hierarchyData[rosterInfo.division][parentTo.emp_id].dates[itin.travel_date].to = {
-                            status: parentTo.status,
-                            destination: itin.destination || 'Field'
-                        };
                     }
                 });
-            }
+                
+                // Add missing PSO dates
+                Object.keys(psoLookup).forEach(psoKey => {
+                    if (psoKey.startsWith(`${emp_id}_`)) {
+                        const date = psoKey.split('_')[1];
+                        if (date.startsWith(targetMonth)) {
+                            ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
+                            hierarchyData[rosterInfo.division][emp_id].dates[date].pso = psoLookup[psoKey];
+                        }
+                    }
+                });
+            });
 
             if (Object.keys(hierarchyData).length === 0) {
-                showAlert(`No data found for ${currentYYYYMM}. Ignored ${ignoredLogsCount} lines from other months.`, 'error');
+                showAlert(`No data found for ${targetMonth}. Ignored ${ignoredLogsCount} lines from other months.`, 'error');
                 parseBtn.textContent = 'Extract & Sync';
                 parseBtn.disabled = false;
                 return;
             }
 
-            document.getElementById('currentMonthLabel').textContent = `Filtered explicitly for ${currentYYYYMM}`;
+            document.getElementById('currentMonthLabel').textContent = `Filtered explicitly for ${targetMonth}`;
             renderTable();
 
         } catch (error) {
@@ -338,6 +378,7 @@
         
         let htmlContent = '';
         const expectedStatuses = ['0', '2', '3', '1']; // In, Break Out, Break In, Out
+        let processedDaysCount = 0;
 
         // Sort Divisions alphabetically
         const sortedDivisions = Object.keys(hierarchyData).sort();
@@ -358,7 +399,7 @@
                 
                 htmlContent += `
                     <tr class="group-header">
-                        <td colspan="6">&#128100; ${empData.full_name} <span style="color:var(--muted); font-size:0.8rem; font-weight:normal; margin-left: 8px;">(Emp ID: ${empId})</span></td>
+                        <td colspan="6">&#128100; ${empData.full_name} <span style="color:var(--muted); font-size:0.85rem; font-weight:normal; margin-left: 8px;">(Emp ID: ${empId})</span></td>
                     </tr>
                 `;
 
@@ -367,6 +408,7 @@
 
                 sortedDates.forEach(date => {
                     const dayData = empData.dates[date];
+                    processedDaysCount++;
                     
                     // Sort logs chronologically and map to slots
                     dayData.logs.sort((a, b) => a.time.localeCompare(b.time));
@@ -386,7 +428,7 @@
                     // Build interactive inputs containing data tags for saving
                     const renderedSlots = slots.map((s, idx) => {
                         return `<input type="time" step="1" class="time-input" 
-                                data-emp="${empId}" data-date="${date}" 
+                                data-div="${div}" data-emp="${empId}" data-date="${date}" 
                                 data-device="${s.device_id}" data-status="${s.status}" 
                                 data-original="${s.time}" value="${s.time}">`;
                     });
@@ -394,7 +436,7 @@
                     const remarksHtml = calculateRemarks(slots, dayData.to, dayData.pso);
 
                     htmlContent += `
-                        <tr>
+                        <tr id="row_${empId}_${date}">
                             <td><strong>${date}</strong></td>
                             <td>${renderedSlots[0]}</td>
                             <td>${renderedSlots[1]}</td>
@@ -413,79 +455,112 @@
         document.querySelectorAll('.time-input').forEach(input => {
             input.addEventListener('change', (e) => {
                 const val = e.target.value;
+                const tr = e.target.closest('tr');
+                const empId = e.target.dataset.emp;
+                const date = e.target.dataset.date;
+                const div = e.target.dataset.div;
+
+                // Sync UI change to dataset
                 if (val && val !== e.target.dataset.original) {
                     e.target.classList.add('manual-entry');
                 } else if (!val) {
                     e.target.classList.remove('manual-entry');
                 }
+
+                // Gather current inputs in this row to recalculate remarks dynamically
+                const rowInputs = Array.from(tr.querySelectorAll('.time-input')).map(inp => ({
+                    time: inp.value
+                }));
+
+                const dayData = hierarchyData[div][empId].dates[date];
+                tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(rowInputs, dayData.to, dayData.pso);
             });
         });
 
+        document.getElementById('logCount').innerHTML = `${processedDaysCount} Timesheets generated.`;
         document.getElementById('tableWrapper').style.display = 'block';
         document.getElementById('uploadAction').style.display = 'flex';
         document.getElementById('alertBox').style.display = 'none';
+        
+        document.getElementById('hrName').value = '';
         document.getElementById('hrPassword').value = ''; 
     };
 
-    // Post to Supabase with HR Tracking
+    // Post to Supabase with HR Tracking and Validation
     document.getElementById('uploadBtn').addEventListener('click', async () => {
         const hrName = document.getElementById('hrName').value.trim();
         const hrPass = document.getElementById('hrPassword').value.trim();
         
-        if (!hrName) {
-            showAlert('Please enter your HR Staff Name.', 'error');
-            document.getElementById('hrName').focus();
+        if (!hrName || !hrPass) {
+            showAlert('Please enter both your HR Username and Password.', 'error');
+            if(!hrName) document.getElementById('hrName').focus();
+            else document.getElementById('hrPassword').focus();
             return;
         }
 
-        if (hrPass !== 'HR2026') {
-            showAlert('Unauthorized. Incorrect HR Password.', 'error');
-            document.getElementById('hrPassword').focus();
+        if (!dbClient) {
+            showAlert('Database connection missing. Cannot push records.', 'error');
             return;
         }
 
         const btn = document.getElementById('uploadBtn');
         btn.disabled = true;
-        btn.textContent = 'Posting to Database...';
-
-        const payload = [];
-        const nowISO = new Date().toISOString(); // Current UTC timestamp for the log
-
-        // Iterate through all inputs to harvest the data directly from the DOM
-        document.querySelectorAll('.time-input').forEach(input => {
-            let timeVal = input.value;
-            if (timeVal) { 
-                if (timeVal.length === 5) timeVal += ":00"; // Append seconds if browser omits them
-                
-                // If it has class manual-entry, it was modified by HR
-                const isManual = input.classList.contains('manual-entry');
-
-                payload.push({
-                    emp_id: input.dataset.emp,
-                    log_time: `${input.dataset.date} ${timeVal}`,
-                    device_id: isManual ? 'Manual' : input.dataset.device,
-                    status: input.dataset.status,
-                    manual_log_name: isManual ? hrName : null,  // Tracks WHO changed it
-                    manual_log_date: isManual ? nowISO : null   // Tracks WHEN it was changed
-                });
-            }
-        });
-
-        if (payload.length === 0) {
-            showAlert('No actual punches found to upload.', 'error');
-            btn.disabled = false;
-            btn.textContent = 'Authorize & Post to DB';
-            return;
-        }
+        btn.textContent = 'Verifying HR Credentials...';
 
         try {
-            const { data, error } = await window.supabaseClient
+            // STEP 1: Verify user from `users` table
+            const { data: user, error: userError } = await dbClient
+                .from('users')
+                .select('username, full_name, role')
+                .eq('username', hrName)
+                .eq('password', hrPass)
+                .single();
+
+            // Validate strict HR roles
+            if (userError || !user) {
+                throw new Error("Invalid username or password.");
+            }
+            if (user.role !== 'HR' && user.role !== 'HR STAFF' && user.role !== 'ADMIN') {
+                throw new Error("Unauthorized. Only HR Staff can post timesheets.");
+            }
+
+            btn.textContent = 'Posting to Database...';
+
+            const payload = [];
+            const nowISO = new Date().toISOString(); 
+
+            // STEP 2: Harvest the data directly from the DOM Inputs
+            document.querySelectorAll('.time-input').forEach(input => {
+                let timeVal = input.value;
+                if (timeVal) { 
+                    if (timeVal.length === 5) timeVal += ":00"; // Append seconds if browser omits them
+                    
+                    // If it has class manual-entry, it was modified by HR
+                    const isManual = input.classList.contains('manual-entry');
+
+                    payload.push({
+                        emp_id: input.dataset.emp,
+                        log_time: `${input.dataset.date} ${timeVal}`,
+                        device_id: isManual ? 'Manual' : input.dataset.device,
+                        status: input.dataset.status,
+                        manual_log_name: isManual ? user.full_name : null,  // Tracks WHO changed it 
+                        manual_log_date: isManual ? nowISO : null           // Tracks WHEN it was changed
+                    });
+                }
+            });
+
+            if (payload.length === 0) {
+                throw new Error("No actual time punches found to upload.");
+            }
+
+            // STEP 3: Insert into Database
+            const { error: insertError } = await dbClient
                 .from('attendance_logs')
                 .insert(payload);
 
-            if (error) throw error;
+            if (insertError) throw insertError;
 
-            showAlert(`Success! ${payload.length} attendance logs have been securely posted.`, 'success');
+            showAlert(`Success! ${payload.length} attendance logs posted by ${user.full_name}.`, 'success');
             
             // Clean up UI
             hierarchyData = {};
@@ -495,7 +570,7 @@
 
         } catch (error) {
             console.error("Upload error:", error);
-            showAlert(`Database Error: ${error.message}`, 'error');
+            showAlert(`${error.message}`, 'error');
         } finally {
             btn.disabled = false;
             btn.textContent = 'Authorize & Post to DB';
