@@ -42,14 +42,16 @@
         .btn-sm { padding: 5px 10px; font-size: .8rem; border-radius: 5px; }
         
         .table-wrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #fff; max-height: 650px; }
-        .monitor-table { width: 100%; min-width: 900px; border-collapse: collapse; }
-        .monitor-table th, .monitor-table td { padding: 12px 10px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; }
+        .monitor-table { width: 100%; min-width: 1000px; border-collapse: collapse; }
+        .monitor-table th, .monitor-table td { padding: 10px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; }
         .monitor-table th { background: #f8fafc; color: #475569; font-size: .76rem; text-transform: uppercase; letter-spacing: .025em; white-space: nowrap; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--line); box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
-        .monitor-table tbody tr:hover:not(.group-header) { background: #fbfdff; }
+        .monitor-table tbody tr:hover:not(.division-header):not(.group-header) { background: #fbfdff; }
         
-        /* Employee Grouping Headers */
-        .group-header { background: #eef4f8 !important; border-top: 2px solid var(--blue); }
-        .group-header td { font-weight: 800; color: var(--navy); padding: 12px 10px; font-size: 0.95rem; }
+        /* Hierarchical Grouping Headers */
+        .division-header { background: var(--navy) !important; }
+        .division-header td { font-weight: 800; color: #fff; padding: 12px 15px; font-size: 1.05rem; letter-spacing: 0.05em; text-transform: uppercase; }
+        .group-header { background: #eef4f8 !important; border-bottom: 1px solid #cbd5e1; }
+        .group-header td { font-weight: 700; color: var(--navy); padding: 8px 15px; font-size: 0.95rem; }
         
         .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; }
         .status-green { background: #dcfce7; color: #166534; }
@@ -62,8 +64,11 @@
         .success-note { border-left-color: var(--green); background: #f0fdf4; color: #166534; }
 
         .auth-bar { display: flex; align-items: center; gap: 10px; background: #fffbeb; padding: 12px 15px; border-radius: 8px; border: 1px solid #fcd34d; }
-        .time-box { background: var(--soft); border: 1px solid var(--line); padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 0.9rem; }
-        .empty-time { color: var(--line); }
+        
+        /* Interactive Time Inputs */
+        input[type="time"] { font-family: monospace; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; width: 110px; font-size: 0.85rem; color: var(--text); }
+        input[type="time"]:focus { border-color: var(--blue); outline: none; }
+        input[type="time"].manual-entry { background: #fff7ed; border-color: #fcd34d; }
     </style>
 </head>
 <body>
@@ -83,7 +88,7 @@
         <div class="module-heading">
             <div>
                 <h2>Extract & Group DAT File <span style="color: var(--amber); font-size: 1rem;">(Current Month Only)</span></h2>
-                <p>Upload biometric logs. Data is automatically filtered for the current month, arranged per employee, per date. 4 punches = Whole Day.</p>
+                <p>Upload biometric logs. Fetches names from Database, filters for current month, maps missing punches, and groups by Division.</p>
             </div>
         </div>
 
@@ -99,7 +104,7 @@
         <div class="module-heading" id="uploadAction" style="display:none; margin-top: 25px; padding-top: 20px; border-top: 1px dashed var(--line);">
             <div>
                 <h3 style="margin:0; color: var(--navy);" id="logCount">0 Days processed</h3>
-                <p style="margin:0; color: var(--muted); font-size: 0.8rem;" id="currentMonthLabel">Arranged by Employee ID</p>
+                <p style="margin:0; color: var(--muted); font-size: 0.8rem;" id="currentMonthLabel">Arranged by Division & Employee</p>
             </div>
             <div class="auth-bar">
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--amber);">HR AUTHORIZATION:</label>
@@ -112,13 +117,12 @@
             <table class="monitor-table">
                 <thead>
                     <tr>
-                        <th style="width: 150px;">Employee ID</th>
-                        <th style="width: 120px;">Date</th>
+                        <th style="width: 100px;">Date</th>
                         <th>Time In</th>
                         <th>Break Out</th>
                         <th>Break In</th>
                         <th>Time Out</th>
-                        <th style="width: 180px;">Remarks</th>
+                        <th style="width: 150px;">Remarks</th>
                         <th style="width: 80px;">Action</th>
                     </tr>
                 </thead>
@@ -140,12 +144,11 @@
             dbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
         }
     } catch (err) {
-        console.warn('Supabase not yet fully configured in common.js', err);
+        console.warn('Supabase not fully configured in common.js', err);
     }
 
     let groupedData = [];
 
-    // Fallback ID generator if running on a local file
     const generateId = () => {
         return (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') 
             ? crypto.randomUUID() 
@@ -160,8 +163,16 @@
         if(type === 'success') { setTimeout(() => { box.style.display = 'none'; }, 6000); }
     };
 
-    // The Bulletproof DAT Parser with CURRENT MONTH FILTER
-    document.getElementById('parseBtn').addEventListener('click', () => {
+    // Calculate Remarks string based on 4-slot structure
+    const calculateRemarks = (slots) => {
+        const filledSlots = slots.filter(s => s.time !== '').length;
+        if (filledSlots === 4) return '<span class="status status-green">&#10003; Complete</span>';
+        if (filledSlots === 0) return '<span class="status status-gray">Empty</span>';
+        return `<span class="status status-amber">&#9888; Missing (${4 - filledSlots})</span>`;
+    };
+
+    // Parse Data & Fetch Employee Roster
+    document.getElementById('parseBtn').addEventListener('click', async () => {
         const fileInput = document.getElementById('fileInput');
         const parseBtn = document.getElementById('parseBtn');
 
@@ -170,13 +181,30 @@
             return;
         }
 
-        parseBtn.textContent = 'Extracting...';
+        if (!dbClient) {
+            showAlert('Database connection missing. Cannot map employee names.', 'error');
+            return;
+        }
+
+        parseBtn.textContent = 'Extracting & Mapping...';
         parseBtn.disabled = true;
+
+        // Fetch Employee Table logic
+        let empMap = {};
+        try {
+            const { data, error } = await dbClient.from('employees').select('emp_id, full_name, division');
+            if (data) {
+                data.forEach(emp => {
+                    empMap[emp.emp_id] = { full_name: emp.full_name, division: emp.division || 'Unassigned Division' };
+                });
+            }
+        } catch(e) {
+            console.warn("Could not fetch employees roster", e);
+        }
 
         const file = fileInput.files[0];
         const reader = new FileReader();
 
-        // Calculate the current month in YYYY-MM format dynamically
         const now = new Date();
         const currentYYYYMM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
@@ -192,57 +220,85 @@
                 lines.forEach(line => {
                     const cleanLine = line.trim();
                     if (!cleanLine) return;
-
                     const parts = cleanLine.split(/\s+/);
                     
                     if (parts.length >= 5) {
                         const emp_id = parts[0];
-                        const date = parts[1]; // Format: YYYY-MM-DD
+                        const date = parts[1]; 
                         const time = parts[2];
                         const device_id = parts[3];
                         const status = parts[4];
                         
-                        // CURRENT MONTH FILTER LOGIC
+                        // CURRENT MONTH ONLY FILTER
                         if (!date.startsWith(currentYYYYMM)) {
                             ignoredLogsCount++;
-                            return; // Skip this loop iteration if it doesn't match current YYYY-MM
+                            return; 
                         }
 
                         rawLogsCount++;
                         const groupKey = `${emp_id}_${date}`;
+                        
                         if (!tempMap[groupKey]) {
+                            // Map ID to Name & Division
+                            const rosterInfo = empMap[emp_id] || { full_name: 'Unknown Employee', division: 'Unmapped IDs' };
+
                             tempMap[groupKey] = {
                                 id: generateId(),
                                 emp_id: emp_id,
+                                full_name: rosterInfo.full_name,
+                                division: rosterInfo.division,
                                 date: date,
-                                logs: []
+                                rawLogs: []
                             };
                         }
-                        tempMap[groupKey].logs.push({ time, device_id, status });
+                        tempMap[groupKey].rawLogs.push({ time, device_id, status });
                     }
                 });
 
                 if (rawLogsCount === 0) {
-                    showAlert(`No data found for the current month (${currentYYYYMM}). Ignored ${ignoredLogsCount} logs from previous/other months.`, 'error');
+                    showAlert(`No data found for the current month (${currentYYYYMM}). Ignored ${ignoredLogsCount} logs from previous months.`, 'error');
                     parseBtn.textContent = 'Extract Data';
                     parseBtn.disabled = false;
                     return;
                 }
 
-                // Update UI hint to show exactly what month we filtered
-                document.getElementById('currentMonthLabel').textContent = `Filtered explicitly for ${currentYYYYMM} | Arranged by Employee`;
+                document.getElementById('currentMonthLabel').textContent = `Filtered explicitly for ${currentYYYYMM} | Grouped by Division & Employee`;
 
-                // Convert map to array and sort by Employee ID, then by Date
                 groupedData = Object.values(tempMap);
-                groupedData.sort((a, b) => {
-                    const empCompare = a.emp_id.localeCompare(b.emp_id, undefined, {numeric: true});
-                    if (empCompare !== 0) return empCompare;
-                    return a.date.localeCompare(b.date);
+
+                // Convert raw logs into exactly 4 Time Slots per day (Time In, B-Out, B-In, Time Out)
+                const expectedStatuses = ['0', '2', '3', '1']; // ZKTeco standard IN, BOUT, BIN, OUT
+                groupedData.forEach(group => {
+                    group.rawLogs.sort((a, b) => a.time.localeCompare(b.time));
+                    
+                    // Initialize empty manual slots
+                    group.timeSlots = [
+                        { time: '', device_id: 'Manual', status: '0', isManual: true },
+                        { time: '', device_id: 'Manual', status: '2', isManual: true },
+                        { time: '', device_id: 'Manual', status: '3', isManual: true },
+                        { time: '', device_id: 'Manual', status: '1', isManual: true }
+                    ];
+
+                    // Fill slots chronologically from raw biometric data
+                    group.rawLogs.forEach((log, idx) => {
+                        if(idx < 4) {
+                            group.timeSlots[idx] = { 
+                                time: log.time, 
+                                device_id: log.device_id, 
+                                status: log.status || expectedStatuses[idx],
+                                isManual: false 
+                            };
+                        }
+                    });
                 });
 
-                // Ensure times within each day are sorted chronologically
-                groupedData.forEach(group => {
-                    group.logs.sort((a, b) => a.time.localeCompare(b.time));
+                // Hierarchical Sorting: Division -> Name -> Date
+                groupedData.sort((a, b) => {
+                    const divCompare = a.division.localeCompare(b.division);
+                    if (divCompare !== 0) return divCompare;
+                    const nameCompare = a.full_name.localeCompare(b.full_name);
+                    if (nameCompare !== 0) return nameCompare;
+                    return a.date.localeCompare(b.date);
                 });
 
                 renderTable();
@@ -259,7 +315,6 @@
         reader.readAsText(file);
     });
 
-    // Render Table in Timesheet Format
     const renderTable = () => {
         const tbody = document.getElementById('previewBody');
         if (groupedData.length === 0) {
@@ -270,59 +325,93 @@
         }
 
         let htmlContent = '';
-        let totalPunches = 0;
-        let currentEmpId = null;
+        let currentDiv = null;
+        let currentEmp = null;
 
         groupedData.forEach((group) => {
-            const logs = group.logs;
-            totalPunches += logs.length;
-
-            if (group.emp_id !== currentEmpId) {
-                currentEmpId = group.emp_id;
+            // Group By Division
+            if (group.division !== currentDiv) {
+                currentDiv = group.division;
+                currentEmp = null; // Reset employee tracking when division changes
                 htmlContent += `
-                    <tr class="group-header">
-                        <td colspan="8">
-                            &#128100; Employee ID: <span style="font-size: 1.1rem; margin-left: 5px;">${currentEmpId}</span>
+                    <tr class="division-header">
+                        <td colspan="7">
+                            &#128188; DIVISION: ${currentDiv}
                         </td>
                     </tr>
                 `;
             }
 
-            const t1 = logs[0] ? `<span class="time-box">${logs[0].time}</span>` : `<span class="empty-time">--:--:--</span>`;
-            const t2 = logs[1] ? `<span class="time-box">${logs[1].time}</span>` : `<span class="empty-time">--:--:--</span>`;
-            const t3 = logs[2] ? `<span class="time-box">${logs[2].time}</span>` : `<span class="empty-time">--:--:--</span>`;
-            const t4 = logs[3] ? `<span class="time-box">${logs[3].time}</span>` : `<span class="empty-time">--:--:--</span>`;
-            
-            let remarks = '';
-            if (logs.length === 4) {
-                remarks = '<span class="status status-green">&#10003; Whole Day</span>';
-            } else if (logs.length < 4) {
-                remarks = `<span class="status status-amber">&#9888; Incomplete (${logs.length})</span>`;
-            } else {
-                remarks = `<span class="status status-red">&#10006; Over-logged (${logs.length})</span>`;
+            // Group By Employee
+            if (group.emp_id !== currentEmp) {
+                currentEmp = group.emp_id;
+                htmlContent += `
+                    <tr class="group-header">
+                        <td colspan="7">
+                            &#128100; ${group.full_name} <span style="color:var(--muted); font-size:0.8rem; font-weight:normal; margin-left: 8px;">(ID: ${currentEmp})</span>
+                        </td>
+                    </tr>
+                `;
             }
+
+            // Render the interactive Time Slots
+            const slots = group.timeSlots.map((slot, idx) => {
+                const inputClass = slot.isManual ? 'manual-entry' : '';
+                // step="1" enables seconds in the time picker
+                return `<input type="time" step="1" class="${inputClass}" data-group-id="${group.id}" data-slot="${idx}" value="${slot.time}">`;
+            });
+            
+            const remarks = calculateRemarks(group.timeSlots);
 
             htmlContent += `
                 <tr id="row_${group.id}">
-                    <td><strong style="color: var(--navy); font-size: 1.05rem;">${group.emp_id}</strong></td>
-                    <td><span style="font-weight: 600;">${group.date}</span></td>
-                    <td>${t1}</td>
-                    <td>${t2}</td>
-                    <td>${t3}</td>
-                    <td>${t4}</td>
-                    <td>${remarks}</td>
-                    <td><button type="button" class="btn btn-danger btn-sm" onclick="removeGroup('${group.id}')">Drop</button></td>
+                    <td><span style="font-weight: 600; font-size: 0.9rem;">${group.date}</span></td>
+                    <td>${slots[0]}</td>
+                    <td>${slots[1]}</td>
+                    <td>${slots[2]}</td>
+                    <td>${slots[3]}</td>
+                    <td class="remarks-cell">${remarks}</td>
+                    <td><button type="button" class="btn btn-danger btn-sm" onclick="removeGroup('${group.id}')">Drop Day</button></td>
                 </tr>
             `;
         });
         
         tbody.innerHTML = htmlContent;
 
-        document.getElementById('logCount').innerHTML = `${groupedData.length} Working Days <span style="color:var(--muted); font-size: 0.8rem; margin-left: 10px; font-weight:normal;">(${totalPunches} total punches)</span>`;
+        // Listen for HR Manual Input Changes
+        document.querySelectorAll('input[type="time"]').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const groupId = e.target.dataset.groupId;
+                const slotIndex = e.target.dataset.slot;
+                const group = groupedData.find(g => g.id === groupId);
+                
+                if (group) {
+                    let newTime = e.target.value;
+                    // Native HTML time input returns "HH:MM" if seconds aren't typed, append :00 for DB compatibility
+                    if (newTime && newTime.length === 5) newTime += ":00"; 
+                    
+                    group.timeSlots[slotIndex].time = newTime;
+                    
+                    // Add manual styling class
+                    if(newTime) {
+                        e.target.classList.add('manual-entry');
+                    } else {
+                        e.target.classList.remove('manual-entry');
+                    }
+
+                    // Dynamically update the remarks cell for this row
+                    const tr = document.getElementById(`row_${groupId}`);
+                    if(tr) {
+                        tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(group.timeSlots);
+                    }
+                }
+            });
+        });
+
+        document.getElementById('logCount').innerHTML = `${groupedData.length} Employee Working Days ready for review.`;
         document.getElementById('tableWrapper').style.display = 'block';
         document.getElementById('uploadAction').style.display = 'flex';
         document.getElementById('alertBox').style.display = 'none';
-        document.getElementById('hrPassword').value = ''; 
     };
 
     window.removeGroup = (idToRemove) => {
@@ -330,10 +419,11 @@
         renderTable();
     };
 
-    // Un-group and Upload
+    // Extract Final Valid Timeslots and Upload
     document.getElementById('uploadBtn').addEventListener('click', async () => {
         const hrPass = document.getElementById('hrPassword').value;
         
+        // HR PASSWORD REQUIREMENT (Update this string to match company protocol)
         if (hrPass !== 'HR2026') {
             showAlert('Unauthorized. Incorrect HR Password.', 'error');
             document.getElementById('hrPassword').focus();
@@ -341,7 +431,7 @@
         }
 
         if (!dbClient) {
-            showAlert('Database connection missing. Make sure your config.js is properly loading the Supabase keys.', 'error');
+            showAlert('Database connection missing. Cannot push records.', 'error');
             return;
         }
 
@@ -353,15 +443,24 @@
 
         const payload = [];
         groupedData.forEach(group => {
-            group.logs.forEach(log => {
-                payload.push({
-                    emp_id: group.emp_id,
-                    log_time: `${group.date} ${log.time}`,
-                    device_id: log.device_id,
-                    status: log.status
-                });
+            group.timeSlots.forEach(slot => {
+                if (slot.time) { // Only push slots that have actual time data
+                    payload.push({
+                        emp_id: group.emp_id,
+                        log_time: `${group.date} ${slot.time}`,
+                        device_id: slot.device_id, // Biometric device ID, or 'Manual' if typed by HR
+                        status: slot.status
+                    });
+                }
             });
         });
+
+        if (payload.length === 0) {
+            showAlert('No actual punches recorded to upload.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Authorize & Post';
+            return;
+        }
 
         try {
             const { data, error } = await dbClient
@@ -370,8 +469,9 @@
 
             if (error) throw error;
 
-            showAlert(`Success! ${payload.length} attendance logs have been authorized and securely posted.`, 'success');
+            showAlert(`Success! ${payload.length} attendance logs have been securely posted.`, 'success');
             
+            // Clean up UI
             groupedData = [];
             document.getElementById('fileInput').value = '';
             renderTable();
