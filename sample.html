@@ -6,8 +6,11 @@
     <title>Upload Attendance | ARBO Management</title>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
+    
+    <!-- Link to your exact config file -->
+    <script src="supabase-config.js"></script>
     <script src="common.js"></script>
+    
     <style>
         /* ARBO DASHBOARD CSS SYSTEM */
         :root{--navy:#0a3d62;--green:#066b4f;--blue:#1769a0;--amber:#b45309;--red:#b91c1c;--line:#dbe3ea;--soft:#f8fafc;--text:#1e293b;--muted:#64748b}
@@ -135,18 +138,6 @@
 </div>
 
 <script>
-    // ==========================================
-    // SAFELY INITIALIZE SUPABASE
-    // ==========================================
-    let dbClient = null;
-    try {
-        if (window.supabase && typeof window.SUPABASE_URL !== 'undefined') {
-            dbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        }
-    } catch (err) {
-        console.warn('Supabase not fully configured in common.js', err);
-    }
-
     let groupedData = [];
 
     const generateId = () => {
@@ -181,18 +172,19 @@
             return;
         }
 
-        if (!dbClient) {
-            showAlert('Database connection missing. Cannot map employee names.', 'error');
+        // Validate that your supabase-config.js successfully attached the client
+        if (!window.supabaseClient) {
+            showAlert('Database connection missing. Ensure supabase-config.js is loaded properly.', 'error');
             return;
         }
 
         parseBtn.textContent = 'Extracting & Mapping...';
         parseBtn.disabled = true;
 
-        // Fetch Employee Table logic
+        // Fetch Employee Table logic utilizing your config setup
         let empMap = {};
         try {
-            const { data, error } = await dbClient.from('employees').select('emp_id, full_name, division');
+            const { data, error } = await window.supabaseClient.from('employees').select('emp_id, full_name, division');
             if (data) {
                 data.forEach(emp => {
                     empMap[emp.emp_id] = { full_name: emp.full_name, division: emp.division || 'Unassigned Division' };
@@ -357,7 +349,7 @@
             // Render the interactive Time Slots
             const slots = group.timeSlots.map((slot, idx) => {
                 const inputClass = slot.isManual ? 'manual-entry' : '';
-                // step="1" enables seconds in the time picker
+                // step="1" enables seconds in the HTML time picker
                 return `<input type="time" step="1" class="${inputClass}" data-group-id="${group.id}" data-slot="${idx}" value="${slot.time}">`;
             });
             
@@ -430,7 +422,7 @@
             return;
         }
 
-        if (!dbClient) {
+        if (!window.supabaseClient) {
             showAlert('Database connection missing. Cannot push records.', 'error');
             return;
         }
@@ -463,7 +455,7 @@
         }
 
         try {
-            const { data, error } = await dbClient
+            const { data, error } = await window.supabaseClient
                 .from('attendance_logs')
                 .insert(payload);
 
