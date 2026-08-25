@@ -56,12 +56,6 @@
         .group-header { background: #eef4f8 !important; border-bottom: 1px solid #cbd5e1; }
         .group-header td { font-weight: 800; color: var(--navy); padding: 10px 15px; font-size: 1rem; }
         
-        /* DTR View Row Highlights */
-        .issue-row td { background-color: #fff1f2 !important; border-bottom-color: #fecdd3; }
-        .issue-row td:first-child { border-left: 4px solid var(--red); }
-        .weekend-row td { background-color: #f8fafc !important; color: var(--muted); }
-        .weekend-row input[type="time"] { opacity: 0.7; background: #f1f5f9; }
-
         .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; margin-right: 5px; margin-bottom: 4px;}
         .status-green { background: #dcfce7; color: #166534; }
         .status-red { background: #fee2e2; color: #991b1b; }
@@ -98,7 +92,7 @@
         <div class="module-heading">
             <div>
                 <h2>Extract & Sync DAT File</h2>
-                <p>Upload biometric logs. Fetches names, flags Travel Orders/PSOs, checks overrides, and generates DTR View (Division > Employee).</p>
+                <p>Upload biometric logs. Fetches names, flags Travel Orders/PSOs, filters for target month, and groups by Division > Employee.</p>
             </div>
         </div>
 
@@ -162,177 +156,11 @@
     });
 
     let hierarchyData = {}; 
-    let schedLookup = {};
-    let extractedDatLogs = [];
-
-    const DB_PAGE_SIZE = 1000;
-    const DB_TIMEOUT_MS = 30000;
-    const TO_QUERY_BATCH_SIZE = 150;
 
     const generateId = () => {
         return (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') 
             ? crypto.randomUUID() 
             : 'id_' + Math.random().toString(36).substr(2, 9);
-    };
-
-    const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
-
-    const runWithTimeout = (request, label) => {
-        let timer;
-        return Promise.race([
-            Promise.resolve(request),
-            new Promise((_, reject) => {
-                timer = setTimeout(() => reject(new Error(`${label} timed out. Please check the connection and try again.`)), DB_TIMEOUT_MS);
-            })
-        ]).finally(() => clearTimeout(timer));
-    };
-
-    // Fetch every matching row in stable pages so Supabase row limits cannot
-    // silently omit employees, PSOs, itineraries, schedules, or Travel Orders.
-    const fetchAllRows = async (table, columns, applyFilters, label = table) => {
-        const rows = [];
-
-        for (let from = 0; ; from += DB_PAGE_SIZE) {
-            let query = dbClient
-                .from(table)
-                .select(columns);
-
-            if (applyFilters) query = applyFilters(query);
-            query = query.range(from, from + DB_PAGE_SIZE - 1);
-
-            const { data, error } = await runWithTimeout(query, label);
-            if (error) throw new Error(`${label}: ${error.message}`);
-
-            const page = data || [];
-            rows.push(...page);
-            if (page.length < DB_PAGE_SIZE) break;
-
-            // Give rendering and input events a chance to run between large pages.
-            await yieldToBrowser();
-        }
-
-        return rows;
-    };
-
-    const fetchTravelOrdersByNumber = async (toNumbers) => {
-        if (!toNumbers.length) return [];
-
-        const batches = [];
-        for (let i = 0; i < toNumbers.length; i += TO_QUERY_BATCH_SIZE) {
-            batches.push(toNumbers.slice(i, i + TO_QUERY_BATCH_SIZE));
-        }
-
-        const rows = [];
-        // Bounded parallel batches keep the request fast without flooding the browser.
-        for (let i = 0; i < batches.length; i += 4) {
-            const group = batches.slice(i, i + 4);
-            const results = await Promise.all(group.map((batch, index) =>
-                fetchAllRows(
-                    'travel_orders',
-                    'to_no, emp_id, status',
-                    query => query.in('to_no', batch).order('id', { ascending: true }),
-                    `Travel Orders batch ${i + index + 1}`
-                )
-            ));
-            results.forEach(result => rows.push(...result));
-        }
-
-        return rows;
-    };
-
-    const normalizeDatTime = (value) => {
-        const match = String(value || '').match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/);
-        if (!match) return '';
-        return `${match[1]}:${match[2]}:${match[3] || '00'}`;
-    };
-
-    const isValidIsoDate = (value) => {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-        const [year, month, day] = value.split('-').map(Number);
-        const parsed = new Date(Date.UTC(year, month - 1, day));
-        return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
-    };
-
-    // Stream and parse large DAT files in chunks to keep the page responsive.
-    const parseDatFile = async (file, targetMonth, empMap) => {
-        const logs = [];
-        let ignoredOtherMonth = 0;
-        let ignoredNonDarpo = 0;
-        let invalidLines = 0;
-        let lineCount = 0;
-
-        const parseLine = (line) => {
-            const cleanLine = line.trim();
-            if (!cleanLine) return;
-
-            const parts = cleanLine.split(/\s+/);
-            if (parts.length < 5) {
-                invalidLines++;
-                return;
-            }
-
-            const emp_id = String(parts[0]).trim();
-            const date = String(parts[1]).replace(/\//g, '-');
-            const time = normalizeDatTime(parts[2]);
-            const device_id = String(parts[3]);
-            const status = String(parts[4]);
-
-            if (!date.startsWith(targetMonth)) {
-                ignoredOtherMonth++;
-                return;
-            }
-
-            // The DTR view and upload are strictly limited to station = DARPO.
-            if (!empMap[emp_id]) {
-                ignoredNonDarpo++;
-                return;
-            }
-
-            if (!isValidIsoDate(date) || !time) {
-                invalidLines++;
-                return;
-            }
-
-            logs.push({
-                emp_id,
-                date,
-                time,
-                device_id,
-                status,
-                sourceIndex: logs.length
-            });
-        };
-
-        if (file.stream && typeof TextDecoderStream !== 'undefined') {
-            const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader();
-            let remainder = '';
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-
-                const lines = (remainder + value).split(/\r?\n/);
-                remainder = lines.pop() || '';
-                lines.forEach(parseLine);
-                lineCount += lines.length;
-
-                if (lineCount >= 5000) {
-                    lineCount = 0;
-                    await yieldToBrowser();
-                }
-            }
-
-            if (remainder.trim()) parseLine(remainder);
-        } else {
-            const textContent = await runWithTimeout(file.text(), 'DAT file reading');
-            const lines = textContent.split(/\r?\n/);
-            for (let i = 0; i < lines.length; i++) {
-                parseLine(lines[i]);
-                if (i > 0 && i % 5000 === 0) await yieldToBrowser();
-            }
-        }
-
-        return { logs, ignoredOtherMonth, ignoredNonDarpo, invalidLines };
     };
 
     const showAlert = (message, type = 'error') => {
@@ -354,38 +182,23 @@
         return dates;
     };
 
-    // Formats dynamic remarks including Weekends, No Work Fridays, and Compressed Fridays
-    const calculateRemarks = (slots, toInfo, psoInfo, isWeekend, isCompressedFriday, isNoWorkFriday) => {
+    // Formats dynamic remarks
+    const calculateRemarks = (slots, toInfo, psoInfo) => {
         let marks = [];
         const filledSlots = slots.filter(s => s && s.time !== '').length;
-        const travelOrders = Array.isArray(toInfo) ? toInfo : (toInfo ? [toInfo] : []);
-
-        if (isWeekend) {
-            marks.push('<span class="status status-gray">WEEKEND</span>');
-        } else if (isNoWorkFriday) {
-            marks.push('<span class="status status-gray">FRIDAY - NO WORK</span>');
-        } else if (isCompressedFriday) {
-            marks.push('<span class="status status-gray">FRIDAY (Compressed)</span>');
-        }
 
         if (filledSlots === 4) {
             marks.push('<span class="status status-green">&#10003; Complete</span>');
         } else if (filledSlots === 0) {
-            if (!isWeekend && !isCompressedFriday && !isNoWorkFriday && travelOrders.length === 0 && !psoInfo) {
-                marks.push('<span class="status status-red">Absent / No Punches</span>');
-            } else if (!isWeekend && !isCompressedFriday && !isNoWorkFriday) {
-                marks.push('<span class="status status-gray">Empty Punches</span>');
-            }
+            marks.push('<span class="status status-gray">Empty Punches</span>');
         } else {
-            marks.push(`<span class="status status-red">&#9888; Missing (${4 - filledSlots})</span>`);
+            marks.push(`<span class="status status-amber">&#9888; Missing (${4 - filledSlots})</span>`);
         }
 
-        travelOrders.forEach(to => {
-            const normalizedStatus = String(to.status || '').toUpperCase();
-            const toColor = (normalizedStatus === 'APPROVED' || normalizedStatus === 'COMPLETED' || normalizedStatus === 'POSTED') ? 'status-green' : 'status-amber';
-            const purpose = to.purpose ? ` | ${to.purpose}` : '';
-            marks.push(`<span class="status ${toColor}">&#9992; TO ${to.to_no || ''} ${to.status || ''} - ${to.destination || 'Field'}${purpose}</span>`);
-        });
+        if (toInfo) {
+            const toColor = toInfo.status === 'APPROVED' ? 'status-green' : 'status-amber';
+            marks.push(`<span class="status ${toColor}">&#9992; TO ${toInfo.status} - ${toInfo.destination}</span>`);
+        }
 
         if (psoInfo) {
             marks.push(`<span class="status status-blue">&#128221; PSO: ${psoInfo}</span>`);
@@ -404,7 +217,7 @@
     document.getElementById('parseBtn').addEventListener('click', async () => {
         const fileInput = document.getElementById('fileInput');
         const parseBtn = document.getElementById('parseBtn');
-        const targetMonth = document.getElementById('targetMonth').value; 
+        const targetMonth = document.getElementById('targetMonth').value; // e.g. "2026-08"
 
         if (!fileInput.files.length) {
             showAlert('Please select a .dat file first.', 'error');
@@ -425,192 +238,141 @@
         parseBtn.disabled = true;
 
         hierarchyData = {}; 
-        schedLookup = {};
-        extractedDatLogs = [];
         let empMap = {};
         let toLookup = {};
         let psoLookup = {};
 
         try {
-            const [tYear, tMonth] = targetMonth.split('-');
-            const daysInMonth = new Date(Number(tYear), Number(tMonth), 0).getDate();
-            const monthStart = `${targetMonth}-01`;
-            const monthEnd = `${targetMonth}-${String(daysInMonth).padStart(2, '0')}`;
-
-            // Independent data sources are fetched concurrently and fully paginated.
-            const [employees, psos, itineraries, schedules] = await Promise.all([
-                fetchAllRows(
-                    'employees',
-                    'emp_id, full_name, division, station',
-                    query => query.eq('station', 'DARPO').order('emp_id', { ascending: true }),
-                    'DARPO employees'
-                ),
-                fetchAllRows(
-                    'pso_records',
-                    'emp_id, start_date, end_date, subject, status',
-                    query => query.lte('start_date', monthEnd).gte('end_date', monthStart).order('id', { ascending: true }),
-                    'PSO records'
-                ),
-                fetchAllRows(
-                    'itinerary',
-                    'to_no, travel_date, destination, purpose',
-                    query => query.like('travel_date', `${targetMonth}%`).order('id', { ascending: true }),
-                    'Travel Order itineraries'
-                ),
-                fetchAllRows(
-                    'schedule_overrides',
-                    'emp_id, start_date, end_date, schedule_type, working_days',
-                    null,
-                    'Schedule overrides'
-                )
+            // Concurrent DB Fetches based on your table schemas
+            const [empRes, psoRes, toRes, itinRes] = await Promise.all([
+                dbClient.from('employees').select('emp_id, full_name, division'),
+                dbClient.from('pso_records').select('emp_id, start_date, end_date, subject, status'),
+                dbClient.from('travel_orders').select('to_no, emp_id, status').in('status', ['PENDING', 'APPROVED']),
+                dbClient.from('itinerary').select('to_no, travel_date, destination')
             ]);
 
-            const relevantToNumbers = [...new Set(
-                itineraries.map(itin => itin.to_no).filter(Boolean)
-            )];
-            const travelOrders = await fetchTravelOrdersByNumber(relevantToNumbers);
-
-            // Map DARPO employees only.
-            employees.forEach(emp => {
-                const empId = String(emp.emp_id || '').trim();
-                if (empId) empMap[empId] = { full_name: emp.full_name, division: emp.division || 'UNASSIGNED' };
-            });
-
-            // Map Schedule Overrides
-            schedules.forEach(s => {
-                if (!schedLookup[s.emp_id]) schedLookup[s.emp_id] = [];
-                schedLookup[s.emp_id].push(s);
-            });
-
-            // Map PSOs - Added split(',') for Group PSOs
-            psos.forEach(pso => {
-                const normalizedStatus = String(pso.status || '').toUpperCase();
-                if (!pso.start_date || !pso.end_date || normalizedStatus === 'CANCELLED' || normalizedStatus === 'REJECTED') return;
-
-                // Clamp the range to the selected month to prevent unnecessarily long loops.
-                const psoStart = String(pso.start_date).slice(0, 10);
-                const psoEnd = String(pso.end_date).slice(0, 10);
-                const dates = getDatesInRange(
-                    psoStart < monthStart ? monthStart : psoStart,
-                    psoEnd > monthEnd ? monthEnd : psoEnd
-                );
-                const empIds = pso.emp_id ? String(pso.emp_id).split(',').map(e => e.trim()) : [];
-
-                dates.forEach(d => {
-                    empIds.forEach(eid => {
-                        if (!empMap[eid]) return;
-                        const key = `${eid}_${d}`;
-                        if (!psoLookup[key]) psoLookup[key] = [];
-                        if (pso.subject && !psoLookup[key].includes(pso.subject)) psoLookup[key].push(pso.subject);
-                    });
+            // Map Employees
+            if (empRes.data) {
+                empRes.data.forEach(emp => {
+                    empMap[emp.emp_id] = { full_name: emp.full_name, division: emp.division || 'UNASSIGNED' };
                 });
-            });
+            }
 
-            // Join every monthly itinerary to every matching TO, then connect it
-            // to each DARPO employee through travel_orders.emp_id.
-            const toReference = {};
-            travelOrders.forEach(to => {
-                const normalizedStatus = String(to.status || '').toUpperCase();
-                if (!to.to_no || normalizedStatus === 'CANCELLED') return;
-                if (!toReference[to.to_no]) toReference[to.to_no] = [];
-                toReference[to.to_no].push(to);
-            });
-
-            itineraries.forEach(itin => {
-                const travelDate = String(itin.travel_date || '').slice(0, 10);
-                const parentTos = toReference[itin.to_no] || [];
-                if (!travelDate.startsWith(targetMonth)) return;
-
-                parentTos.forEach(parentTo => {
-                    const empIds = parentTo.emp_id ? String(parentTo.emp_id).split(',').map(e => e.trim()) : [];
-
-                    empIds.forEach(eid => {
-                        if (!empMap[eid]) return;
-                        const key = `${eid}_${travelDate}`;
-                        if (!toLookup[key]) toLookup[key] = [];
-
-                        const mappedTo = {
-                            to_no: parentTo.to_no,
-                            status: parentTo.status,
-                            destination: itin.destination || 'Field',
-                            purpose: itin.purpose || ''
-                        };
-                        const signature = JSON.stringify(mappedTo);
-                        if (!toLookup[key].some(item => JSON.stringify(item) === signature)) {
-                            toLookup[key].push(mappedTo);
+            // Map PSOs into lookup based on valid dates
+            if (psoRes.data) {
+                psoRes.data.forEach(pso => {
+                    if(!pso.start_date || !pso.end_date) return;
+                    const dates = getDatesInRange(pso.start_date, pso.end_date);
+                    dates.forEach(d => {
+                        if (d.startsWith(targetMonth)) {
+                            psoLookup[`${pso.emp_id}_${d}`] = pso.subject;
                         }
                     });
                 });
-            });
-
-            // Read every selected-month DAT record belonging to a DARPO employee.
-            const datResult = await parseDatFile(fileInput.files[0], targetMonth, empMap);
-            extractedDatLogs = datResult.logs;
-
-            extractedDatLogs.forEach(log => {
-                const rosterInfo = empMap[log.emp_id];
-                ensureHierarchy(rosterInfo.division, log.emp_id, rosterInfo.full_name, log.date);
-                hierarchyData[rosterInfo.division][log.emp_id].dates[log.date].logs.push(log);
-            });
-
-            // DTR VIEW GENERATION: Inject all days of the month for active employees
-            const activeEmpIds = Object.keys(empMap);
-            const allDaysOfMonth = [];
-            
-            for (let i = 1; i <= daysInMonth; i++) {
-                allDaysOfMonth.push(`${tYear}-${tMonth}-${String(i).padStart(2, '0')}`);
             }
 
+            // Map Travel Orders joining the itinerary
+            if (toRes.data && itinRes.data) {
+                const toReference = {};
+                toRes.data.forEach(t => { toReference[t.to_no] = t; });
+
+                itinRes.data.forEach(itin => {
+                    const parentTo = toReference[itin.to_no];
+                    if (parentTo && itin.travel_date && itin.travel_date.startsWith(targetMonth)) {
+                        toLookup[`${parentTo.emp_id}_${itin.travel_date}`] = { 
+                            status: parentTo.status, 
+                            destination: itin.destination || 'Field' 
+                        };
+                    }
+                });
+            }
+
+            // Read the DAT File
+            const file = fileInput.files[0];
+            const textContent = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.readAsText(file);
+            });
+
+            const lines = textContent.split(/\r?\n/);
+            let rawLogsCount = 0;
+            let ignoredLogsCount = 0;
+
+            lines.forEach(line => {
+                const cleanLine = line.trim();
+                if (!cleanLine) return;
+                const parts = cleanLine.split(/\s+/);
+                
+                if (parts.length >= 5) {
+                    const emp_id = parts[0];
+                    const date = parts[1]; 
+                    const time = parts[2];
+                    const device_id = parts[3];
+                    const status = parts[4];
+                    
+                    if (!date.startsWith(targetMonth)) {
+                        ignoredLogsCount++;
+                        return; 
+                    }
+
+                    rawLogsCount++;
+                    const rosterInfo = empMap[emp_id] || { full_name: 'Unknown Employee', division: 'UNMAPPED' };
+                    
+                    ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
+                    hierarchyData[rosterInfo.division][emp_id].dates[date].logs.push({ time, device_id, status });
+                }
+            });
+
+            // Inject missing rows for employees who are on TO/PSO in this month but didn't Biometric punch
+            const activeEmpIds = Object.keys(empMap);
             activeEmpIds.forEach(emp_id => {
                 const rosterInfo = empMap[emp_id];
                 
-                // Construct the full 1-to-30/31 matrix for the employee
-                allDaysOfMonth.forEach(date => {
-                    ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
-                    
-                    const toKey = `${emp_id}_${date}`;
-                    if (toLookup[toKey]) hierarchyData[rosterInfo.division][emp_id].dates[date].to = toLookup[toKey];
-                    
-                    const psoKey = `${emp_id}_${date}`;
-                    if (psoLookup[psoKey]) hierarchyData[rosterInfo.division][emp_id].dates[date].pso = psoLookup[psoKey].join('; ');
+                // Add missing TO dates
+                Object.keys(toLookup).forEach(toKey => {
+                    if (toKey.startsWith(`${emp_id}_`)) {
+                        const date = toKey.split('_')[1];
+                        if (date.startsWith(targetMonth)) {
+                            ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
+                            hierarchyData[rosterInfo.division][emp_id].dates[date].to = toLookup[toKey];
+                        }
+                    }
+                });
+                
+                // Add missing PSO dates
+                Object.keys(psoLookup).forEach(psoKey => {
+                    if (psoKey.startsWith(`${emp_id}_`)) {
+                        const date = psoKey.split('_')[1];
+                        if (date.startsWith(targetMonth)) {
+                            ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
+                            hierarchyData[rosterInfo.division][emp_id].dates[date].pso = psoLookup[psoKey];
+                        }
+                    }
                 });
             });
 
             if (Object.keys(hierarchyData).length === 0) {
-                showAlert(`No DARPO employees or matching data were found for ${targetMonth}.`, 'error');
+                showAlert(`No data found for ${targetMonth}. Ignored ${ignoredLogsCount} lines from other months.`, 'error');
                 parseBtn.textContent = 'Extract & Sync';
                 parseBtn.disabled = false;
                 return;
             }
 
             document.getElementById('currentMonthLabel').textContent = `Filtered explicitly for ${targetMonth}`;
-            await renderTable();
+            renderTable();
 
         } catch (error) {
             console.error(error);
-            showAlert(error.message || 'An unexpected error occurred during sync.', 'error');
+            showAlert('An unexpected error occurred during sync.', 'error');
         } finally {
             parseBtn.textContent = 'Extract & Sync';
             parseBtn.disabled = false;
         }
     });
 
-    const getScheduleForDate = (empId, dateStr) => {
-        let empScheds = schedLookup[empId] || [];
-        let allScheds = schedLookup['ALL'] || [];
-        let combined = [...allScheds, ...empScheds]; // ALL overrides prioritized first
-
-        const d = new Date(dateStr);
-        let activeSched = combined.find(s => {
-            let start = s.start_date ? new Date(s.start_date) : new Date('2000-01-01');
-            let end = s.end_date ? new Date(s.end_date) : new Date('2100-01-01');
-            return d >= start && d <= end;
-        });
-        return activeSched;
-    };
-
     // Render Table Hierarchically
-    const renderTable = async () => {
+    const renderTable = () => {
         const tbody = document.getElementById('previewBody');
         tbody.innerHTML = '';
         
@@ -621,7 +383,7 @@
         // Sort Divisions alphabetically
         const sortedDivisions = Object.keys(hierarchyData).sort();
 
-        for (const div of sortedDivisions) {
+        sortedDivisions.forEach(div => {
             htmlContent += `
                 <tr class="division-header">
                     <td colspan="6">&#128188; DIVISION: ${div}</td>
@@ -632,8 +394,7 @@
             const employees = hierarchyData[div];
             const sortedEmpIds = Object.keys(employees).sort();
 
-            for (let empIndex = 0; empIndex < sortedEmpIds.length; empIndex++) {
-                const empId = sortedEmpIds[empIndex];
+            sortedEmpIds.forEach(empId => {
                 const empData = employees[empId];
                 
                 htmlContent += `
@@ -649,45 +410,13 @@
                     const dayData = empData.dates[date];
                     processedDaysCount++;
                     
-                    // Determine Schedule/Weekends based on `schedule_overrides` rules
-                    const d = new Date(date);
-                    const dayOfWeek = d.getDay();
-                    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-                    
-                    const activeSched = getScheduleForDate(empId, date);
-                    const workingDays = activeSched && activeSched.working_days ? activeSched.working_days : 'Mon-Fri';
-                    const schedEmpId = activeSched ? activeSched.emp_id : null;
-                    const wdLower = workingDays.toLowerCase();
-                    
-                    let isCompressedFriday = false;
-                    let isNoWorkFriday = false;
-                    
-                    if (dayOfWeek === 5) {
-                        if (schedEmpId === 'ALL') {
-                            isNoWorkFriday = true;
-                        } else if (!wdLower.includes('fri') && (wdLower.includes('thu') || wdLower.includes('4-day'))) {
-                            isCompressedFriday = true;
-                        }
-                    }
-
-                    // Sort logs chronologically and map the biometric status to
-                    // the correct DTR slot. Extra punches remain in extractedDatLogs
-                    // and are still posted even though the DTR has four visible slots.
+                    // Sort logs chronologically and map to slots
                     dayData.logs.sort((a, b) => a.time.localeCompare(b.time));
                     const slots = [null, null, null, null];
                     
-                    dayData.logs.forEach(log => {
-                        let slotIndex = expectedStatuses.indexOf(String(log.status));
-                        if (slotIndex < 0 || slots[slotIndex]) slotIndex = slots.findIndex(slot => !slot);
-
-                        if (slotIndex >= 0) {
-                            slots[slotIndex] = {
-                                time: log.time,
-                                device_id: log.device_id,
-                                status: log.status || expectedStatuses[slotIndex],
-                                isManual: false,
-                                sourceIndex: log.sourceIndex
-                            };
+                    dayData.logs.forEach((log, idx) => {
+                        if(idx < 4) {
+                            slots[idx] = { time: log.time, device_id: log.device_id, status: log.status || expectedStatuses[idx], isManual: false };
                         }
                     });
 
@@ -701,24 +430,13 @@
                         return `<input type="time" step="1" class="time-input" 
                                 data-div="${div}" data-emp="${empId}" data-date="${date}" 
                                 data-device="${s.device_id}" data-status="${s.status}" 
-                                data-source-index="${s.sourceIndex ?? ''}"
                                 data-original="${s.time}" value="${s.time}">`;
                     });
 
-                    // Figure out highlights and remarks
-                    const filledSlots = slots.filter(s => s && s.time !== '').length;
-                    let rowClass = "";
-                    
-                    if (isWeekend || isCompressedFriday || isNoWorkFriday) {
-                        rowClass = "weekend-row";
-                    } else if (filledSlots < 4 && !dayData.to && !dayData.pso) {
-                        rowClass = "issue-row"; // DTR Highlights issue if missing punches without TO/PSO
-                    }
-
-                    const remarksHtml = calculateRemarks(slots, dayData.to, dayData.pso, isWeekend, isCompressedFriday, isNoWorkFriday);
+                    const remarksHtml = calculateRemarks(slots, dayData.to, dayData.pso);
 
                     htmlContent += `
-                        <tr id="row_${empId}_${date}" class="${rowClass}" data-isweekend="${isWeekend}" data-iscompressed="${isCompressedFriday}" data-isnowork="${isNoWorkFriday}">
+                        <tr id="row_${empId}_${date}">
                             <td><strong>${date}</strong></td>
                             <td>${renderedSlots[0]}</td>
                             <td>${renderedSlots[1]}</td>
@@ -728,57 +446,38 @@
                         </tr>
                     `;
                 });
+            });
+        });
+        
+        tbody.innerHTML = htmlContent;
 
-                // Render in bounded groups so large DARPO rosters do not freeze.
-                if ((empIndex + 1) % 20 === 0) {
-                    tbody.insertAdjacentHTML('beforeend', htmlContent);
-                    htmlContent = '';
-                    await yieldToBrowser();
+        // Auto-tag manual changes
+        document.querySelectorAll('.time-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const val = e.target.value;
+                const tr = e.target.closest('tr');
+                const empId = e.target.dataset.emp;
+                const date = e.target.dataset.date;
+                const div = e.target.dataset.div;
+
+                // Sync UI change to dataset
+                if (val && val !== e.target.dataset.original) {
+                    e.target.classList.add('manual-entry');
+                } else if (!val) {
+                    e.target.classList.remove('manual-entry');
                 }
-            }
 
-            if (htmlContent) {
-                tbody.insertAdjacentHTML('beforeend', htmlContent);
-                htmlContent = '';
-            }
-            await yieldToBrowser();
-        }
+                // Gather current inputs in this row to recalculate remarks dynamically
+                const rowInputs = Array.from(tr.querySelectorAll('.time-input')).map(inp => ({
+                    time: inp.value
+                }));
 
-        // One delegated handler replaces thousands of per-input listeners.
-        tbody.onchange = (e) => {
-            if (!e.target.matches('.time-input')) return;
+                const dayData = hierarchyData[div][empId].dates[date];
+                tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(rowInputs, dayData.to, dayData.pso);
+            });
+        });
 
-            const val = e.target.value;
-            const tr = e.target.closest('tr');
-            const empId = e.target.dataset.emp;
-            const date = e.target.dataset.date;
-            const div = e.target.dataset.div;
-
-            if (val !== e.target.dataset.original) e.target.classList.add('manual-entry');
-            else e.target.classList.remove('manual-entry');
-
-            const rowInputs = Array.from(tr.querySelectorAll('.time-input')).map(inp => ({
-                time: inp.value
-            }));
-
-            const dayData = hierarchyData[div][empId].dates[date];
-            const isWknd = tr.dataset.isweekend === "true";
-            const isComp = tr.dataset.iscompressed === "true";
-            const isNoWork = tr.dataset.isnowork === "true";
-
-            tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(rowInputs, dayData.to, dayData.pso, isWknd, isComp, isNoWork);
-
-            const filled = rowInputs.filter(s => s.time !== '').length;
-            if (isWknd || isComp || isNoWork) {
-                tr.className = "weekend-row";
-            } else if (filled < 4 && !dayData.to && !dayData.pso) {
-                tr.className = "issue-row";
-            } else {
-                tr.className = "";
-            }
-        };
-
-        document.getElementById('logCount').innerHTML = `${processedDaysCount} Timesheet records mapped.`;
+        document.getElementById('logCount').innerHTML = `${processedDaysCount} Timesheets generated.`;
         document.getElementById('tableWrapper').style.display = 'block';
         document.getElementById('uploadAction').style.display = 'flex';
         document.getElementById('alertBox').style.display = 'none';
@@ -827,82 +526,44 @@
 
             btn.textContent = 'Posting to Database...';
 
+            const payload = [];
             const nowISO = new Date().toISOString(); 
 
-            // STEP 2: Start with every extracted DAT punch, including extra
-            // punches that do not fit in the four visible DTR columns.
-            const payload = extractedDatLogs.map(log => ({
-                emp_id: log.emp_id,
-                log_time: `${log.date} ${log.time}`,
-                device_id: log.device_id,
-                status: log.status,
-                manual_log_name: null,
-                manual_log_date: null
-            }));
-
-            // Apply visible HR edits to their original DAT record, or append a
-            // new manual record when the edited slot had no DAT source.
+            // STEP 2: Harvest the data directly from the DOM Inputs
             document.querySelectorAll('.time-input').forEach(input => {
                 let timeVal = input.value;
-                if (timeVal && timeVal.length === 5) timeVal += ":00";
+                if (timeVal) { 
+                    if (timeVal.length === 5) timeVal += ":00"; // Append seconds if browser omits them
+                    
+                    // If it has class manual-entry, it was modified by HR
+                    const isManual = input.classList.contains('manual-entry');
 
-                const sourceValue = input.dataset.sourceIndex;
-                const hasSource = sourceValue !== '' && Number.isInteger(Number(sourceValue));
-                const isManual = input.classList.contains('manual-entry');
-
-                if (hasSource) {
-                    const sourceIndex = Number(sourceValue);
-                    if (!timeVal) {
-                        payload[sourceIndex] = null;
-                    } else if (isManual) {
-                        payload[sourceIndex] = {
-                            emp_id: input.dataset.emp,
-                            log_time: `${input.dataset.date} ${timeVal}`,
-                            device_id: 'Manual',
-                            status: input.dataset.status,
-                            manual_log_name: user.full_name,
-                            manual_log_date: nowISO
-                        };
-                    }
-                } else if (timeVal) {
                     payload.push({
                         emp_id: input.dataset.emp,
                         log_time: `${input.dataset.date} ${timeVal}`,
-                        device_id: 'Manual',
+                        device_id: isManual ? 'Manual' : input.dataset.device,
                         status: input.dataset.status,
-                        manual_log_name: user.full_name,
-                        manual_log_date: nowISO
+                        manual_log_name: isManual ? user.full_name : null,  // Tracks WHO changed it 
+                        manual_log_date: isManual ? nowISO : null           // Tracks WHEN it was changed
                     });
                 }
             });
 
-            const finalPayload = payload.filter(Boolean);
-
-            if (finalPayload.length === 0) {
+            if (payload.length === 0) {
                 throw new Error("No actual time punches found to upload.");
             }
 
-            // STEP 3: Post in bounded batches to prevent large files from
-            // freezing the page or exceeding a single-request payload limit.
-            const INSERT_BATCH_SIZE = 1000;
-            for (let i = 0; i < finalPayload.length; i += INSERT_BATCH_SIZE) {
-                const batch = finalPayload.slice(i, i + INSERT_BATCH_SIZE);
-                btn.textContent = `Posting ${Math.min(i + batch.length, finalPayload.length)} of ${finalPayload.length}...`;
+            // STEP 3: Insert into Database
+            const { error: insertError } = await dbClient
+                .from('attendance_logs')
+                .insert(payload);
 
-                const { error: insertError } = await runWithTimeout(
-                    dbClient.from('attendance_logs').insert(batch),
-                    `Attendance upload batch ${Math.floor(i / INSERT_BATCH_SIZE) + 1}`
-                );
+            if (insertError) throw insertError;
 
-                if (insertError) throw insertError;
-                await yieldToBrowser();
-            }
-
-            showAlert(`Success! ${finalPayload.length} attendance logs posted by ${user.full_name}.`, 'success');
+            showAlert(`Success! ${payload.length} attendance logs posted by ${user.full_name}.`, 'success');
             
             // Clean up UI
             hierarchyData = {};
-            extractedDatLogs = [];
             document.getElementById('fileInput').value = '';
             document.getElementById('tableWrapper').style.display = 'none';
             document.getElementById('uploadAction').style.display = 'none';
