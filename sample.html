@@ -189,13 +189,15 @@
         return dates;
     };
 
-    // Formats dynamic remarks including Weekends and Compressed Fridays
-    const calculateRemarks = (slots, toInfo, psoInfo, isWeekend, isCompressedFriday) => {
+    // Formats dynamic remarks including Weekends, No Work Fridays, and Compressed Fridays
+    const calculateRemarks = (slots, toInfo, psoInfo, isWeekend, isCompressedFriday, isNoWorkFriday) => {
         let marks = [];
         const filledSlots = slots.filter(s => s && s.time !== '').length;
 
         if (isWeekend) {
             marks.push('<span class="status status-gray">WEEKEND</span>');
+        } else if (isNoWorkFriday) {
+            marks.push('<span class="status status-gray">FRIDAY - NO WORK</span>');
         } else if (isCompressedFriday) {
             marks.push('<span class="status status-gray">FRIDAY (Compressed)</span>');
         }
@@ -203,9 +205,9 @@
         if (filledSlots === 4) {
             marks.push('<span class="status status-green">&#10003; Complete</span>');
         } else if (filledSlots === 0) {
-            if (!isWeekend && !isCompressedFriday && !toInfo && !psoInfo) {
+            if (!isWeekend && !isCompressedFriday && !isNoWorkFriday && !toInfo && !psoInfo) {
                 marks.push('<span class="status status-red">Absent / No Punches</span>');
-            } else if (!isWeekend && !isCompressedFriday) {
+            } else if (!isWeekend && !isCompressedFriday && !isNoWorkFriday) {
                 marks.push('<span class="status status-gray">Empty Punches</span>');
             }
         } else {
@@ -277,12 +279,11 @@
                 });
             }
 
-            // Map Schedule Overrides (Support for "ALL")
+            // Map Schedule Overrides
             if (schedRes.data) {
                 schedRes.data.forEach(s => {
-                    const empKey = s.emp_id ? s.emp_id.toString().toUpperCase() : 'ALL';
-                    if (!schedLookup[empKey]) schedLookup[empKey] = [];
-                    schedLookup[empKey].push(s);
+                    if (!schedLookup[s.emp_id]) schedLookup[s.emp_id] = [];
+                    schedLookup[s.emp_id].push(s);
                 });
             }
 
@@ -395,28 +396,17 @@
     });
 
     const getScheduleForDate = (empId, dateStr) => {
+        let empScheds = schedLookup[empId] || [];
+        let allScheds = schedLookup['ALL'] || [];
+        let combined = [...allScheds, ...empScheds]; // ALL overrides prioritized first
+
         const d = new Date(dateStr);
-        
-        // Helper to check date bounds
-        const findActiveSched = (schedules) => {
-            if (!schedules) return null;
-            return schedules.find(s => {
-                let start = s.start_date ? new Date(s.start_date) : new Date('2000-01-01');
-                let end = s.end_date ? new Date(s.end_date) : new Date('2100-01-01');
-                return d >= start && d <= end;
-            });
-        };
-
-        // 1. Prioritize employee-specific schedule
-        let activeSched = findActiveSched(schedLookup[empId]);
-        
-        // 2. Fall back to global "ALL" schedule if no specific one exists
-        if (!activeSched) {
-            activeSched = findActiveSched(schedLookup['ALL']);
-        }
-
-        // 3. Fall back to standard week if nothing is found in the database
-        return activeSched ? activeSched.working_days : 'Mon-Fri';
+        let activeSched = combined.find(s => {
+            let start = s.start_date ? new Date(s.start_date) : new Date('2000-01-01');
+            let end = s.end_date ? new Date(s.end_date) : new Date('2100-01-01');
+            return d >= start && d <= end;
+        });
+        return activeSched;
     };
 
     // Render Table Hierarchically
@@ -463,12 +453,18 @@
                     const dayOfWeek = d.getDay();
                     const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
                     
-                    const workingDays = getScheduleForDate(empId, date) || 'Mon-Fri';
+                    const activeSched = getScheduleForDate(empId, date);
+                    const workingDays = activeSched ? activeSched.working_days : 'Mon-Fri';
+                    const schedEmpId = activeSched ? activeSched.emp_id : null;
                     const wdLower = workingDays.toLowerCase();
+                    
                     let isCompressedFriday = false;
+                    let isNoWorkFriday = false;
                     
                     if (dayOfWeek === 5) {
-                        if (!wdLower.includes('fri') && (wdLower.includes('thu') || wdLower.includes('4-day'))) {
+                        if (schedEmpId === 'ALL') {
+                            isNoWorkFriday = true;
+                        } else if (!wdLower.includes('fri') && (wdLower.includes('thu') || wdLower.includes('4-day'))) {
                             isCompressedFriday = true;
                         }
                     }
@@ -500,16 +496,16 @@
                     const filledSlots = slots.filter(s => s && s.time !== '').length;
                     let rowClass = "";
                     
-                    if (isWeekend || isCompressedFriday) {
+                    if (isWeekend || isCompressedFriday || isNoWorkFriday) {
                         rowClass = "weekend-row";
                     } else if (filledSlots < 4 && !dayData.to && !dayData.pso) {
                         rowClass = "issue-row"; // DTR Highlights issue if missing punches without TO/PSO
                     }
 
-                    const remarksHtml = calculateRemarks(slots, dayData.to, dayData.pso, isWeekend, isCompressedFriday);
+                    const remarksHtml = calculateRemarks(slots, dayData.to, dayData.pso, isWeekend, isCompressedFriday, isNoWorkFriday);
 
                     htmlContent += `
-                        <tr id="row_${empId}_${date}" class="${rowClass}" data-isweekend="${isWeekend}" data-iscompressed="${isCompressedFriday}">
+                        <tr id="row_${empId}_${date}" class="${rowClass}" data-isweekend="${isWeekend}" data-iscompressed="${isCompressedFriday}" data-isnowork="${isNoWorkFriday}">
                             <td><strong>${date}</strong></td>
                             <td>${renderedSlots[0]}</td>
                             <td>${renderedSlots[1]}</td>
@@ -548,12 +544,13 @@
                 const dayData = hierarchyData[div][empId].dates[date];
                 const isWknd = tr.dataset.isweekend === "true";
                 const isComp = tr.dataset.iscompressed === "true";
+                const isNoWork = tr.dataset.isnowork === "true";
                 
-                tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(rowInputs, dayData.to, dayData.pso, isWknd, isComp);
+                tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(rowInputs, dayData.to, dayData.pso, isWknd, isComp, isNoWork);
                 
                 // Dynamically update DTR row highlight
                 const filled = rowInputs.filter(s => s.time !== '').length;
-                if (isWknd || isComp) {
+                if (isWknd || isComp || isNoWork) {
                     tr.className = "weekend-row";
                 } else if (filled < 4 && !dayData.to && !dayData.pso) {
                     tr.className = "issue-row";
