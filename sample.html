@@ -215,7 +215,7 @@
         }
 
         if (toInfo) {
-            const toColor = toInfo.status === 'APPROVED' ? 'status-green' : 'status-amber';
+            const toColor = (toInfo.status === 'APPROVED' || toInfo.status === 'COMPLETED' || toInfo.status === 'POSTED') ? 'status-green' : 'status-amber';
             marks.push(`<span class="status ${toColor}">&#9992; TO ${toInfo.status} - ${toInfo.destination}</span>`);
         }
 
@@ -263,13 +263,13 @@
         let psoLookup = {};
 
         try {
-            // Concurrent DB Fetches including schedule_overrides
+            // Concurrent DB Fetches - INCREASED LIMITS & CORRECTED FILTERS to prevent data truncation
             const [empRes, psoRes, toRes, itinRes, schedRes] = await Promise.all([
-                dbClient.from('employees').select('emp_id, full_name, division'),
-                dbClient.from('pso_records').select('emp_id, start_date, end_date, subject, status'),
-                dbClient.from('travel_orders').select('to_no, emp_id, status').in('status', ['PENDING', 'APPROVED']),
-                dbClient.from('itinerary').select('to_no, travel_date, destination'),
-                dbClient.from('schedule_overrides').select('emp_id, start_date, end_date, schedule_type, working_days')
+                dbClient.from('employees').select('emp_id, full_name, division').limit(5000),
+                dbClient.from('pso_records').select('emp_id, start_date, end_date, subject, status').neq('status', 'CANCELLED').limit(20000),
+                dbClient.from('travel_orders').select('to_no, emp_id, status').neq('status', 'CANCELLED').limit(20000),
+                dbClient.from('itinerary').select('to_no, travel_date, destination').like('travel_date', `${targetMonth}%`).limit(20000),
+                dbClient.from('schedule_overrides').select('emp_id, start_date, end_date, schedule_type, working_days').limit(5000)
             ]);
 
             // Map Employees
@@ -287,20 +287,25 @@
                 });
             }
 
-            // Map PSOs into lookup based on valid dates
+            // Map PSOs - Added split(',') for Group PSOs
             if (psoRes.data) {
                 psoRes.data.forEach(pso => {
-                    if(!pso.start_date || !pso.end_date) return;
+                    if(!pso.start_date || !pso.end_date || pso.status === 'CANCELLED' || pso.status === 'REJECTED') return;
                     const dates = getDatesInRange(pso.start_date, pso.end_date);
+                    // Split in case of comma separated group IDs
+                    const empIds = pso.emp_id ? String(pso.emp_id).split(',').map(e => e.trim()) : [];
+                    
                     dates.forEach(d => {
                         if (d.startsWith(targetMonth)) {
-                            psoLookup[`${pso.emp_id}_${d}`] = pso.subject;
+                            empIds.forEach(eid => {
+                                if (eid) psoLookup[`${eid}_${d}`] = pso.subject;
+                            });
                         }
                     });
                 });
             }
 
-            // Map Travel Orders joining the itinerary
+            // Map Travel Orders joining the itinerary - Added split(',') for Group TOs
             if (toRes.data && itinRes.data) {
                 const toReference = {};
                 toRes.data.forEach(t => { toReference[t.to_no] = t; });
@@ -308,10 +313,17 @@
                 itinRes.data.forEach(itin => {
                     const parentTo = toReference[itin.to_no];
                     if (parentTo && itin.travel_date && itin.travel_date.startsWith(targetMonth)) {
-                        toLookup[`${parentTo.emp_id}_${itin.travel_date}`] = { 
-                            status: parentTo.status, 
-                            destination: itin.destination || 'Field' 
-                        };
+                        // Split in case of comma separated group IDs
+                        const empIds = parentTo.emp_id ? String(parentTo.emp_id).split(',').map(e => e.trim()) : [];
+                        
+                        empIds.forEach(eid => {
+                            if (eid) {
+                                toLookup[`${eid}_${itin.travel_date}`] = { 
+                                    status: parentTo.status, 
+                                    destination: itin.destination || 'Field' 
+                                };
+                            }
+                        });
                     }
                 });
             }
