@@ -40,7 +40,7 @@
         .editable-cell { cursor: pointer; transition: background-color 0.2s; }
         .editable-cell:hover { background-color: #FEF3C7; }
 
-        /* DAT Extractor tab */
+        /* DTR Log Extractor tab */
         .extractor-alert { margin-bottom: 1rem; padding: .8rem 1rem; border-left: 4px solid #1769a0; border-radius: .375rem; background: #eff6ff; color: #1e3a5f; }
         .extractor-alert-error { border-left-color: #b91c1c; background: #fff1f2; color: #881337; }
         .extractor-alert-success { border-left-color: #006400; background: #f0fdf4; color: #166534; }
@@ -70,14 +70,6 @@
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
-
-    <div id="securityGate" class="fixed inset-0 z-[100] bg-[#003811] flex items-center justify-center text-white">
-        <div class="text-center p-8">
-            <div class="w-12 h-12 mx-auto mb-4 rounded-full border-4 border-[#D4AF37] border-t-transparent animate-spin"></div>
-            <h2 class="text-xl font-bold text-[#D4AF37]">Verifying Secure Session</h2>
-            <p id="securityGateMessage" class="text-sm text-gray-300 mt-2">Checking authentication and HRMO access…</p>
-        </div>
-    </div>
 
     <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
         <div class="p-6 hidden md:block border-b border-[#006400]">
@@ -113,7 +105,7 @@
 
         <div class="flex px-8 border-b border-gray-300">
             <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn tab-active px-6 py-3 rounded-t-lg">Monthly Log View</button>
-            <button onclick="switchTab('extractor')" id="tab-extractor" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">DAT Extractor</button>
+            <button onclick="switchTab('extractor')" id="tab-extractor" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">DTR Log Extractor</button>
             <button onclick="switchTab('f48')" id="tab-f48" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Form 48 Generator</button>
             <button onclick="switchTab('deduction')" id="tab-deduction" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Deduction</button>
         </div>
@@ -192,15 +184,9 @@
 
         <div id="module-extractor" class="hidden flex-1 p-8 overflow-y-auto">
             <div class="card p-6 border-t-4 border-[#D4AF37]">
-                <div class="flex flex-wrap justify-between items-start gap-4 mb-6 border-b pb-4">
-                    <div>
-                        <h3 class="text-2xl font-bold text-[#003811]">DAT Attendance Extractor</h3>
-                        <p class="text-sm text-gray-500 mt-1">Generate a monthly DTR View for DAT employees assigned to DARPO-CS1, with TO itineraries, PSOs, and holidays.</p>
-                    </div>
-                    <div class="text-right text-xs text-gray-500">
-                        <div class="font-bold text-[#003811]">SECURE HRMO SESSION</div>
-                        <div id="extractorAuthorizedUser"></div>
-                    </div>
+                <div class="mb-6 border-b pb-4">
+                    <h3 class="text-2xl font-bold text-[#003811]">DTR Log Extractor</h3>
+                    <p class="text-sm text-gray-500 mt-1">Extract the selected month from a DAT file and generate the DARPO-CS1 DTR View with TO itineraries, PSOs, and holidays.</p>
                 </div>
 
                 <div id="extractorAlertBox" class="extractor-alert" style="display:none;"></div>
@@ -454,107 +440,22 @@
     </div>
 
 <script>
-    let currentUser = null;
-    let authenticatedUser = null;
-
-    function setSecurityGate(message, isError = false) {
-        const gate = document.getElementById('securityGate');
-        const label = document.getElementById('securityGateMessage');
-        if (label) {
-            label.textContent = message;
-            label.className = isError ? 'text-sm text-red-200 mt-2 font-bold' : 'text-sm text-gray-300 mt-2';
-        }
-        if (gate) gate.style.display = 'flex';
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) window.location.href = 'index.html';
+    const currentUser = JSON.parse(userData);
+    
+    if (!currentUser.role.toUpperCase().includes('HRMO')) {
+        alert("Unauthorized Access. HR personnel only.");
+        window.location.href = 'dashboard.html';
     }
 
-    async function initializeAttendanceSecurity() {
-        try {
-            if (typeof supabaseClient === 'undefined' || !supabaseClient || !supabaseClient.auth) {
-                throw new Error('Secure database client is unavailable.');
-            }
+    document.getElementById('activeUser').innerText = currentUser.full_name;
+    document.getElementById('userRoleBadge').innerText = currentUser.role;
+    document.getElementById('lblHrName').innerText = currentUser.username;
 
-            const { data: authData, error: authError } = await supabaseClient.auth.getUser();
-            if (authError || !authData?.user) {
-                setSecurityGate('Your secure session has expired. Redirecting to login…', true);
-                setTimeout(() => window.location.replace('login.html'), 800);
-                return null;
-            }
-
-            authenticatedUser = authData.user;
-            const { data: profile, error: profileError } = await supabaseClient
-                .from('profiles')
-                .select('*')
-                .eq('id', authenticatedUser.id)
-                .single();
-
-            if (profileError || !profile) {
-                throw new Error('Your authenticated account has no valid system profile.');
-            }
-
-            const normalizedRole = String(profile.role || '').trim().toUpperCase().replace(/_/g, ' ');
-            const roleParts = normalizedRole.split(',').map(role => role.trim()).filter(Boolean);
-            const isAuthorized = roleParts.some(role => role.includes('HRMO') || role.includes('ADMIN') || role.includes('PARPO'));
-
-            if (!isAuthorized) {
-                setSecurityGate('Access denied. This page is restricted to authorized HRMO personnel.', true);
-                setTimeout(() => window.location.replace('dashboard.html'), 1000);
-                return null;
-            }
-
-            currentUser = {
-                ...profile,
-                id: authenticatedUser.id,
-                username: profile.username || authenticatedUser.email || authenticatedUser.id,
-                full_name: profile.full_name || authenticatedUser.user_metadata?.full_name || authenticatedUser.email || 'Authorized User',
-                role: profile.role || 'HRMO'
-            };
-
-            // Retain only a server-verified profile for compatibility with the
-            // rest of the HR pages; sessionStorage is never trusted for access.
-            sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
-            document.getElementById('activeUser').textContent = currentUser.full_name;
-            document.getElementById('userRoleBadge').textContent = currentUser.role;
-            document.getElementById('lblHrName').textContent = currentUser.username;
-            document.getElementById('extractorAuthorizedUser').textContent = `${currentUser.full_name} (${currentUser.role})`;
-            document.getElementById('securityGate').style.display = 'none';
-
-            supabaseClient.auth.onAuthStateChange((event) => {
-                if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-                    sessionStorage.removeItem('currentUser');
-                    window.location.replace('login.html');
-                }
-            });
-
-            return currentUser;
-        } catch (error) {
-            console.error('Attendance security initialization failed:', error);
-            setSecurityGate(error.message || 'Security verification failed.', true);
-            return null;
-        }
-    }
-
-    const attendanceSecurityReady = initializeAttendanceSecurity();
-
-    async function requireSecureHrSession() {
-        const profile = await attendanceSecurityReady;
-        if (!profile) throw new Error('A verified HRMO session is required.');
-
-        const { data, error } = await supabaseClient.auth.getUser();
-        if (error || !data?.user || data.user.id !== authenticatedUser?.id) {
-            throw new Error('Your secure session has expired. Please log in again.');
-        }
-        return profile;
-    }
-
-    async function logout() {
-        try {
-            if (typeof supabaseClient !== 'undefined' && supabaseClient?.auth) {
-                await supabaseClient.auth.signOut();
-            }
-        } finally {
-            sessionStorage.removeItem('currentUser');
-            window.location.replace('login.html');
-        }
+    function logout() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
     }
 
     function switchTab(tab) {
@@ -591,9 +492,6 @@
     let currentViewData = []; 
 
     window.onload = async () => {
-        const verifiedProfile = await attendanceSecurityReady;
-        if (!verifiedProfile) return;
-
         const today = new Date();
         document.getElementById('mDate').value = today.toISOString().split('T')[0];
         document.getElementById('printDailyDate').value = today.toISOString().split('T')[0];
@@ -1911,11 +1809,32 @@
             btn.disabled = false; btn.innerText = "PRINT DEDUCTION SUMMARY";
         }
     }
-
-    // ================================================================
-    // SECURE DAT EXTRACTOR TAB
+    // DTR LOG EXTRACTOR TAB
     // ================================================================
     (() => {
+        // Reuse the attendance page's existing currentUser session. This tab
+        // does not create or request a second login.
+        const requireActiveAttendanceSession = () => {
+            const activeSession = sessionStorage.getItem('currentUser');
+            if (!activeSession) {
+                window.location.href = 'index.html';
+                throw new Error('Your attendance session is no longer active.');
+            }
+
+            let activeUser;
+            try {
+                activeUser = JSON.parse(activeSession);
+            } catch (error) {
+                window.location.href = 'index.html';
+                throw new Error('Your attendance session is invalid.');
+            }
+
+            if (!String(activeUser.role || '').toUpperCase().includes('HRMO')) {
+                throw new Error('Unauthorized Access. HR personnel only.');
+            }
+            return activeUser;
+        };
+
         const PAGE_SIZE = 1000;
         const QUERY_BATCH_SIZE = 150;
         const QUERY_TIMEOUT_MS = 30000;
@@ -2273,7 +2192,7 @@
             document.getElementById('extractorUploadAction').style.display = 'none';
 
             try {
-                await requireSecureHrSession();
+                await requireActiveAttendanceSession();
                 const [year, month] = targetMonth.split('-').map(Number);
                 const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
                 const monthStart = `${targetMonth}-01`;
@@ -2415,7 +2334,7 @@
             button.textContent = 'VERIFYING SESSION...';
 
             try {
-                const verifiedProfile = await requireSecureHrSession();
+                const verifiedProfile = await requireActiveAttendanceSession();
                 const nowIso = new Date().toISOString();
                 const payload = state.datLogs.map(log => ({
                     emp_id: log.emp_id,
@@ -2472,7 +2391,7 @@
                     await yieldToBrowser();
                 }
 
-                showExtractorAlert(`${finalPayload.length} attendance log(s) were securely posted by ${verifiedProfile.full_name || verifiedProfile.username}.`, 'success');
+                showExtractorAlert(`${finalPayload.length} attendance log(s) were posted by ${verifiedProfile.full_name || verifiedProfile.username}.`, 'success');
                 state.hierarchy = {};
                 state.schedules = {};
                 state.datLogs = [];
