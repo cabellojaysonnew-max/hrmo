@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Attendance | ARBO Management</title>
+    <title>Upload Attendance | DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -12,11 +13,11 @@
     <script src="common.js"></script>
     
     <style>
-        /* ARBO DASHBOARD CSS SYSTEM */
-        :root{--navy:#0a3d62;--green:#066b4f;--blue:#1769a0;--amber:#b45309;--red:#b91c1c;--line:#dbe3ea;--soft:#f8fafc;--text:#1e293b;--muted:#64748b}
+        /* DAR HRMO DASHBOARD CSS SYSTEM */
+        :root{--navy:#003811;--green:#006400;--blue:#1769a0;--amber:#D4AF37;--red:#b91c1c;--line:#dbe3ea;--soft:#f8fafc;--text:#1e293b;--muted:#64748b}
         *{box-sizing:border-box}
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f9; color: var(--text); margin: 0; padding: 20px; }
-        .container { max-width: 1450px; margin: 0 auto; }
+        body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #F3F4F6; color: var(--text); margin: 0; padding: 0; }
+        .container { max-width: 1600px; margin: 0 auto; }
         h1 { margin: 0 0 15px; color: var(--navy); font-size: 1.5rem; }
         h1 small { color: var(--muted); font-size: 1rem; font-weight: normal; margin-left: 10px; }
         
@@ -45,7 +46,7 @@
         .btn-sm { padding: 5px 10px; font-size: .8rem; border-radius: 5px; }
         
         .table-wrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #fff; max-height: 700px; }
-        .monitor-table { width: 100%; min-width: 1100px; border-collapse: collapse; }
+        .monitor-table { width: 100%; min-width: 1280px; border-collapse: collapse; }
         .monitor-table th, .monitor-table td { padding: 10px 15px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; font-size: 0.9rem; }
         .monitor-table th { background: #f8fafc; color: #475569; font-size: .76rem; text-transform: uppercase; letter-spacing: .025em; white-space: nowrap; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--line); box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
         .monitor-table tbody tr:hover:not(.division-header):not(.group-header) { background: #fbfdff; }
@@ -56,12 +57,20 @@
         .group-header { background: #eef4f8 !important; border-bottom: 1px solid #cbd5e1; }
         .group-header td { font-weight: 800; color: var(--navy); padding: 10px 15px; font-size: 1rem; }
         
+        /* DTR View Row Highlights */
+        .issue-row td { background-color: #fff1f2 !important; border-bottom-color: #fecdd3; }
+        .issue-row td:first-child { border-left: 4px solid var(--red); }
+        .weekend-row td { background-color: #f8fafc !important; color: var(--muted); }
+        .weekend-row input[type="time"] { opacity: 0.7; background: #f1f5f9; }
+
         .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; margin-right: 5px; margin-bottom: 4px;}
         .status-green { background: #dcfce7; color: #166534; }
         .status-red { background: #fee2e2; color: #991b1b; }
         .status-amber { background: #fef3c7; color: #92400e; }
         .status-gray { background: #e2e8f0; color: #475569; }
         .status-blue { background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd; } 
+        .status-purple { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+        .holiday-row td { background-color: #faf5ff !important; }
         
         .access-note { margin: 0 0 20px; padding: 12px 15px; border-left: 4px solid var(--blue); border-radius: 6px; background: #eff6ff; color: #1e3a5f; }
         .error-note { border-left-color: var(--red); background: #fff1f2; color: #881337; }
@@ -73,26 +82,51 @@
         input[type="time"] { font-family: monospace; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; width: 110px; font-size: 0.85rem; color: var(--text); }
         input[type="time"]:focus { border-color: var(--blue); outline: none; }
         input[type="time"].manual-entry { background: #fff7ed; border-color: #fcd34d; border-width: 2px; }
+        input[type="time"][readonly], input[type="time"]:disabled { background: #f1f5f9; color: #64748b; cursor: not-allowed; opacity: .8; }
+        @media (max-width: 900px) {
+            .filter-grid { grid-template-columns: 1fr; }
+            .auth-bar { width: 100%; flex-wrap: wrap; }
+        }
     </style>
 </head>
-<body>
+<body class="flex h-screen overflow-hidden text-[#1F2937]">
 
-<div class="container">
-    <h1>&#128338; Attendance Logs <small>Timesheet Processing</small></h1>
-    
-    <nav class="nav" id="mainNav">
-        <a href="dashboard.html">&#128202; Dashboard</a>
-        <a href="arbo.html">&#127970; ARBO Management</a>
-        <a href="#" class="active">&#128338; Upload Attendance</a>
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+            <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-[#D4AF37] bg-[#006400]">ATTENDANCE</a>
+            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
+            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS &amp; CTO</a>
+            <a href="pso_encoder.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PSO ENCODER</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">SYSTEM USERS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
+        </div>
     </nav>
 
-    <div id="alertBox" class="access-note" style="display:none;"></div>
+    <main class="flex-1 overflow-y-auto p-8 relative">
+    <div class="container">
+        <div class="flex justify-between items-end mb-6 border-b border-gray-300 pb-4">
+            <div>
+                <h1>&#128338; Attendance Logs <small>Timesheet Processing</small></h1>
+                <p class="text-sm text-gray-500 font-bold uppercase tracking-wide">DAT File Processing and DTR View</p>
+            </div>
+        </div>
+
+        <div id="alertBox" class="access-note" style="display:none;"></div>
 
     <section class="section">
         <div class="module-heading">
             <div>
                 <h2>Extract & Sync DAT File</h2>
-                <p>Upload biometric logs. Fetches names, flags Travel Orders/PSOs, filters for target month, and groups by Division > Employee.</p>
+                <p>Upload biometric logs and generate the monthly DTR View for DARPO-CS1 employees.</p>
             </div>
         </div>
 
@@ -112,7 +146,7 @@
         <div class="module-heading" id="uploadAction" style="display:none; margin-top: 25px; padding-top: 20px; border-top: 1px dashed var(--line);">
             <div>
                 <h3 style="margin:0; color: var(--navy);" id="logCount">0 records processed</h3>
-                <p style="margin:0; color: var(--muted); font-size: 0.8rem;" id="currentMonthLabel">Arranged by Division > Employee</p>
+                <p style="margin:0; color: var(--muted); font-size: 0.8rem;" id="currentMonthLabel">Arranged by Employee Name</p>
             </div>
             <div class="auth-bar">
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--amber);">HR AUTHORIZATION:</label>
@@ -127,11 +161,12 @@
                 <thead>
                     <tr>
                         <th style="width: 110px;">Date</th>
+                        <th style="width: 100px;">Day</th>
                         <th>Time In</th>
-                        <th>Break Out</th>
-                        <th>Break In</th>
                         <th>Time Out</th>
-                        <th style="width: 320px;">System Remarks (TO / PSO)</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
+                        <th style="width: 390px;">Remarks</th>
                     </tr>
                 </thead>
                 <tbody id="previewBody">
@@ -140,7 +175,8 @@
             </table>
         </div>
     </section>
-</div>
+    </div>
+    </main>
 
 <script>
     // ==========================================
@@ -153,14 +189,215 @@
         const now = new Date();
         const yyyymm = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
         document.getElementById('targetMonth').value = yyyymm;
+
+        try {
+            const userData = sessionStorage.getItem('currentUser');
+            if (userData) {
+                const currentUser = JSON.parse(userData);
+                document.getElementById('activeUser').textContent = currentUser.full_name || currentUser.username || '';
+                document.getElementById('userRoleBadge').textContent = currentUser.role || '';
+            }
+        } catch (error) {
+            console.warn('Unable to load the active user label.', error);
+        }
     });
 
+    window.logout = function() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    };
+
     let hierarchyData = {}; 
+    let schedLookup = {};
+    let extractedDatLogs = [];
+
+    const DB_PAGE_SIZE = 1000;
+    const DB_TIMEOUT_MS = 30000;
+    const TO_QUERY_BATCH_SIZE = 150;
 
     const generateId = () => {
         return (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') 
             ? crypto.randomUUID() 
             : 'id_' + Math.random().toString(36).substr(2, 9);
+    };
+
+    const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
+
+    const runWithTimeout = (request, label) => {
+        let timer;
+        return Promise.race([
+            Promise.resolve(request),
+            new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error(`${label} timed out. Please check the connection and try again.`)), DB_TIMEOUT_MS);
+            })
+        ]).finally(() => clearTimeout(timer));
+    };
+
+    // Fetch every matching row in stable pages so Supabase row limits cannot
+    // silently omit employees, PSOs, itineraries, schedules, or Travel Orders.
+    const fetchAllRows = async (table, columns, applyFilters, label = table) => {
+        const rows = [];
+
+        for (let from = 0; ; from += DB_PAGE_SIZE) {
+            let query = dbClient
+                .from(table)
+                .select(columns);
+
+            if (applyFilters) query = applyFilters(query);
+            query = query.range(from, from + DB_PAGE_SIZE - 1);
+
+            const { data, error } = await runWithTimeout(query, label);
+            if (error) throw new Error(`${label}: ${error.message}`);
+
+            const page = data || [];
+            rows.push(...page);
+            if (page.length < DB_PAGE_SIZE) break;
+
+            // Give rendering and input events a chance to run between large pages.
+            await yieldToBrowser();
+        }
+
+        return rows;
+    };
+
+    const fetchTravelOrdersByNumber = async (toNumbers) => {
+        if (!toNumbers.length) return [];
+
+        const batches = [];
+        for (let i = 0; i < toNumbers.length; i += TO_QUERY_BATCH_SIZE) {
+            batches.push(toNumbers.slice(i, i + TO_QUERY_BATCH_SIZE));
+        }
+
+        const rows = [];
+        // Bounded parallel batches keep the request fast without flooding the browser.
+        for (let i = 0; i < batches.length; i += 4) {
+            const group = batches.slice(i, i + 4);
+            const results = await Promise.all(group.map((batch, index) =>
+                fetchAllRows(
+                    'travel_orders',
+                    'to_no, emp_id, status',
+                    query => query.in('to_no', batch).order('id', { ascending: true }),
+                    `Travel Orders batch ${i + index + 1}`
+                )
+            ));
+            results.forEach(result => rows.push(...result));
+        }
+
+        return rows;
+    };
+
+    const fetchRowsByValues = async (table, columns, column, values, label) => {
+        const uniqueValues = [...new Set(values.map(value => String(value).trim()).filter(Boolean))];
+        if (!uniqueValues.length) return [];
+
+        const rows = [];
+        for (let i = 0; i < uniqueValues.length; i += TO_QUERY_BATCH_SIZE * 4) {
+            const group = [];
+            const groupEnd = Math.min(i + TO_QUERY_BATCH_SIZE * 4, uniqueValues.length);
+
+            for (let start = i; start < groupEnd; start += TO_QUERY_BATCH_SIZE) {
+                const batch = uniqueValues.slice(start, start + TO_QUERY_BATCH_SIZE);
+                group.push(fetchAllRows(
+                    table,
+                    columns,
+                    query => query.in(column, batch),
+                    `${label} batch ${Math.floor(start / TO_QUERY_BATCH_SIZE) + 1}`
+                ));
+            }
+
+            const results = await Promise.all(group);
+            results.forEach(result => rows.push(...result));
+        }
+
+        return rows;
+    };
+
+    const normalizeDatTime = (value) => {
+        const match = String(value || '').match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/);
+        if (!match) return '';
+        return `${match[1]}:${match[2]}:${match[3] || '00'}`;
+    };
+
+    const isValidIsoDate = (value) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+        const [year, month, day] = value.split('-').map(Number);
+        const parsed = new Date(Date.UTC(year, month - 1, day));
+        return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+    };
+
+    // Stream and parse large DAT files in chunks to keep the page responsive.
+    const parseDatFile = async (file, targetMonth) => {
+        const logs = [];
+        let ignoredOtherMonth = 0;
+        let invalidLines = 0;
+        let lineCount = 0;
+
+        const parseLine = (line) => {
+            const cleanLine = line.trim();
+            if (!cleanLine) return;
+
+            const parts = cleanLine.split(/\s+/);
+            if (parts.length < 5) {
+                invalidLines++;
+                return;
+            }
+
+            const emp_id = String(parts[0]).trim();
+            const date = String(parts[1]).replace(/\//g, '-');
+            const time = normalizeDatTime(parts[2]);
+            const device_id = String(parts[3]);
+            const status = String(parts[4]);
+
+            if (!date.startsWith(targetMonth)) {
+                ignoredOtherMonth++;
+                return;
+            }
+
+            if (!isValidIsoDate(date) || !time) {
+                invalidLines++;
+                return;
+            }
+
+            logs.push({
+                emp_id,
+                date,
+                time,
+                device_id,
+                status,
+                sourceIndex: logs.length
+            });
+        };
+
+        if (file.stream && typeof TextDecoderStream !== 'undefined') {
+            const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader();
+            let remainder = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const lines = (remainder + value).split(/\r?\n/);
+                remainder = lines.pop() || '';
+                lines.forEach(parseLine);
+                lineCount += lines.length;
+
+                if (lineCount >= 5000) {
+                    lineCount = 0;
+                    await yieldToBrowser();
+                }
+            }
+
+            if (remainder.trim()) parseLine(remainder);
+        } else {
+            const textContent = await runWithTimeout(file.text(), 'DAT file reading');
+            const lines = textContent.split(/\r?\n/);
+            for (let i = 0; i < lines.length; i++) {
+                parseLine(lines[i]);
+                if (i > 0 && i % 5000 === 0) await yieldToBrowser();
+            }
+        }
+
+        return { logs, ignoredOtherMonth, invalidLines };
     };
 
     const showAlert = (message, type = 'error') => {
@@ -182,23 +419,45 @@
         return dates;
     };
 
-    // Formats dynamic remarks
-    const calculateRemarks = (slots, toInfo, psoInfo) => {
+    // Formats dynamic remarks including Weekends, No Work Fridays, and Compressed Fridays
+    const calculateRemarks = (slots, toInfo, psoInfo, holidayInfo, isWeekend, isCompressedFriday, isNoWorkFriday) => {
         let marks = [];
         const filledSlots = slots.filter(s => s && s.time !== '').length;
+        const travelOrders = Array.isArray(toInfo) ? toInfo : (toInfo ? [toInfo] : []);
+        const holidays = Array.isArray(holidayInfo) ? holidayInfo : (holidayInfo ? [holidayInfo] : []);
+        const isExcused = isWeekend || isCompressedFriday || isNoWorkFriday || travelOrders.length > 0 || Boolean(psoInfo) || holidays.length > 0;
+
+        if (isWeekend) {
+            marks.push('<span class="status status-gray">WEEKEND</span>');
+        } else if (isNoWorkFriday) {
+            marks.push('<span class="status status-gray">FRIDAY - NO WORK</span>');
+        } else if (isCompressedFriday) {
+            marks.push('<span class="status status-gray">FRIDAY (Compressed)</span>');
+        }
+
+        holidays.forEach(holiday => {
+            const details = [holiday.type, holiday.coverage].filter(Boolean).join(' | ');
+            marks.push(`<span class="status status-purple">HOLIDAY: ${holiday.description}${details ? ` (${details})` : ''}</span>`);
+        });
 
         if (filledSlots === 4) {
             marks.push('<span class="status status-green">&#10003; Complete</span>');
         } else if (filledSlots === 0) {
-            marks.push('<span class="status status-gray">Empty Punches</span>');
-        } else {
-            marks.push(`<span class="status status-amber">&#9888; Missing (${4 - filledSlots})</span>`);
+            if (!isExcused) {
+                marks.push('<span class="status status-red">Absent / No Punches</span>');
+            }
+        } else if (!isExcused) {
+            marks.push(`<span class="status status-red">&#9888; Missing (${4 - filledSlots})</span>`);
+        } else if (filledSlots < 4) {
+            marks.push(`<span class="status status-gray">Partial punches (${filledSlots}/4)</span>`);
         }
 
-        if (toInfo) {
-            const toColor = toInfo.status === 'APPROVED' ? 'status-green' : 'status-amber';
-            marks.push(`<span class="status ${toColor}">&#9992; TO ${toInfo.status} - ${toInfo.destination}</span>`);
-        }
+        travelOrders.forEach(to => {
+            const normalizedStatus = String(to.status || '').toUpperCase();
+            const toColor = (normalizedStatus === 'APPROVED' || normalizedStatus === 'COMPLETED' || normalizedStatus === 'POSTED') ? 'status-green' : 'status-amber';
+            const purpose = to.purpose ? ` | ${to.purpose}` : '';
+            marks.push(`<span class="status ${toColor}">&#9992; TO ${to.to_no || ''} ${to.status || ''} - ${to.destination || 'Field'}${purpose}</span>`);
+        });
 
         if (psoInfo) {
             marks.push(`<span class="status status-blue">&#128221; PSO: ${psoInfo}</span>`);
@@ -210,14 +469,14 @@
     const ensureHierarchy = (div, empId, name, date) => {
         if (!hierarchyData[div]) hierarchyData[div] = {};
         if (!hierarchyData[div][empId]) hierarchyData[div][empId] = { full_name: name, dates: {} };
-        if (!hierarchyData[div][empId].dates[date]) hierarchyData[div][empId].dates[date] = { logs: [], to: null, pso: null };
+        if (!hierarchyData[div][empId].dates[date]) hierarchyData[div][empId].dates[date] = { logs: [], to: null, pso: null, holidays: [] };
     };
 
     // Extract & Map Data
     document.getElementById('parseBtn').addEventListener('click', async () => {
         const fileInput = document.getElementById('fileInput');
         const parseBtn = document.getElementById('parseBtn');
-        const targetMonth = document.getElementById('targetMonth').value; // e.g. "2026-08"
+        const targetMonth = document.getElementById('targetMonth').value; 
 
         if (!fileInput.files.length) {
             showAlert('Please select a .dat file first.', 'error');
@@ -238,141 +497,252 @@
         parseBtn.disabled = true;
 
         hierarchyData = {}; 
+        schedLookup = {};
+        extractedDatLogs = [];
         let empMap = {};
         let toLookup = {};
         let psoLookup = {};
+        let holidayLookup = {};
 
         try {
-            // Concurrent DB Fetches based on your table schemas
-            const [empRes, psoRes, toRes, itinRes] = await Promise.all([
-                dbClient.from('employees').select('emp_id, full_name, division'),
-                dbClient.from('pso_records').select('emp_id, start_date, end_date, subject, status'),
-                dbClient.from('travel_orders').select('to_no, emp_id, status').in('status', ['PENDING', 'APPROVED']),
-                dbClient.from('itinerary').select('to_no, travel_date, destination')
+            const [tYear, tMonth] = targetMonth.split('-');
+            const daysInMonth = new Date(Number(tYear), Number(tMonth), 0).getDate();
+            const monthStart = `${targetMonth}-01`;
+            const monthEnd = `${targetMonth}-${String(daysInMonth).padStart(2, '0')}`;
+
+            // The selected-month DAT file determines which employee IDs must be checked.
+            parseBtn.textContent = 'Reading DAT File...';
+            const datResult = await parseDatFile(fileInput.files[0], targetMonth);
+            const datEmpIds = [...new Set(datResult.logs.map(log => log.emp_id))];
+
+            if (!datEmpIds.length) {
+                throw new Error(`No valid biometric logs were found for ${targetMonth}.`);
+            }
+
+            parseBtn.textContent = 'Checking TOs, PSOs & Holidays...';
+
+            // Every relevant table is fully paginated. Employees are limited to
+            // IDs actually present in the DAT file; the other monthly records are
+            // checked completely so no TO itinerary, PSO, or holiday is truncated.
+            const [employees, travelOrders, itineraries, psos, holidays, schedules] = await Promise.all([
+                fetchRowsByValues(
+                    'employees',
+                    'emp_id, full_name, division, station',
+                    'emp_id',
+                    datEmpIds,
+                    'Employees'
+                ),
+                fetchAllRows(
+                    'travel_orders',
+                    'to_no, emp_id, status',
+                    query => query.order('id', { ascending: true }),
+                    'Travel Orders'
+                ),
+                fetchAllRows(
+                    'itinerary',
+                    'to_no, travel_date, destination, purpose',
+                    query => query.like('travel_date', `${targetMonth}%`).order('id', { ascending: true }),
+                    'Travel Order itineraries'
+                ),
+                fetchAllRows(
+                    'pso_records',
+                    'pso_no, emp_id, start_date, end_date, subject, status',
+                    query => query.lte('start_date', monthEnd).gte('end_date', monthStart).order('id', { ascending: true }),
+                    'PSO records'
+                ),
+                fetchAllRows(
+                    'holidays',
+                    'date, description, type, coverage',
+                    query => query.like('date', `${targetMonth}%`).order('id', { ascending: true }),
+                    'Holidays'
+                ),
+                fetchAllRows(
+                    'schedule_overrides',
+                    'emp_id, start_date, end_date, schedule_type, working_days',
+                    null,
+                    'Schedule overrides'
+                )
             ]);
 
-            // Map Employees
-            if (empRes.data) {
-                empRes.data.forEach(emp => {
-                    empMap[emp.emp_id] = { full_name: emp.full_name, division: emp.division || 'UNASSIGNED' };
-                });
-            }
-
-            // Map PSOs into lookup based on valid dates
-            if (psoRes.data) {
-                psoRes.data.forEach(pso => {
-                    if(!pso.start_date || !pso.end_date) return;
-                    const dates = getDatesInRange(pso.start_date, pso.end_date);
-                    dates.forEach(d => {
-                        if (d.startsWith(targetMonth)) {
-                            psoLookup[`${pso.emp_id}_${d}`] = pso.subject;
-                        }
-                    });
-                });
-            }
-
-            // Map Travel Orders joining the itinerary
-            if (toRes.data && itinRes.data) {
-                const toReference = {};
-                toRes.data.forEach(t => { toReference[t.to_no] = t; });
-
-                itinRes.data.forEach(itin => {
-                    const parentTo = toReference[itin.to_no];
-                    if (parentTo && itin.travel_date && itin.travel_date.startsWith(targetMonth)) {
-                        toLookup[`${parentTo.emp_id}_${itin.travel_date}`] = { 
-                            status: parentTo.status, 
-                            destination: itin.destination || 'Field' 
-                        };
-                    }
-                });
-            }
-
-            // Read the DAT File
-            const file = fileInput.files[0];
-            const textContent = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = e => resolve(e.target.result);
-                reader.readAsText(file);
-            });
-
-            const lines = textContent.split(/\r?\n/);
-            let rawLogsCount = 0;
-            let ignoredLogsCount = 0;
-
-            lines.forEach(line => {
-                const cleanLine = line.trim();
-                if (!cleanLine) return;
-                const parts = cleanLine.split(/\s+/);
-                
-                if (parts.length >= 5) {
-                    const emp_id = parts[0];
-                    const date = parts[1]; 
-                    const time = parts[2];
-                    const device_id = parts[3];
-                    const status = parts[4];
-                    
-                    if (!date.startsWith(targetMonth)) {
-                        ignoredLogsCount++;
-                        return; 
-                    }
-
-                    rawLogsCount++;
-                    const rosterInfo = empMap[emp_id] || { full_name: 'Unknown Employee', division: 'UNMAPPED' };
-                    
-                    ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
-                    hierarchyData[rosterInfo.division][emp_id].dates[date].logs.push({ time, device_id, status });
+            // Only employees with a selected-month DAT log and station DARPO-CS1.
+            employees.forEach(emp => {
+                const empId = String(emp.emp_id || '').trim();
+                const station = String(emp.station || '').trim().toUpperCase();
+                if (empId && station === 'DARPO-CS1') {
+                    empMap[empId] = { full_name: emp.full_name, division: emp.division || 'UNASSIGNED' };
                 }
             });
 
-            // Inject missing rows for employees who are on TO/PSO in this month but didn't Biometric punch
+            if (!Object.keys(empMap).length) {
+                throw new Error(`No employees with station DARPO-CS1 matched the ${targetMonth} DAT logs.`);
+            }
+
+            extractedDatLogs = datResult.logs
+                .filter(log => empMap[log.emp_id])
+                .map((log, sourceIndex) => ({ ...log, sourceIndex }));
+
+            // Map Schedule Overrides
+            schedules.forEach(s => {
+                const scheduleEmpId = String(s.emp_id || '').trim();
+                if (scheduleEmpId !== 'ALL' && !empMap[scheduleEmpId]) return;
+                if (!schedLookup[scheduleEmpId]) schedLookup[scheduleEmpId] = [];
+                schedLookup[scheduleEmpId].push(s);
+            });
+
+            // Map all active PSOs to their covered dates and employees.
+            psos.forEach(pso => {
+                const normalizedStatus = String(pso.status || '').toUpperCase();
+                if (!pso.start_date || !pso.end_date || normalizedStatus === 'CANCELLED' || normalizedStatus === 'CANCELED' || normalizedStatus === 'REJECTED') return;
+
+                const psoStart = String(pso.start_date).slice(0, 10);
+                const psoEnd = String(pso.end_date).slice(0, 10);
+                const dates = getDatesInRange(
+                    psoStart < monthStart ? monthStart : psoStart,
+                    psoEnd > monthEnd ? monthEnd : psoEnd
+                );
+                const empIds = pso.emp_id ? String(pso.emp_id).split(',').map(e => e.trim()) : [];
+
+                dates.forEach(d => {
+                    empIds.forEach(eid => {
+                        if (!empMap[eid]) return;
+                        const key = `${eid}_${d}`;
+                        if (!psoLookup[key]) psoLookup[key] = [];
+                        const psoLabel = [pso.pso_no, pso.subject].filter(Boolean).join(' - ') || 'Official PSO';
+                        if (!psoLookup[key].includes(psoLabel)) psoLookup[key].push(psoLabel);
+                    });
+                });
+            });
+
+            // Map every holiday in the selected month.
+            holidays.forEach(holiday => {
+                const holidayDate = String(holiday.date || '').slice(0, 10);
+                if (!holidayDate.startsWith(targetMonth)) return;
+                if (!holidayLookup[holidayDate]) holidayLookup[holidayDate] = [];
+
+                const holidayItem = {
+                    description: holiday.description || 'Holiday',
+                    type: holiday.type || '',
+                    coverage: holiday.coverage || ''
+                };
+                const signature = JSON.stringify(holidayItem);
+                if (!holidayLookup[holidayDate].some(item => JSON.stringify(item) === signature)) {
+                    holidayLookup[holidayDate].push(holidayItem);
+                }
+            });
+
+            // Include every TO status except cancelled/unapproved records. The
+            // employee connection comes from travel_orders.emp_id, while the
+            // date-specific destination comes only from itinerary.travel_date.
+            const excludedToStatuses = new Set([
+                'CANCELLED', 'CANCELED', 'UNAPPROVED', 'NOT APPROVED', 'DISAPPROVED', 'REJECTED'
+            ]);
+            const toReference = {};
+            travelOrders.forEach(to => {
+                const normalizedStatus = String(to.status || '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+                const toNo = String(to.to_no || '').trim();
+                if (!toNo || excludedToStatuses.has(normalizedStatus)) return;
+
+                const matchingEmpIds = String(to.emp_id || '')
+                    .split(',')
+                    .map(eid => eid.trim())
+                    .filter(eid => empMap[eid]);
+
+                if (!matchingEmpIds.length) return;
+                if (!toReference[toNo]) toReference[toNo] = [];
+                toReference[toNo].push({ ...to, to_no: toNo, matchingEmpIds });
+            });
+
+            itineraries.forEach(itin => {
+                const travelDate = String(itin.travel_date || '').slice(0, 10);
+                const toNo = String(itin.to_no || '').trim();
+                const parentTos = toReference[toNo] || [];
+                if (!travelDate.startsWith(targetMonth)) return;
+
+                parentTos.forEach(parentTo => {
+                    parentTo.matchingEmpIds.forEach(eid => {
+                        const key = `${eid}_${travelDate}`;
+                        if (!toLookup[key]) toLookup[key] = [];
+
+                        const mappedTo = {
+                            to_no: parentTo.to_no,
+                            status: parentTo.status,
+                            destination: itin.destination || 'No destination indicated',
+                            purpose: itin.purpose || ''
+                        };
+                        const signature = JSON.stringify(mappedTo);
+                        if (!toLookup[key].some(item => JSON.stringify(item) === signature)) {
+                            toLookup[key].push(mappedTo);
+                        }
+                    });
+                });
+            });
+
+            extractedDatLogs.forEach(log => {
+                const rosterInfo = empMap[log.emp_id];
+                ensureHierarchy(rosterInfo.division, log.emp_id, rosterInfo.full_name, log.date);
+                hierarchyData[rosterInfo.division][log.emp_id].dates[log.date].logs.push(log);
+            });
+
+            // DTR VIEW GENERATION: Inject all days of the month for active employees
             const activeEmpIds = Object.keys(empMap);
+            const allDaysOfMonth = [];
+            
+            for (let i = 1; i <= daysInMonth; i++) {
+                allDaysOfMonth.push(`${tYear}-${tMonth}-${String(i).padStart(2, '0')}`);
+            }
+
             activeEmpIds.forEach(emp_id => {
                 const rosterInfo = empMap[emp_id];
                 
-                // Add missing TO dates
-                Object.keys(toLookup).forEach(toKey => {
-                    if (toKey.startsWith(`${emp_id}_`)) {
-                        const date = toKey.split('_')[1];
-                        if (date.startsWith(targetMonth)) {
-                            ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
-                            hierarchyData[rosterInfo.division][emp_id].dates[date].to = toLookup[toKey];
-                        }
-                    }
-                });
-                
-                // Add missing PSO dates
-                Object.keys(psoLookup).forEach(psoKey => {
-                    if (psoKey.startsWith(`${emp_id}_`)) {
-                        const date = psoKey.split('_')[1];
-                        if (date.startsWith(targetMonth)) {
-                            ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
-                            hierarchyData[rosterInfo.division][emp_id].dates[date].pso = psoLookup[psoKey];
-                        }
-                    }
+                // Construct the full 1-to-30/31 matrix for the employee
+                allDaysOfMonth.forEach(date => {
+                    ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
+                    
+                    const toKey = `${emp_id}_${date}`;
+                    if (toLookup[toKey]) hierarchyData[rosterInfo.division][emp_id].dates[date].to = toLookup[toKey];
+                    
+                    const psoKey = `${emp_id}_${date}`;
+                    if (psoLookup[psoKey]) hierarchyData[rosterInfo.division][emp_id].dates[date].pso = psoLookup[psoKey].join('; ');
+
+                    if (holidayLookup[date]) hierarchyData[rosterInfo.division][emp_id].dates[date].holidays = holidayLookup[date];
                 });
             });
 
             if (Object.keys(hierarchyData).length === 0) {
-                showAlert(`No data found for ${targetMonth}. Ignored ${ignoredLogsCount} lines from other months.`, 'error');
+                showAlert(`No DARPO-CS1 employees with DAT logs were found for ${targetMonth}.`, 'error');
                 parseBtn.textContent = 'Extract & Sync';
                 parseBtn.disabled = false;
                 return;
             }
 
-            document.getElementById('currentMonthLabel').textContent = `Filtered explicitly for ${targetMonth}`;
-            renderTable();
+            document.getElementById('currentMonthLabel').textContent = `${Object.keys(empMap).length} DARPO-CS1 employee(s) with DAT logs for ${targetMonth}`;
+            await renderTable();
 
         } catch (error) {
             console.error(error);
-            showAlert('An unexpected error occurred during sync.', 'error');
+            showAlert(error.message || 'An unexpected error occurred during sync.', 'error');
         } finally {
             parseBtn.textContent = 'Extract & Sync';
             parseBtn.disabled = false;
         }
     });
 
+    const getScheduleForDate = (empId, dateStr) => {
+        let empScheds = schedLookup[empId] || [];
+        let allScheds = schedLookup['ALL'] || [];
+        let combined = [...allScheds, ...empScheds]; // ALL overrides prioritized first
+
+        const d = new Date(dateStr);
+        let activeSched = combined.find(s => {
+            let start = s.start_date ? new Date(s.start_date) : new Date('2000-01-01');
+            let end = s.end_date ? new Date(s.end_date) : new Date('2100-01-01');
+            return d >= start && d <= end;
+        });
+        return activeSched;
+    };
+
     // Render Table Hierarchically
-    const renderTable = () => {
+    const renderTable = async () => {
         const tbody = document.getElementById('previewBody');
         tbody.innerHTML = '';
         
@@ -380,26 +750,21 @@
         const expectedStatuses = ['0', '2', '3', '1']; // In, Break Out, Break In, Out
         let processedDaysCount = 0;
 
-        // Sort Divisions alphabetically
-        const sortedDivisions = Object.keys(hierarchyData).sort();
+        const employeeList = [];
+        Object.entries(hierarchyData).forEach(([div, employees]) => {
+            Object.entries(employees).forEach(([empId, empData]) => {
+                employeeList.push({ div, empId, empData });
+            });
+        });
+        employeeList.sort((a, b) => String(a.empData.full_name || '').localeCompare(String(b.empData.full_name || '')));
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-        sortedDivisions.forEach(div => {
-            htmlContent += `
-                <tr class="division-header">
-                    <td colspan="6">&#128188; DIVISION: ${div}</td>
-                </tr>
-            `;
-
-            // Sort Employees inside division
-            const employees = hierarchyData[div];
-            const sortedEmpIds = Object.keys(employees).sort();
-
-            sortedEmpIds.forEach(empId => {
-                const empData = employees[empId];
+        for (let empIndex = 0; empIndex < employeeList.length; empIndex++) {
+                const { div, empId, empData } = employeeList[empIndex];
                 
                 htmlContent += `
                     <tr class="group-header">
-                        <td colspan="6">&#128100; ${empData.full_name} <span style="color:var(--muted); font-size:0.85rem; font-weight:normal; margin-left: 8px;">(Emp ID: ${empId})</span></td>
+                        <td colspan="7"><span style="font-size:.76rem; letter-spacing:.08em;">NAME:</span> ${empData.full_name} <span style="color:var(--muted); font-size:0.82rem; font-weight:normal; margin-left: 8px;">(Emp ID: ${empId} | ${div})</span></td>
                     </tr>
                 `;
 
@@ -410,13 +775,46 @@
                     const dayData = empData.dates[date];
                     processedDaysCount++;
                     
-                    // Sort logs chronologically and map to slots
+                    // Determine Schedule/Weekends based on `schedule_overrides` rules
+                    const d = new Date(`${date}T00:00:00Z`);
+                    const dayOfWeek = d.getUTCDay();
+                    const dayName = dayNames[dayOfWeek];
+                    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                    
+                    const activeSched = getScheduleForDate(empId, date);
+                    const workingDays = activeSched && activeSched.working_days ? activeSched.working_days : 'Mon-Fri';
+                    const schedEmpId = activeSched ? activeSched.emp_id : null;
+                    const wdLower = workingDays.toLowerCase();
+                    
+                    let isCompressedFriday = false;
+                    let isNoWorkFriday = false;
+                    
+                    if (dayOfWeek === 5) {
+                        if (schedEmpId === 'ALL') {
+                            isNoWorkFriday = true;
+                        } else if (!wdLower.includes('fri') && (wdLower.includes('thu') || wdLower.includes('4-day'))) {
+                            isCompressedFriday = true;
+                        }
+                    }
+
+                    // Sort logs chronologically and map the biometric status to
+                    // the correct DTR slot. Extra punches remain in extractedDatLogs
+                    // and are still posted even though the DTR has four visible slots.
                     dayData.logs.sort((a, b) => a.time.localeCompare(b.time));
                     const slots = [null, null, null, null];
                     
-                    dayData.logs.forEach((log, idx) => {
-                        if(idx < 4) {
-                            slots[idx] = { time: log.time, device_id: log.device_id, status: log.status || expectedStatuses[idx], isManual: false };
+                    dayData.logs.forEach(log => {
+                        let slotIndex = expectedStatuses.indexOf(String(log.status));
+                        if (slotIndex < 0 || slots[slotIndex]) slotIndex = slots.findIndex(slot => !slot);
+
+                        if (slotIndex >= 0) {
+                            slots[slotIndex] = {
+                                time: log.time,
+                                device_id: log.device_id,
+                                status: log.status || expectedStatuses[slotIndex],
+                                isManual: false,
+                                sourceIndex: log.sourceIndex
+                            };
                         }
                     });
 
@@ -425,19 +823,41 @@
                         if(!slots[i]) slots[i] = { time: '', device_id: 'Manual', status: expectedStatuses[i], isManual: true };
                     }
 
-                    // Build interactive inputs containing data tags for saving
-                    const renderedSlots = slots.map((s, idx) => {
+                    // Figure out highlights and remarks
+                    const filledSlots = slots.filter(s => s && s.time !== '').length;
+                    const hasTo = Array.isArray(dayData.to) ? dayData.to.length > 0 : Boolean(dayData.to);
+                    const hasPso = Boolean(dayData.pso);
+                    const hasHoliday = Array.isArray(dayData.holidays) && dayData.holidays.length > 0;
+                    const canManualInput = filledSlots < 4 && !hasTo && !hasPso && !hasHoliday && !isWeekend && !isCompressedFriday && !isNoWorkFriday;
+
+                    // Existing DAT punches are read-only. HR can enter only a
+                    // missing punch on an incomplete, ordinary workday without TO/PSO.
+                    const renderedSlots = slots.map(s => {
+                        const hasDatSource = Number.isInteger(s.sourceIndex);
+                        const inputState = hasDatSource ? 'readonly' : (canManualInput ? '' : 'disabled');
                         return `<input type="time" step="1" class="time-input" 
                                 data-div="${div}" data-emp="${empId}" data-date="${date}" 
                                 data-device="${s.device_id}" data-status="${s.status}" 
-                                data-original="${s.time}" value="${s.time}">`;
+                                data-source-index="${s.sourceIndex ?? ''}"
+                                data-original="${s.time}" value="${s.time}" ${inputState}>`;
                     });
 
-                    const remarksHtml = calculateRemarks(slots, dayData.to, dayData.pso);
+                    let rowClass = "";
+                    
+                    if (hasHoliday) {
+                        rowClass = "holiday-row";
+                    } else if (isWeekend || isCompressedFriday || isNoWorkFriday) {
+                        rowClass = "weekend-row";
+                    } else if (filledSlots < 4 && !hasTo && !hasPso) {
+                        rowClass = "issue-row"; // DTR Highlights issue if missing punches without TO/PSO
+                    }
+
+                    const remarksHtml = calculateRemarks(slots, dayData.to, dayData.pso, dayData.holidays, isWeekend, isCompressedFriday, isNoWorkFriday);
 
                     htmlContent += `
-                        <tr id="row_${empId}_${date}">
+                        <tr id="row_${empId}_${date}" class="${rowClass}" data-isweekend="${isWeekend}" data-iscompressed="${isCompressedFriday}" data-isnowork="${isNoWorkFriday}" data-isholiday="${hasHoliday}">
                             <td><strong>${date}</strong></td>
+                            <td>${dayName}</td>
                             <td>${renderedSlots[0]}</td>
                             <td>${renderedSlots[1]}</td>
                             <td>${renderedSlots[2]}</td>
@@ -446,38 +866,57 @@
                         </tr>
                     `;
                 });
-            });
-        });
-        
-        tbody.innerHTML = htmlContent;
 
-        // Auto-tag manual changes
-        document.querySelectorAll('.time-input').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const val = e.target.value;
-                const tr = e.target.closest('tr');
-                const empId = e.target.dataset.emp;
-                const date = e.target.dataset.date;
-                const div = e.target.dataset.div;
-
-                // Sync UI change to dataset
-                if (val && val !== e.target.dataset.original) {
-                    e.target.classList.add('manual-entry');
-                } else if (!val) {
-                    e.target.classList.remove('manual-entry');
+                // Render in bounded groups so large DAT files do not freeze.
+                if ((empIndex + 1) % 20 === 0) {
+                    tbody.insertAdjacentHTML('beforeend', htmlContent);
+                    htmlContent = '';
+                    await yieldToBrowser();
                 }
+        }
 
-                // Gather current inputs in this row to recalculate remarks dynamically
-                const rowInputs = Array.from(tr.querySelectorAll('.time-input')).map(inp => ({
-                    time: inp.value
-                }));
+        if (htmlContent) tbody.insertAdjacentHTML('beforeend', htmlContent);
+        await yieldToBrowser();
 
-                const dayData = hierarchyData[div][empId].dates[date];
-                tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(rowInputs, dayData.to, dayData.pso);
-            });
-        });
+        // One delegated handler replaces thousands of per-input listeners.
+        tbody.onchange = (e) => {
+            if (!e.target.matches('.time-input')) return;
 
-        document.getElementById('logCount').innerHTML = `${processedDaysCount} Timesheets generated.`;
+            const val = e.target.value;
+            const tr = e.target.closest('tr');
+            const empId = e.target.dataset.emp;
+            const date = e.target.dataset.date;
+            const div = e.target.dataset.div;
+
+            if (val !== e.target.dataset.original) e.target.classList.add('manual-entry');
+            else e.target.classList.remove('manual-entry');
+
+            const rowInputs = Array.from(tr.querySelectorAll('.time-input')).map(inp => ({
+                time: inp.value
+            }));
+
+            const dayData = hierarchyData[div][empId].dates[date];
+            const isWknd = tr.dataset.isweekend === "true";
+            const isComp = tr.dataset.iscompressed === "true";
+            const isNoWork = tr.dataset.isnowork === "true";
+            const hasHoliday = tr.dataset.isholiday === "true";
+
+            tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(rowInputs, dayData.to, dayData.pso, dayData.holidays, isWknd, isComp, isNoWork);
+
+            const filled = rowInputs.filter(s => s.time !== '').length;
+            const hasTo = Array.isArray(dayData.to) ? dayData.to.length > 0 : Boolean(dayData.to);
+            if (hasHoliday) {
+                tr.className = "holiday-row";
+            } else if (isWknd || isComp || isNoWork) {
+                tr.className = "weekend-row";
+            } else if (filled < 4 && !hasTo && !dayData.pso) {
+                tr.className = "issue-row";
+            } else {
+                tr.className = "";
+            }
+        };
+
+        document.getElementById('logCount').innerHTML = `${processedDaysCount} Timesheet records mapped.`;
         document.getElementById('tableWrapper').style.display = 'block';
         document.getElementById('uploadAction').style.display = 'flex';
         document.getElementById('alertBox').style.display = 'none';
@@ -520,50 +959,89 @@
             if (userError || !user) {
                 throw new Error("Invalid username or password.");
             }
-            if (user.role !== 'HR' && user.role !== 'HR STAFF' && user.role !== 'ADMIN') {
+            const normalizedRole = String(user.role || '').trim().toUpperCase().replace(/_/g, ' ');
+            if (!['HR', 'HR STAFF', 'HRMO', 'ADMIN'].includes(normalizedRole)) {
                 throw new Error("Unauthorized. Only HR Staff can post timesheets.");
             }
 
             btn.textContent = 'Posting to Database...';
 
-            const payload = [];
             const nowISO = new Date().toISOString(); 
 
-            // STEP 2: Harvest the data directly from the DOM Inputs
+            // STEP 2: Start with every extracted DAT punch, including extra
+            // punches that do not fit in the four visible DTR columns.
+            const payload = extractedDatLogs.map(log => ({
+                emp_id: log.emp_id,
+                log_time: `${log.date} ${log.time}`,
+                device_id: log.device_id,
+                status: log.status,
+                manual_log_name: null,
+                manual_log_date: null
+            }));
+
+            // Apply visible HR edits to their original DAT record, or append a
+            // new manual record when the edited slot had no DAT source.
             document.querySelectorAll('.time-input').forEach(input => {
                 let timeVal = input.value;
-                if (timeVal) { 
-                    if (timeVal.length === 5) timeVal += ":00"; // Append seconds if browser omits them
-                    
-                    // If it has class manual-entry, it was modified by HR
-                    const isManual = input.classList.contains('manual-entry');
+                if (timeVal && timeVal.length === 5) timeVal += ":00";
 
+                const sourceValue = input.dataset.sourceIndex;
+                const hasSource = sourceValue !== '' && Number.isInteger(Number(sourceValue));
+                const isManual = input.classList.contains('manual-entry');
+
+                if (hasSource) {
+                    const sourceIndex = Number(sourceValue);
+                    if (!timeVal) {
+                        payload[sourceIndex] = null;
+                    } else if (isManual) {
+                        payload[sourceIndex] = {
+                            emp_id: input.dataset.emp,
+                            log_time: `${input.dataset.date} ${timeVal}`,
+                            device_id: 'Manual',
+                            status: input.dataset.status,
+                            manual_log_name: user.full_name,
+                            manual_log_date: nowISO
+                        };
+                    }
+                } else if (timeVal) {
                     payload.push({
                         emp_id: input.dataset.emp,
                         log_time: `${input.dataset.date} ${timeVal}`,
-                        device_id: isManual ? 'Manual' : input.dataset.device,
+                        device_id: 'Manual',
                         status: input.dataset.status,
-                        manual_log_name: isManual ? user.full_name : null,  // Tracks WHO changed it 
-                        manual_log_date: isManual ? nowISO : null           // Tracks WHEN it was changed
+                        manual_log_name: user.full_name,
+                        manual_log_date: nowISO
                     });
                 }
             });
 
-            if (payload.length === 0) {
+            const finalPayload = payload.filter(Boolean);
+
+            if (finalPayload.length === 0) {
                 throw new Error("No actual time punches found to upload.");
             }
 
-            // STEP 3: Insert into Database
-            const { error: insertError } = await dbClient
-                .from('attendance_logs')
-                .insert(payload);
+            // STEP 3: Post in bounded batches to prevent large files from
+            // freezing the page or exceeding a single-request payload limit.
+            const INSERT_BATCH_SIZE = 1000;
+            for (let i = 0; i < finalPayload.length; i += INSERT_BATCH_SIZE) {
+                const batch = finalPayload.slice(i, i + INSERT_BATCH_SIZE);
+                btn.textContent = `Posting ${Math.min(i + batch.length, finalPayload.length)} of ${finalPayload.length}...`;
 
-            if (insertError) throw insertError;
+                const { error: insertError } = await runWithTimeout(
+                    dbClient.from('attendance_logs').insert(batch),
+                    `Attendance upload batch ${Math.floor(i / INSERT_BATCH_SIZE) + 1}`
+                );
 
-            showAlert(`Success! ${payload.length} attendance logs posted by ${user.full_name}.`, 'success');
+                if (insertError) throw insertError;
+                await yieldToBrowser();
+            }
+
+            showAlert(`Success! ${finalPayload.length} attendance logs posted by ${user.full_name}.`, 'success');
             
             // Clean up UI
             hierarchyData = {};
+            extractedDatLogs = [];
             document.getElementById('fileInput').value = '';
             document.getElementById('tableWrapper').style.display = 'none';
             document.getElementById('uploadAction').style.display = 'none';
