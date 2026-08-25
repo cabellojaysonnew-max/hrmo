@@ -39,9 +39,45 @@
         
         .editable-cell { cursor: pointer; transition: background-color 0.2s; }
         .editable-cell:hover { background-color: #FEF3C7; }
+
+        /* DAT Extractor tab */
+        .extractor-alert { margin-bottom: 1rem; padding: .8rem 1rem; border-left: 4px solid #1769a0; border-radius: .375rem; background: #eff6ff; color: #1e3a5f; }
+        .extractor-alert-error { border-left-color: #b91c1c; background: #fff1f2; color: #881337; }
+        .extractor-alert-success { border-left-color: #006400; background: #f0fdf4; color: #166534; }
+        .extractor-table-wrap { width: 100%; overflow: auto; border: 1px solid #dbe3ea; border-radius: .5rem; background: #fff; max-height: 680px; }
+        .extractor-table { width: 100%; min-width: 1280px; border-collapse: collapse; }
+        .extractor-table th, .extractor-table td { padding: .65rem .8rem; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; font-size: .82rem; }
+        .extractor-table th { position: sticky; top: 0; z-index: 10; background: #003811; color: #fff; font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+        .extractor-division-row { background: #003811 !important; }
+        .extractor-division-row td { color: #D4AF37; font-size: .78rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+        .extractor-name-row { background: #eef4f0 !important; }
+        .extractor-name-row td { color: #003811; font-size: .95rem; font-weight: 800; }
+        .extractor-issue-row td { background: #fff1f2 !important; }
+        .extractor-issue-row td:first-child { border-left: 4px solid #b91c1c; }
+        .extractor-weekend-row td { background: #f8fafc !important; color: #64748b; }
+        .extractor-holiday-row td { background: #faf5ff !important; }
+        .extractor-status { display: inline-flex; align-items: center; padding: .2rem .55rem; border-radius: 999px; font-size: .66rem; font-weight: 800; white-space: nowrap; margin: 0 .25rem .2rem 0; }
+        .extractor-status-green { background: #dcfce7; color: #166534; }
+        .extractor-status-red { background: #fee2e2; color: #991b1b; }
+        .extractor-status-amber { background: #fef3c7; color: #92400e; }
+        .extractor-status-gray { background: #e2e8f0; color: #475569; }
+        .extractor-status-blue { background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd; }
+        .extractor-status-purple { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+        .extractor-time-input { width: 105px; padding: .35rem .45rem; border: 1px solid #cbd5e1; border-radius: .25rem; background: #fff; color: #1e293b; font-family: monospace; font-size: .8rem; }
+        .extractor-time-input:focus { outline: none; border-color: #1769a0; box-shadow: 0 0 0 2px rgba(23,105,160,.1); }
+        .extractor-time-input.extractor-manual-entry { background: #fff7ed; border: 2px solid #fcd34d; }
+        .extractor-time-input[readonly], .extractor-time-input:disabled { background: #f1f5f9; color: #64748b; cursor: not-allowed; opacity: .8; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
+
+    <div id="securityGate" class="fixed inset-0 z-[100] bg-[#003811] flex items-center justify-center text-white">
+        <div class="text-center p-8">
+            <div class="w-12 h-12 mx-auto mb-4 rounded-full border-4 border-[#D4AF37] border-t-transparent animate-spin"></div>
+            <h2 class="text-xl font-bold text-[#D4AF37]">Verifying Secure Session</h2>
+            <p id="securityGateMessage" class="text-sm text-gray-300 mt-2">Checking authentication and HRMO access…</p>
+        </div>
+    </div>
 
     <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
         <div class="p-6 hidden md:block border-b border-[#006400]">
@@ -77,6 +113,7 @@
 
         <div class="flex px-8 border-b border-gray-300">
             <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn tab-active px-6 py-3 rounded-t-lg">Monthly Log View</button>
+            <button onclick="switchTab('extractor')" id="tab-extractor" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">DAT Extractor</button>
             <button onclick="switchTab('f48')" id="tab-f48" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Form 48 Generator</button>
             <button onclick="switchTab('deduction')" id="tab-deduction" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Deduction</button>
         </div>
@@ -148,6 +185,60 @@
                         <tbody id="logsTableBody" class="divide-y">
                             <tr><td colspan="9" class="p-8 text-center text-gray-400 italic">Select Month & Year, then click Generate View...</td></tr>
                         </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="module-extractor" class="hidden flex-1 p-8 overflow-y-auto">
+            <div class="card p-6 border-t-4 border-[#D4AF37]">
+                <div class="flex flex-wrap justify-between items-start gap-4 mb-6 border-b pb-4">
+                    <div>
+                        <h3 class="text-2xl font-bold text-[#003811]">DAT Attendance Extractor</h3>
+                        <p class="text-sm text-gray-500 mt-1">Generate a monthly DTR View for DAT employees assigned to DARPO-CS1, with TO itineraries, PSOs, and holidays.</p>
+                    </div>
+                    <div class="text-right text-xs text-gray-500">
+                        <div class="font-bold text-[#003811]">SECURE HRMO SESSION</div>
+                        <div id="extractorAuthorizedUser"></div>
+                    </div>
+                </div>
+
+                <div id="extractorAlertBox" class="extractor-alert" style="display:none;"></div>
+
+                <div class="grid grid-cols-1 md:grid-cols-[190px_1fr_auto] gap-4 items-end mb-6 p-4 bg-gray-50 border rounded-lg">
+                    <div>
+                        <label for="extractorTargetMonth" class="form-label">Target Month</label>
+                        <input type="month" id="extractorTargetMonth" class="form-input h-[42px]">
+                    </div>
+                    <div>
+                        <label for="extractorFileInput" class="form-label">Biometric File (.dat)</label>
+                        <input type="file" id="extractorFileInput" class="form-input h-[42px] bg-white" accept=".dat,.txt">
+                    </div>
+                    <button id="extractorParseBtn" type="button" class="bg-[#003811] text-white px-5 h-[42px] rounded font-bold text-sm hover:bg-[#006400]">EXTRACT &amp; CHECK</button>
+                </div>
+
+                <div id="extractorUploadAction" class="hidden flex-wrap justify-between items-center gap-4 my-5 pt-5 border-t border-dashed">
+                    <div>
+                        <h4 id="extractorLogCount" class="font-bold text-[#003811]">0 records processed</h4>
+                        <p id="extractorCurrentMonthLabel" class="text-xs text-gray-500">Arranged by Division and Employee Name</p>
+                    </div>
+                    <button id="extractorUploadBtn" type="button" class="bg-[#006400] text-white px-5 py-2.5 rounded font-bold text-sm hover:bg-green-800">POST EXTRACTED LOGS</button>
+                </div>
+
+                <div id="extractorTableWrapper" class="extractor-table-wrap" style="display:none;">
+                    <table class="extractor-table">
+                        <thead>
+                            <tr>
+                                <th style="width:110px;">Date</th>
+                                <th style="width:100px;">Day</th>
+                                <th>Time In</th>
+                                <th>Time Out</th>
+                                <th>Time In</th>
+                                <th>Time Out</th>
+                                <th style="width:390px;">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="extractorPreviewBody"></tbody>
                     </table>
                 </div>
             </div>
@@ -363,30 +454,117 @@
     </div>
 
 <script>
-    const userData = sessionStorage.getItem('currentUser');
-    if (!userData) window.location.href = 'index.html';
-    const currentUser = JSON.parse(userData);
-    
-    if (!currentUser.role.toUpperCase().includes('HRMO')) {
-        alert("Unauthorized Access. HR personnel only.");
-        window.location.href = 'dashboard.html';
+    let currentUser = null;
+    let authenticatedUser = null;
+
+    function setSecurityGate(message, isError = false) {
+        const gate = document.getElementById('securityGate');
+        const label = document.getElementById('securityGateMessage');
+        if (label) {
+            label.textContent = message;
+            label.className = isError ? 'text-sm text-red-200 mt-2 font-bold' : 'text-sm text-gray-300 mt-2';
+        }
+        if (gate) gate.style.display = 'flex';
     }
 
-    document.getElementById('activeUser').innerText = currentUser.full_name;
-    document.getElementById('userRoleBadge').innerText = currentUser.role;
-    document.getElementById('lblHrName').innerText = currentUser.username;
+    async function initializeAttendanceSecurity() {
+        try {
+            if (typeof supabaseClient === 'undefined' || !supabaseClient || !supabaseClient.auth) {
+                throw new Error('Secure database client is unavailable.');
+            }
 
-    function logout() {
-        sessionStorage.removeItem('currentUser');
-        window.location.href = 'index.html';
+            const { data: authData, error: authError } = await supabaseClient.auth.getUser();
+            if (authError || !authData?.user) {
+                setSecurityGate('Your secure session has expired. Redirecting to login…', true);
+                setTimeout(() => window.location.replace('login.html'), 800);
+                return null;
+            }
+
+            authenticatedUser = authData.user;
+            const { data: profile, error: profileError } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('id', authenticatedUser.id)
+                .single();
+
+            if (profileError || !profile) {
+                throw new Error('Your authenticated account has no valid system profile.');
+            }
+
+            const normalizedRole = String(profile.role || '').trim().toUpperCase().replace(/_/g, ' ');
+            const roleParts = normalizedRole.split(',').map(role => role.trim()).filter(Boolean);
+            const isAuthorized = roleParts.some(role => role.includes('HRMO') || role.includes('ADMIN') || role.includes('PARPO'));
+
+            if (!isAuthorized) {
+                setSecurityGate('Access denied. This page is restricted to authorized HRMO personnel.', true);
+                setTimeout(() => window.location.replace('dashboard.html'), 1000);
+                return null;
+            }
+
+            currentUser = {
+                ...profile,
+                id: authenticatedUser.id,
+                username: profile.username || authenticatedUser.email || authenticatedUser.id,
+                full_name: profile.full_name || authenticatedUser.user_metadata?.full_name || authenticatedUser.email || 'Authorized User',
+                role: profile.role || 'HRMO'
+            };
+
+            // Retain only a server-verified profile for compatibility with the
+            // rest of the HR pages; sessionStorage is never trusted for access.
+            sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+            document.getElementById('activeUser').textContent = currentUser.full_name;
+            document.getElementById('userRoleBadge').textContent = currentUser.role;
+            document.getElementById('lblHrName').textContent = currentUser.username;
+            document.getElementById('extractorAuthorizedUser').textContent = `${currentUser.full_name} (${currentUser.role})`;
+            document.getElementById('securityGate').style.display = 'none';
+
+            supabaseClient.auth.onAuthStateChange((event) => {
+                if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+                    sessionStorage.removeItem('currentUser');
+                    window.location.replace('login.html');
+                }
+            });
+
+            return currentUser;
+        } catch (error) {
+            console.error('Attendance security initialization failed:', error);
+            setSecurityGate(error.message || 'Security verification failed.', true);
+            return null;
+        }
+    }
+
+    const attendanceSecurityReady = initializeAttendanceSecurity();
+
+    async function requireSecureHrSession() {
+        const profile = await attendanceSecurityReady;
+        if (!profile) throw new Error('A verified HRMO session is required.');
+
+        const { data, error } = await supabaseClient.auth.getUser();
+        if (error || !data?.user || data.user.id !== authenticatedUser?.id) {
+            throw new Error('Your secure session has expired. Please log in again.');
+        }
+        return profile;
+    }
+
+    async function logout() {
+        try {
+            if (typeof supabaseClient !== 'undefined' && supabaseClient?.auth) {
+                await supabaseClient.auth.signOut();
+            }
+        } finally {
+            sessionStorage.removeItem('currentUser');
+            window.location.replace('login.html');
+        }
     }
 
     function switchTab(tab) {
         document.getElementById('module-logs').classList.add('hidden');
+        document.getElementById('module-extractor').classList.add('hidden');
         document.getElementById('module-f48').classList.add('hidden');
         document.getElementById('module-deduction').classList.add('hidden');
         
         document.getElementById('tab-logs').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg';
+        document.getElementById('tab-extractor').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
         document.getElementById('tab-f48').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
         document.getElementById('tab-deduction').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
 
@@ -394,6 +572,9 @@
             document.getElementById('module-logs').classList.remove('hidden');
             document.getElementById('module-logs').classList.add('flex');
             document.getElementById('tab-logs').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg';
+        } else if (tab === 'extractor') {
+            document.getElementById('module-extractor').classList.remove('hidden');
+            document.getElementById('tab-extractor').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
         } else if (tab === 'f48') {
             document.getElementById('module-f48').classList.remove('hidden');
             document.getElementById('module-f48').classList.add('flex');
@@ -410,9 +591,13 @@
     let currentViewData = []; 
 
     window.onload = async () => {
+        const verifiedProfile = await attendanceSecurityReady;
+        if (!verifiedProfile) return;
+
         const today = new Date();
         document.getElementById('mDate').value = today.toISOString().split('T')[0];
         document.getElementById('printDailyDate').value = today.toISOString().split('T')[0];
+        document.getElementById('extractorTargetMonth').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
         const currYear = today.getFullYear();
         const yHtml = `<option value="${currYear}">${currYear}</option><option value="${currYear-1}">${currYear-1}</option>`;
@@ -1726,6 +1911,583 @@
             btn.disabled = false; btn.innerText = "PRINT DEDUCTION SUMMARY";
         }
     }
+
+    // ================================================================
+    // SECURE DAT EXTRACTOR TAB
+    // ================================================================
+    (() => {
+        const PAGE_SIZE = 1000;
+        const QUERY_BATCH_SIZE = 150;
+        const QUERY_TIMEOUT_MS = 30000;
+        const state = { hierarchy: {}, schedules: {}, datLogs: [] };
+
+        const escapeHtml = (value) => String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+
+        const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
+
+        const runWithTimeout = (request, label) => {
+            let timer;
+            return Promise.race([
+                Promise.resolve(request),
+                new Promise((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(`${label} timed out. Please check the connection and try again.`)), QUERY_TIMEOUT_MS);
+                })
+            ]).finally(() => clearTimeout(timer));
+        };
+
+        const fetchAllRows = async (table, columns, applyFilters, label = table) => {
+            const rows = [];
+            for (let from = 0; ; from += PAGE_SIZE) {
+                let query = supabaseClient.from(table).select(columns);
+                if (applyFilters) query = applyFilters(query);
+                query = query.range(from, from + PAGE_SIZE - 1);
+
+                const { data, error } = await runWithTimeout(query, label);
+                if (error) throw new Error(`${label}: ${error.message}`);
+                const page = data || [];
+                rows.push(...page);
+                if (page.length < PAGE_SIZE) break;
+                await yieldToBrowser();
+            }
+            return rows;
+        };
+
+        const fetchRowsByValues = async (table, columns, column, values, label) => {
+            const uniqueValues = [...new Set(values.map(value => String(value).trim()).filter(Boolean))];
+            if (!uniqueValues.length) return [];
+
+            const rows = [];
+            for (let i = 0; i < uniqueValues.length; i += QUERY_BATCH_SIZE * 4) {
+                const requests = [];
+                const end = Math.min(i + QUERY_BATCH_SIZE * 4, uniqueValues.length);
+                for (let start = i; start < end; start += QUERY_BATCH_SIZE) {
+                    const batch = uniqueValues.slice(start, start + QUERY_BATCH_SIZE);
+                    requests.push(fetchAllRows(
+                        table,
+                        columns,
+                        query => query.in(column, batch).order('id', { ascending: true }),
+                        `${label} batch ${Math.floor(start / QUERY_BATCH_SIZE) + 1}`
+                    ));
+                }
+                const results = await Promise.all(requests);
+                results.forEach(result => rows.push(...result));
+            }
+            return rows;
+        };
+
+        const normalizeDatTime = (value) => {
+            const match = String(value || '').match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/);
+            return match ? `${match[1]}:${match[2]}:${match[3] || '00'}` : '';
+        };
+
+        const isValidIsoDate = (value) => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+            const [year, month, day] = value.split('-').map(Number);
+            const parsed = new Date(Date.UTC(year, month - 1, day));
+            return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+        };
+
+        const parseDatFile = async (file, targetMonth) => {
+            const logs = [];
+            let invalidLines = 0;
+            let otherMonthLines = 0;
+            let processedSinceYield = 0;
+
+            const parseLine = (line) => {
+                const cleanLine = line.trim();
+                if (!cleanLine) return;
+                const parts = cleanLine.split(/\s+/);
+                if (parts.length < 5) { invalidLines++; return; }
+
+                const emp_id = String(parts[0]).trim();
+                const date = String(parts[1]).replace(/\//g, '-');
+                const time = normalizeDatTime(parts[2]);
+                if (!date.startsWith(targetMonth)) { otherMonthLines++; return; }
+                if (!emp_id || !isValidIsoDate(date) || !time) { invalidLines++; return; }
+
+                logs.push({
+                    emp_id,
+                    date,
+                    time,
+                    device_id: String(parts[3]),
+                    status: String(parts[4]),
+                    sourceIndex: logs.length
+                });
+            };
+
+            if (file.stream && typeof TextDecoderStream !== 'undefined') {
+                const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader();
+                let remainder = '';
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const lines = (remainder + value).split(/\r?\n/);
+                    remainder = lines.pop() || '';
+                    lines.forEach(parseLine);
+                    processedSinceYield += lines.length;
+                    if (processedSinceYield >= 5000) {
+                        processedSinceYield = 0;
+                        await yieldToBrowser();
+                    }
+                }
+                if (remainder.trim()) parseLine(remainder);
+            } else {
+                const content = await runWithTimeout(file.text(), 'DAT file reading');
+                const lines = content.split(/\r?\n/);
+                for (let i = 0; i < lines.length; i++) {
+                    parseLine(lines[i]);
+                    if (i > 0 && i % 5000 === 0) await yieldToBrowser();
+                }
+            }
+            return { logs, invalidLines, otherMonthLines };
+        };
+
+        const getDatesInRange = (startDate, endDate) => {
+            const start = new Date(`${startDate}T00:00:00Z`);
+            const end = new Date(`${endDate}T00:00:00Z`);
+            const dates = [];
+            while (start <= end) {
+                dates.push(start.toISOString().slice(0, 10));
+                start.setUTCDate(start.getUTCDate() + 1);
+            }
+            return dates;
+        };
+
+        const isSpecialWorkingDay = (holiday) => {
+            const classification = `${holiday?.type || ''} ${holiday?.description || ''}`
+                .trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+            return classification.includes('SPECIAL WORKING') && !classification.includes('NON WORKING');
+        };
+
+        const showExtractorAlert = (message, type = 'error') => {
+            const box = document.getElementById('extractorAlertBox');
+            box.style.display = 'block';
+            box.className = type === 'success'
+                ? 'extractor-alert extractor-alert-success'
+                : 'extractor-alert extractor-alert-error';
+            box.innerHTML = `<strong>${type === 'success' ? 'Success:' : 'Notice:'}</strong> ${escapeHtml(message)}`;
+        };
+
+        const ensureDay = (division, empId, fullName, date) => {
+            if (!state.hierarchy[division]) state.hierarchy[division] = {};
+            if (!state.hierarchy[division][empId]) state.hierarchy[division][empId] = { full_name: fullName, dates: {} };
+            if (!state.hierarchy[division][empId].dates[date]) {
+                state.hierarchy[division][empId].dates[date] = { logs: [], to: null, pso: null, holidays: [] };
+            }
+        };
+
+        const scheduleForDate = (empId, date) => {
+            const schedules = [...(state.schedules.ALL || []), ...(state.schedules[empId] || [])];
+            const target = new Date(`${date}T00:00:00Z`);
+            return schedules.find(schedule => {
+                const start = schedule.start_date ? new Date(`${String(schedule.start_date).slice(0,10)}T00:00:00Z`) : new Date('2000-01-01T00:00:00Z');
+                const end = schedule.end_date ? new Date(`${String(schedule.end_date).slice(0,10)}T00:00:00Z`) : new Date('2100-01-01T00:00:00Z');
+                return target >= start && target <= end;
+            });
+        };
+
+        const buildRemarks = (slots, toInfo, psoInfo, holidayInfo, isWeekend, isCompressedFriday, isNoWorkFriday) => {
+            const marks = [];
+            const filled = slots.filter(slot => slot?.time).length;
+            const travelOrders = Array.isArray(toInfo) ? toInfo : (toInfo ? [toInfo] : []);
+            const holidays = Array.isArray(holidayInfo) ? holidayInfo : (holidayInfo ? [holidayInfo] : []);
+            const nonWorkingHolidays = holidays.filter(holiday => !isSpecialWorkingDay(holiday));
+            const isExcused = isWeekend || isCompressedFriday || isNoWorkFriday || travelOrders.length > 0 || Boolean(psoInfo) || nonWorkingHolidays.length > 0;
+
+            if (isWeekend) marks.push('<span class="extractor-status extractor-status-gray">WEEKEND</span>');
+            else if (isNoWorkFriday) marks.push('<span class="extractor-status extractor-status-gray">FRIDAY - NO WORK</span>');
+            else if (isCompressedFriday) marks.push('<span class="extractor-status extractor-status-gray">FRIDAY (Compressed)</span>');
+
+            holidays.forEach(holiday => {
+                const working = isSpecialWorkingDay(holiday);
+                const details = [holiday.type, holiday.coverage].filter(Boolean).map(escapeHtml).join(' | ');
+                marks.push(`<span class="extractor-status ${working ? 'extractor-status-amber' : 'extractor-status-purple'}">${working ? 'SPECIAL WORKING DAY' : 'HOLIDAY'}: ${escapeHtml(holiday.description)}${details ? ` (${details})` : ''}</span>`);
+            });
+
+            if (filled === 4) marks.push('<span class="extractor-status extractor-status-green">COMPLETE</span>');
+            else if (filled === 0 && !isExcused) marks.push('<span class="extractor-status extractor-status-red">ABSENT / NO PUNCHES</span>');
+            else if (filled > 0 && filled < 4 && !isExcused) marks.push(`<span class="extractor-status extractor-status-red">MISSING (${4 - filled})</span>`);
+            else if (filled > 0 && filled < 4) marks.push(`<span class="extractor-status extractor-status-gray">PARTIAL PUNCHES (${filled}/4)</span>`);
+
+            travelOrders.forEach(to => {
+                const status = String(to.status || '').trim();
+                const normalized = status.toUpperCase();
+                const green = ['APPROVED', 'COMPLETED', 'POSTED', 'RELEASED'].includes(normalized);
+                const purpose = to.purpose ? ` | ${escapeHtml(to.purpose)}` : '';
+                marks.push(`<span class="extractor-status ${green ? 'extractor-status-green' : 'extractor-status-amber'}">TO ${escapeHtml(to.to_no)} ${escapeHtml(status)} - ${escapeHtml(to.destination)}${purpose}</span>`);
+            });
+
+            if (psoInfo) marks.push(`<span class="extractor-status extractor-status-blue">PSO: ${escapeHtml(psoInfo)}</span>`);
+            return marks.join(' ');
+        };
+
+        const renderExtractorTable = async () => {
+            const tbody = document.getElementById('extractorPreviewBody');
+            tbody.innerHTML = '';
+
+            const expectedStatuses = ['0', '2', '3', '1'];
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const employeeList = [];
+            let processedDays = 0;
+
+            Object.entries(state.hierarchy).forEach(([division, employees]) => {
+                Object.entries(employees).forEach(([empId, employee]) => {
+                    employeeList.push({ division, empId, employee });
+                });
+            });
+            employeeList.sort((a, b) =>
+                String(a.division).localeCompare(String(b.division)) ||
+                String(a.employee.full_name || '').localeCompare(String(b.employee.full_name || ''))
+            );
+
+            let html = '';
+            let lastDivision = null;
+            for (let employeeIndex = 0; employeeIndex < employeeList.length; employeeIndex++) {
+                const { division, empId, employee } = employeeList[employeeIndex];
+                if (division !== lastDivision) {
+                    html += `<tr class="extractor-division-row"><td colspan="7">DIVISION: ${escapeHtml(division)}</td></tr>`;
+                    lastDivision = division;
+                }
+                html += `<tr class="extractor-name-row"><td colspan="7"><span class="text-[11px] tracking-widest">NAME:</span> ${escapeHtml(employee.full_name)} <span class="text-xs font-normal text-gray-500 ml-2">(EMP ID: ${escapeHtml(empId)})</span></td></tr>`;
+
+                for (const date of Object.keys(employee.dates).sort()) {
+                    const dayData = employee.dates[date];
+                    const dateObject = new Date(`${date}T00:00:00Z`);
+                    const dayOfWeek = dateObject.getUTCDay();
+                    const dayName = dayNames[dayOfWeek];
+                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                    const activeSchedule = scheduleForDate(empId, date);
+                    const workingDays = String(activeSchedule?.working_days || 'Monday,Tuesday,Wednesday,Thursday,Friday').toLowerCase();
+                    const hasFriday = workingDays.includes('fri');
+                    const compressed = String(activeSchedule?.schedule_type || '').toUpperCase().includes('COMPRESSED') || workingDays.includes('4-day') || workingDays.includes('4 day');
+                    const isCompressedFriday = dayOfWeek === 5 && !hasFriday && compressed;
+                    const isNoWorkFriday = dayOfWeek === 5 && !hasFriday && !compressed;
+
+                    dayData.logs.sort((a, b) => a.time.localeCompare(b.time));
+                    const slots = [null, null, null, null];
+                    dayData.logs.forEach(log => {
+                        let slotIndex = expectedStatuses.indexOf(String(log.status));
+                        if (slotIndex < 0 || slots[slotIndex]) slotIndex = slots.findIndex(slot => !slot);
+                        if (slotIndex >= 0) {
+                            slots[slotIndex] = {
+                                time: log.time,
+                                device_id: log.device_id,
+                                status: log.status || expectedStatuses[slotIndex],
+                                sourceIndex: log.sourceIndex
+                            };
+                        }
+                    });
+                    for (let slotIndex = 0; slotIndex < 4; slotIndex++) {
+                        if (!slots[slotIndex]) {
+                            slots[slotIndex] = { time: '', device_id: 'Manual', status: expectedStatuses[slotIndex] };
+                        }
+                    }
+
+                    const filled = slots.filter(slot => slot.time).length;
+                    const hasTo = Array.isArray(dayData.to) ? dayData.to.length > 0 : Boolean(dayData.to);
+                    const hasPso = Boolean(dayData.pso);
+                    const hasNonWorkingHoliday = (dayData.holidays || []).some(holiday => !isSpecialWorkingDay(holiday));
+                    const canManualInput = filled < 4 && !hasTo && !hasPso && !hasNonWorkingHoliday && !isWeekend && !isCompressedFriday && !isNoWorkFriday;
+
+                    const renderedSlots = slots.map(slot => {
+                        const hasDatSource = Number.isInteger(slot.sourceIndex);
+                        const inputState = hasDatSource ? 'readonly' : (canManualInput ? '' : 'disabled');
+                        return `<input type="time" step="1" class="extractor-time-input"
+                            data-division="${escapeHtml(division)}" data-emp="${escapeHtml(empId)}" data-date="${date}"
+                            data-device="${escapeHtml(slot.device_id)}" data-status="${escapeHtml(slot.status)}"
+                            data-source-index="${slot.sourceIndex ?? ''}" data-original="${escapeHtml(slot.time)}"
+                            value="${escapeHtml(slot.time)}" ${inputState}>`;
+                    });
+
+                    let rowClass = '';
+                    if (hasNonWorkingHoliday) rowClass = 'extractor-holiday-row';
+                    else if (isWeekend || isCompressedFriday || isNoWorkFriday) rowClass = 'extractor-weekend-row';
+                    else if (filled < 4 && !hasTo && !hasPso) rowClass = 'extractor-issue-row';
+
+                    const remarks = buildRemarks(slots, dayData.to, dayData.pso, dayData.holidays, isWeekend, isCompressedFriday, isNoWorkFriday);
+                    html += `<tr class="${rowClass}" data-is-weekend="${isWeekend}" data-is-compressed="${isCompressedFriday}" data-is-no-work="${isNoWorkFriday}" data-is-non-working-holiday="${hasNonWorkingHoliday}">
+                        <td><strong>${date}</strong></td><td>${dayName}</td>
+                        <td>${renderedSlots[0]}</td><td>${renderedSlots[1]}</td><td>${renderedSlots[2]}</td><td>${renderedSlots[3]}</td>
+                        <td class="extractor-remarks-cell">${remarks}</td></tr>`;
+                    processedDays++;
+                }
+
+                if ((employeeIndex + 1) % 20 === 0) {
+                    tbody.insertAdjacentHTML('beforeend', html);
+                    html = '';
+                    await yieldToBrowser();
+                }
+            }
+            if (html) tbody.insertAdjacentHTML('beforeend', html);
+
+            tbody.onchange = (event) => {
+                const input = event.target;
+                if (!input.matches('.extractor-time-input')) return;
+                const row = input.closest('tr');
+                const dayData = state.hierarchy[input.dataset.division]?.[input.dataset.emp]?.dates?.[input.dataset.date];
+                if (!dayData) return;
+
+                input.classList.toggle('extractor-manual-entry', input.value !== input.dataset.original);
+                const rowSlots = Array.from(row.querySelectorAll('.extractor-time-input')).map(field => ({ time: field.value }));
+                const isWeekend = row.dataset.isWeekend === 'true';
+                const isCompressed = row.dataset.isCompressed === 'true';
+                const isNoWork = row.dataset.isNoWork === 'true';
+                const isNonWorkingHoliday = row.dataset.isNonWorkingHoliday === 'true';
+                row.querySelector('.extractor-remarks-cell').innerHTML = buildRemarks(rowSlots, dayData.to, dayData.pso, dayData.holidays, isWeekend, isCompressed, isNoWork);
+
+                const filled = rowSlots.filter(slot => slot.time).length;
+                const hasTo = Array.isArray(dayData.to) ? dayData.to.length > 0 : Boolean(dayData.to);
+                if (isNonWorkingHoliday) row.className = 'extractor-holiday-row';
+                else if (isWeekend || isCompressed || isNoWork) row.className = 'extractor-weekend-row';
+                else if (filled < 4 && !hasTo && !dayData.pso) row.className = 'extractor-issue-row';
+                else row.className = '';
+            };
+
+            document.getElementById('extractorLogCount').textContent = `${processedDays} DTR day record(s) mapped.`;
+            document.getElementById('extractorTableWrapper').style.display = 'block';
+            const action = document.getElementById('extractorUploadAction');
+            action.classList.remove('hidden');
+            action.style.display = 'flex';
+            document.getElementById('extractorAlertBox').style.display = 'none';
+        };
+
+        document.getElementById('extractorParseBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('extractorFileInput');
+            const button = document.getElementById('extractorParseBtn');
+            const targetMonth = document.getElementById('extractorTargetMonth').value;
+
+            if (!fileInput.files.length) return showExtractorAlert('Please select a .dat file first.');
+            if (!/^\d{4}-\d{2}$/.test(targetMonth)) return showExtractorAlert('Please select a valid target month.');
+
+            button.disabled = true;
+            button.textContent = 'VERIFYING SESSION...';
+            state.hierarchy = {};
+            state.schedules = {};
+            state.datLogs = [];
+            document.getElementById('extractorTableWrapper').style.display = 'none';
+            document.getElementById('extractorUploadAction').style.display = 'none';
+
+            try {
+                await requireSecureHrSession();
+                const [year, month] = targetMonth.split('-').map(Number);
+                const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+                const monthStart = `${targetMonth}-01`;
+                const monthEnd = `${targetMonth}-${String(daysInMonth).padStart(2, '0')}`;
+
+                button.textContent = 'READING DAT FILE...';
+                const parsed = await parseDatFile(fileInput.files[0], targetMonth);
+                const datEmpIds = [...new Set(parsed.logs.map(log => log.emp_id))];
+                if (!datEmpIds.length) throw new Error(`No valid biometric logs were found for ${targetMonth}.`);
+
+                button.textContent = 'CHECKING TO, ITINERARY, PSO & HOLIDAYS...';
+                const [employees, travelOrders, itineraries, psos, holidays, schedules] = await Promise.all([
+                    fetchRowsByValues('employees', 'emp_id,full_name,division,station', 'emp_id', datEmpIds, 'Employees'),
+                    fetchAllRows('travel_orders', 'to_no,emp_id,status', query => query.order('id', { ascending: true }), 'Travel Orders'),
+                    fetchAllRows('itinerary', 'to_no,travel_date,destination,purpose', query => query.like('travel_date', `${targetMonth}%`).order('id', { ascending: true }), 'Travel Order itineraries'),
+                    fetchAllRows('pso_records', 'pso_no,emp_id,start_date,end_date,subject,status', query => query.lte('start_date', monthEnd).gte('end_date', monthStart).order('id', { ascending: true }), 'PSO records'),
+                    fetchAllRows('holidays', 'date,description,type,coverage', query => query.like('date', `${targetMonth}%`).order('id', { ascending: true }), 'Holidays'),
+                    fetchAllRows('schedule_overrides', 'emp_id,start_date,end_date,schedule_type,working_days', query => query.order('id', { ascending: true }), 'Schedule overrides')
+                ]);
+
+                const employeeMap = {};
+                employees.forEach(employee => {
+                    const empId = String(employee.emp_id || '').trim();
+                    if (empId && String(employee.station || '').trim().toUpperCase() === 'DARPO-CS1') {
+                        employeeMap[empId] = {
+                            full_name: employee.full_name || empId,
+                            division: employee.division || 'UNASSIGNED'
+                        };
+                    }
+                });
+                if (!Object.keys(employeeMap).length) {
+                    throw new Error(`No DARPO-CS1 employees matched the employee IDs in the ${targetMonth} DAT file.`);
+                }
+
+                state.datLogs = parsed.logs
+                    .filter(log => employeeMap[log.emp_id])
+                    .map((log, sourceIndex) => ({ ...log, sourceIndex }));
+
+                schedules.forEach(schedule => {
+                    const empId = String(schedule.emp_id || '').trim();
+                    if (empId !== 'ALL' && !employeeMap[empId]) return;
+                    if (!state.schedules[empId]) state.schedules[empId] = [];
+                    state.schedules[empId].push(schedule);
+                });
+
+                const psoLookup = {};
+                psos.forEach(pso => {
+                    const status = String(pso.status || '').trim().toUpperCase();
+                    if (!pso.start_date || !pso.end_date || ['CANCELLED', 'CANCELED', 'REJECTED'].includes(status)) return;
+                    const start = String(pso.start_date).slice(0, 10) < monthStart ? monthStart : String(pso.start_date).slice(0, 10);
+                    const end = String(pso.end_date).slice(0, 10) > monthEnd ? monthEnd : String(pso.end_date).slice(0, 10);
+                    String(pso.emp_id || '').split(',').map(value => value.trim()).filter(value => employeeMap[value]).forEach(empId => {
+                        getDatesInRange(start, end).forEach(date => {
+                            const key = `${empId}_${date}`;
+                            if (!psoLookup[key]) psoLookup[key] = [];
+                            const label = [pso.pso_no, pso.subject].filter(Boolean).join(' - ') || 'Official PSO';
+                            if (!psoLookup[key].includes(label)) psoLookup[key].push(label);
+                        });
+                    });
+                });
+
+                const holidayLookup = {};
+                holidays.forEach(holiday => {
+                    const date = String(holiday.date || '').slice(0, 10);
+                    if (!date.startsWith(targetMonth)) return;
+                    if (!holidayLookup[date]) holidayLookup[date] = [];
+                    const item = { description: holiday.description || 'Holiday', type: holiday.type || '', coverage: holiday.coverage || '' };
+                    const signature = JSON.stringify(item);
+                    if (!holidayLookup[date].some(existing => JSON.stringify(existing) === signature)) holidayLookup[date].push(item);
+                });
+
+                const excludedStatuses = new Set(['CANCELLED', 'CANCELED', 'UNAPPROVED', 'NOT APPROVED', 'DISAPPROVED', 'REJECTED']);
+                const travelOrderReference = {};
+                travelOrders.forEach(travelOrder => {
+                    const status = String(travelOrder.status || '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+                    const toNo = String(travelOrder.to_no || '').trim();
+                    if (!toNo || excludedStatuses.has(status)) return;
+                    const employeeIds = String(travelOrder.emp_id || '').split(',').map(value => value.trim()).filter(value => employeeMap[value]);
+                    if (!employeeIds.length) return;
+                    if (!travelOrderReference[toNo]) travelOrderReference[toNo] = [];
+                    travelOrderReference[toNo].push({ to_no: toNo, status: travelOrder.status || '', employeeIds });
+                });
+
+                const toLookup = {};
+                itineraries.forEach(itinerary => {
+                    const toNo = String(itinerary.to_no || '').trim();
+                    const travelDate = String(itinerary.travel_date || '').slice(0, 10);
+                    if (!travelDate.startsWith(targetMonth)) return;
+                    (travelOrderReference[toNo] || []).forEach(parent => {
+                        parent.employeeIds.forEach(empId => {
+                            const key = `${empId}_${travelDate}`;
+                            if (!toLookup[key]) toLookup[key] = [];
+                            const mapped = {
+                                to_no: parent.to_no,
+                                status: parent.status,
+                                destination: itinerary.destination || 'No destination indicated',
+                                purpose: itinerary.purpose || ''
+                            };
+                            const signature = JSON.stringify(mapped);
+                            if (!toLookup[key].some(existing => JSON.stringify(existing) === signature)) toLookup[key].push(mapped);
+                        });
+                    });
+                });
+
+                state.datLogs.forEach(log => {
+                    const employee = employeeMap[log.emp_id];
+                    ensureDay(employee.division, log.emp_id, employee.full_name, log.date);
+                    state.hierarchy[employee.division][log.emp_id].dates[log.date].logs.push(log);
+                });
+
+                Object.keys(employeeMap).forEach(empId => {
+                    const employee = employeeMap[empId];
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const date = `${targetMonth}-${String(day).padStart(2, '0')}`;
+                        ensureDay(employee.division, empId, employee.full_name, date);
+                        const dayData = state.hierarchy[employee.division][empId].dates[date];
+                        dayData.to = toLookup[`${empId}_${date}`] || null;
+                        dayData.pso = (psoLookup[`${empId}_${date}`] || []).join('; ') || null;
+                        dayData.holidays = holidayLookup[date] || [];
+                    }
+                });
+
+                document.getElementById('extractorCurrentMonthLabel').textContent = `${Object.keys(employeeMap).length} DARPO-CS1 employee(s) with DAT logs for ${targetMonth}, arranged by division and name.`;
+                await renderExtractorTable();
+                const ignored = parsed.invalidLines + parsed.otherMonthLines;
+                if (ignored) showExtractorAlert(`DTR View generated. ${ignored} invalid or out-of-month line(s) were safely ignored.`, 'success');
+            } catch (error) {
+                console.error('Extractor error:', error);
+                showExtractorAlert(error.message || 'The extractor could not complete the request.');
+            } finally {
+                button.disabled = false;
+                button.textContent = 'EXTRACT & CHECK';
+            }
+        });
+
+        document.getElementById('extractorUploadBtn').addEventListener('click', async () => {
+            const button = document.getElementById('extractorUploadBtn');
+            button.disabled = true;
+            button.textContent = 'VERIFYING SESSION...';
+
+            try {
+                const verifiedProfile = await requireSecureHrSession();
+                const nowIso = new Date().toISOString();
+                const payload = state.datLogs.map(log => ({
+                    emp_id: log.emp_id,
+                    log_time: `${log.date} ${log.time}`,
+                    device_id: log.device_id,
+                    status: log.status,
+                    manual_log_name: null,
+                    manual_log_date: null
+                }));
+
+                document.querySelectorAll('#extractorPreviewBody .extractor-time-input').forEach(input => {
+                    let time = input.value;
+                    if (time && time.length === 5) time += ':00';
+                    const sourceIndex = input.dataset.sourceIndex;
+                    const hasSource = sourceIndex !== '' && Number.isInteger(Number(sourceIndex));
+                    const isManual = input.classList.contains('extractor-manual-entry');
+
+                    if (hasSource) {
+                        if (!time) payload[Number(sourceIndex)] = null;
+                        else if (isManual) {
+                            payload[Number(sourceIndex)] = {
+                                emp_id: input.dataset.emp,
+                                log_time: `${input.dataset.date} ${time}`,
+                                device_id: 'Manual',
+                                status: input.dataset.status,
+                                manual_log_name: verifiedProfile.full_name || verifiedProfile.username,
+                                manual_log_date: nowIso
+                            };
+                        }
+                    } else if (time) {
+                        payload.push({
+                            emp_id: input.dataset.emp,
+                            log_time: `${input.dataset.date} ${time}`,
+                            device_id: 'Manual',
+                            status: input.dataset.status,
+                            manual_log_name: verifiedProfile.full_name || verifiedProfile.username,
+                            manual_log_date: nowIso
+                        });
+                    }
+                });
+
+                const finalPayload = payload.filter(Boolean);
+                if (!finalPayload.length) throw new Error('No actual time punches were found to post.');
+
+                const batchSize = 1000;
+                for (let index = 0; index < finalPayload.length; index += batchSize) {
+                    const batch = finalPayload.slice(index, index + batchSize);
+                    button.textContent = `POSTING ${Math.min(index + batch.length, finalPayload.length)} OF ${finalPayload.length}...`;
+                    const { error } = await runWithTimeout(
+                        supabaseClient.from('attendance_logs').insert(batch),
+                        `Attendance upload batch ${Math.floor(index / batchSize) + 1}`
+                    );
+                    if (error) throw error;
+                    await yieldToBrowser();
+                }
+
+                showExtractorAlert(`${finalPayload.length} attendance log(s) were securely posted by ${verifiedProfile.full_name || verifiedProfile.username}.`, 'success');
+                state.hierarchy = {};
+                state.schedules = {};
+                state.datLogs = [];
+                document.getElementById('extractorFileInput').value = '';
+                document.getElementById('extractorTableWrapper').style.display = 'none';
+                document.getElementById('extractorUploadAction').style.display = 'none';
+            } catch (error) {
+                console.error('Extractor upload error:', error);
+                showExtractorAlert(error.message || 'The attendance logs could not be posted.');
+            } finally {
+                button.disabled = false;
+                button.textContent = 'POST EXTRACTED LOGS';
+            }
+        });
+    })();
 </script>
 </body>
 </html>
