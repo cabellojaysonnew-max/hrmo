@@ -16,7 +16,7 @@
         :root{--navy:#0a3d62;--green:#066b4f;--blue:#1769a0;--amber:#b45309;--red:#b91c1c;--line:#dbe3ea;--soft:#f8fafc;--text:#1e293b;--muted:#64748b}
         *{box-sizing:border-box}
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f9; color: var(--text); margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
+        .container { max-width: 1450px; margin: 0 auto; }
         h1 { margin: 0 0 15px; color: var(--navy); font-size: 1.5rem; }
         h1 small { color: var(--muted); font-size: 1rem; font-weight: normal; margin-left: 10px; }
         
@@ -44,8 +44,8 @@
         .btn-danger:hover { background: #991b1b; }
         .btn-sm { padding: 5px 10px; font-size: .8rem; border-radius: 5px; }
         
-        .table-wrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #fff; max-height: 650px; }
-        .monitor-table { width: 100%; min-width: 1000px; border-collapse: collapse; }
+        .table-wrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #fff; max-height: 700px; }
+        .monitor-table { width: 100%; min-width: 1100px; border-collapse: collapse; }
         .monitor-table th, .monitor-table td { padding: 10px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; }
         .monitor-table th { background: #f8fafc; color: #475569; font-size: .76rem; text-transform: uppercase; letter-spacing: .025em; white-space: nowrap; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--line); box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
         .monitor-table tbody tr:hover:not(.division-header):not(.group-header) { background: #fbfdff; }
@@ -56,11 +56,12 @@
         .group-header { background: #eef4f8 !important; border-bottom: 1px solid #cbd5e1; }
         .group-header td { font-weight: 700; color: var(--navy); padding: 8px 15px; font-size: 0.95rem; }
         
-        .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; }
+        .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; margin-right: 5px; }
         .status-green { background: #dcfce7; color: #166534; }
         .status-red { background: #fee2e2; color: #991b1b; }
         .status-amber { background: #fef3c7; color: #92400e; }
         .status-gray { background: #e2e8f0; color: #475569; }
+        .status-blue { background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd; } /* Improved PSO note style */
         
         .access-note { margin: 0 0 20px; padding: 12px 15px; border-left: 4px solid var(--blue); border-radius: 6px; background: #eff6ff; color: #1e3a5f; }
         .error-note { border-left-color: var(--red); background: #fff1f2; color: #881337; }
@@ -91,7 +92,7 @@
         <div class="module-heading">
             <div>
                 <h2>Extract & Group DAT File <span style="color: var(--amber); font-size: 1rem;">(Current Month Only)</span></h2>
-                <p>Upload biometric logs. Fetches names from Database, filters for current month, maps missing punches, and groups by Division.</p>
+                <p>Upload biometric logs. Fetches names, flags Travel Orders/PSOs using literal titles, filters for the current month, and groups by Division.</p>
             </div>
         </div>
 
@@ -100,7 +101,7 @@
                 <label for="fileInput">Biometric File (.dat)</label>
                 <input type="file" id="fileInput" class="control" accept=".dat,.txt" style="padding: 7px 12px;">
             </div>
-            <button class="btn btn-primary" id="parseBtn" type="button" style="height: 42px; min-width: 150px;">Extract Data</button>
+            <button class="btn btn-primary" id="parseBtn" type="button" style="height: 42px; min-width: 150px;">Extract & Sync</button>
         </div>
 
         <!-- HR Authorization Bar -->
@@ -125,7 +126,7 @@
                         <th>Break Out</th>
                         <th>Break In</th>
                         <th>Time Out</th>
-                        <th style="width: 150px;">Remarks</th>
+                        <th style="width: 300px;">System Remarks</th>
                         <th style="width: 80px;">Action</th>
                     </tr>
                 </thead>
@@ -138,7 +139,21 @@
 </div>
 
 <script>
+    // ==========================================
+    // SAFELY INITIALIZE SUPABASE
+    // ==========================================
+    let dbClient = null;
+    try {
+        if (window.supabase && typeof window.SUPABASE_URL !== 'undefined') {
+            dbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        }
+    } catch (err) {
+        console.warn('Supabase not fully configured in config files.', err);
+    }
+
     let groupedData = [];
+    let toLookup = {};  // To hold Travel Orders
+    let psoLookup = {}; // To hold PSO records
 
     const generateId = () => {
         return (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') 
@@ -154,15 +169,48 @@
         if(type === 'success') { setTimeout(() => { box.style.display = 'none'; }, 6000); }
     };
 
-    // Calculate Remarks string based on 4-slot structure
-    const calculateRemarks = (slots) => {
+    // Calculate dynamic remarks checking biometric slots + TO/PSO lookup
+    const calculateRemarks = (slots, empId, date) => {
+        const key = `${empId}_${date}`;
+        let marks = [];
+
+        // 1. Biometric Punches
         const filledSlots = slots.filter(s => s.time !== '').length;
-        if (filledSlots === 4) return '<span class="status status-green">&#10003; Complete</span>';
-        if (filledSlots === 0) return '<span class="status status-gray">Empty</span>';
-        return `<span class="status status-amber">&#9888; Missing (${4 - filledSlots})</span>`;
+        if (filledSlots === 4) {
+            marks.push('<span class="status status-green">&#10003; Complete</span>');
+        } else if (filledSlots === 0) {
+            marks.push('<span class="status status-gray">Empty Punches</span>');
+        } else {
+            marks.push(`<span class="status status-amber">&#9888; Missing (${4 - filledSlots})</span>`);
+        }
+
+        // 2. Travel Orders logic
+        if (toLookup[key]) {
+            const toColor = toLookup[key].status === 'APPROVED' ? 'status-green' : 'status-amber';
+            marks.push(`<span class="status ${toColor}">&#9992; TO ${toLookup[key].status} - ${toLookup[key].destination}</span>`);
+        }
+
+        // 3. PSO / RSO / SO logic (Strictly uses the database Title/Subject)
+        if (psoLookup[key]) {
+            marks.push(`<span class="status status-blue">&#128221; PSO/SO: ${psoLookup[key].subject || 'No Title'}</span>`);
+        }
+
+        return marks.join(' ');
     };
 
-    // Parse Data & Fetch Employee Roster
+    // Helper to generate Dates between two dates (for PSOs)
+    const getDatesInRange = (startDate, endDate) => {
+        const date = new Date(startDate);
+        const end = new Date(endDate);
+        const dates = [];
+        while (date <= end) {
+            dates.push(new Date(date).toISOString().split('T')[0]);
+            date.setDate(date.getDate() + 1);
+        }
+        return dates;
+    };
+
+    // Extract & Map Data
     document.getElementById('parseBtn').addEventListener('click', async () => {
         const fileInput = document.getElementById('fileInput');
         const parseBtn = document.getElementById('parseBtn');
@@ -172,33 +220,74 @@
             return;
         }
 
-        // Validate that your supabase-config.js successfully attached the client
         if (!window.supabaseClient) {
             showAlert('Database connection missing. Ensure supabase-config.js is loaded properly.', 'error');
             return;
         }
 
-        parseBtn.textContent = 'Extracting & Mapping...';
+        parseBtn.textContent = 'Syncing Database...';
         parseBtn.disabled = true;
 
-        // Fetch Employee Table logic utilizing your config setup
+        // Current Month string for filtering
+        const now = new Date();
+        const currentYYYYMM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
         let empMap = {};
+        toLookup = {};
+        psoLookup = {};
+
         try {
-            const { data, error } = await window.supabaseClient.from('employees').select('emp_id, full_name, division');
-            if (data) {
-                data.forEach(emp => {
+            // Concurrent Database Fetches
+            const [empRes, psoRes, toRes, itinRes] = await Promise.all([
+                dbClient.from('employees').select('emp_id, full_name, division'),
+                dbClient.from('pso_records').select('emp_id, start_date, end_date, pso_no, subject, status'),
+                dbClient.from('travel_orders').select('to_no, emp_id, status').in('status', ['PENDING', 'APPROVED']),
+                dbClient.from('itinerary').select('to_no, travel_date, destination, purpose')
+            ]);
+
+            // 1. Build Employee Map
+            if (empRes.data) {
+                empRes.data.forEach(emp => {
                     empMap[emp.emp_id] = { full_name: emp.full_name, division: emp.division || 'Unassigned Division' };
                 });
             }
+
+            // 2. Build PSO Map (Expanding date ranges to daily map keys)
+            if (psoRes.data) {
+                psoRes.data.forEach(pso => {
+                    if(!pso.start_date || !pso.end_date) return;
+                    const dates = getDatesInRange(pso.start_date, pso.end_date);
+                    dates.forEach(d => {
+                        if (d.startsWith(currentYYYYMM)) {
+                            // Uses the exact subject from the DB
+                            psoLookup[`${pso.emp_id}_${d}`] = { pso_no: pso.pso_no, subject: pso.subject };
+                        }
+                    });
+                });
+            }
+
+            // 3. Build Travel Order Map (Joining TO to Itinerary manually)
+            if (toRes.data && itinRes.data) {
+                const toReference = {};
+                toRes.data.forEach(t => { toReference[t.to_no] = t; });
+
+                itinRes.data.forEach(itin => {
+                    const parentTo = toReference[itin.to_no];
+                    if (parentTo && itin.travel_date && itin.travel_date.startsWith(currentYYYYMM)) {
+                        toLookup[`${parentTo.emp_id}_${itin.travel_date}`] = { 
+                            status: parentTo.status, 
+                            destination: itin.destination || 'Unknown Destination' 
+                        };
+                    }
+                });
+            }
+
         } catch(e) {
-            console.warn("Could not fetch employees roster", e);
+            console.warn("Database sync failed. Proceeding with raw data.", e);
         }
 
         const file = fileInput.files[0];
         const reader = new FileReader();
-
-        const now = new Date();
-        const currentYYYYMM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
         reader.onload = function(e) {
             try {
@@ -209,6 +298,7 @@
                 let rawLogsCount = 0;
                 let ignoredLogsCount = 0;
 
+                // Pass 1: Add Biometric Data to tempMap
                 lines.forEach(line => {
                     const cleanLine = line.trim();
                     if (!cleanLine) return;
@@ -221,7 +311,7 @@
                         const device_id = parts[3];
                         const status = parts[4];
                         
-                        // CURRENT MONTH ONLY FILTER
+                        // Current Month filter
                         if (!date.startsWith(currentYYYYMM)) {
                             ignoredLogsCount++;
                             return; 
@@ -231,9 +321,7 @@
                         const groupKey = `${emp_id}_${date}`;
                         
                         if (!tempMap[groupKey]) {
-                            // Map ID to Name & Division
                             const rosterInfo = empMap[emp_id] || { full_name: 'Unknown Employee', division: 'Unmapped IDs' };
-
                             tempMap[groupKey] = {
                                 id: generateId(),
                                 emp_id: emp_id,
@@ -247,23 +335,53 @@
                     }
                 });
 
-                if (rawLogsCount === 0) {
-                    showAlert(`No data found for the current month (${currentYYYYMM}). Ignored ${ignoredLogsCount} logs from previous months.`, 'error');
+                // Pass 2: Inject empty rows for employees on TO or PSO who didn't scan Biometrics
+                const activeEmpIds = Object.keys(empMap);
+                activeEmpIds.forEach(emp_id => {
+                    // Check TOs
+                    Object.keys(toLookup).forEach(toKey => {
+                        if (toKey.startsWith(`${emp_id}_`)) {
+                            const date = toKey.split('_')[1];
+                            if (!tempMap[toKey]) {
+                                tempMap[toKey] = {
+                                    id: generateId(), emp_id: emp_id,
+                                    full_name: empMap[emp_id].full_name, division: empMap[emp_id].division,
+                                    date: date, rawLogs: []
+                                };
+                            }
+                        }
+                    });
+                    // Check PSOs
+                    Object.keys(psoLookup).forEach(psoKey => {
+                        if (psoKey.startsWith(`${emp_id}_`)) {
+                            const date = psoKey.split('_')[1];
+                            if (!tempMap[psoKey]) {
+                                tempMap[psoKey] = {
+                                    id: generateId(), emp_id: emp_id,
+                                    full_name: empMap[emp_id].full_name, division: empMap[emp_id].division,
+                                    date: date, rawLogs: []
+                                };
+                            }
+                        }
+                    });
+                });
+
+                if (Object.keys(tempMap).length === 0) {
+                    showAlert(`No data found for the current month (${currentYYYYMM}). Ignored ${ignoredLogsCount} logs from other dates.`, 'error');
                     parseBtn.textContent = 'Extract Data';
                     parseBtn.disabled = false;
                     return;
                 }
 
-                document.getElementById('currentMonthLabel').textContent = `Filtered explicitly for ${currentYYYYMM} | Grouped by Division & Employee`;
+                document.getElementById('currentMonthLabel').textContent = `Filtered for ${currentYYYYMM} | Grouped by Division & Employee`;
 
                 groupedData = Object.values(tempMap);
 
-                // Convert raw logs into exactly 4 Time Slots per day (Time In, B-Out, B-In, Time Out)
-                const expectedStatuses = ['0', '2', '3', '1']; // ZKTeco standard IN, BOUT, BIN, OUT
+                // Initialize 4-slots
+                const expectedStatuses = ['0', '2', '3', '1']; 
                 groupedData.forEach(group => {
                     group.rawLogs.sort((a, b) => a.time.localeCompare(b.time));
                     
-                    // Initialize empty manual slots
                     group.timeSlots = [
                         { time: '', device_id: 'Manual', status: '0', isManual: true },
                         { time: '', device_id: 'Manual', status: '2', isManual: true },
@@ -271,7 +389,6 @@
                         { time: '', device_id: 'Manual', status: '1', isManual: true }
                     ];
 
-                    // Fill slots chronologically from raw biometric data
                     group.rawLogs.forEach((log, idx) => {
                         if(idx < 4) {
                             group.timeSlots[idx] = { 
@@ -299,7 +416,7 @@
                 console.error(error);
                 showAlert('An unexpected error occurred during extraction.', 'error');
             } finally {
-                parseBtn.textContent = 'Extract Data';
+                parseBtn.textContent = 'Extract & Sync';
                 parseBtn.disabled = false;
             }
         };
@@ -321,10 +438,10 @@
         let currentEmp = null;
 
         groupedData.forEach((group) => {
-            // Group By Division
+            // Render Division Header
             if (group.division !== currentDiv) {
                 currentDiv = group.division;
-                currentEmp = null; // Reset employee tracking when division changes
+                currentEmp = null; 
                 htmlContent += `
                     <tr class="division-header">
                         <td colspan="7">
@@ -334,7 +451,7 @@
                 `;
             }
 
-            // Group By Employee
+            // Render Employee Group Header
             if (group.emp_id !== currentEmp) {
                 currentEmp = group.emp_id;
                 htmlContent += `
@@ -346,14 +463,14 @@
                 `;
             }
 
-            // Render the interactive Time Slots
+            // Render Interactive Slots
             const slots = group.timeSlots.map((slot, idx) => {
                 const inputClass = slot.isManual ? 'manual-entry' : '';
-                // step="1" enables seconds in the HTML time picker
                 return `<input type="time" step="1" class="${inputClass}" data-group-id="${group.id}" data-slot="${idx}" value="${slot.time}">`;
             });
             
-            const remarks = calculateRemarks(group.timeSlots);
+            // Pass emp_id and date to fetch lookup mappings
+            const remarks = calculateRemarks(group.timeSlots, group.emp_id, group.date);
 
             htmlContent += `
                 <tr id="row_${group.id}">
@@ -370,7 +487,7 @@
         
         tbody.innerHTML = htmlContent;
 
-        // Listen for HR Manual Input Changes
+        // Dynamic Event Listeners for Manual Overrides
         document.querySelectorAll('input[type="time"]').forEach(input => {
             input.addEventListener('change', (e) => {
                 const groupId = e.target.dataset.groupId;
@@ -379,28 +496,26 @@
                 
                 if (group) {
                     let newTime = e.target.value;
-                    // Native HTML time input returns "HH:MM" if seconds aren't typed, append :00 for DB compatibility
                     if (newTime && newTime.length === 5) newTime += ":00"; 
                     
                     group.timeSlots[slotIndex].time = newTime;
                     
-                    // Add manual styling class
                     if(newTime) {
                         e.target.classList.add('manual-entry');
                     } else {
                         e.target.classList.remove('manual-entry');
                     }
 
-                    // Dynamically update the remarks cell for this row
+                    // Dynamically refresh remarks, maintaining the TO/PSO badges
                     const tr = document.getElementById(`row_${groupId}`);
                     if(tr) {
-                        tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(group.timeSlots);
+                        tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(group.timeSlots, group.emp_id, group.date);
                     }
                 }
             });
         });
 
-        document.getElementById('logCount').innerHTML = `${groupedData.length} Employee Working Days ready for review.`;
+        document.getElementById('logCount').innerHTML = `${groupedData.length} Timesheets ready for review.`;
         document.getElementById('tableWrapper').style.display = 'block';
         document.getElementById('uploadAction').style.display = 'flex';
         document.getElementById('alertBox').style.display = 'none';
@@ -415,7 +530,6 @@
     document.getElementById('uploadBtn').addEventListener('click', async () => {
         const hrPass = document.getElementById('hrPassword').value;
         
-        // HR PASSWORD REQUIREMENT (Update this string to match company protocol)
         if (hrPass !== 'HR2026') {
             showAlert('Unauthorized. Incorrect HR Password.', 'error');
             document.getElementById('hrPassword').focus();
@@ -436,7 +550,7 @@
         const payload = [];
         groupedData.forEach(group => {
             group.timeSlots.forEach(slot => {
-                if (slot.time) { // Only push slots that have actual time data
+                if (slot.time) { 
                     payload.push({
                         emp_id: group.emp_id,
                         log_time: `${group.date} ${slot.time}`,
@@ -463,7 +577,6 @@
 
             showAlert(`Success! ${payload.length} attendance logs have been securely posted.`, 'success');
             
-            // Clean up UI
             groupedData = [];
             document.getElementById('fileInput').value = '';
             renderTable();
