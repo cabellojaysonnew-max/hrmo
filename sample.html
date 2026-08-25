@@ -56,6 +56,12 @@
         .group-header { background: #eef4f8 !important; border-bottom: 1px solid #cbd5e1; }
         .group-header td { font-weight: 800; color: var(--navy); padding: 10px 15px; font-size: 1rem; }
         
+        /* DTR View Row Highlights */
+        .issue-row td { background-color: #fff1f2 !important; border-bottom-color: #fecdd3; }
+        .issue-row td:first-child { border-left: 4px solid var(--red); }
+        .weekend-row td { background-color: #f8fafc !important; color: var(--muted); }
+        .weekend-row input[type="time"] { opacity: 0.7; background: #f1f5f9; }
+
         .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; margin-right: 5px; margin-bottom: 4px;}
         .status-green { background: #dcfce7; color: #166534; }
         .status-red { background: #fee2e2; color: #991b1b; }
@@ -92,7 +98,7 @@
         <div class="module-heading">
             <div>
                 <h2>Extract & Sync DAT File</h2>
-                <p>Upload biometric logs. Fetches names, flags Travel Orders/PSOs, filters for target month, and groups by Division > Employee.</p>
+                <p>Upload biometric logs. Fetches names, flags Travel Orders/PSOs, checks overrides, and generates DTR View (Division > Employee).</p>
             </div>
         </div>
 
@@ -156,6 +162,7 @@
     });
 
     let hierarchyData = {}; 
+    let schedLookup = {};
 
     const generateId = () => {
         return (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') 
@@ -182,17 +189,27 @@
         return dates;
     };
 
-    // Formats dynamic remarks
-    const calculateRemarks = (slots, toInfo, psoInfo) => {
+    // Formats dynamic remarks including Weekends and Compressed Fridays
+    const calculateRemarks = (slots, toInfo, psoInfo, isWeekend, isCompressedFriday) => {
         let marks = [];
         const filledSlots = slots.filter(s => s && s.time !== '').length;
+
+        if (isWeekend) {
+            marks.push('<span class="status status-gray">WEEKEND</span>');
+        } else if (isCompressedFriday) {
+            marks.push('<span class="status status-gray">FRIDAY (Compressed)</span>');
+        }
 
         if (filledSlots === 4) {
             marks.push('<span class="status status-green">&#10003; Complete</span>');
         } else if (filledSlots === 0) {
-            marks.push('<span class="status status-gray">Empty Punches</span>');
+            if (!isWeekend && !isCompressedFriday && !toInfo && !psoInfo) {
+                marks.push('<span class="status status-red">Absent / No Punches</span>');
+            } else if (!isWeekend && !isCompressedFriday) {
+                marks.push('<span class="status status-gray">Empty Punches</span>');
+            }
         } else {
-            marks.push(`<span class="status status-amber">&#9888; Missing (${4 - filledSlots})</span>`);
+            marks.push(`<span class="status status-red">&#9888; Missing (${4 - filledSlots})</span>`);
         }
 
         if (toInfo) {
@@ -217,7 +234,7 @@
     document.getElementById('parseBtn').addEventListener('click', async () => {
         const fileInput = document.getElementById('fileInput');
         const parseBtn = document.getElementById('parseBtn');
-        const targetMonth = document.getElementById('targetMonth').value; // e.g. "2026-08"
+        const targetMonth = document.getElementById('targetMonth').value; 
 
         if (!fileInput.files.length) {
             showAlert('Please select a .dat file first.', 'error');
@@ -238,23 +255,34 @@
         parseBtn.disabled = true;
 
         hierarchyData = {}; 
+        schedLookup = {};
         let empMap = {};
         let toLookup = {};
         let psoLookup = {};
 
         try {
-            // Concurrent DB Fetches based on your table schemas
-            const [empRes, psoRes, toRes, itinRes] = await Promise.all([
+            // Concurrent DB Fetches including schedule_overrides
+            const [empRes, psoRes, toRes, itinRes, schedRes] = await Promise.all([
                 dbClient.from('employees').select('emp_id, full_name, division'),
                 dbClient.from('pso_records').select('emp_id, start_date, end_date, subject, status'),
                 dbClient.from('travel_orders').select('to_no, emp_id, status').in('status', ['PENDING', 'APPROVED']),
-                dbClient.from('itinerary').select('to_no, travel_date, destination')
+                dbClient.from('itinerary').select('to_no, travel_date, destination'),
+                dbClient.from('schedule_overrides').select('emp_id, start_date, end_date, schedule_type, working_days')
             ]);
 
             // Map Employees
             if (empRes.data) {
                 empRes.data.forEach(emp => {
                     empMap[emp.emp_id] = { full_name: emp.full_name, division: emp.division || 'UNASSIGNED' };
+                });
+            }
+
+            // Map Schedule Overrides (Support for "ALL")
+            if (schedRes.data) {
+                schedRes.data.forEach(s => {
+                    const empKey = s.emp_id ? s.emp_id.toString().toUpperCase() : 'ALL';
+                    if (!schedLookup[empKey]) schedLookup[empKey] = [];
+                    schedLookup[empKey].push(s);
                 });
             }
 
@@ -296,7 +324,6 @@
             });
 
             const lines = textContent.split(/\r?\n/);
-            let rawLogsCount = 0;
             let ignoredLogsCount = 0;
 
             lines.forEach(line => {
@@ -316,7 +343,6 @@
                         return; 
                     }
 
-                    rawLogsCount++;
                     const rosterInfo = empMap[emp_id] || { full_name: 'Unknown Employee', division: 'UNMAPPED' };
                     
                     ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
@@ -324,31 +350,28 @@
                 }
             });
 
-            // Inject missing rows for employees who are on TO/PSO in this month but didn't Biometric punch
+            // DTR VIEW GENERATION: Inject all days of the month for active employees
             const activeEmpIds = Object.keys(empMap);
+            const [tYear, tMonth] = targetMonth.split('-');
+            const daysInMonth = new Date(tYear, tMonth, 0).getDate();
+            const allDaysOfMonth = [];
+            
+            for (let i = 1; i <= daysInMonth; i++) {
+                allDaysOfMonth.push(`${tYear}-${tMonth}-${String(i).padStart(2, '0')}`);
+            }
+
             activeEmpIds.forEach(emp_id => {
                 const rosterInfo = empMap[emp_id];
                 
-                // Add missing TO dates
-                Object.keys(toLookup).forEach(toKey => {
-                    if (toKey.startsWith(`${emp_id}_`)) {
-                        const date = toKey.split('_')[1];
-                        if (date.startsWith(targetMonth)) {
-                            ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
-                            hierarchyData[rosterInfo.division][emp_id].dates[date].to = toLookup[toKey];
-                        }
-                    }
-                });
-                
-                // Add missing PSO dates
-                Object.keys(psoLookup).forEach(psoKey => {
-                    if (psoKey.startsWith(`${emp_id}_`)) {
-                        const date = psoKey.split('_')[1];
-                        if (date.startsWith(targetMonth)) {
-                            ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
-                            hierarchyData[rosterInfo.division][emp_id].dates[date].pso = psoLookup[psoKey];
-                        }
-                    }
+                // Construct the full 1-to-30/31 matrix for the employee
+                allDaysOfMonth.forEach(date => {
+                    ensureHierarchy(rosterInfo.division, emp_id, rosterInfo.full_name, date);
+                    
+                    const toKey = `${emp_id}_${date}`;
+                    if (toLookup[toKey]) hierarchyData[rosterInfo.division][emp_id].dates[date].to = toLookup[toKey];
+                    
+                    const psoKey = `${emp_id}_${date}`;
+                    if (psoLookup[psoKey]) hierarchyData[rosterInfo.division][emp_id].dates[date].pso = psoLookup[psoKey];
                 });
             });
 
@@ -370,6 +393,31 @@
             parseBtn.disabled = false;
         }
     });
+
+    const getScheduleForDate = (empId, dateStr) => {
+        const d = new Date(dateStr);
+        
+        // Helper to check date bounds
+        const findActiveSched = (schedules) => {
+            if (!schedules) return null;
+            return schedules.find(s => {
+                let start = s.start_date ? new Date(s.start_date) : new Date('2000-01-01');
+                let end = s.end_date ? new Date(s.end_date) : new Date('2100-01-01');
+                return d >= start && d <= end;
+            });
+        };
+
+        // 1. Prioritize employee-specific schedule
+        let activeSched = findActiveSched(schedLookup[empId]);
+        
+        // 2. Fall back to global "ALL" schedule if no specific one exists
+        if (!activeSched) {
+            activeSched = findActiveSched(schedLookup['ALL']);
+        }
+
+        // 3. Fall back to standard week if nothing is found in the database
+        return activeSched ? activeSched.working_days : 'Mon-Fri';
+    };
 
     // Render Table Hierarchically
     const renderTable = () => {
@@ -410,6 +458,21 @@
                     const dayData = empData.dates[date];
                     processedDaysCount++;
                     
+                    // Determine Schedule/Weekends based on `schedule_overrides` rules
+                    const d = new Date(date);
+                    const dayOfWeek = d.getDay();
+                    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                    
+                    const workingDays = getScheduleForDate(empId, date) || 'Mon-Fri';
+                    const wdLower = workingDays.toLowerCase();
+                    let isCompressedFriday = false;
+                    
+                    if (dayOfWeek === 5) {
+                        if (!wdLower.includes('fri') && (wdLower.includes('thu') || wdLower.includes('4-day'))) {
+                            isCompressedFriday = true;
+                        }
+                    }
+
                     // Sort logs chronologically and map to slots
                     dayData.logs.sort((a, b) => a.time.localeCompare(b.time));
                     const slots = [null, null, null, null];
@@ -433,10 +496,20 @@
                                 data-original="${s.time}" value="${s.time}">`;
                     });
 
-                    const remarksHtml = calculateRemarks(slots, dayData.to, dayData.pso);
+                    // Figure out highlights and remarks
+                    const filledSlots = slots.filter(s => s && s.time !== '').length;
+                    let rowClass = "";
+                    
+                    if (isWeekend || isCompressedFriday) {
+                        rowClass = "weekend-row";
+                    } else if (filledSlots < 4 && !dayData.to && !dayData.pso) {
+                        rowClass = "issue-row"; // DTR Highlights issue if missing punches without TO/PSO
+                    }
+
+                    const remarksHtml = calculateRemarks(slots, dayData.to, dayData.pso, isWeekend, isCompressedFriday);
 
                     htmlContent += `
-                        <tr id="row_${empId}_${date}">
+                        <tr id="row_${empId}_${date}" class="${rowClass}" data-isweekend="${isWeekend}" data-iscompressed="${isCompressedFriday}">
                             <td><strong>${date}</strong></td>
                             <td>${renderedSlots[0]}</td>
                             <td>${renderedSlots[1]}</td>
@@ -473,11 +546,24 @@
                 }));
 
                 const dayData = hierarchyData[div][empId].dates[date];
-                tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(rowInputs, dayData.to, dayData.pso);
+                const isWknd = tr.dataset.isweekend === "true";
+                const isComp = tr.dataset.iscompressed === "true";
+                
+                tr.querySelector('.remarks-cell').innerHTML = calculateRemarks(rowInputs, dayData.to, dayData.pso, isWknd, isComp);
+                
+                // Dynamically update DTR row highlight
+                const filled = rowInputs.filter(s => s.time !== '').length;
+                if (isWknd || isComp) {
+                    tr.className = "weekend-row";
+                } else if (filled < 4 && !dayData.to && !dayData.pso) {
+                    tr.className = "issue-row";
+                } else {
+                    tr.className = "";
+                }
             });
         });
 
-        document.getElementById('logCount').innerHTML = `${processedDaysCount} Timesheets generated.`;
+        document.getElementById('logCount').innerHTML = `${processedDaysCount} Timesheet records mapped.`;
         document.getElementById('tableWrapper').style.display = 'block';
         document.getElementById('uploadAction').style.display = 'flex';
         document.getElementById('alertBox').style.display = 'none';
