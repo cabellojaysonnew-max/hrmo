@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/html5-qrcode" defer></script>
 
-  <!-- THIS IS THE FIX: Connecting your actual database -->
+  <!-- Connects your actual database credentials -->
   <script src="supabase-config.js"></script>
 
   <style>
@@ -154,14 +154,16 @@
 
   <script>
     /*
-     * This page follows the existing DAR HR pages:
-     *   - HR authorization comes from localStorage/sessionStorage.
-     *   - The same Supabase project and publishable key are used.
-     *   - Employees are matched by employees.emp_id.
+     * THIS IS THE FIX FOR THE SYNTAX ERROR:
+     * We removed the duplicate `const SUPABASE_URL` declarations here.
+     * The code now safely checks if the variables exist from your config file,
+     * preventing the browser crash seen in the console.
      */
-    const SUPABASE_URL = window.SUPABASE_URL || window.SUPABASE_CONFIG?.url || window.supabaseConfig?.url || 'https://xnwttnpfzcjbszwxsgox.supabase.co';
-    const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || window.SUPABASE_CONFIG?.anonKey || window.SUPABASE_CONFIG?.publishableKey || window.supabaseConfig?.anonKey || 'sb_publishable_zEh0y_OAF7nVwLBuTTB74w_gPX0XomI';
-    const db = window.supabaseClient || window.secureDbClient || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const db = window.supabaseClient || window.secureDbClient || window.supabase.createClient(
+      typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://xnwttnpfzcjbszwxsgox.supabase.co',
+      typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'sb_publishable_zEh0y_OAF7nVwLBuTTB74w_gPX0XomI'
+    );
+    
     const state = { mode: 'employee', entryMode: 'manual', ceremony: null, employee: null, existing: null, records: [], allEmployees: null, scanner: null, user: null };
 
     const today = () => { const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000); return local.toISOString().slice(0, 10); };
@@ -177,7 +179,7 @@
     
     const getUser = () => { const raw = localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser'); if (!raw) return null; try { return JSON.parse(raw); } catch (_) { return null; } };
     
-    // THIS IS THE FIX: Accepts literally ANY user with "HR" in their role, unit, or division.
+    // Accepts literally ANY user with "HR" in their role, unit, or division.
     const isAllowedHr = (user) => { 
       const role = String(user?.role || '').toUpperCase(); 
       const unit = String(user?.unit || '').toUpperCase(); 
