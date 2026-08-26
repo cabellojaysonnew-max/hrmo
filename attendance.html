@@ -1922,7 +1922,7 @@
                 fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', dStr + "T00:00:00").lte('log_time', dStr + "T23:59:59").order('log_time', {ascending: true})),
                 fetchSafe(supabaseClient.from('flag_attendance').select('emp_id, time_in, status').eq('date', dStr)),
                 fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')),
-                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').eq('travel_date', dStr)),
+                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date, destination, purpose').eq('travel_date', dStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', dStr).gte('end_date', dStr)),
                 fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type, transaction_t').in('transaction_t', ['APPROVED', 'PENDING']).eq('date', dStr))
             ]);
@@ -1937,10 +1937,12 @@
                 flagMap[f.emp_id] = f;
             });
 
-            const toSet = new Set();
+            const toMap = {};
             (itinRes.data || []).forEach(i => {
                 const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
-                empsOnTO.forEach(t => toSet.add(t.emp_id));
+                empsOnTO.forEach(t => {
+                    toMap[t.emp_id] = { destination: i.destination, purpose: i.purpose };
+                });
             });
 
             const psoSet = new Set((psoRes.data || []).map(p => p.emp_id));
@@ -1958,7 +1960,7 @@
                 let remarks = "";
                 let attLogDisplay = "-";
                 let flagLogDisplay = "-";
-                let toDisplay = toSet.has(e.emp_id) ? "YES" : "-";
+                let toDisplay = toMap[e.emp_id] ? "YES" : "-";
                 let leaveData = leaveMap[e.emp_id];
                 let leaveDisplay = leaveData ? leaveData.type : "-";
                 let psoDisplay = psoSet.has(e.emp_id) ? "YES" : "-";
@@ -1994,7 +1996,10 @@
                 if (fLog && fLog.status && fLog.status.toUpperCase() === 'LATE') isLate = true;
 
                 if (toDisplay === "YES") {
-                    remarks = "ON TRAVEL";
+                    const tInfo = toMap[e.emp_id];
+                    const dest = tInfo.destination ? tInfo.destination : "N/A";
+                    const purp = tInfo.purpose ? tInfo.purpose : "N/A";
+                    remarks = `ON TRAVEL - ${dest} (${purp})`;
                 } else if (psoDisplay === "YES") {
                     remarks = "WITH PSO/RSO/SO";
                 } else if (leaveData) {
@@ -2009,6 +2014,8 @@
                         remarks = "Present but did not attend Flag Ceremony";
                     } else if (!attendedFlag && aLogs.length > 0 && isLate) {
                         remarks = "Late and did not attend Flag Ceremony";
+                    } else if (attendedFlag && aLogs.length === 0) {
+                        remarks = "NO ATTENDANCE LOG, ATTENDED FLAG CEREMONY";
                     } else {
                         remarks = "ABSENT";
                     }
