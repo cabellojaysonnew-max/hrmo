@@ -68,8 +68,19 @@
         .extractor-time-input.extractor-manual-entry { background: #fff7ed; border: 2px solid #fcd34d; }
         .extractor-time-input[readonly], .extractor-time-input:disabled { background: #f1f5f9; color: #64748b; cursor: not-allowed; opacity: .8; }
         .extractor-time-select { min-width: 145px; width: 100%; }
-        .extractor-employee-locator { min-width: 320px; margin-left: 12px; padding: .4rem .55rem; border: 1px solid #d97706; border-radius: .3rem; background: #fffbeb; color: #78350f; font-size: .76rem; font-weight: 700; }
+        .extractor-employee-locator { width: min(520px, 100%); margin-left: 12px; padding: .5rem .65rem; border: 1px solid #d97706; border-radius: .3rem; background: #fffbeb; color: #78350f; font-size: .76rem; font-weight: 700; }
         .extractor-unidentified { color: #991b1b; }
+        .extractor-monthly-tables { display: grid; gap: .8rem; }
+        .extractor-division-heading { margin-top: .5rem; padding: .65rem .9rem; border-radius: .4rem; background: #003811; color: #D4AF37; font-size: .78rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+        .extractor-month-card { overflow: hidden; border: 1px solid #cbd5e1; border-radius: .5rem; background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+        .extractor-month-card > summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding: .85rem 1rem; cursor: pointer; background: #eef4f0; color: #003811; font-size: .85rem; font-weight: 800; list-style: none; }
+        .extractor-month-card > summary::-webkit-details-marker { display: none; }
+        .extractor-month-card > summary::after { content: 'OPEN MONTHLY TABLE'; color: #1769a0; font-size: .66rem; letter-spacing: .04em; }
+        .extractor-month-card[open] > summary::after { content: 'CLOSE MONTHLY TABLE'; }
+        .extractor-month-card .extractor-table-wrap { max-height: 560px; border: 0; border-top: 1px solid #dbe3ea; border-radius: 0; }
+        .extractor-slot-editor { display: grid; gap: .3rem; min-width: 150px; }
+        .extractor-punch-picker { width: 100%; padding: .3rem .35rem; border: 1px solid #d97706; border-radius: .25rem; background: #fffbeb; color: #78350f; font-size: .68rem; font-weight: 700; }
+        .extractor-slot-editor .extractor-time-input { width: 100%; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
@@ -214,21 +225,9 @@
                     <button id="extractorUploadBtn" type="button" class="bg-[#006400] text-white px-5 py-2.5 rounded font-bold text-sm hover:bg-green-800">POST EXTRACTED LOGS</button>
                 </div>
 
-                <div id="extractorTableWrapper" class="extractor-table-wrap" style="display:none;">
-                    <table class="extractor-table">
-                        <thead>
-                            <tr>
-                                <th style="width:110px;">Date</th>
-                                <th style="width:100px;">Day</th>
-                                <th>Time In</th>
-                                <th>Time Out</th>
-                                <th>Time In</th>
-                                <th>Time Out</th>
-                                <th style="width:390px;">Remarks</th>
-                            </tr>
-                        </thead>
-                        <tbody id="extractorPreviewBody"></tbody>
-                    </table>
+                <datalist id="extractorEmployeeDirectoryOptions"></datalist>
+                <div id="extractorTableWrapper" class="extractor-monthly-tables" style="display:none;">
+                    <div id="extractorPreviewBody"></div>
                 </div>
             </div>
         </div>
@@ -1846,6 +1845,7 @@
             schedules: {},
             datLogs: [],
             employeeDirectory: {},
+            directorySearch: {},
             resolutions: {},
             unresolvedIds: new Set(),
             context: null
@@ -2073,6 +2073,63 @@
             });
         };
 
+        const inferPunchSlots = (logs, expectedStatuses) => {
+            const sorted = [...logs].sort((a, b) => a.time.localeCompare(b.time));
+            const slots = [null, null, null, null];
+            const usedLogs = new Set();
+
+            const assign = (slotIndex, log) => {
+                if (slots[slotIndex] || !log || usedLogs.has(log)) return;
+                slots[slotIndex] = {
+                    time: log.time,
+                    device_id: log.device_id,
+                    status: expectedStatuses[slotIndex],
+                    sourceIndex: log.sourceIndex
+                };
+                usedLogs.add(log);
+            };
+
+            const beforeLunch = sorted.filter(log => log.time.slice(0, 5) < '12:00');
+            const lunchRange = sorted.filter(log => {
+                const hhmm = log.time.slice(0, 5);
+                return hhmm >= '12:00' && hhmm <= '13:00';
+            });
+            const afterLunch = sorted.filter(log => log.time.slice(0, 5) > '13:00');
+
+            // Earliest morning punch is morning IN.
+            assign(0, beforeLunch[0]);
+
+            // Lunch punches are mapped within the 12:00–1:00 PM window.
+            if (lunchRange.length >= 2) {
+                assign(1, lunchRange[0]);
+                assign(2, lunchRange[lunchRange.length - 1]);
+            } else if (lunchRange.length === 1) {
+                assign(lunchRange[0].time.slice(0, 5) < '12:30' ? 1 : 2, lunchRange[0]);
+            }
+
+            // A second pre-noon punch is the best available lunch OUT only
+            // when there is no punch within the normal lunch window.
+            if (!slots[1] && beforeLunch.length > 1 && lunchRange.length === 0) {
+                assign(1, beforeLunch[beforeLunch.length - 1]);
+            }
+
+            if (afterLunch.length >= 2) {
+                assign(2, afterLunch[0]);
+                assign(3, afterLunch[afterLunch.length - 1]);
+            } else if (afterLunch.length === 1) {
+                // A lone late punch (for example, 18:00) is afternoon OUT.
+                // An early-afternoon punch is more likely afternoon IN.
+                const slotIndex = afterLunch[0].time.slice(0, 5) >= '15:00' ? 3 : 2;
+                assign(slotIndex, afterLunch[0]);
+            }
+
+            return slots.map((slot, slotIndex) => slot || {
+                time: '',
+                device_id: 'Manual',
+                status: expectedStatuses[slotIndex]
+            });
+        };
+
         const buildRemarks = (slots, toInfo, psoInfo, holidayInfo, isWeekend, isCompressedFriday, isNoWorkFriday, rawPunchCount = 0) => {
             const marks = [];
             const filled = slots.filter(slot => slot?.time).length;
@@ -2089,6 +2146,8 @@
 
             if (rawPunchCount > 4) {
                 marks.push(`<span class="extractor-status extractor-status-amber">${rawPunchCount} PUNCHES - SELECT THE CORRECT FOUR</span>`);
+            } else if (rawPunchCount > 0 && rawPunchCount < 4) {
+                marks.push(`<span class="extractor-status extractor-status-amber">${rawPunchCount} PUNCHES - ASSIGN LOGS AND ENTER MISSING TIME</span>`);
             }
             if (hasDuplicateSelection) {
                 marks.push('<span class="extractor-status extractor-status-red">DUPLICATE TIME SELECTED</span>');
@@ -2138,11 +2197,16 @@
             const employeeList = [];
             let processedDays = 0;
 
+            state.directorySearch = {};
             const directoryOptions = Object.entries(state.employeeDirectory)
                 .sort((a, b) => String(a[1].full_name || '').localeCompare(String(b[1].full_name || '')))
-                .map(([empId, employee]) =>
-                    `<option value="${escapeHtml(empId)}">${escapeHtml(employee.full_name)} — ${escapeHtml(empId)} — ${escapeHtml(employee.division)}</option>`
-                ).join('');
+                .map(([empId, employee]) => {
+                    const label = `${employee.full_name} — ${empId} — ${employee.division}`;
+                    state.directorySearch[label.trim().toLowerCase()] = empId;
+                    state.directorySearch[String(empId).trim().toLowerCase()] = empId;
+                    return `<option value="${escapeHtml(label)}"></option>`;
+                }).join('');
+            document.getElementById('extractorEmployeeDirectoryOptions').innerHTML = directoryOptions;
 
             Object.entries(state.hierarchy).forEach(([division, employees]) => {
                 Object.entries(employees).forEach(([empId, employee]) => {
@@ -2160,9 +2224,25 @@
                 const { division, empId, employee } = employeeList[employeeIndex];
                 const effectiveEmpId = employee.effective_emp_id || '';
                 if (division !== lastDivision) {
-                    html += `<tr class="extractor-division-row"><td colspan="7">DIVISION: ${escapeHtml(division)}</td></tr>`;
+                    html += `<div class="extractor-division-heading">DIVISION: ${escapeHtml(division)}</div>`;
                     lastDivision = division;
                 }
+
+                const displayName = employee.isUnidentified ? 'UNIDENTIFIED EMPLOYEE' : employee.full_name;
+                const displayEmpId = employee.isUnidentified ? employee.raw_emp_id : (effectiveEmpId || empId);
+                const shouldOpen = employeeIndex === 0 || employee.isUnidentified ? 'open' : '';
+                html += `<details class="extractor-month-card" ${shouldOpen}>
+                    <summary>
+                        <span>${escapeHtml(displayName)} <span class="text-xs font-normal text-gray-500">(${escapeHtml(displayEmpId)})</span></span>
+                        <span class="text-xs font-normal">${escapeHtml(state.context.targetMonth)} MONTHLY DTR</span>
+                    </summary>
+                    <div class="extractor-table-wrap">
+                        <table class="extractor-table">
+                            <thead><tr>
+                                <th style="width:110px;">Date</th><th style="width:100px;">Day</th>
+                                <th>AM In</th><th>AM Out</th><th>PM In</th><th>PM Out</th>
+                                <th style="width:390px;">Remarks</th>
+                            </tr></thead><tbody>`;
 
                 if (employee.isUnidentified) {
                     html += `<tr class="extractor-name-row">
@@ -2170,10 +2250,9 @@
                             <span class="text-[11px] tracking-widest">NAME:</span>
                             <span class="extractor-unidentified">UNIDENTIFIED EMPLOYEE</span>
                             <span class="text-xs font-normal text-red-700 ml-2">(BIOMETRIC ID: ${escapeHtml(employee.raw_emp_id)})</span>
-                            <select class="extractor-employee-locator" data-raw-emp="${escapeHtml(employee.raw_emp_id)}">
-                                <option value="">LOCATE EMPLOYEE FROM DARPO-CS1 LIST…</option>
-                                ${directoryOptions}
-                            </select>
+                            <input type="search" list="extractorEmployeeDirectoryOptions"
+                                class="extractor-employee-locator" data-raw-emp="${escapeHtml(employee.raw_emp_id)}"
+                                placeholder="TYPE EMPLOYEE NAME OR EMPLOYEE NUMBER…" autocomplete="off">
                         </td>
                     </tr>`;
                 } else {
@@ -2193,57 +2272,54 @@
                     const isCompressedFriday = dayOfWeek === 5 && !hasFriday && compressed;
                     const isNoWorkFriday = dayOfWeek === 5 && !hasFriday && !compressed;
 
-                    // Position determines the DTR slot: 1st IN, 2nd OUT,
-                    // 3rd IN (afternoon), and 4th OUT (afternoon).
+                    // Infer each DTR slot from its time band so a late punch,
+                    // such as 18:00, is never mistaken for lunch OUT.
                     const cleanLogs = [...dayData.logs]
                         .filter(log => normalizeDatTime(log.time))
                         .sort((a, b) => a.time.localeCompare(b.time))
                         .filter((log, index, logs) => index === 0 || log.time !== logs[index - 1].time);
                     const hasRedundantPunches = cleanLogs.length > 4;
-                    const slots = Array.from({ length: 4 }, (_, slotIndex) => {
-                        const log = cleanLogs[slotIndex];
-                        return log
-                            ? {
-                                time: log.time,
-                                device_id: log.device_id,
-                                status: expectedStatuses[slotIndex],
-                                sourceIndex: log.sourceIndex
-                            }
-                            : {
-                                time: '',
-                                device_id: 'Manual',
-                                status: expectedStatuses[slotIndex]
-                            };
-                    });
+                    const slots = inferPunchSlots(cleanLogs, expectedStatuses);
+                    const requiresHrReview = cleanLogs.length !== 4 || slots.some(slot => !slot.time);
 
                     const filled = slots.filter(slot => slot.time).length;
                     const hasTo = Array.isArray(dayData.to) ? dayData.to.length > 0 : Boolean(dayData.to);
                     const hasPso = Boolean(dayData.pso);
                     const hasNonWorkingHoliday = (dayData.holidays || []).some(holiday => !isSpecialWorkingDay(holiday));
-                    const canManualInput = filled < 4 && !employee.isUnidentified && !hasTo && !hasPso && !hasNonWorkingHoliday && !isWeekend && !isCompressedFriday && !isNoWorkFriday;
+                    const canManualInput = requiresHrReview && !employee.isUnidentified && !hasTo && !hasPso && !hasNonWorkingHoliday && !isWeekend && !isCompressedFriday && !isNoWorkFriday;
                     const dataEmpId = effectiveEmpId || employee.raw_emp_id || empId;
 
                     const renderedSlots = slots.map((slot, slotIndex) => {
-                        if (hasRedundantPunches) {
-                            const options = cleanLogs.map((log, logIndex) =>
-                                `<option value="${escapeHtml(log.time)}" data-device="${escapeHtml(log.device_id)}" data-source-index="${log.sourceIndex}" ${logIndex === slotIndex ? 'selected' : ''}>${escapeHtml(log.time)} — Device ${escapeHtml(log.device_id)}</option>`
+                        const hasDatSource = Number.isInteger(slot.sourceIndex);
+                        const lunchLimits = canManualInput && (slotIndex === 1 || slotIndex === 2)
+                            ? 'min="12:00" max="13:00" title="HR manual lunch entry: 12:00–1:00 PM"'
+                            : '';
+
+                        if (requiresHrReview) {
+                            const options = cleanLogs.map(log =>
+                                `<option value="${escapeHtml(log.time)}" data-device="${escapeHtml(log.device_id)}" data-source-index="${log.sourceIndex}" ${log.sourceIndex === slot.sourceIndex ? 'selected' : ''}>${escapeHtml(log.time)} — Device ${escapeHtml(log.device_id)}</option>`
                             ).join('');
-                            return `<select class="extractor-time-input extractor-time-select"
-                                data-division="${escapeHtml(division)}" data-internal-emp="${escapeHtml(empId)}"
-                                data-emp="${escapeHtml(dataEmpId)}" data-date="${date}"
-                                data-status="${expectedStatuses[slotIndex]}" data-original="${escapeHtml(slot.time)}">
-                                <option value="">-- Select time --</option>${options}
-                            </select>`;
+                            const manualState = canManualInput ? '' : 'readonly';
+                            const pickerState = employee.isUnidentified ? 'disabled' : '';
+                            return `<div class="extractor-slot-editor">
+                                <select class="extractor-punch-picker" ${pickerState} title="Assign a biometric punch to this DTR slot">
+                                    <option value="">MANUAL / LEAVE BLANK</option>${options}
+                                </select>
+                                <input type="time" step="1" class="extractor-time-input ${!hasDatSource && canManualInput ? 'extractor-manual-entry' : ''}"
+                                    data-division="${escapeHtml(division)}" data-internal-emp="${escapeHtml(empId)}"
+                                    data-emp="${escapeHtml(dataEmpId)}" data-date="${date}"
+                                    data-device="${escapeHtml(slot.device_id)}" data-status="${expectedStatuses[slotIndex]}"
+                                    data-source-index="${slot.sourceIndex ?? ''}" data-original="${escapeHtml(slot.time)}"
+                                    value="${escapeHtml(slot.time)}" ${lunchLimits} ${manualState}>
+                            </div>`;
                         }
 
-                        const hasDatSource = Number.isInteger(slot.sourceIndex);
-                        const inputState = hasDatSource ? 'readonly' : (canManualInput ? '' : 'disabled');
                         return `<input type="time" step="1" class="extractor-time-input"
                             data-division="${escapeHtml(division)}" data-internal-emp="${escapeHtml(empId)}"
                             data-emp="${escapeHtml(dataEmpId)}" data-date="${date}"
                             data-device="${escapeHtml(slot.device_id)}" data-status="${expectedStatuses[slotIndex]}"
                             data-source-index="${slot.sourceIndex ?? ''}" data-original="${escapeHtml(slot.time)}"
-                            value="${escapeHtml(slot.time)}" ${inputState}>`;
+                            value="${escapeHtml(slot.time)}" readonly>`;
                     });
 
                     let rowClass = '';
@@ -2260,6 +2336,8 @@
                     processedDays++;
                 }
 
+                html += `</tbody></table></div></details>`;
+
                 if ((employeeIndex + 1) % 20 === 0) {
                     tbody.insertAdjacentHTML('beforeend', html);
                     html = '';
@@ -2269,12 +2347,17 @@
             if (html) tbody.insertAdjacentHTML('beforeend', html);
 
             tbody.onchange = async (event) => {
-                const input = event.target;
+                let input = event.target;
 
                 if (input.matches('.extractor-employee-locator')) {
                     const rawEmpId = input.dataset.rawEmp;
-                    const selectedEmpId = input.value;
-                    if (!selectedEmpId || !state.employeeDirectory[selectedEmpId]) return;
+                    const searchValue = String(input.value || '').trim();
+                    const selectedEmpId = state.directorySearch[searchValue.toLowerCase()];
+                    if (!selectedEmpId || !state.employeeDirectory[selectedEmpId]) {
+                        showExtractorAlert('Select an employee from the search results using the employee name or employee number.');
+                        input.focus();
+                        return;
+                    }
                     state.resolutions[rawEmpId] = selectedEmpId;
                     rebuildExtractorHierarchy();
                     await renderExtractorTable();
@@ -2282,7 +2365,23 @@
                     return;
                 }
 
+                if (input.matches('.extractor-punch-picker')) {
+                    const timeInput = input.closest('.extractor-slot-editor')?.querySelector('.extractor-time-input');
+                    if (!timeInput) return;
+                    const selectedOption = input.options[input.selectedIndex];
+                    timeInput.value = input.value;
+                    timeInput.dataset.sourceIndex = selectedOption?.dataset.sourceIndex || '';
+                    timeInput.dataset.device = selectedOption?.dataset.device || 'Manual';
+                    input = timeInput;
+                }
+
                 if (!input.matches('.extractor-time-input')) return;
+                const sourcePicker = input.closest('.extractor-slot-editor')?.querySelector('.extractor-punch-picker');
+                if (sourcePicker && sourcePicker.value !== input.value) {
+                    sourcePicker.value = '';
+                    input.dataset.sourceIndex = '';
+                    input.dataset.device = 'Manual';
+                }
                 const row = input.closest('tr');
                 const dayData = state.hierarchy[input.dataset.division]?.[input.dataset.internalEmp]?.dates?.[input.dataset.date];
                 if (!dayData) return;
@@ -2335,6 +2434,7 @@
             state.schedules = {};
             state.datLogs = [];
             state.employeeDirectory = {};
+            state.directorySearch = {};
             state.resolutions = {};
             state.unresolvedIds = new Set();
             state.context = null;
@@ -2548,6 +2648,7 @@
                 state.schedules = {};
                 state.datLogs = [];
                 state.employeeDirectory = {};
+                state.directorySearch = {};
                 state.resolutions = {};
                 state.unresolvedIds = new Set();
                 state.context = null;
