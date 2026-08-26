@@ -134,7 +134,8 @@
      *   - The same Supabase project and publishable key are used.
      *   - Employees are matched by employees.emp_id.
      *
-     * Run db/flag-ceremony.sql once to create the flag_ceremonies settings table.
+     * Ceremony settings are stored on this HR workstation. No additional table
+     * is required; attendance records continue to use flag_attendance only.
      */
     const SUPABASE_URL = window.SUPABASE_URL || window.SUPABASE_CONFIG?.url || window.supabaseConfig?.url || 'https://xnwttnpfzcjbszwxsgox.supabase.co';
     const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || window.SUPABASE_CONFIG?.anonKey || window.SUPABASE_CONFIG?.publishableKey || window.supabaseConfig?.anonKey || 'sb_publishable_zEh0y_OAF7nVwLBuTTB74w_gPX0XomI';
@@ -162,16 +163,11 @@
     }
     const setBox = (id, html, type) => { const el = document.getElementById(id); el.className = `notice notice-${type || 'error'}`; el.innerHTML = html; el.classList.remove('hidden'); };
     const clearBox = (id) => { const el = document.getElementById(id); el.classList.add('hidden'); el.innerHTML = ''; };
-    const isRejected = (error) => /relation .*does not exist|could not find the table|schema cache/i.test(String(error?.message || error || ''));
+    const settingsKey = (date) => `dar_flag_ceremony_settings_${date}`;
+    const storedCeremony = (date) => { try { const saved = JSON.parse(localStorage.getItem(settingsKey(date)) || 'null'); return { ...fallbackCeremony(date), ...(saved || {}) }; } catch (_) { return fallbackCeremony(date); } };
+    const saveStoredCeremony = (ceremony) => localStorage.setItem(settingsKey(ceremony.ceremony_date), JSON.stringify(ceremony));
 
-    async function loadCeremony(showMessage) {
-      const date = state.mode === 'hr' ? document.getElementById('hrDate').value : today();
-      const { data, error } = await db.from('flag_ceremonies').select('id,ceremony_date,ceremony_time,allowance_minutes,announcement,is_open').eq('ceremony_date', date).limit(1).maybeSingle();
-      if (error && !isRejected(error)) { if (showMessage) setBox('globalNotice', esc(error.message), 'error'); state.ceremony = fallbackCeremony(date); }
-      else state.ceremony = data ? { ...data, ceremony_date: String(data.ceremony_date).slice(0,10), ceremony_time: normalTime(data.ceremony_time).slice(0,5), allowance_minutes: Number(data.allowance_minutes ?? 10), announcement: data.announcement || '', is_open: data.is_open !== false } : fallbackCeremony(date);
-      if (error && isRejected(error)) setBox('globalNotice', '<strong>Setup required:</strong> Run the supplied <code>flag-ceremony.sql</code> once to enable HR ceremony settings. Employee records still use <code>flag_attendance</code>.', 'warn');
-      renderCeremony();
-    }
+    async function loadCeremony(showMessage) { const date = state.mode === 'hr' ? document.getElementById('hrDate').value : today(); state.ceremony = storedCeremony(date); renderCeremony(); }
 
     function renderCeremony() {
       const c = state.ceremony || fallbackCeremony(today());
@@ -245,7 +241,7 @@
 
     async function saveCeremony(event) {
       event.preventDefault(); const button = document.getElementById('saveBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Saving'; clearBox('hrNotice'); const date = document.getElementById('hrDate').value; const payload = { ceremony_date: date, ceremony_time: `${document.getElementById('hrTime').value || '08:00'}:00`, allowance_minutes: Math.max(0, Math.min(180, Number(document.getElementById('hrAllowance').value) || 0)), announcement: document.getElementById('hrAnnouncement').value.trim(), is_open: document.getElementById('hrOpen').checked, created_by: state.user?.username || state.user?.full_name || 'HRMO' };
-      const result = await db.from('flag_ceremonies').upsert(payload, { onConflict: 'ceremony_date' }).select().maybeSingle(); if (result.error) setBox('hrNotice', esc(result.error.message), 'error'); else { state.ceremony = { ...payload, ceremony_time: payload.ceremony_time.slice(0,5) }; setBox('hrNotice', `✓ Ceremony settings saved for ${esc(dateLabel(date))}.`, 'success'); renderCeremony(); await loadHrRecords(); } button.disabled = false; button.innerHTML = '✓ Save ceremony settings';
+      state.ceremony = { ...payload, ceremony_time: payload.ceremony_time.slice(0,5) }; saveStoredCeremony(state.ceremony); setBox('hrNotice', `✓ Ceremony settings saved on this HR workstation for ${esc(dateLabel(date))}.`, 'success'); renderCeremony(); await loadHrRecords(); button.disabled = false; button.innerHTML = '✓ Save ceremony settings';
     }
     async function loadHrRecords() { const date = document.getElementById('hrDate').value || today(); const result = await db.from('flag_attendance').select('emp_id,date,time_in,last_name,first_name,division,status').eq('date', date).order('time_in', { ascending: true }); if (result.error) { setBox('hrNotice', esc(result.error.message), 'error'); state.records = []; } else state.records = result.data || []; renderRecords(); }
     function renderRecords() { const filter = String(document.getElementById('recordSearch').value || '').toLowerCase().trim(); const rows = state.records.filter((record) => !filter || [record.emp_id, record.first_name, record.last_name, record.division].some((value) => String(value || '').toLowerCase().includes(filter))); const present = state.records.filter((r) => String(r.status).toUpperCase() === 'PRESENT').length; const late = state.records.filter((r) => String(r.status).toUpperCase() === 'LATE').length; document.getElementById('countTotal').textContent = state.records.length; document.getElementById('countPresent').textContent = present; document.getElementById('countLate').textContent = late; document.getElementById('recordsLabel').textContent = `${dateLabel(document.getElementById('hrDate').value)} · ${state.records.length} saved record(s)`; document.getElementById('recordsBody').innerHTML = rows.length ? rows.map((r) => { const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.emp_id; const isLate = String(r.status).toUpperCase() === 'LATE'; return `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><p class="font-bold text-slate-800">${esc(name)}</p><p class="font-mono text-xs text-slate-500">${esc(r.emp_id)}</p></td><td class="px-5 py-4 text-slate-600">${esc(r.division || '—')}</td><td class="px-5 py-4 font-mono text-slate-700">${esc(time12(r.time_in))}</td><td class="px-5 py-4"><span class="pill ${isLate ? 'pill-late' : 'pill-present'}">${isLate ? 'LATE' : 'PRESENT'}</span></td></tr>`; }).join('') : '<tr><td colspan="4" class="px-5 py-16 text-center text-slate-400">No attendance records for this ceremony yet.</td></tr>'; }
