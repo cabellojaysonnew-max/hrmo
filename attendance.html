@@ -122,6 +122,7 @@
             <button onclick="switchTab('extractor')" id="tab-extractor" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">DTR Log Extractor</button>
             <button onclick="switchTab('f48')" id="tab-f48" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Form 48 Generator</button>
             <button onclick="switchTab('deduction')" id="tab-deduction" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Deduction</button>
+            <button onclick="switchTab('flag')" id="tab-flag" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Flag Convocation</button>
         </div>
 
         <div id="module-logs" class="flex-1 flex flex-col p-8 overflow-hidden">
@@ -352,6 +353,43 @@
             </div>
         </div>
 
+        <div id="module-flag" class="hidden flex-1 p-8 overflow-y-auto">
+            <div class="card p-6 border-t-4 border-[#003811]">
+                <div class="mb-6 border-b pb-4 flex justify-between items-end">
+                    <div>
+                        <h3 class="text-2xl font-bold text-[#003811]">Flag Convocation Summary</h3>
+                        <p class="text-sm text-gray-500 mt-1">Generate summary of flag ceremony attendance across all stations per division.</p>
+                    </div>
+                    <div class="flex gap-4 items-end">
+                        <div>
+                            <label class="form-label">Select Date</label>
+                            <input type="date" id="flagDate" class="form-input h-[36px]">
+                        </div>
+                        <button onclick="generateFlagView()" class="bg-[#003811] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-[#006400] h-[36px]">GENERATE</button>
+                        <button onclick="printFlagPDF()" id="btnFlagPrint" class="bg-[#1976D2] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-blue-800 shadow-sm h-[36px]">PRINT PDF</button>
+                    </div>
+                </div>
+                <div class="overflow-auto scroll-list" style="max-height: 600px;">
+                    <table class="w-full text-xs text-left" id="tblFlag">
+                        <thead class="bg-[#003811] text-white sticky top-0 z-10">
+                            <tr>
+                                <th class="p-3 font-bold border-b">NAME</th>
+                                <th class="p-3 font-bold border-b text-center">ATTENDANCE LOG</th>
+                                <th class="p-3 font-bold border-b text-center">FLAG CEREMONY LOG</th>
+                                <th class="p-3 font-bold border-b text-center">TRAVEL ORDER</th>
+                                <th class="p-3 font-bold border-b text-center">LEAVE</th>
+                                <th class="p-3 font-bold border-b text-center">PSO</th>
+                                <th class="p-3 font-bold border-b">REMARKS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="flagTableBody" class="divide-y">
+                            <tr><td colspan="7" class="p-8 text-center text-gray-400 italic">Select a date and click Generate...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <div id="modalManual" class="fixed inset-0 modal-bg hidden z-50 flex items-center justify-center">
@@ -441,6 +479,26 @@
         </div>
     </div>
 
+    <div id="modalExtractorAuth" class="fixed inset-0 modal-bg hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-2xl w-[400px]">
+            <div class="px-6 py-4 bg-[#003811] text-white rounded-t-lg flex justify-between items-center">
+                <h3 class="font-bold text-lg">Authorize DTR Posting</h3>
+                <button onclick="closeModal('modalExtractorAuth')" class="text-white hover:text-gray-300 font-bold text-xl">&times;</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-gray-600">Please enter your HR password to authorize posting these extracted logs to the database.</p>
+                <div class="bg-gray-50 p-4 border rounded mt-2">
+                    <label class="form-label text-[#003811]">HR Password</label>
+                    <input type="password" id="extractorAuthPass" class="form-input" placeholder="Enter Password...">
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
+                <button onclick="closeModal('modalExtractorAuth')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded font-bold text-sm hover:bg-gray-400">CANCEL</button>
+                <button id="btnSubmitExtractorAuth" class="px-4 py-2 bg-[#D4AF37] text-[#003811] rounded font-bold text-sm shadow hover:bg-yellow-500">AUTHORIZE & POST</button>
+            </div>
+        </div>
+    </div>
+
 <script>
     const userData = sessionStorage.getItem('currentUser');
     if (!userData) window.location.href = 'index.html';
@@ -465,11 +523,13 @@
         document.getElementById('module-extractor').classList.add('hidden');
         document.getElementById('module-f48').classList.add('hidden');
         document.getElementById('module-deduction').classList.add('hidden');
+        document.getElementById('module-flag').classList.add('hidden');
         
         document.getElementById('tab-logs').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg';
         document.getElementById('tab-extractor').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
         document.getElementById('tab-f48').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
         document.getElementById('tab-deduction').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
+        document.getElementById('tab-flag').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
 
         if (tab === 'logs') {
             document.getElementById('module-logs').classList.remove('hidden');
@@ -486,6 +546,10 @@
             document.getElementById('module-deduction').classList.remove('hidden');
             document.getElementById('module-deduction').classList.add('flex');
             document.getElementById('tab-deduction').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
+        } else if (tab === 'flag') {
+            document.getElementById('module-flag').classList.remove('hidden');
+            document.getElementById('module-flag').classList.add('flex');
+            document.getElementById('tab-flag').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
         }
     }
 
@@ -497,6 +561,7 @@
         const today = new Date();
         document.getElementById('mDate').value = today.toISOString().split('T')[0];
         document.getElementById('printDailyDate').value = today.toISOString().split('T')[0];
+        document.getElementById('flagDate').value = today.toISOString().split('T')[0];
         document.getElementById('extractorTargetMonth').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
         const currYear = today.getFullYear();
@@ -1811,6 +1876,206 @@
             btn.disabled = false; btn.innerText = "PRINT DEDUCTION SUMMARY";
         }
     }
+
+    // ==========================================
+    // FLAG CONVOCATION LOGIC
+    // ==========================================
+    let flagDataCache = {}; 
+
+    async function generateFlagView() {
+        const dStr = document.getElementById('flagDate').value;
+        if (!dStr) return alert("Please select a date.");
+
+        const tbody = document.getElementById('flagTableBody');
+        tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-[#D4AF37] font-bold">Fetching Data...</td></tr>';
+        flagDataCache = {};
+
+        try {
+            const [empRes, attRes, flagRes, toRes, itinRes, psoRes, leaveRes] = await Promise.all([
+                fetchSafe(supabaseClient.from('employees').select('emp_id, full_name, division, flexi_range_start')),
+                fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', dStr + "T00:00:00").lte('log_time', dStr + "T23:59:59").order('log_time', {ascending: true})),
+                fetchSafe(supabaseClient.from('flag_attendance').select('emp_id, time_in, status').eq('date', dStr)),
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')),
+                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').eq('travel_date', dStr)),
+                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', dStr).gte('end_date', dStr)),
+                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type').eq('transaction_t', 'APPROVED').eq('date', dStr))
+            ]);
+
+            const attMap = {};
+            (attRes.data || []).forEach(l => {
+                if (!attMap[l.emp_id]) attMap[l.emp_id] = [];
+                attMap[l.emp_id].push(new Date(l.log_time));
+            });
+
+            const flagMap = {};
+            (flagRes.data || []).forEach(f => {
+                flagMap[f.emp_id] = f;
+            });
+
+            const toSet = new Set();
+            (itinRes.data || []).forEach(i => {
+                const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
+                empsOnTO.forEach(t => toSet.add(t.emp_id));
+            });
+
+            const psoSet = new Set((psoRes.data || []).map(p => p.emp_id));
+            const leaveMap = {};
+            (leaveRes.data || []).forEach(l => leaveMap[l.emp_id] = l.type);
+
+            const emps = empRes.data || [];
+            const byDiv = {};
+
+            emps.forEach(e => {
+                const div = (e.division || 'UNASSIGNED').toUpperCase();
+                if (!byDiv[div]) byDiv[div] = [];
+
+                let remarks = "";
+                let attLogDisplay = "-";
+                let flagLogDisplay = "-";
+                let toDisplay = toSet.has(e.emp_id) ? "YES" : "-";
+                let leaveDisplay = leaveMap[e.emp_id] || "-";
+                let psoDisplay = psoSet.has(e.emp_id) ? "YES" : "-";
+
+                const aLogs = attMap[e.emp_id] || [];
+                const fLog = flagMap[e.emp_id];
+
+                if (aLogs.length > 0) {
+                    attLogDisplay = formatTime12(aLogs[0]);
+                }
+                
+                if (fLog) {
+                    flagLogDisplay = fLog.time_in ? formatTime12(new Date(`${dStr}T${fLog.time_in}`)) : "YES";
+                    if(!fLog.time_in && fLog.status) flagLogDisplay = fLog.status;
+                }
+
+                let isLate = false;
+                const cutoff = new Date(`${dStr}T08:00:00`); 
+
+                if (aLogs.length > 0 && aLogs[0] > cutoff) isLate = true;
+                if (fLog && fLog.time_in && new Date(`${dStr}T${fLog.time_in}`) > cutoff) isLate = true;
+                if (fLog && fLog.status && fLog.status.toUpperCase() === 'LATE') isLate = true;
+
+                if (toDisplay === "YES") {
+                    remarks = "ON TRAVEL";
+                } else if (psoDisplay === "YES") {
+                    remarks = "WITH PSO/RSO/SO";
+                } else if (leaveDisplay !== "-") {
+                    remarks = `ON LEAVE (${leaveDisplay})`;
+                } else {
+                    if (fLog && !isLate) {
+                        remarks = "Present and Attended Flag Ceremony";
+                    } else if (fLog && isLate) {
+                        remarks = "Late and Attended Flag Ceremony";
+                    } else if (!fLog && aLogs.length > 0 && !isLate) {
+                        remarks = "Present but did not attend Flag Ceremony";
+                    } else if (!fLog && aLogs.length > 0 && isLate) {
+                        remarks = "Late and did not attend Flag Ceremony";
+                    } else {
+                        remarks = "ABSENT";
+                    }
+                }
+
+                byDiv[div].push({
+                    name: e.full_name,
+                    attLog: attLogDisplay,
+                    flagLog: flagLogDisplay,
+                    to: toDisplay,
+                    leave: leaveDisplay,
+                    pso: psoDisplay,
+                    remarks: remarks
+                });
+            });
+
+            let html = '';
+            const sortedDivs = Object.keys(byDiv).sort();
+            sortedDivs.forEach(div => {
+                html += `<tr class="bg-[#003811] text-[#D4AF37]"><td colspan="7" class="p-2 font-bold uppercase tracking-widest">${div}</td></tr>`;
+                byDiv[div].sort((a,b) => a.name.localeCompare(b.name)).forEach(r => {
+                    let rmClass = "";
+                    if(r.remarks.includes("Late")) rmClass = "text-orange-600 font-bold";
+                    if(r.remarks === "ABSENT") rmClass = "text-red-600 font-bold italic";
+                    if(r.remarks === "Present and Attended Flag Ceremony") rmClass = "text-green-700 font-bold";
+                    if(r.remarks.includes("did not attend")) rmClass = "text-red-500 font-bold";
+
+                    html += `<tr class="hover:bg-gray-50 border-b">
+                        <td class="p-2 font-medium">${r.name}</td>
+                        <td class="p-2 text-center font-mono">${r.attLog}</td>
+                        <td class="p-2 text-center font-mono">${r.flagLog}</td>
+                        <td class="p-2 text-center">${r.to}</td>
+                        <td class="p-2 text-center">${r.leave}</td>
+                        <td class="p-2 text-center">${r.pso}</td>
+                        <td class="p-2 ${rmClass}">${r.remarks}</td>
+                    </tr>`;
+                });
+            });
+
+            tbody.innerHTML = html;
+            flagDataCache = byDiv;
+
+        } catch (error) {
+            tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-red-600">Error: ${error.message}</td></tr>`;
+        }
+    }
+
+    async function printFlagPDF() {
+        if (!flagDataCache || Object.keys(flagDataCache).length === 0) {
+            return alert("Please generate the view first before printing.");
+        }
+        const dStr = document.getElementById('flagDate').value;
+        const formattedDate = new Date(dStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4'); 
+
+        let isFirst = true;
+        for (const div in flagDataCache) {
+            if (!isFirst) doc.addPage();
+            isFirst = false;
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+            doc.text(`FLAG CONVOCATION SUMMARY - ${div}`, 148.5, 15, { align: "center" });
+            doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+            doc.text(`Date: ${formattedDate}`, 148.5, 22, { align: "center" });
+
+            let yPos = 35;
+            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+            doc.rect(10, yPos, 70, 6); doc.text("NAME", 45, yPos + 4, { align: "center" });
+            doc.rect(80, yPos, 25, 6); doc.text("ATT LOG", 92.5, yPos + 4, { align: "center" });
+            doc.rect(105, yPos, 25, 6); doc.text("FLAG LOG", 117.5, yPos + 4, { align: "center" });
+            doc.rect(130, yPos, 20, 6); doc.text("T.O.", 140, yPos + 4, { align: "center" });
+            doc.rect(150, yPos, 20, 6); doc.text("LEAVE", 160, yPos + 4, { align: "center" });
+            doc.rect(170, yPos, 20, 6); doc.text("PSO", 180, yPos + 4, { align: "center" });
+            doc.rect(190, yPos, 90, 6); doc.text("REMARKS", 235, yPos + 4, { align: "center" });
+
+            yPos += 6;
+            doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+
+            flagDataCache[div].forEach(r => {
+                doc.rect(10, yPos, 70, 6); doc.text(r.name.substring(0, 45), 12, yPos + 4);
+                doc.rect(80, yPos, 25, 6); doc.text(r.attLog, 92.5, yPos + 4, { align: "center" });
+                doc.rect(105, yPos, 25, 6); doc.text(r.flagLog, 117.5, yPos + 4, { align: "center" });
+                doc.rect(130, yPos, 20, 6); doc.text(r.to, 140, yPos + 4, { align: "center" });
+                doc.rect(150, yPos, 20, 6); doc.text(r.leave, 160, yPos + 4, { align: "center" });
+                doc.rect(170, yPos, 20, 6); doc.text(r.pso, 180, yPos + 4, { align: "center" });
+                doc.rect(190, yPos, 90, 6); doc.text(r.remarks.substring(0, 55), 192, yPos + 4);
+
+                yPos += 6;
+                if (yPos > 185) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+            });
+
+            yPos += 15;
+            doc.text("Certified Correct:", 15, yPos);
+            yPos += 15;
+            doc.text("_______________________", 15, yPos);
+            doc.text("HR Officer Signature", 15, yPos + 5);
+        }
+
+        doc.save(`Flag_Summary_${dStr}.pdf`);
+    }
+
     // DTR LOG EXTRACTOR TAB
     // ================================================================
     (() => {
@@ -2096,10 +2361,8 @@
             });
             const afterLunch = sorted.filter(log => log.time.slice(0, 5) > '13:00');
 
-            // Earliest morning punch is morning IN.
             assign(0, beforeLunch[0]);
 
-            // Lunch punches are mapped within the 12:00–1:00 PM window.
             if (lunchRange.length >= 2) {
                 assign(1, lunchRange[0]);
                 assign(2, lunchRange[lunchRange.length - 1]);
@@ -2107,8 +2370,6 @@
                 assign(lunchRange[0].time.slice(0, 5) < '12:30' ? 1 : 2, lunchRange[0]);
             }
 
-            // A second pre-noon punch is the best available lunch OUT only
-            // when there is no punch within the normal lunch window.
             if (!slots[1] && beforeLunch.length > 1 && lunchRange.length === 0) {
                 assign(1, beforeLunch[beforeLunch.length - 1]);
             }
@@ -2117,8 +2378,6 @@
                 assign(2, afterLunch[0]);
                 assign(3, afterLunch[afterLunch.length - 1]);
             } else if (afterLunch.length === 1) {
-                // A lone late punch (for example, 18:00) is afternoon OUT.
-                // An early-afternoon punch is more likely afternoon IN.
                 const slotIndex = afterLunch[0].time.slice(0, 5) >= '15:00' ? 3 : 2;
                 assign(slotIndex, afterLunch[0]);
             }
@@ -2153,7 +2412,6 @@
                 marks.push('<span class="extractor-status extractor-status-red">DUPLICATE TIME SELECTED</span>');
             }
 
-            // Lunch OUT and afternoon IN are normally within 12:00–1:00 PM.
             const withinLunchRange = (time) => {
                 const hhmm = String(time || '').slice(0, 5);
                 return hhmm >= '12:00' && hhmm <= '13:00';
@@ -2272,8 +2530,6 @@
                     const isCompressedFriday = dayOfWeek === 5 && !hasFriday && compressed;
                     const isNoWorkFriday = dayOfWeek === 5 && !hasFriday && !compressed;
 
-                    // Infer each DTR slot from its time band so a late punch,
-                    // such as 18:00, is never mistaken for lunch OUT.
                     const cleanLogs = [...dayData.logs]
                         .filter(log => normalizeDatTime(log.time))
                         .sort((a, b) => a.time.localeCompare(b.time))
@@ -2582,20 +2838,36 @@
             }
         });
 
-        document.getElementById('extractorUploadBtn').addEventListener('click', async () => {
-            const button = document.getElementById('extractorUploadBtn');
-            button.disabled = true;
-            button.textContent = 'VERIFYING SESSION...';
+        document.getElementById('extractorUploadBtn').addEventListener('click', () => {
+            document.getElementById('extractorAuthPass').value = '';
+            document.getElementById('modalExtractorAuth').classList.remove('hidden');
+        });
+
+        document.getElementById('btnSubmitExtractorAuth').addEventListener('click', async () => {
+            const pass = document.getElementById('extractorAuthPass').value;
+            if (!pass) return alert("HR Password required to post data.");
+
+            const authBtn = document.getElementById('btnSubmitExtractorAuth');
+            authBtn.disabled = true;
+            authBtn.textContent = 'VERIFYING...';
 
             try {
+                const { data: u, error } = await supabaseClient.from('users').select('password').eq('username', currentUser.username).single();
+                if (error || !u) throw new Error("Authentication failed.");
+                if (u.password !== pass) throw new Error("Invalid Password.");
+
+                closeModal('modalExtractorAuth');
+
+                const button = document.getElementById('extractorUploadBtn');
+                button.disabled = true;
+                button.textContent = 'POSTING...';
+                
                 const verifiedProfile = await requireActiveAttendanceSession();
                 const nowIso = new Date().toISOString();
                 if (state.unresolvedIds.size) {
                     throw new Error(`Please locate all ${state.unresolvedIds.size} unidentified biometric employee number(s) before posting.`);
                 }
 
-                // Post only the four reviewed DTR slots. Extra raw punches are
-                // excluded after HR selects the correct time for each slot.
                 const payload = [];
                 const selectedPunches = new Set();
                 document.querySelectorAll('#extractorPreviewBody .extractor-time-input').forEach(input => {
@@ -2621,7 +2893,7 @@
                         log_time: `${cleanDate} ${cleanTime}`,
                         device_id: hasSource ? (selectedOption?.dataset.device || input.dataset.device || 'Biometric') : 'Manual',
                         status: String(input.dataset.status || '').trim(),
-                        manual_log_name: hasSource ? null : (verifiedProfile.full_name || verifiedProfile.username),
+                        manual_log_name: hasSource ? null : currentUser.username,
                         manual_log_date: hasSource ? null : nowIso
                     });
                 });
@@ -2635,11 +2907,11 @@
                 for (let index = 0; index < finalPayload.length; index += batchSize) {
                     const batch = finalPayload.slice(index, index + batchSize);
                     button.textContent = `POSTING ${Math.min(index + batch.length, finalPayload.length)} OF ${finalPayload.length}...`;
-                    const { error } = await runWithTimeout(
+                    const { error: insErr } = await runWithTimeout(
                         supabaseClient.from('attendance_logs').insert(batch),
                         `Attendance upload batch ${Math.floor(index / batchSize) + 1}`
                     );
-                    if (error) throw error;
+                    if (insErr) throw insErr;
                     await yieldToBrowser();
                 }
 
@@ -2659,6 +2931,9 @@
                 console.error('Extractor upload error:', error);
                 showExtractorAlert(error.message || 'The attendance logs could not be posted.');
             } finally {
+                authBtn.disabled = false;
+                authBtn.textContent = 'AUTHORIZE & POST';
+                const button = document.getElementById('extractorUploadBtn');
                 button.disabled = false;
                 button.textContent = 'POST EXTRACTED LOGS';
             }
