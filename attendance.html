@@ -1924,9 +1924,8 @@
                 fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')),
                 fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').eq('travel_date', dStr)),
                 fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', dStr).gte('end_date', dStr)),
-                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type').eq('transaction_t', 'APPROVED').eq('date', dStr))
+                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type, transaction_t').in('transaction_t', ['APPROVED', 'PENDING']).eq('date', dStr))
             ]);
-
             const attMap = {};
             (attRes.data || []).forEach(l => {
                 if (!attMap[l.emp_id]) attMap[l.emp_id] = [];
@@ -1946,7 +1945,7 @@
 
             const psoSet = new Set((psoRes.data || []).map(p => p.emp_id));
             const leaveMap = {};
-            (leaveRes.data || []).forEach(l => leaveMap[l.emp_id] = l.type);
+            (leaveRes.data || []).forEach(l => leaveMap[l.emp_id] = { type: l.type, status: l.transaction_t });
 
             const emps = empRes.data || [];
             const byDiv = {};
@@ -1955,13 +1954,15 @@
                 const div = (e.division || 'UNASSIGNED').toUpperCase();
                 if (!byDiv[div]) byDiv[div] = [];
 
+    
                 let remarks = "";
                 let attLogDisplay = "-";
                 let flagLogDisplay = "-";
                 let toDisplay = toSet.has(e.emp_id) ? "YES" : "-";
-                let leaveDisplay = leaveMap[e.emp_id] || "-";
+                let leaveData = leaveMap[e.emp_id];
+                let leaveDisplay = leaveData ? leaveData.type : "-";
                 let psoDisplay = psoSet.has(e.emp_id) ? "YES" : "-";
-
+                
                 const aLogs = attMap[e.emp_id] || [];
                 const fLog = flagMap[e.emp_id];
 
@@ -1996,11 +1997,10 @@
                     remarks = "ON TRAVEL";
                 } else if (psoDisplay === "YES") {
                     remarks = "WITH PSO/RSO/SO";
-                } else if (leaveDisplay !== "-") {
-                    remarks = `ON LEAVE (${leaveDisplay})`;
+                } else if (leaveData) {
+                    remarks = leaveData.status === 'PENDING' ? `PENDING LEAVE APPLICATION (${leaveDisplay})` : `ON LEAVE (${leaveDisplay})`;
                 } else {
                     const attendedFlag = fLog && !isFlagAbsent;
-
                     if (attendedFlag && !isLate) {
                         remarks = "Present and Attended Flag Ceremony";
                     } else if (attendedFlag && isLate) {
@@ -2035,6 +2035,7 @@
                     if(r.remarks === "ABSENT") rmClass = "text-red-600 font-bold italic";
                     if(r.remarks === "Present and Attended Flag Ceremony") rmClass = "text-green-700 font-bold";
                     if(r.remarks.includes("did not attend")) rmClass = "text-red-500 font-bold";
+                    if(r.remarks.includes("PENDING LEAVE")) rmClass = "text-yellow-600 font-bold italic";
 
                     html += `<tr class="hover:bg-gray-50 border-b">
                         <td class="p-2 font-medium">${r.name}</td>
