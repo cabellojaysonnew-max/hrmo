@@ -46,10 +46,10 @@
       body { height: 100vh; overflow: hidden; }
       main { height: calc(100vh - 174px); overflow: hidden; padding-top: 22px !important; padding-bottom: 12px !important; }
       #employeeMode, #hrMode { height: 100%; min-height: 0; }
-      #employeeMode > .card, #employeeMode > .space-y-6 { min-height: 0; }
+      #employeeMode > .grid, #employeeMode > .space-y-6 { min-height: 0; }
       #hrMode { overflow: hidden; }
       #hrMode > .grid { min-height: 0; flex: 1; }
-      #hrMode .table-wrap { max-height: calc(100vh - 430px); }
+      #hrMode .table-wrap { max-height: calc(100vh - 300px); }
       footer { height: 34px; overflow: hidden; }
     }
     @media (max-width: 899px) { body { overflow-x: hidden; } }
@@ -88,46 +88,49 @@
   <main class="max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
     <div id="globalNotice" class="hidden mb-6"></div>
 
-    <section id="employeeMode" class="grid lg:grid-cols-[1.05fr_.95fr] gap-6">
-      <div class="card overflow-hidden">
-        <div class="p-6 sm:p-8 border-b border-slate-100">
-          <span class="pill bg-[#e9f1eb] text-[#003811]">EMPLOYEE CHECK-IN</span>
-          <h2 class="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-[#003811]">Record your Flag Ceremony attendance</h2>
-          <p class="mt-2 text-sm leading-6 text-slate-500">Scan the QR code on your employee ID or enter your employee number. Your profile will be shown before the attendance record is saved.</p>
-        </div>
-        <div class="p-6 sm:p-8 space-y-6">
-          <div class="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
-            <button id="manualModeBtn" class="rounded-lg px-3 py-2.5 text-sm font-bold bg-white text-[#003811] shadow-sm" onclick="setEntryMode('manual')">Manual employee ID</button>
-            <button id="qrModeBtn" class="rounded-lg px-3 py-2.5 text-sm font-bold text-slate-500" onclick="setEntryMode('qr')">▣ Scan QR code</button>
-          </div>
-          <div id="manualEntry" class="space-y-3">
-            <label for="employeeId" class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]">Employee number</label>
-            <form onsubmit="locateEmployee(event)" class="flex gap-2"><input id="employeeId" class="input h-12 text-base" autocomplete="off" placeholder="Enter employee ID"><button id="locateBtn" class="btn btn-green h-12 px-5" type="submit">⌕ Locate</button></form>
-          </div>
-          <div id="qrEntry" class="hidden space-y-3"><div id="qr-reader"></div><button class="btn btn-outline w-full" onclick="stopScanner()">✕ Stop camera</button><p id="qrStatus" class="text-xs text-slate-500 text-center"></p></div>
-          <div id="employeeNotice" class="hidden"></div>
-          <div id="employeeProfile" class="hidden rounded-2xl border border-[#d7e6da] bg-[#f5faf6] p-5"></div>
-        </div>
-      </div>
-
-      <div class="space-y-6">
-        <div class="card bg-[#003811] text-white border-0 overflow-hidden"><div class="p-6 sm:p-8"><div class="flex items-center gap-2 text-[#D4AF37] text-xs font-extrabold uppercase tracking-[.18em]">◷ Current Flag Ceremony</div><p id="ceremonyDateLabel" class="mt-5 text-2xl sm:text-3xl font-extrabold"></p><div class="mt-6 grid grid-cols-2 gap-3"><div class="rounded-xl border border-white/15 bg-white/10 p-4"><span class="block text-[10px] uppercase tracking-wider text-white/60 font-bold">Ceremony time</span><span id="ceremonyTimeLabel" class="block mt-1 text-2xl font-extrabold text-[#D4AF37]"></span></div><div class="rounded-xl border border-white/15 bg-white/10 p-4"><span class="block text-[10px] uppercase tracking-wider text-white/60 font-bold">Allowance</span><span id="ceremonyAllowanceLabel" class="block mt-1 text-2xl font-extrabold text-[#D4AF37]"></span></div></div><div class="mt-6 flex items-start gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm leading-6"><span class="text-[#D4AF37]">▸</span><p id="ceremonyAnnouncement"></p></div><div class="mt-5 pt-4 border-t border-white/15 flex justify-between items-center text-xs"><span>Check-in status</span><span id="ceremonyOpenLabel" class="pill"></span></div></div></div>
-        <div class="card"><div class="p-5 flex items-start gap-3 text-sm text-slate-600 leading-6"><span class="text-[#003811]">●</span><p>The system matches your employee number with the official <strong>employee</strong> table before showing your profile and saving your record.</p></div></div>
-        <button onclick="loadCeremony(true)" class="btn btn-outline w-full no-print">↻ Refresh ceremony notice</button>
-      </div>
-    </section>
-
-    <section id="hrMode" class="hidden space-y-6">
-      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><span class="pill bg-[#e9f1eb] text-[#003811]">HR CONSOLE</span><h2 class="mt-3 text-3xl font-extrabold tracking-tight text-[#003811]">Flag Ceremony monitoring</h2><p id="hrSignedIn" class="mt-2 text-sm text-slate-500"></p></div><button class="btn btn-outline no-print" onclick="loadHrRecords()">↻ Refresh records</button></div>
-      <div id="hrNotice" class="hidden"></div>
-
-      <!-- NEW: DASHBOARD MONITORING -->
+    <section id="employeeMode" class="flex flex-col gap-6">
+      
+      <!-- REAL-TIME DASHBOARD MONITORING ON MAIN PAGE -->
       <div id="divisionDashboard" class="flex flex-wrap gap-8 justify-center py-8 px-6 bg-white rounded-2xl border border-slate-200 shadow-sm no-print items-center min-h-[160px] overflow-x-auto">
       </div>
 
-      <div class="grid xl:grid-cols-[380px_1fr] gap-6">
-        <div class="card"><div class="p-6 border-b border-slate-100"><h3 class="font-extrabold text-lg text-[#003811]">⚙ Ceremony settings</h3><p class="text-sm text-slate-500 mt-1">Set the time, allowable allowance and announcement for the selected date.</p></div><form onsubmit="saveCeremony(event)" class="p-6 space-y-5"><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrDate">Ceremony date</label><input id="hrDate" type="date" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrTime">Flag Ceremony time</label><input id="hrTime" type="time" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAllowance">Allowable allowance (minutes)</label><input id="hrAllowance" type="number" min="0" max="180" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAnnouncement">Announcement</label><textarea id="hrAnnouncement" rows="4" class="input mt-2 resize-y" placeholder="Write the message employees will see..."></textarea></div><label class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer"><span><span class="block font-bold text-sm">Allow employee check-in</span><span class="block text-xs text-slate-500 mt-1">Close this after the ceremony.</span></span><input id="hrOpen" type="checkbox" class="w-5 h-5 accent-[#003811]"></label><button id="saveBtn" class="btn btn-green w-full h-11" type="submit">✓ Save ceremony settings</button></form></div>
-        <div class="space-y-6"><div class="grid sm:grid-cols-3 gap-3"><div class="rounded-2xl bg-[#e9f1eb] text-[#003811] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Total checked in</p><p id="countTotal" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-[#fbf4d9] text-[#7a5c00] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Present</p><p id="countPresent" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-red-50 text-red-800 px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Late</p><p id="countLate" class="mt-1 text-3xl font-extrabold">0</p></div></div><div class="card overflow-hidden"><div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-end justify-between gap-3"><div><h3 class="font-extrabold text-lg text-[#003811]">Attendance records</h3><p id="recordsLabel" class="text-sm text-slate-500 mt-1"></p></div><input id="recordSearch" oninput="renderRecords()" class="input sm:w-52" placeholder="Search records"></div><div class="table-wrap"><table class="w-full min-w-[680px] text-left text-sm"><thead class="sticky top-0 bg-[#003811] text-white text-xs uppercase tracking-wider"><tr><th class="px-5 py-3">Employee</th><th class="px-5 py-3">Division</th><th class="px-5 py-3">Time in</th><th class="px-5 py-3">Status</th></tr></thead><tbody id="recordsBody" class="divide-y divide-slate-100"></tbody></table></div></div></div></div>
+      <div class="grid lg:grid-cols-[1.05fr_.95fr] gap-6 flex-1 min-h-0">
+        <div class="card overflow-hidden flex flex-col">
+          <div class="p-6 sm:p-8 border-b border-slate-100">
+            <span class="pill bg-[#e9f1eb] text-[#003811]">EMPLOYEE CHECK-IN</span>
+            <h2 class="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-[#003811]">Record your Flag Ceremony attendance</h2>
+            <p class="mt-2 text-sm leading-6 text-slate-500">Scan the QR code on your employee ID or enter your employee number. Your profile will be shown before the attendance record is saved.</p>
+          </div>
+          <div class="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1">
+            <div class="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+              <button id="manualModeBtn" class="rounded-lg px-3 py-2.5 text-sm font-bold bg-white text-[#003811] shadow-sm" onclick="setEntryMode('manual')">Manual employee ID</button>
+              <button id="qrModeBtn" class="rounded-lg px-3 py-2.5 text-sm font-bold text-slate-500" onclick="setEntryMode('qr')">▣ Scan QR code</button>
+            </div>
+            <div id="manualEntry" class="space-y-3">
+              <label for="employeeId" class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]">Employee number</label>
+              <form onsubmit="locateEmployee(event)" class="flex gap-2"><input id="employeeId" class="input h-12 text-base" autocomplete="off" placeholder="Enter employee ID"><button id="locateBtn" class="btn btn-green h-12 px-5" type="submit">⌕ Locate</button></form>
+            </div>
+            <div id="qrEntry" class="hidden space-y-3"><div id="qr-reader"></div><button class="btn btn-outline w-full" onclick="stopScanner()">✕ Stop camera</button><p id="qrStatus" class="text-xs text-slate-500 text-center"></p></div>
+            <div id="employeeNotice" class="hidden"></div>
+            <div id="employeeProfile" class="hidden rounded-2xl border border-[#d7e6da] bg-[#f5faf6] p-5"></div>
+          </div>
+        </div>
+
+        <div class="space-y-6 flex flex-col">
+          <div class="card bg-[#003811] text-white border-0 overflow-hidden"><div class="p-6 sm:p-8"><div class="flex items-center gap-2 text-[#D4AF37] text-xs font-extrabold uppercase tracking-[.18em]">◷ Current Flag Ceremony</div><p id="ceremonyDateLabel" class="mt-5 text-2xl sm:text-3xl font-extrabold"></p><div class="mt-6 grid grid-cols-2 gap-3"><div class="rounded-xl border border-white/15 bg-white/10 p-4"><span class="block text-[10px] uppercase tracking-wider text-white/60 font-bold">Ceremony time</span><span id="ceremonyTimeLabel" class="block mt-1 text-2xl font-extrabold text-[#D4AF37]"></span></div><div class="rounded-xl border border-white/15 bg-white/10 p-4"><span class="block text-[10px] uppercase tracking-wider text-white/60 font-bold">Allowance</span><span id="ceremonyAllowanceLabel" class="block mt-1 text-2xl font-extrabold text-[#D4AF37]"></span></div></div><div class="mt-6 flex items-start gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm leading-6"><span class="text-[#D4AF37]">▸</span><p id="ceremonyAnnouncement"></p></div><div class="mt-5 pt-4 border-t border-white/15 flex justify-between items-center text-xs"><span>Check-in status</span><span id="ceremonyOpenLabel" class="pill"></span></div></div></div>
+          <div class="card"><div class="p-5 flex items-start gap-3 text-sm text-slate-600 leading-6"><span class="text-[#003811]">●</span><p>The system matches your employee number with the official <strong>employees</strong> table before showing your profile and saving your record.</p></div></div>
+          <button onclick="loadCeremony(true)" class="btn btn-outline w-full no-print">↻ Refresh ceremony notice</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="hrMode" class="hidden space-y-6 flex flex-col h-full">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><span class="pill bg-[#e9f1eb] text-[#003811]">HR CONSOLE</span><h2 class="mt-3 text-3xl font-extrabold tracking-tight text-[#003811]">Flag Ceremony monitoring</h2><p id="hrSignedIn" class="mt-2 text-sm text-slate-500"></p></div><button class="btn btn-outline no-print" onclick="loadHrRecords()">↻ Refresh records</button></div>
+      <div id="hrNotice" class="hidden"></div>
+      
+      <div class="grid xl:grid-cols-[380px_1fr] gap-6 flex-1 min-h-0">
+        <div class="card overflow-y-auto"><div class="p-6 border-b border-slate-100"><h3 class="font-extrabold text-lg text-[#003811]">⚙ Ceremony settings</h3><p class="text-sm text-slate-500 mt-1">Set the time, allowable allowance and announcement for the selected date.</p></div><form onsubmit="saveCeremony(event)" class="p-6 space-y-5"><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrDate">Ceremony date</label><input id="hrDate" type="date" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrTime">Flag Ceremony time</label><input id="hrTime" type="time" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAllowance">Allowable allowance (minutes)</label><input id="hrAllowance" type="number" min="0" max="180" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAnnouncement">Announcement</label><textarea id="hrAnnouncement" rows="4" class="input mt-2 resize-y" placeholder="Write the message employees will see..."></textarea></div><label class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer"><span><span class="block font-bold text-sm">Allow employee check-in</span><span class="block text-xs text-slate-500 mt-1">Close this after the ceremony.</span></span><input id="hrOpen" type="checkbox" class="w-5 h-5 accent-[#003811]"></label><button id="saveBtn" class="btn btn-green w-full h-11" type="submit">✓ Save ceremony settings</button></form></div>
+        <div class="space-y-6 flex flex-col"><div class="grid sm:grid-cols-3 gap-3"><div class="rounded-2xl bg-[#e9f1eb] text-[#003811] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Total checked in</p><p id="countTotal" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-[#fbf4d9] text-[#7a5c00] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Present</p><p id="countPresent" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-red-50 text-red-800 px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Late</p><p id="countLate" class="mt-1 text-3xl font-extrabold">0</p></div></div><div class="card overflow-hidden flex flex-col flex-1"><div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-end justify-between gap-3"><div><h3 class="font-extrabold text-lg text-[#003811]">Attendance records</h3><p id="recordsLabel" class="text-sm text-slate-500 mt-1"></p></div><input id="recordSearch" oninput="renderRecords()" class="input sm:w-52" placeholder="Search records"></div><div class="table-wrap flex-1"><table class="w-full min-w-[680px] text-left text-sm"><thead class="sticky top-0 bg-[#003811] text-white text-xs uppercase tracking-wider"><tr><th class="px-5 py-3">Employee</th><th class="px-5 py-3">Division</th><th class="px-5 py-3">Time in</th><th class="px-5 py-3">Status</th></tr></thead><tbody id="recordsBody" class="divide-y divide-slate-100"></tbody></table></div></div></div></div>
     </section>
   </main>
   <footer class="max-w-7xl mx-auto px-5 sm:px-8 pb-8 text-xs text-slate-400 flex justify-between gap-3"><span>Attendance is identified by employee number and ceremony date.</span><span>Connected to DAR employee records</span></footer>
@@ -137,7 +140,7 @@
      * This page follows the existing DAR HR pages:
      *   - HR authorization comes from sessionStorage.currentUser.
      *   - The same Supabase project and publishable key are used.
-     *   - Employees are matched by employee.emp_id.
+     *   - Employees are matched by employees.emp_id.
      *
      * Ceremony settings are stored on this HR workstation. No additional table
      * is required; attendance records continue to use flag_attendance only.
@@ -145,7 +148,7 @@
     const SUPABASE_URL = window.SUPABASE_URL || window.SUPABASE_CONFIG?.url || window.supabaseConfig?.url || 'https://xnwttnpfzcjbszwxsgox.supabase.co';
     const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || window.SUPABASE_CONFIG?.anonKey || window.SUPABASE_CONFIG?.publishableKey || window.supabaseConfig?.anonKey || 'sb_publishable_zEh0y_OAF7nVwLBuTTB74w_gPX0XomI';
     const db = window.supabaseClient || window.secureDbClient || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const state = { mode: 'employee', entryMode: 'manual', ceremony: null, employee: null, existing: null, records: [], scanner: null, user: null };
+    const state = { mode: 'employee', entryMode: 'manual', ceremony: null, employee: null, existing: null, records: [], allEmployees: null, scanner: null, user: null };
 
     const today = () => { const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000); return local.toISOString().slice(0, 10); };
     const esc = (value) => String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
@@ -172,7 +175,16 @@
     const storedCeremony = (date) => { try { const saved = JSON.parse(localStorage.getItem(settingsKey(date)) || 'null'); return { ...fallbackCeremony(date), ...(saved || {}) }; } catch (_) { return fallbackCeremony(date); } };
     const saveStoredCeremony = (ceremony) => localStorage.setItem(settingsKey(ceremony.ceremony_date), JSON.stringify(ceremony));
 
-    async function loadCeremony(showMessage) { const date = state.mode === 'hr' ? document.getElementById('hrDate').value : today(); state.ceremony = storedCeremony(date); renderCeremony(); }
+    async function loadCeremony(showMessage) { 
+        const date = state.mode === 'hr' ? document.getElementById('hrDate').value : today(); 
+        state.ceremony = storedCeremony(date); 
+        renderCeremony();
+        
+        // Refresh dashboard on ceremony load to keep the main page synced
+        if (state.mode === 'employee') {
+            refreshDashboard();
+        }
+    }
 
     function renderCeremony() {
       const c = state.ceremony || fallbackCeremony(today());
@@ -192,12 +204,13 @@
         const role = String(user.role || '').toUpperCase();
         if (!isAllowedHr(user)) { setBox('globalNotice', 'This active session is not authorized for the HR Flag Ceremony console.', 'error'); return; }
         state.user = user; state.mode = 'hr';
-        document.getElementById('employeeMode').classList.add('hidden'); document.getElementById('hrMode').classList.remove('hidden');
+        document.getElementById('employeeMode').classList.add('hidden'); document.getElementById('hrMode').classList.remove('hidden'); document.getElementById('hrMode').classList.add('flex');
         document.getElementById('employeeTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold text-slate-500'; document.getElementById('hrTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold bg-[#003811] text-white shadow-sm';
         document.getElementById('pageKicker').textContent = 'HR monitoring workspace'; document.getElementById('pageSub').textContent = 'Manage ceremony settings and monitor check-ins.'; document.getElementById('hrSignedIn').textContent = `Signed in as ${user.full_name || user.username || 'HRMO'} · ${user.role || 'HRMO'}`;
         document.getElementById('hrDate').value = today(); document.getElementById('recordSearch').value = ''; loadCeremony(false).then(loadHrRecords);
       } else {
-        state.mode = 'employee'; document.getElementById('employeeMode').classList.remove('hidden'); document.getElementById('hrMode').classList.add('hidden'); document.getElementById('employeeTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold bg-white text-[#003811] shadow-sm'; document.getElementById('hrTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold text-slate-500'; document.getElementById('pageKicker').textContent = 'Welcome to the Flag Ceremony'; document.getElementById('pageSub').textContent = 'Use your QR code or employee number to record attendance.'; loadCeremony(false);
+        state.mode = 'employee'; document.getElementById('employeeMode').classList.remove('hidden'); document.getElementById('employeeMode').classList.add('flex'); document.getElementById('hrMode').classList.add('hidden'); document.getElementById('hrMode').classList.remove('flex');
+        document.getElementById('employeeTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold bg-white text-[#003811] shadow-sm'; document.getElementById('hrTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold text-slate-500'; document.getElementById('pageKicker').textContent = 'Welcome to the Flag Ceremony'; document.getElementById('pageSub').textContent = 'Use your QR code or employee number to record attendance.'; loadCeremony(false);
       }
     }
 
@@ -219,10 +232,10 @@
       if (event) event.preventDefault();
       const id = cleanId(document.getElementById('employeeId').value); if (!id) return setBox('employeeNotice', 'Enter an employee number.', 'error');
       const button = document.getElementById('locateBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Locating'; clearBox('employeeNotice'); document.getElementById('employeeProfile').classList.add('hidden'); state.employee = null; state.existing = null;
-      // Fixed schema cache error by referring to the actual table name 'employee'
-      const { data, error } = await db.from('employee').select('*').eq('emp_id', id).limit(1).maybeSingle();
+      
+      const { data, error } = await db.from('employees').select('*').eq('emp_id', id).limit(1).maybeSingle();
       if (error) setBox('employeeNotice', esc(error.message), 'error');
-      else if (!data) setBox('employeeNotice', `Employee number <strong>${esc(id)}</strong> was not found in the employee table.`, 'error');
+      else if (!data) setBox('employeeNotice', `Employee number <strong>${esc(id)}</strong> was not found in the employees table.`, 'error');
       else { state.employee = data; const existing = await db.from('flag_attendance').select('emp_id,date,time_in,status').eq('emp_id', id).eq('date', state.ceremony.ceremony_date).limit(1).maybeSingle(); state.existing = existing.data || null; if (existing.error) setBox('employeeNotice', esc(existing.error.message), 'error'); renderProfile(); }
       button.disabled = false; button.innerHTML = '⌕ Locate';
     }
@@ -239,10 +252,17 @@
       const button = document.getElementById('checkInBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Saving';
       const now = new Date(); const timeIn = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`; const names = splitName(displayName(state.employee)); const allowedUntil = mins(state.ceremony.ceremony_time) + Number(state.ceremony.allowance_minutes || 0); const status = mins(timeIn) <= allowedUntil ? 'PRESENT' : 'LATE';
       const payload = { emp_id: cleanId(state.employee.emp_id), date: state.ceremony.ceremony_date, time_in: timeIn, last_name: state.employee.last_name || names.last_name, first_name: state.employee.first_name || names.first_name, division: state.employee.division || 'UNASSIGNED', status };
+      
       const result = await db.from('flag_attendance').upsert(payload, { onConflict: 'emp_id,date', ignoreDuplicates: true }).select().maybeSingle();
       if (result.error) { setBox('employeeNotice', esc(result.error.message), 'error'); button.disabled = false; button.innerHTML = '✓ CONFIRM FLAG CEREMONY ATTENDANCE'; return; }
-      state.existing = result.data || payload; setBox('employeeNotice', `✓ Welcome, <strong>${esc(displayName(state.employee))}</strong>. Attendance recorded at <strong>${esc(time12(timeIn))}</strong> (${status}).`, 'success'); renderProfile();
+      
+      state.existing = result.data || payload; setBox('employeeNotice', `✓ Welcome, <strong>${esc(displayName(state.employee))}</strong>. Attendance recorded at <strong>${esc(time12(timeIn))}</strong> (${status}).`, 'success'); 
+      renderProfile();
+
+      // Trigger a real-time dashboard refresh on successful scan
+      refreshDashboard();
     }
+
     function clearEmployee() { state.employee = null; state.existing = null; document.getElementById('employeeId').value = ''; document.getElementById('employeeProfile').classList.add('hidden'); clearBox('employeeNotice'); }
 
     async function saveCeremony(event) {
@@ -260,26 +280,37 @@
         state.records = result.data || []; 
       }
       renderRecords(); 
-      await renderDivisionDashboard();
     }
 
     function renderRecords() { const filter = String(document.getElementById('recordSearch').value || '').toLowerCase().trim(); const rows = state.records.filter((record) => !filter || [record.emp_id, record.first_name, record.last_name, record.division].some((value) => String(value || '').toLowerCase().includes(filter))); const present = state.records.filter((r) => String(r.status).toUpperCase() === 'PRESENT').length; const late = state.records.filter((r) => String(r.status).toUpperCase() === 'LATE').length; document.getElementById('countTotal').textContent = state.records.length; document.getElementById('countPresent').textContent = present; document.getElementById('countLate').textContent = late; document.getElementById('recordsLabel').textContent = `${dateLabel(document.getElementById('hrDate').value)} · ${state.records.length} saved record(s)`; document.getElementById('recordsBody').innerHTML = rows.length ? rows.map((r) => { const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.emp_id; const isLate = String(r.status).toUpperCase() === 'LATE'; return `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><p class="font-bold text-slate-800">${esc(name)}</p><p class="font-mono text-xs text-slate-500">${esc(r.emp_id)}</p></td><td class="px-5 py-4 text-slate-600">${esc(r.division || '—')}</td><td class="px-5 py-4 font-mono text-slate-700">${esc(time12(r.time_in))}</td><td class="px-5 py-4"><span class="pill ${isLate ? 'pill-late' : 'pill-present'}">${isLate ? 'LATE' : 'PRESENT'}</span></td></tr>`; }).join('') : '<tr><td colspan="4" class="px-5 py-16 text-center text-slate-400">No attendance records for this ceremony yet.</td></tr>'; }
 
-    async function renderDivisionDashboard() {
+    // This function independently controls the top dashboard for real-time tracking
+    async function refreshDashboard() {
       const dash = document.getElementById('divisionDashboard');
-      dash.innerHTML = '<div class="w-full text-center text-sm text-slate-500 py-4"><span class="loader inline-block"></span> Loading division statistics...</div>';
+      
+      // If empty, show loading. If already rendered, update smoothly without flashing.
+      if (!dash.innerHTML.trim()) dash.innerHTML = '<div class="w-full text-center text-sm text-slate-500 py-4"><span class="loader inline-block"></span> Loading division statistics...</div>';
 
-      // Fix schema cache error by querying the actual table name 'employee'
-      const { data: emps, error } = await db.from('employee').select('*');
-      if (error) {
-        dash.innerHTML = '<div class="w-full text-center text-sm text-red-500 py-4">Failed to load employee statistics.</div>';
-        return;
+      const ceremonyDate = state.ceremony?.ceremony_date || today();
+
+      // Cache employees to avoid fetching them every single scan
+      if (!state.allEmployees) {
+        const { data: emps, error: empErr } = await db.from('employees').select('emp_id, division, station, status');
+        if (empErr) {
+            dash.innerHTML = '<div class="w-full text-center text-sm text-red-500 py-4">Failed to load employee statistics.</div>';
+            return;
+        }
+        state.allEmployees = emps || [];
       }
+
+      // Fetch fresh attendance exclusively for the current ceremony date
+      const { data: att, error: attErr } = await db.from('flag_attendance').select('emp_id, division, status').eq('date', ceremonyDate);
+      if (attErr) return;
 
       const allowedEmps = new Set();
       const divTotals = {};
 
-      (emps || []).forEach(e => {
+      state.allEmployees.forEach(e => {
         const station = String(e.station || '').toUpperCase();
         const status = String(e.status || '').toUpperCase();
 
@@ -288,16 +319,14 @@
         if (status === 'INACTIVE') return;
 
         allowedEmps.add(e.emp_id);
-
         const div = String(e.division || 'UNASSIGNED').toUpperCase().trim();
         divTotals[div] = (divTotals[div] || 0) + 1;
       });
 
       const divPresent = {};
-      state.records.forEach(r => {
+      (att || []).forEach(r => {
         // Only count them in the dashboard if they are an active, non-DARMO employee
         if (!allowedEmps.has(r.emp_id)) return;
-
         const div = String(r.division || 'UNASSIGNED').toUpperCase().trim();
         divPresent[div] = (divPresent[div] || 0) + 1;
       });
@@ -324,7 +353,7 @@
       if (overallPercentage > 100) overallPercentage = 100;
       const overallDashArray = (overallPercentage / 100) * 251.2; 
 
-      // Build out the dashboard matching the requested aesthetics in the image
+      // Build out the dashboard matching the requested aesthetics
       let html = `
         <div class="flex flex-col items-center gap-4">
             <div class="relative w-[110px] h-[110px]">
