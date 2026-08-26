@@ -38,6 +38,9 @@
     #qr-reader__dashboard { padding: 8px 0 0 !important; }
     #qr-reader__dashboard button { border: 1px solid #cbd5e1; border-radius: 7px; padding: 6px 10px; background: white; }
     .table-wrap { max-height: 600px; overflow: auto; }
+    body.locked > header, body.locked > nav, body.locked > main, body.locked > footer { display: none !important; }
+    #authGate { display: flex; }
+    body.authorized #authGate { display: none; }
     @media print { .no-print { display: none !important; } body { background: #fff; } .card { box-shadow: none; border: 0; } }
     @media (min-width: 900px) {
       body { height: 100vh; overflow: hidden; }
@@ -52,14 +55,23 @@
     @media (max-width: 899px) { body { overflow-x: hidden; } }
   </style>
 </head>
-<body>
+<body class="locked">
+  <div id="authGate" class="fixed inset-0 z-50 items-center justify-center bg-[#003811] px-5">
+    <div class="card w-full max-w-md p-8 text-center">
+      <div class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#003811] text-3xl text-[#D4AF37]">⚑</div>
+      <h1 class="mt-5 text-2xl font-extrabold text-[#003811]">DAR Flag Ceremony Attendance</h1>
+      <p class="mt-3 text-sm leading-6 text-slate-600">This page is restricted to authorized HRMO or HR staff. Sign in through the existing DAR HR login to continue.</p>
+      <p id="authGateMessage" class="mt-4 hidden notice notice-error text-left"></p>
+      <a href="index.html" class="btn btn-green mt-6 w-full">GO TO EXISTING HR LOGIN</a>
+    </div>
+  </div>
   <header class="bg-[#003811] text-white border-b border-[#0d5528]">
     <div class="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <div class="w-11 h-11 rounded-2xl bg-[#D4AF37] text-[#003811] grid place-items-center text-2xl">⚑</div>
         <div><p class="text-[10px] uppercase tracking-[.22em] font-bold text-[#D4AF37]">Department of Agrarian Reform</p><h1 class="text-lg sm:text-xl font-extrabold">Flag Ceremony Attendance</h1></div>
       </div>
-      <div id="headerDate" class="hidden sm:block text-xs text-white/70"></div>
+      <div class="hidden sm:block text-right"><div id="headerDate" class="text-xs text-white/70"></div><div id="activeHrName" class="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]"></div></div>
     </div>
   </header>
 
@@ -140,6 +152,14 @@
     const dateLabel = (value) => new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
     const fallbackCeremony = (date) => ({ ceremony_date: date, ceremony_time: '08:00', allowance_minutes: 10, announcement: 'Please be present before the Flag Ceremony begins.', is_open: true });
     const getUser = () => { const raw = sessionStorage.getItem('currentUser'); if (!raw) return null; try { return JSON.parse(raw); } catch (_) { return null; } };
+    const isAllowedHr = (user) => { const role = String(user?.role || '').toUpperCase(); return /\bHRMO\b/.test(role) || /HR\s*MO\s*STAFF/.test(role) || /HR\s*STAFF/.test(role) || /HR\s*OFFICER/.test(role); };
+    function requireHrSession() {
+      const user = getUser();
+      const message = document.getElementById('authGateMessage');
+      if (!user) { message.textContent = 'No active DAR HR session was found.'; message.classList.remove('hidden'); return false; }
+      if (!isAllowedHr(user)) { message.textContent = 'This account is not authorized for the Flag Ceremony page.'; message.classList.remove('hidden'); return false; }
+      state.user = user; document.body.classList.remove('locked'); document.body.classList.add('authorized'); document.getElementById('activeHrName').textContent = user.full_name || user.username || 'HR STAFF'; return true;
+    }
     const setBox = (id, html, type) => { const el = document.getElementById(id); el.className = `notice notice-${type || 'error'}`; el.innerHTML = html; el.classList.remove('hidden'); };
     const clearBox = (id) => { const el = document.getElementById(id); el.classList.add('hidden'); el.innerHTML = ''; };
     const isRejected = (error) => /relation .*does not exist|could not find the table|schema cache/i.test(String(error?.message || error || ''));
@@ -169,7 +189,7 @@
         const user = getUser();
         if (!user) { setBox('globalNotice', 'No active HR session was found. Sign in through the existing DAR HR login first. This page does not create a second login.', 'error'); return; }
         const role = String(user.role || '').toUpperCase();
-        if (!role.includes('HRMO') && !role.includes('ADMIN') && !role.includes('HR')) { setBox('globalNotice', 'This active session is not authorized for the HR Flag Ceremony console.', 'error'); return; }
+        if (!isAllowedHr(user)) { setBox('globalNotice', 'This active session is not authorized for the HR Flag Ceremony console.', 'error'); return; }
         state.user = user; state.mode = 'hr';
         document.getElementById('employeeMode').classList.add('hidden'); document.getElementById('hrMode').classList.remove('hidden');
         document.getElementById('employeeTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold text-slate-500'; document.getElementById('hrTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold bg-[#003811] text-white shadow-sm';
@@ -231,7 +251,7 @@
     function renderRecords() { const filter = String(document.getElementById('recordSearch').value || '').toLowerCase().trim(); const rows = state.records.filter((record) => !filter || [record.emp_id, record.first_name, record.last_name, record.division].some((value) => String(value || '').toLowerCase().includes(filter))); const present = state.records.filter((r) => String(r.status).toUpperCase() === 'PRESENT').length; const late = state.records.filter((r) => String(r.status).toUpperCase() === 'LATE').length; document.getElementById('countTotal').textContent = state.records.length; document.getElementById('countPresent').textContent = present; document.getElementById('countLate').textContent = late; document.getElementById('recordsLabel').textContent = `${dateLabel(document.getElementById('hrDate').value)} · ${state.records.length} saved record(s)`; document.getElementById('recordsBody').innerHTML = rows.length ? rows.map((r) => { const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.emp_id; const isLate = String(r.status).toUpperCase() === 'LATE'; return `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><p class="font-bold text-slate-800">${esc(name)}</p><p class="font-mono text-xs text-slate-500">${esc(r.emp_id)}</p></td><td class="px-5 py-4 text-slate-600">${esc(r.division || '—')}</td><td class="px-5 py-4 font-mono text-slate-700">${esc(time12(r.time_in))}</td><td class="px-5 py-4"><span class="pill ${isLate ? 'pill-late' : 'pill-present'}">${isLate ? 'LATE' : 'PRESENT'}</span></td></tr>`; }).join('') : '<tr><td colspan="4" class="px-5 py-16 text-center text-slate-400">No attendance records for this ceremony yet.</td></tr>'; }
 
     document.getElementById('hrDate').addEventListener('change', () => { loadCeremony(false).then(loadHrRecords); });
-    window.addEventListener('load', () => { document.getElementById('hrDate').value = today(); loadCeremony(false); });
+    window.addEventListener('load', () => { if (!requireHrSession()) return; document.getElementById('hrDate').value = today(); loadCeremony(false); });
   </script>
 </body>
 </html>
