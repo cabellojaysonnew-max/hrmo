@@ -7,10 +7,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/html5-qrcode" defer></script>
-  
+
   <!-- THIS IS THE FIX: Connecting your actual database -->
   <script src="supabase-config.js"></script>
-  
+
   <style>
     :root { --dar-green: #003811; --dar-gold: #D4AF37; }
     html, body { min-height: 100%; }
@@ -65,7 +65,7 @@
       <div class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#003811] text-3xl text-[#D4AF37]">⚑</div>
       <h1 class="mt-5 text-2xl font-extrabold text-[#003811]">DAR Flag Ceremony Attendance</h1>
       <p class="mt-3 text-sm leading-6 text-slate-600">This page is restricted to authorized HRMO or HR staff. Please log in to continue.</p>
-      
+
       <form id="loginForm" onsubmit="handleLogin(event)" class="mt-5 space-y-4 text-left">
         <div>
           <label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]">Username</label>
@@ -106,7 +106,7 @@
     <div id="globalNotice" class="hidden mb-6"></div>
 
     <section id="employeeMode" class="flex flex-col gap-6">
-      
+
       <!-- REAL-TIME DASHBOARD MONITORING ON MAIN PAGE -->
       <div id="divisionDashboard" class="flex flex-wrap gap-8 justify-center py-8 px-6 bg-white rounded-2xl border border-slate-200 shadow-sm no-print items-center min-h-[160px] overflow-x-auto">
       </div>
@@ -144,7 +144,7 @@
     <section id="hrMode" class="hidden space-y-6 flex flex-col h-full">
       <div class="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><span class="pill bg-[#e9f1eb] text-[#003811]">HR CONSOLE</span><h2 class="mt-3 text-3xl font-extrabold tracking-tight text-[#003811]">Flag Ceremony monitoring</h2><p id="hrSignedIn" class="mt-2 text-sm text-slate-500"></p></div><button class="btn btn-outline no-print" onclick="loadHrRecords()">↻ Refresh records</button></div>
       <div id="hrNotice" class="hidden"></div>
-      
+
       <div class="grid xl:grid-cols-[380px_1fr] gap-6 flex-1 min-h-0">
         <div class="card overflow-y-auto"><div class="p-6 border-b border-slate-100"><h3 class="font-extrabold text-lg text-[#003811]">⚙ Ceremony settings</h3><p class="text-sm text-slate-500 mt-1">Set the time, allowable allowance and announcement for the selected date.</p></div><form onsubmit="saveCeremony(event)" class="p-6 space-y-5"><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrDate">Ceremony date</label><input id="hrDate" type="date" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrTime">Flag Ceremony time</label><input id="hrTime" type="time" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAllowance">Allowable allowance (minutes)</label><input id="hrAllowance" type="number" min="0" max="180" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAnnouncement">Announcement</label><textarea id="hrAnnouncement" rows="4" class="input mt-2 resize-y" placeholder="Write the message employees will see..."></textarea></div><label class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer"><span><span class="block font-bold text-sm">Allow employee check-in</span><span class="block text-xs text-slate-500 mt-1">Close this after the ceremony.</span></span><input id="hrOpen" type="checkbox" class="w-5 h-5 accent-[#003811]"></label><button id="saveBtn" class="btn btn-green w-full h-11" type="submit">✓ Save ceremony settings</button></form></div>
         <div class="space-y-6 flex flex-col"><div class="grid sm:grid-cols-3 gap-3"><div class="rounded-2xl bg-[#e9f1eb] text-[#003811] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Total checked in</p><p id="countTotal" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-[#fbf4d9] text-[#7a5c00] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Present</p><p id="countPresent" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-red-50 text-red-800 px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Late</p><p id="countLate" class="mt-1 text-3xl font-extrabold">0</p></div></div><div class="card overflow-hidden flex flex-col flex-1"><div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-end justify-between gap-3"><div><h3 class="font-extrabold text-lg text-[#003811]">Attendance records</h3><p id="recordsLabel" class="text-sm text-slate-500 mt-1"></p></div><input id="recordSearch" oninput="renderRecords()" class="input sm:w-52" placeholder="Search records"></div><div class="table-wrap flex-1"><table class="w-full min-w-[680px] text-left text-sm"><thead class="sticky top-0 bg-[#003811] text-white text-xs uppercase tracking-wider"><tr><th class="px-5 py-3">Employee</th><th class="px-5 py-3">Division</th><th class="px-5 py-3">Time in</th><th class="px-5 py-3">Status</th></tr></thead><tbody id="recordsBody" class="divide-y divide-slate-100"></tbody></table></div></div></div></div>
@@ -155,7 +155,7 @@
   <script>
     /*
      * This page follows the existing DAR HR pages:
-     *   - HR authorization comes from sessionStorage.currentUser.
+     *   - HR authorization comes from localStorage/sessionStorage.
      *   - The same Supabase project and publishable key are used.
      *   - Employees are matched by employees.emp_id.
      */
@@ -174,9 +174,10 @@
     const time12 = (value) => { const m = normalTime(value).match(/^(\d{2}):(\d{2})/); if (!m) return value || '—'; const h = Number(m[1]); return `${h % 12 || 12}:${m[2]} ${h >= 12 ? 'PM' : 'AM'}`; };
     const dateLabel = (value) => new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
     const fallbackCeremony = (date) => ({ ceremony_date: date, ceremony_time: '08:00', allowance_minutes: 10, announcement: 'Please be present before the Flag Ceremony begins.', is_open: true });
-    const getUser = () => { const raw = sessionStorage.getItem('currentUser'); if (!raw) return null; try { return JSON.parse(raw); } catch (_) { return null; } };
-    const isAllowedHr = (user) => { const role = String(user?.role || '').toUpperCase(); return /\bHRMO\b/.test(role) || /HR\s*MO\s*STAFF/.test(role) || /HR\s*STAFF/.test(role) || /HR\s*OFFICER/.test(role); };
     
+    const getUser = () => { const raw = localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser'); if (!raw) return null; try { return JSON.parse(raw); } catch (_) { return null; } };
+    const isAllowedHr = (user) => { const role = String(user?.role || '').toUpperCase(); const unit = String(user?.unit || '').toUpperCase(); return /\bHRMO\b/.test(role) || /HR\s*MO\s*STAFF/.test(role) || /HR\s*STAFF/.test(role) || /HR\s*OFFICER/.test(role) || /\bHRMO\b/.test(unit); };
+
     function requireHrSession() {
       const user = getUser();
       const message = document.getElementById('authGateMessage');
@@ -191,14 +192,14 @@
       const pass = document.getElementById('loginPass').value;
       const btn = document.getElementById('loginBtn');
       const msg = document.getElementById('authGateMessage');
-      
+
       btn.disabled = true;
       btn.innerHTML = '<span class="loader"></span> Authenticating';
       msg.classList.add('hidden');
-      
+
       // Changed .eq('username', user) to .ilike('username', user) to allow case-insensitive login
       const { data, error } = await db.from('users').select('*').ilike('username', user).eq('password', pass).maybeSingle();
-      
+
       if (error) {
         msg.textContent = esc(error.message);
         msg.classList.remove('hidden');
@@ -206,6 +207,7 @@
         msg.textContent = 'Invalid username or password.';
         msg.classList.remove('hidden');
       } else {
+        localStorage.setItem('currentUser', JSON.stringify(data));
         sessionStorage.setItem('currentUser', JSON.stringify(data));
         if (requireHrSession()) {
           document.getElementById('hrDate').value = today();
@@ -226,7 +228,7 @@
         const date = state.mode === 'hr' ? document.getElementById('hrDate').value : today(); 
         state.ceremony = storedCeremony(date); 
         renderCeremony();
-        
+
         if (state.mode === 'employee') {
             refreshDashboard();
         }
@@ -278,9 +280,9 @@
       if (event) event.preventDefault();
       const id = cleanId(document.getElementById('employeeId').value); if (!id) return setBox('employeeNotice', 'Enter an employee number.', 'error');
       const button = document.getElementById('locateBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Locating'; clearBox('employeeNotice'); document.getElementById('employeeProfile').classList.add('hidden'); state.employee = null; state.existing = null;
-      
+
       const { data, error } = await db.from('employees').select('*').eq('emp_id', id).limit(1).maybeSingle();
-      
+
       if (error) {
           // EXPLICIT SUPABASE SCHEMA CACHE ERROR TRAP
           if (error.message.includes('schema cache')) {
@@ -312,10 +314,10 @@
       const button = document.getElementById('checkInBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Saving';
       const now = new Date(); const timeIn = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`; const names = splitName(displayName(state.employee)); const allowedUntil = mins(state.ceremony.ceremony_time) + Number(state.ceremony.allowance_minutes || 0); const status = mins(timeIn) <= allowedUntil ? 'PRESENT' : 'LATE';
       const payload = { emp_id: cleanId(state.employee.emp_id), date: state.ceremony.ceremony_date, time_in: timeIn, last_name: state.employee.last_name || names.last_name, first_name: state.employee.first_name || names.first_name, division: state.employee.division || 'UNASSIGNED', status };
-      
+
       const result = await db.from('flag_attendance').upsert(payload, { onConflict: 'emp_id,date', ignoreDuplicates: true }).select().maybeSingle();
       if (result.error) { setBox('employeeNotice', esc(result.error.message), 'error'); button.disabled = false; button.innerHTML = '✓ CONFIRM FLAG CEREMONY ATTENDANCE'; return; }
-      
+
       state.existing = result.data || payload; setBox('employeeNotice', `✓ Welcome, <strong>${esc(displayName(state.employee))}</strong>. Attendance recorded at <strong>${esc(time12(timeIn))}</strong> (${status}).`, 'success'); 
       renderProfile();
 
@@ -345,7 +347,7 @@
 
     async function refreshDashboard() {
       const dash = document.getElementById('divisionDashboard');
-      
+
       if (!dash.innerHTML.trim()) dash.innerHTML = '<div class="w-full text-center text-sm text-slate-500 py-4"><span class="loader inline-block"></span> Loading division statistics...</div>';
 
       const ceremonyDate = state.ceremony?.ceremony_date || today();
@@ -433,7 +435,7 @@
       sortedDivs.forEach((div, index) => {
         const total = divTotals[div] || 0;
         const present = divPresent[div] || 0;
-        
+
         let percentage = total > 0 ? (present / total) * 100 : 100;
         if (percentage > 100) percentage = 100;
         if (percentage === 0) percentage = 0.1;
