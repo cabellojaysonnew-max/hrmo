@@ -1954,7 +1954,7 @@
                 const div = (e.division || 'UNASSIGNED').toUpperCase();
                 if (!byDiv[div]) byDiv[div] = [];
 
-    
+                
                 let remarks = "";
                 let attLogDisplay = "-";
                 let flagLogDisplay = "-";
@@ -2001,9 +2001,9 @@
                     remarks = leaveData.status === 'PENDING' ? `PENDING LEAVE APPLICATION (${leaveDisplay})` : `ON LEAVE (${leaveDisplay})`;
                 } else {
                     const attendedFlag = fLog && !isFlagAbsent;
-                    if (attendedFlag && !isLate) {
+                    if (attendedFlag && aLogs.length > 0 && !isLate) {
                         remarks = "Present and Attended Flag Ceremony";
-                    } else if (attendedFlag && isLate) {
+                    } else if (attendedFlag && aLogs.length > 0 && isLate) {
                         remarks = "Late and Attended Flag Ceremony";
                     } else if (!attendedFlag && aLogs.length > 0 && !isLate) {
                         remarks = "Present but did not attend Flag Ceremony";
