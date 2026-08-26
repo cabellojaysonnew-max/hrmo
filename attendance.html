@@ -67,6 +67,9 @@
         .extractor-time-input:focus { outline: none; border-color: #1769a0; box-shadow: 0 0 0 2px rgba(23,105,160,.1); }
         .extractor-time-input.extractor-manual-entry { background: #fff7ed; border: 2px solid #fcd34d; }
         .extractor-time-input[readonly], .extractor-time-input:disabled { background: #f1f5f9; color: #64748b; cursor: not-allowed; opacity: .8; }
+        .extractor-time-select { min-width: 145px; width: 100%; }
+        .extractor-employee-locator { min-width: 320px; margin-left: 12px; padding: .4rem .55rem; border: 1px solid #d97706; border-radius: .3rem; background: #fffbeb; color: #78350f; font-size: .76rem; font-weight: 700; }
+        .extractor-unidentified { color: #991b1b; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-[#1F2937]">
@@ -1838,7 +1841,15 @@
         const PAGE_SIZE = 1000;
         const QUERY_BATCH_SIZE = 150;
         const QUERY_TIMEOUT_MS = 30000;
-        const state = { hierarchy: {}, schedules: {}, datLogs: [] };
+        const state = {
+            hierarchy: {},
+            schedules: {},
+            datLogs: [],
+            employeeDirectory: {},
+            resolutions: {},
+            unresolvedIds: new Set(),
+            context: null
+        };
 
         const escapeHtml = (value) => String(value ?? '')
             .replaceAll('&', '&amp;')
@@ -1913,8 +1924,10 @@
 
         const parseDatFile = async (file, targetMonth) => {
             const logs = [];
+            const seenLogs = new Set();
             let invalidLines = 0;
             let otherMonthLines = 0;
+            let duplicateLines = 0;
             let processedSinceYield = 0;
 
             const parseLine = (line) => {
@@ -1923,18 +1936,24 @@
                 const parts = cleanLine.split(/\s+/);
                 if (parts.length < 5) { invalidLines++; return; }
 
-                const emp_id = String(parts[0]).trim();
+                const emp_id = String(parts[0]).replace(/^\uFEFF/, '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
                 const date = String(parts[1]).replace(/\//g, '-');
                 const time = normalizeDatTime(parts[2]);
                 if (!date.startsWith(targetMonth)) { otherMonthLines++; return; }
                 if (!emp_id || !isValidIsoDate(date) || !time) { invalidLines++; return; }
 
+                // Remove exact duplicate punches from noisy biometric exports.
+                const cleanKey = `${emp_id}|${date}|${time}`;
+                if (seenLogs.has(cleanKey)) { duplicateLines++; return; }
+                seenLogs.add(cleanKey);
+
                 logs.push({
                     emp_id,
+                    raw_emp_id: emp_id,
                     date,
                     time,
-                    device_id: String(parts[3]),
-                    status: String(parts[4]),
+                    device_id: String(parts[3]).trim(),
+                    status: String(parts[4]).trim(),
                     sourceIndex: logs.length
                 });
             };
@@ -1963,7 +1982,9 @@
                     if (i > 0 && i % 5000 === 0) await yieldToBrowser();
                 }
             }
-            return { logs, invalidLines, otherMonthLines };
+            logs.sort((a, b) => a.emp_id.localeCompare(b.emp_id) || a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+            logs.forEach((log, sourceIndex) => { log.sourceIndex = sourceIndex; });
+            return { logs, invalidLines, otherMonthLines, duplicateLines };
         };
 
         const getDatesInRange = (startDate, endDate) => {
@@ -1992,9 +2013,11 @@
             box.innerHTML = `<strong>${type === 'success' ? 'Success:' : 'Notice:'}</strong> ${escapeHtml(message)}`;
         };
 
-        const ensureDay = (division, empId, fullName, date) => {
+        const ensureDay = (division, empId, fullName, date, employeeMeta = {}) => {
             if (!state.hierarchy[division]) state.hierarchy[division] = {};
-            if (!state.hierarchy[division][empId]) state.hierarchy[division][empId] = { full_name: fullName, dates: {} };
+            if (!state.hierarchy[division][empId]) {
+                state.hierarchy[division][empId] = { full_name: fullName, ...employeeMeta, dates: {} };
+            }
             if (!state.hierarchy[division][empId].dates[date]) {
                 state.hierarchy[division][empId].dates[date] = { logs: [], to: null, pso: null, holidays: [] };
             }
@@ -2010,9 +2033,51 @@
             });
         };
 
-        const buildRemarks = (slots, toInfo, psoInfo, holidayInfo, isWeekend, isCompressedFriday, isNoWorkFriday) => {
+        const rebuildExtractorHierarchy = () => {
+            state.hierarchy = {};
+            state.unresolvedIds = new Set();
+            if (!state.context) return;
+
+            const participants = {};
+            state.datLogs.forEach(log => {
+                const rawEmpId = String(log.raw_emp_id || log.emp_id || '').trim();
+                const resolvedEmpId = state.employeeDirectory[rawEmpId]
+                    ? rawEmpId
+                    : state.resolutions[rawEmpId];
+                const employee = resolvedEmpId ? state.employeeDirectory[resolvedEmpId] : null;
+                const internalEmpId = employee ? resolvedEmpId : `UNIDENTIFIED::${rawEmpId}`;
+                const division = employee ? employee.division : 'UNIDENTIFIED EMPLOYEE NUMBERS';
+                const fullName = employee ? employee.full_name : 'UNIDENTIFIED EMPLOYEE';
+                const employeeMeta = employee
+                    ? { effective_emp_id: resolvedEmpId, isUnidentified: false }
+                    : { effective_emp_id: '', isUnidentified: true, raw_emp_id: rawEmpId };
+
+                if (!employee) state.unresolvedIds.add(rawEmpId);
+                participants[internalEmpId] = { division, fullName, employeeMeta };
+                ensureDay(division, internalEmpId, fullName, log.date, employeeMeta);
+                state.hierarchy[division][internalEmpId].dates[log.date].logs.push(log);
+            });
+
+            Object.entries(participants).forEach(([internalEmpId, participant]) => {
+                const effectiveEmpId = participant.employeeMeta.effective_emp_id;
+                for (let day = 1; day <= state.context.daysInMonth; day++) {
+                    const date = `${state.context.targetMonth}-${String(day).padStart(2, '0')}`;
+                    ensureDay(participant.division, internalEmpId, participant.fullName, date, participant.employeeMeta);
+                    const dayData = state.hierarchy[participant.division][internalEmpId].dates[date];
+                    if (effectiveEmpId) {
+                        dayData.to = state.context.toLookup[`${effectiveEmpId}_${date}`] || null;
+                        dayData.pso = (state.context.psoLookup[`${effectiveEmpId}_${date}`] || []).join('; ') || null;
+                    }
+                    dayData.holidays = state.context.holidayLookup[date] || [];
+                }
+            });
+        };
+
+        const buildRemarks = (slots, toInfo, psoInfo, holidayInfo, isWeekend, isCompressedFriday, isNoWorkFriday, rawPunchCount = 0) => {
             const marks = [];
             const filled = slots.filter(slot => slot?.time).length;
+            const selectedTimes = slots.map(slot => slot?.time).filter(Boolean);
+            const hasDuplicateSelection = new Set(selectedTimes).size !== selectedTimes.length;
             const travelOrders = Array.isArray(toInfo) ? toInfo : (toInfo ? [toInfo] : []);
             const holidays = Array.isArray(holidayInfo) ? holidayInfo : (holidayInfo ? [holidayInfo] : []);
             const nonWorkingHolidays = holidays.filter(holiday => !isSpecialWorkingDay(holiday));
@@ -2022,13 +2087,32 @@
             else if (isNoWorkFriday) marks.push('<span class="extractor-status extractor-status-gray">FRIDAY - NO WORK</span>');
             else if (isCompressedFriday) marks.push('<span class="extractor-status extractor-status-gray">FRIDAY (Compressed)</span>');
 
+            if (rawPunchCount > 4) {
+                marks.push(`<span class="extractor-status extractor-status-amber">${rawPunchCount} PUNCHES - SELECT THE CORRECT FOUR</span>`);
+            }
+            if (hasDuplicateSelection) {
+                marks.push('<span class="extractor-status extractor-status-red">DUPLICATE TIME SELECTED</span>');
+            }
+
+            // Lunch OUT and afternoon IN are normally within 12:00–1:00 PM.
+            const withinLunchRange = (time) => {
+                const hhmm = String(time || '').slice(0, 5);
+                return hhmm >= '12:00' && hhmm <= '13:00';
+            };
+            if (slots[1]?.time && !withinLunchRange(slots[1].time)) {
+                marks.push('<span class="extractor-status extractor-status-amber">CHECK LUNCH OUT (12:00–1:00)</span>');
+            }
+            if (slots[2]?.time && !withinLunchRange(slots[2].time)) {
+                marks.push('<span class="extractor-status extractor-status-amber">CHECK AFTERNOON IN (12:00–1:00)</span>');
+            }
+
             holidays.forEach(holiday => {
                 const working = isSpecialWorkingDay(holiday);
                 const details = [holiday.type, holiday.coverage].filter(Boolean).map(escapeHtml).join(' | ');
                 marks.push(`<span class="extractor-status ${working ? 'extractor-status-amber' : 'extractor-status-purple'}">${working ? 'SPECIAL WORKING DAY' : 'HOLIDAY'}: ${escapeHtml(holiday.description)}${details ? ` (${details})` : ''}</span>`);
             });
 
-            if (filled === 4) marks.push('<span class="extractor-status extractor-status-green">COMPLETE</span>');
+            if (filled === 4 && !hasDuplicateSelection) marks.push('<span class="extractor-status extractor-status-green">COMPLETE</span>');
             else if (filled === 0 && !isExcused) marks.push('<span class="extractor-status extractor-status-red">ABSENT / NO PUNCHES</span>');
             else if (filled > 0 && filled < 4 && !isExcused) marks.push(`<span class="extractor-status extractor-status-red">MISSING (${4 - filled})</span>`);
             else if (filled > 0 && filled < 4) marks.push(`<span class="extractor-status extractor-status-gray">PARTIAL PUNCHES (${filled}/4)</span>`);
@@ -2049,10 +2133,16 @@
             const tbody = document.getElementById('extractorPreviewBody');
             tbody.innerHTML = '';
 
-            const expectedStatuses = ['0', '2', '3', '1'];
+            const expectedStatuses = ['0', '2', '3', '1']; // IN, OUT, IN, OUT
             const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             const employeeList = [];
             let processedDays = 0;
+
+            const directoryOptions = Object.entries(state.employeeDirectory)
+                .sort((a, b) => String(a[1].full_name || '').localeCompare(String(b[1].full_name || '')))
+                .map(([empId, employee]) =>
+                    `<option value="${escapeHtml(empId)}">${escapeHtml(employee.full_name)} — ${escapeHtml(empId)} — ${escapeHtml(employee.division)}</option>`
+                ).join('');
 
             Object.entries(state.hierarchy).forEach(([division, employees]) => {
                 Object.entries(employees).forEach(([empId, employee]) => {
@@ -2068,11 +2158,27 @@
             let lastDivision = null;
             for (let employeeIndex = 0; employeeIndex < employeeList.length; employeeIndex++) {
                 const { division, empId, employee } = employeeList[employeeIndex];
+                const effectiveEmpId = employee.effective_emp_id || '';
                 if (division !== lastDivision) {
                     html += `<tr class="extractor-division-row"><td colspan="7">DIVISION: ${escapeHtml(division)}</td></tr>`;
                     lastDivision = division;
                 }
-                html += `<tr class="extractor-name-row"><td colspan="7"><span class="text-[11px] tracking-widest">NAME:</span> ${escapeHtml(employee.full_name)} <span class="text-xs font-normal text-gray-500 ml-2">(EMP ID: ${escapeHtml(empId)})</span></td></tr>`;
+
+                if (employee.isUnidentified) {
+                    html += `<tr class="extractor-name-row">
+                        <td colspan="7">
+                            <span class="text-[11px] tracking-widest">NAME:</span>
+                            <span class="extractor-unidentified">UNIDENTIFIED EMPLOYEE</span>
+                            <span class="text-xs font-normal text-red-700 ml-2">(BIOMETRIC ID: ${escapeHtml(employee.raw_emp_id)})</span>
+                            <select class="extractor-employee-locator" data-raw-emp="${escapeHtml(employee.raw_emp_id)}">
+                                <option value="">LOCATE EMPLOYEE FROM DARPO-CS1 LIST…</option>
+                                ${directoryOptions}
+                            </select>
+                        </td>
+                    </tr>`;
+                } else {
+                    html += `<tr class="extractor-name-row"><td colspan="7"><span class="text-[11px] tracking-widest">NAME:</span> ${escapeHtml(employee.full_name)} <span class="text-xs font-normal text-gray-500 ml-2">(EMP ID: ${escapeHtml(effectiveEmpId || empId)})</span></td></tr>`;
+                }
 
                 for (const date of Object.keys(employee.dates).sort()) {
                     const dayData = employee.dates[date];
@@ -2080,56 +2186,74 @@
                     const dayOfWeek = dateObject.getUTCDay();
                     const dayName = dayNames[dayOfWeek];
                     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                    const activeSchedule = scheduleForDate(empId, date);
+                    const activeSchedule = effectiveEmpId ? scheduleForDate(effectiveEmpId, date) : null;
                     const workingDays = String(activeSchedule?.working_days || 'Monday,Tuesday,Wednesday,Thursday,Friday').toLowerCase();
                     const hasFriday = workingDays.includes('fri');
                     const compressed = String(activeSchedule?.schedule_type || '').toUpperCase().includes('COMPRESSED') || workingDays.includes('4-day') || workingDays.includes('4 day');
                     const isCompressedFriday = dayOfWeek === 5 && !hasFriday && compressed;
                     const isNoWorkFriday = dayOfWeek === 5 && !hasFriday && !compressed;
 
-                    dayData.logs.sort((a, b) => a.time.localeCompare(b.time));
-                    const slots = [null, null, null, null];
-                    dayData.logs.forEach(log => {
-                        let slotIndex = expectedStatuses.indexOf(String(log.status));
-                        if (slotIndex < 0 || slots[slotIndex]) slotIndex = slots.findIndex(slot => !slot);
-                        if (slotIndex >= 0) {
-                            slots[slotIndex] = {
+                    // Position determines the DTR slot: 1st IN, 2nd OUT,
+                    // 3rd IN (afternoon), and 4th OUT (afternoon).
+                    const cleanLogs = [...dayData.logs]
+                        .filter(log => normalizeDatTime(log.time))
+                        .sort((a, b) => a.time.localeCompare(b.time))
+                        .filter((log, index, logs) => index === 0 || log.time !== logs[index - 1].time);
+                    const hasRedundantPunches = cleanLogs.length > 4;
+                    const slots = Array.from({ length: 4 }, (_, slotIndex) => {
+                        const log = cleanLogs[slotIndex];
+                        return log
+                            ? {
                                 time: log.time,
                                 device_id: log.device_id,
-                                status: log.status || expectedStatuses[slotIndex],
+                                status: expectedStatuses[slotIndex],
                                 sourceIndex: log.sourceIndex
+                            }
+                            : {
+                                time: '',
+                                device_id: 'Manual',
+                                status: expectedStatuses[slotIndex]
                             };
-                        }
                     });
-                    for (let slotIndex = 0; slotIndex < 4; slotIndex++) {
-                        if (!slots[slotIndex]) {
-                            slots[slotIndex] = { time: '', device_id: 'Manual', status: expectedStatuses[slotIndex] };
-                        }
-                    }
 
                     const filled = slots.filter(slot => slot.time).length;
                     const hasTo = Array.isArray(dayData.to) ? dayData.to.length > 0 : Boolean(dayData.to);
                     const hasPso = Boolean(dayData.pso);
                     const hasNonWorkingHoliday = (dayData.holidays || []).some(holiday => !isSpecialWorkingDay(holiday));
-                    const canManualInput = filled < 4 && !hasTo && !hasPso && !hasNonWorkingHoliday && !isWeekend && !isCompressedFriday && !isNoWorkFriday;
+                    const canManualInput = filled < 4 && !employee.isUnidentified && !hasTo && !hasPso && !hasNonWorkingHoliday && !isWeekend && !isCompressedFriday && !isNoWorkFriday;
+                    const dataEmpId = effectiveEmpId || employee.raw_emp_id || empId;
 
-                    const renderedSlots = slots.map(slot => {
+                    const renderedSlots = slots.map((slot, slotIndex) => {
+                        if (hasRedundantPunches) {
+                            const options = cleanLogs.map((log, logIndex) =>
+                                `<option value="${escapeHtml(log.time)}" data-device="${escapeHtml(log.device_id)}" data-source-index="${log.sourceIndex}" ${logIndex === slotIndex ? 'selected' : ''}>${escapeHtml(log.time)} — Device ${escapeHtml(log.device_id)}</option>`
+                            ).join('');
+                            return `<select class="extractor-time-input extractor-time-select"
+                                data-division="${escapeHtml(division)}" data-internal-emp="${escapeHtml(empId)}"
+                                data-emp="${escapeHtml(dataEmpId)}" data-date="${date}"
+                                data-status="${expectedStatuses[slotIndex]}" data-original="${escapeHtml(slot.time)}">
+                                <option value="">-- Select time --</option>${options}
+                            </select>`;
+                        }
+
                         const hasDatSource = Number.isInteger(slot.sourceIndex);
                         const inputState = hasDatSource ? 'readonly' : (canManualInput ? '' : 'disabled');
                         return `<input type="time" step="1" class="extractor-time-input"
-                            data-division="${escapeHtml(division)}" data-emp="${escapeHtml(empId)}" data-date="${date}"
-                            data-device="${escapeHtml(slot.device_id)}" data-status="${escapeHtml(slot.status)}"
+                            data-division="${escapeHtml(division)}" data-internal-emp="${escapeHtml(empId)}"
+                            data-emp="${escapeHtml(dataEmpId)}" data-date="${date}"
+                            data-device="${escapeHtml(slot.device_id)}" data-status="${expectedStatuses[slotIndex]}"
                             data-source-index="${slot.sourceIndex ?? ''}" data-original="${escapeHtml(slot.time)}"
                             value="${escapeHtml(slot.time)}" ${inputState}>`;
                     });
 
                     let rowClass = '';
-                    if (hasNonWorkingHoliday) rowClass = 'extractor-holiday-row';
+                    if (hasRedundantPunches) rowClass = 'extractor-issue-row';
+                    else if (hasNonWorkingHoliday) rowClass = 'extractor-holiday-row';
                     else if (isWeekend || isCompressedFriday || isNoWorkFriday) rowClass = 'extractor-weekend-row';
                     else if (filled < 4 && !hasTo && !hasPso) rowClass = 'extractor-issue-row';
 
-                    const remarks = buildRemarks(slots, dayData.to, dayData.pso, dayData.holidays, isWeekend, isCompressedFriday, isNoWorkFriday);
-                    html += `<tr class="${rowClass}" data-is-weekend="${isWeekend}" data-is-compressed="${isCompressedFriday}" data-is-no-work="${isNoWorkFriday}" data-is-non-working-holiday="${hasNonWorkingHoliday}">
+                    const remarks = buildRemarks(slots, dayData.to, dayData.pso, dayData.holidays, isWeekend, isCompressedFriday, isNoWorkFriday, cleanLogs.length);
+                    html += `<tr class="${rowClass}" data-is-weekend="${isWeekend}" data-is-compressed="${isCompressedFriday}" data-is-no-work="${isNoWorkFriday}" data-is-non-working-holiday="${hasNonWorkingHoliday}" data-raw-count="${cleanLogs.length}">
                         <td><strong>${date}</strong></td><td>${dayName}</td>
                         <td>${renderedSlots[0]}</td><td>${renderedSlots[1]}</td><td>${renderedSlots[2]}</td><td>${renderedSlots[3]}</td>
                         <td class="extractor-remarks-cell">${remarks}</td></tr>`;
@@ -2144,11 +2268,23 @@
             }
             if (html) tbody.insertAdjacentHTML('beforeend', html);
 
-            tbody.onchange = (event) => {
+            tbody.onchange = async (event) => {
                 const input = event.target;
+
+                if (input.matches('.extractor-employee-locator')) {
+                    const rawEmpId = input.dataset.rawEmp;
+                    const selectedEmpId = input.value;
+                    if (!selectedEmpId || !state.employeeDirectory[selectedEmpId]) return;
+                    state.resolutions[rawEmpId] = selectedEmpId;
+                    rebuildExtractorHierarchy();
+                    await renderExtractorTable();
+                    showExtractorAlert(`Biometric ID ${rawEmpId} was matched to ${state.employeeDirectory[selectedEmpId].full_name} (${selectedEmpId}).`, 'success');
+                    return;
+                }
+
                 if (!input.matches('.extractor-time-input')) return;
                 const row = input.closest('tr');
-                const dayData = state.hierarchy[input.dataset.division]?.[input.dataset.emp]?.dates?.[input.dataset.date];
+                const dayData = state.hierarchy[input.dataset.division]?.[input.dataset.internalEmp]?.dates?.[input.dataset.date];
                 if (!dayData) return;
 
                 input.classList.toggle('extractor-manual-entry', input.value !== input.dataset.original);
@@ -2157,11 +2293,16 @@
                 const isCompressed = row.dataset.isCompressed === 'true';
                 const isNoWork = row.dataset.isNoWork === 'true';
                 const isNonWorkingHoliday = row.dataset.isNonWorkingHoliday === 'true';
-                row.querySelector('.extractor-remarks-cell').innerHTML = buildRemarks(rowSlots, dayData.to, dayData.pso, dayData.holidays, isWeekend, isCompressed, isNoWork);
+                const rawCount = Number(row.dataset.rawCount || 0);
+
+                row.querySelector('.extractor-remarks-cell').innerHTML = buildRemarks(rowSlots, dayData.to, dayData.pso, dayData.holidays, isWeekend, isCompressed, isNoWork, rawCount);
 
                 const filled = rowSlots.filter(slot => slot.time).length;
                 const hasTo = Array.isArray(dayData.to) ? dayData.to.length > 0 : Boolean(dayData.to);
-                if (isNonWorkingHoliday) row.className = 'extractor-holiday-row';
+                const chosenTimes = rowSlots.map(slot => slot.time).filter(Boolean);
+                const hasDuplicateSelection = new Set(chosenTimes).size !== chosenTimes.length;
+                if (rawCount > 4 || hasDuplicateSelection) row.className = 'extractor-issue-row';
+                else if (isNonWorkingHoliday) row.className = 'extractor-holiday-row';
                 else if (isWeekend || isCompressed || isNoWork) row.className = 'extractor-weekend-row';
                 else if (filled < 4 && !hasTo && !dayData.pso) row.className = 'extractor-issue-row';
                 else row.className = '';
@@ -2172,7 +2313,12 @@
             const action = document.getElementById('extractorUploadAction');
             action.classList.remove('hidden');
             action.style.display = 'flex';
-            document.getElementById('extractorAlertBox').style.display = 'none';
+
+            if (state.unresolvedIds.size) {
+                showExtractorAlert(`${state.unresolvedIds.size} unidentified biometric employee number(s) are shown below. Locate each employee before posting.`);
+            } else {
+                document.getElementById('extractorAlertBox').style.display = 'none';
+            }
         };
 
         document.getElementById('extractorParseBtn').addEventListener('click', async () => {
@@ -2188,6 +2334,10 @@
             state.hierarchy = {};
             state.schedules = {};
             state.datLogs = [];
+            state.employeeDirectory = {};
+            state.resolutions = {};
+            state.unresolvedIds = new Set();
+            state.context = null;
             document.getElementById('extractorTableWrapper').style.display = 'none';
             document.getElementById('extractorUploadAction').style.display = 'none';
 
@@ -2204,8 +2354,9 @@
                 if (!datEmpIds.length) throw new Error(`No valid biometric logs were found for ${targetMonth}.`);
 
                 button.textContent = 'CHECKING TO, ITINERARY, PSO & HOLIDAYS...';
-                const [employees, travelOrders, itineraries, psos, holidays, schedules] = await Promise.all([
+                const [matchedEmployees, darpoEmployees, travelOrders, itineraries, psos, holidays, schedules] = await Promise.all([
                     fetchRowsByValues('employees', 'emp_id,full_name,division,station', 'emp_id', datEmpIds, 'Employees'),
+                    fetchAllRows('employees', 'emp_id,full_name,division,station', query => query.eq('station', 'DARPO-CS1').order('id', { ascending: true }), 'DARPO-CS1 employee directory'),
                     fetchAllRows('travel_orders', 'to_no,emp_id,status', query => query.order('id', { ascending: true }), 'Travel Orders'),
                     fetchAllRows('itinerary', 'to_no,travel_date,destination,purpose', query => query.like('travel_date', `${targetMonth}%`).order('id', { ascending: true }), 'Travel Order itineraries'),
                     fetchAllRows('pso_records', 'pso_no,emp_id,start_date,end_date,subject,status', query => query.lte('start_date', monthEnd).gte('end_date', monthStart).order('id', { ascending: true }), 'PSO records'),
@@ -2213,23 +2364,36 @@
                     fetchAllRows('schedule_overrides', 'emp_id,start_date,end_date,schedule_type,working_days', query => query.order('id', { ascending: true }), 'Schedule overrides')
                 ]);
 
-                const employeeMap = {};
-                employees.forEach(employee => {
+                const matchedEmployeeMap = {};
+                matchedEmployees.forEach(employee => {
+                    const empId = String(employee.emp_id || '').trim();
+                    if (empId) matchedEmployeeMap[empId] = employee;
+                });
+
+                [...darpoEmployees, ...matchedEmployees].forEach(employee => {
                     const empId = String(employee.emp_id || '').trim();
                     if (empId && String(employee.station || '').trim().toUpperCase() === 'DARPO-CS1') {
-                        employeeMap[empId] = {
+                        state.employeeDirectory[empId] = {
                             full_name: employee.full_name || empId,
-                            division: employee.division || 'UNASSIGNED'
+                            division: employee.division || 'UNASSIGNED',
+                            station: 'DARPO-CS1'
                         };
                     }
                 });
-                if (!Object.keys(employeeMap).length) {
-                    throw new Error(`No DARPO-CS1 employees matched the employee IDs in the ${targetMonth} DAT file.`);
-                }
+
+                const unknownEmpIds = new Set(datEmpIds.filter(empId => !matchedEmployeeMap[empId]));
+                const eligibleEmpIds = new Set(datEmpIds.filter(empId => state.employeeDirectory[empId]));
+                const wrongStationIds = new Set(datEmpIds.filter(empId => matchedEmployeeMap[empId] && !state.employeeDirectory[empId]));
 
                 state.datLogs = parsed.logs
-                    .filter(log => employeeMap[log.emp_id])
+                    .filter(log => eligibleEmpIds.has(log.emp_id) || unknownEmpIds.has(log.emp_id))
                     .map((log, sourceIndex) => ({ ...log, sourceIndex }));
+
+                if (!state.datLogs.length) {
+                    throw new Error(`No DARPO-CS1 or unidentified employee logs were found for ${targetMonth}.`);
+                }
+
+                const employeeMap = state.employeeDirectory;
 
                 schedules.forEach(schedule => {
                     const empId = String(schedule.emp_id || '').trim();
@@ -2297,28 +2461,18 @@
                     });
                 });
 
-                state.datLogs.forEach(log => {
-                    const employee = employeeMap[log.emp_id];
-                    ensureDay(employee.division, log.emp_id, employee.full_name, log.date);
-                    state.hierarchy[employee.division][log.emp_id].dates[log.date].logs.push(log);
-                });
+                state.context = { targetMonth, daysInMonth, toLookup, psoLookup, holidayLookup };
+                rebuildExtractorHierarchy();
 
-                Object.keys(employeeMap).forEach(empId => {
-                    const employee = employeeMap[empId];
-                    for (let day = 1; day <= daysInMonth; day++) {
-                        const date = `${targetMonth}-${String(day).padStart(2, '0')}`;
-                        ensureDay(employee.division, empId, employee.full_name, date);
-                        const dayData = state.hierarchy[employee.division][empId].dates[date];
-                        dayData.to = toLookup[`${empId}_${date}`] || null;
-                        dayData.pso = (psoLookup[`${empId}_${date}`] || []).join('; ') || null;
-                        dayData.holidays = holidayLookup[date] || [];
-                    }
-                });
-
-                document.getElementById('extractorCurrentMonthLabel').textContent = `${Object.keys(employeeMap).length} DARPO-CS1 employee(s) with DAT logs for ${targetMonth}, arranged by division and name.`;
+                const knownCount = eligibleEmpIds.size;
+                const unknownCount = unknownEmpIds.size;
+                const skippedCount = wrongStationIds.size;
+                document.getElementById('extractorCurrentMonthLabel').textContent = `${knownCount} DARPO-CS1 employee(s), ${unknownCount} unidentified biometric ID(s) for ${targetMonth}${skippedCount ? `; ${skippedCount} non-DARPO employee ID(s) excluded` : ''}.`;
                 await renderExtractorTable();
-                const ignored = parsed.invalidLines + parsed.otherMonthLines;
-                if (ignored) showExtractorAlert(`DTR View generated. ${ignored} invalid or out-of-month line(s) were safely ignored.`, 'success');
+                const ignored = parsed.invalidLines + parsed.otherMonthLines + parsed.duplicateLines;
+                if (ignored && !state.unresolvedIds.size) {
+                    showExtractorAlert(`DTR View generated. ${parsed.invalidLines} invalid, ${parsed.otherMonthLines} out-of-month, and ${parsed.duplicateLines} duplicate line(s) were safely removed.`, 'success');
+                }
             } catch (error) {
                 console.error('Extractor error:', error);
                 showExtractorAlert(error.message || 'The extractor could not complete the request.');
@@ -2336,47 +2490,45 @@
             try {
                 const verifiedProfile = await requireActiveAttendanceSession();
                 const nowIso = new Date().toISOString();
-                const payload = state.datLogs.map(log => ({
-                    emp_id: log.emp_id,
-                    log_time: `${log.date} ${log.time}`,
-                    device_id: log.device_id,
-                    status: log.status,
-                    manual_log_name: null,
-                    manual_log_date: null
-                }));
+                if (state.unresolvedIds.size) {
+                    throw new Error(`Please locate all ${state.unresolvedIds.size} unidentified biometric employee number(s) before posting.`);
+                }
 
+                // Post only the four reviewed DTR slots. Extra raw punches are
+                // excluded after HR selects the correct time for each slot.
+                const payload = [];
+                const selectedPunches = new Set();
                 document.querySelectorAll('#extractorPreviewBody .extractor-time-input').forEach(input => {
                     let time = input.value;
+                    if (!time) return;
                     if (time && time.length === 5) time += ':00';
-                    const sourceIndex = input.dataset.sourceIndex;
+                    const selectedOption = input.tagName === 'SELECT' ? input.options[input.selectedIndex] : null;
+                    const sourceIndex = selectedOption?.dataset.sourceIndex ?? input.dataset.sourceIndex;
                     const hasSource = sourceIndex !== '' && Number.isInteger(Number(sourceIndex));
-                    const isManual = input.classList.contains('extractor-manual-entry');
+                    const cleanEmpId = String(input.dataset.emp || '').trim();
+                    const cleanDate = String(input.dataset.date || '').trim();
+                    const cleanTime = normalizeDatTime(time);
+                    if (!cleanEmpId || !isValidIsoDate(cleanDate) || !cleanTime) return;
 
-                    if (hasSource) {
-                        if (!time) payload[Number(sourceIndex)] = null;
-                        else if (isManual) {
-                            payload[Number(sourceIndex)] = {
-                                emp_id: input.dataset.emp,
-                                log_time: `${input.dataset.date} ${time}`,
-                                device_id: 'Manual',
-                                status: input.dataset.status,
-                                manual_log_name: verifiedProfile.full_name || verifiedProfile.username,
-                                manual_log_date: nowIso
-                            };
-                        }
-                    } else if (time) {
-                        payload.push({
-                            emp_id: input.dataset.emp,
-                            log_time: `${input.dataset.date} ${time}`,
-                            device_id: 'Manual',
-                            status: input.dataset.status,
-                            manual_log_name: verifiedProfile.full_name || verifiedProfile.username,
-                            manual_log_date: nowIso
-                        });
+                    const selectionKey = `${cleanEmpId}|${cleanDate}|${cleanTime}`;
+                    if (selectedPunches.has(selectionKey)) {
+                        throw new Error(`Duplicate time ${cleanTime} was selected for employee ${cleanEmpId} on ${cleanDate}.`);
                     }
+                    selectedPunches.add(selectionKey);
+
+                    payload.push({
+                        emp_id: cleanEmpId,
+                        log_time: `${cleanDate} ${cleanTime}`,
+                        device_id: hasSource ? (selectedOption?.dataset.device || input.dataset.device || 'Biometric') : 'Manual',
+                        status: String(input.dataset.status || '').trim(),
+                        manual_log_name: hasSource ? null : (verifiedProfile.full_name || verifiedProfile.username),
+                        manual_log_date: hasSource ? null : nowIso
+                    });
                 });
 
-                const finalPayload = payload.filter(Boolean);
+                const finalPayload = payload.sort((a, b) =>
+                    a.emp_id.localeCompare(b.emp_id) || a.log_time.localeCompare(b.log_time)
+                );
                 if (!finalPayload.length) throw new Error('No actual time punches were found to post.');
 
                 const batchSize = 1000;
@@ -2395,6 +2547,10 @@
                 state.hierarchy = {};
                 state.schedules = {};
                 state.datLogs = [];
+                state.employeeDirectory = {};
+                state.resolutions = {};
+                state.unresolvedIds = new Set();
+                state.context = null;
                 document.getElementById('extractorFileInput').value = '';
                 document.getElementById('extractorTableWrapper').style.display = 'none';
                 document.getElementById('extractorUploadAction').style.display = 'none';
