@@ -196,7 +196,8 @@
       btn.innerHTML = '<span class="loader"></span> Authenticating';
       msg.classList.add('hidden');
       
-      const { data, error } = await db.from('users').select('*').eq('username', user).eq('password', pass).maybeSingle();
+      // Changed .eq('username', user) to .ilike('username', user) to allow case-insensitive login
+      const { data, error } = await db.from('users').select('*').ilike('username', user).eq('password', pass).maybeSingle();
       
       if (error) {
         msg.textContent = esc(error.message);
