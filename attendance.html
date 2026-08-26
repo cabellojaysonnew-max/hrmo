@@ -1968,17 +1968,28 @@
                 if (aLogs.length > 0) {
                     attLogDisplay = formatTime12(aLogs[0]);
                 }
-                
+
+                let isFlagAbsent = false;
+
                 if (fLog) {
-                    flagLogDisplay = fLog.time_in ? formatTime12(new Date(`${dStr}T${fLog.time_in}`)) : "YES";
-                    if(!fLog.time_in && fLog.status) flagLogDisplay = fLog.status;
+                    if (fLog.time_in && fLog.time_in.toUpperCase() !== 'ABSENT') {
+                        flagLogDisplay = formatTime12(new Date(`${dStr}T${fLog.time_in}`));
+                    } else if (fLog.time_in && fLog.time_in.toUpperCase() === 'ABSENT') {
+                        flagLogDisplay = 'ABSENT';
+                        isFlagAbsent = true;
+                    } else if (!fLog.time_in && fLog.status) {
+                        flagLogDisplay = fLog.status;
+                        if (fLog.status.toUpperCase() === 'ABSENT') isFlagAbsent = true;
+                    } else {
+                        flagLogDisplay = "YES";
+                    }
                 }
 
                 let isLate = false;
                 const cutoff = new Date(`${dStr}T08:00:00`); 
 
                 if (aLogs.length > 0 && aLogs[0] > cutoff) isLate = true;
-                if (fLog && fLog.time_in && new Date(`${dStr}T${fLog.time_in}`) > cutoff) isLate = true;
+                if (fLog && fLog.time_in && fLog.time_in.toUpperCase() !== 'ABSENT' && new Date(`${dStr}T${fLog.time_in}`) > cutoff) isLate = true;
                 if (fLog && fLog.status && fLog.status.toUpperCase() === 'LATE') isLate = true;
 
                 if (toDisplay === "YES") {
@@ -1988,13 +1999,15 @@
                 } else if (leaveDisplay !== "-") {
                     remarks = `ON LEAVE (${leaveDisplay})`;
                 } else {
-                    if (fLog && !isLate) {
+                    const attendedFlag = fLog && !isFlagAbsent;
+
+                    if (attendedFlag && !isLate) {
                         remarks = "Present and Attended Flag Ceremony";
-                    } else if (fLog && isLate) {
+                    } else if (attendedFlag && isLate) {
                         remarks = "Late and Attended Flag Ceremony";
-                    } else if (!fLog && aLogs.length > 0 && !isLate) {
+                    } else if (!attendedFlag && aLogs.length > 0 && !isLate) {
                         remarks = "Present but did not attend Flag Ceremony";
-                    } else if (!fLog && aLogs.length > 0 && isLate) {
+                    } else if (!attendedFlag && aLogs.length > 0 && isLate) {
                         remarks = "Late and did not attend Flag Ceremony";
                     } else {
                         remarks = "ABSENT";
