@@ -1,461 +1,237 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance Terminal - DAR</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <script src="supabase-config.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #003811; overflow: hidden; color: white; }
-        .clock-text { font-size: 5rem; font-weight: bold; line-height: 1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); color: #D4AF37; }
-        .date-text { font-size: 1.5rem; font-weight: 600; color: #E5E7EB; }
-        
-        /* HARDWARE ACCELERATED CAMERA CONTAINERS */
-        #face-video-container { position: relative; width: 100%; max-width: 450px; border-radius: 1rem; overflow: hidden; border: 4px solid #D4AF37; box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #000; will-change: transform; transform: translateZ(0); }
-        #face-video { width: 100%; height: auto; transform: scaleX(-1); will-change: transform; }
-        
-        #qr-video-container { width: 250px; height: 250px; border-radius: 0.5rem; overflow: hidden; border: 2px solid #6B7280; background: #000; position: relative; will-change: transform; transform: translateZ(0); }
-        
-        .scanner-input { background: rgba(255,255,255,0.1); border: 2px solid #D4AF37; color: white; text-align: center; font-size: 1.5rem; font-weight: bold; letter-spacing: 0.1em; outline: none; transition: all 0.2s; }
-        .scanner-input:focus { background: rgba(255,255,255,0.2); box-shadow: 0 0 15px rgba(212, 175, 55, 0.5); }
-        
-        .toast-enter { animation: slideIn 0.2s ease-out forwards; }
-        @keyframes slideIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        
-        #settings-modal { backdrop-filter: blur(5px); }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DAR Flag Ceremony Attendance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/html5-qrcode" defer></script>
+  <style>
+    :root { --dar-green: #003811; --dar-gold: #D4AF37; }
+    html, body { min-height: 100%; }
+    body { font-family: "Segoe UI", Arial, sans-serif; background: #f3f6f4; color: #1f2937; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 38px rgba(0, 56, 17, .08); }
+    .input { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 11px 13px; background: #fff; outline: none; }
+    .input:focus { border-color: var(--dar-green); box-shadow: 0 0 0 3px rgba(0,56,17,.12); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; padding: 11px 16px; font-weight: 800; font-size: 13px; transition: .15s; }
+    .btn:disabled { cursor: not-allowed; opacity: .55; }
+    .btn-green { background: var(--dar-green); color: #fff; }
+    .btn-green:hover:not(:disabled) { background: #00521a; }
+    .btn-gold { background: var(--dar-gold); color: var(--dar-green); }
+    .btn-gold:hover:not(:disabled) { background: #e7c34d; }
+    .btn-outline { border: 1px solid #cbd5e1; color: #334155; background: #fff; }
+    .btn-outline:hover:not(:disabled) { background: #f8fafc; }
+    .pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 800; }
+    .pill-present { background: #dcfce7; color: #166534; }
+    .pill-late { background: #fef3c7; color: #92400e; }
+    .pill-open { background: #a7f3d0; color: #065f46; }
+    .pill-closed { background: #fecaca; color: #991b1b; }
+    .notice { border-radius: 10px; border: 1px solid; padding: 11px 13px; font-size: 13px; line-height: 1.55; }
+    .notice-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+    .notice-success { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+    .notice-warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+    .loader { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 999px; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #qr-reader video { width: 100% !important; border-radius: 14px; }
+    #qr-reader__scan_region { min-height: 230px; border-radius: 14px; overflow: hidden; background: #020617; }
+    #qr-reader__dashboard { padding: 8px 0 0 !important; }
+    #qr-reader__dashboard button { border: 1px solid #cbd5e1; border-radius: 7px; padding: 6px 10px; background: white; }
+    .table-wrap { max-height: 600px; overflow: auto; }
+    @media print { .no-print { display: none !important; } body { background: #fff; } .card { box-shadow: none; border: 0; } }
+    @media (min-width: 900px) {
+      body { height: 100vh; overflow: hidden; }
+      main { height: calc(100vh - 174px); overflow: hidden; padding-top: 22px !important; padding-bottom: 12px !important; }
+      #employeeMode, #hrMode { height: 100%; min-height: 0; }
+      #employeeMode > .card, #employeeMode > .space-y-6 { min-height: 0; }
+      #hrMode { overflow: hidden; }
+      #hrMode > .grid { min-height: 0; flex: 1; }
+      #hrMode .table-wrap { max-height: calc(100vh - 430px); }
+      footer { height: 34px; overflow: hidden; }
+    }
+    @media (max-width: 899px) { body { overflow-x: hidden; } }
+  </style>
 </head>
-<body class="flex h-screen items-center justify-center relative p-8">
-
-    <div class="absolute top-4 left-4">
-        <button onclick="openSettings()" class="bg-gray-800 text-white p-3 rounded-full shadow-lg hover:bg-gray-700 transition" title="Camera Settings">
-            ⚙️ Setup
-        </button>
+<body>
+  <header class="bg-[#003811] text-white border-b border-[#0d5528]">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-[#D4AF37] text-[#003811] grid place-items-center text-2xl">⚑</div>
+        <div><p class="text-[10px] uppercase tracking-[.22em] font-bold text-[#D4AF37]">Department of Agrarian Reform</p><h1 class="text-lg sm:text-xl font-extrabold">Flag Ceremony Attendance</h1></div>
+      </div>
+      <div id="headerDate" class="hidden sm:block text-xs text-white/70"></div>
     </div>
+  </header>
 
-    <div class="absolute top-4 right-4 flex flex-col gap-2 items-end z-10">
-        <div id="networkStatus" class="px-4 py-2 rounded-full font-bold text-sm bg-green-600 shadow-lg flex items-center gap-2 transition-colors duration-300">
-            <div class="w-3 h-3 rounded-full bg-white animate-pulse"></div>SYSTEM ONLINE
-        </div>
-        <button onclick="syncLogs(true)" id="queueBadge" class="px-4 py-2 rounded-full font-bold text-xs bg-gray-600 text-white shadow-lg cursor-pointer transition-colors duration-300">
-            0 PENDING LOGS
-        </button>
+  <nav class="bg-white border-b border-slate-200 no-print">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div><p id="pageKicker" class="font-bold text-sm text-[#003811]">Welcome to the Flag Ceremony</p><p id="pageSub" class="text-xs text-slate-500">Use your QR code or employee number to record attendance.</p></div>
+      <div class="flex gap-1 rounded-xl bg-slate-100 p-1">
+        <button id="employeeTab" class="px-4 py-2 rounded-lg text-xs font-extrabold bg-white text-[#003811] shadow-sm" onclick="showMode('employee')">Employee entry</button>
+        <button id="hrTab" class="px-4 py-2 rounded-lg text-xs font-extrabold text-slate-500" onclick="showMode('hr')">HR console</button>
+      </div>
     </div>
+  </nav>
 
-    <div class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        
-        <div class="lg:col-span-5 flex flex-col items-center justify-center gap-6">
-            <div class="flex flex-col items-center">
-                <div id="face-video-container">
-                    <video id="face-video" autoplay playsinline muted></video>
-                    <div class="absolute bottom-2 left-0 w-full text-center">
-                        <span class="bg-black/70 px-3 py-1 rounded text-[10px] tracking-widest uppercase font-bold text-[#D4AF37]">📸 PHOTO AUDIT CAMERA</span>
-                    </div>
-                </div>
-                <canvas id="canvas" class="hidden"></canvas>
-            </div>
+  <main class="max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+    <div id="globalNotice" class="hidden mb-6"></div>
 
-            <div class="flex flex-col items-center bg-white/5 p-4 rounded-xl border border-white/10 w-full max-w-[450px]">
-                <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest mb-2 text-center">SCAN QR ID HERE</h3>
-                <div id="qr-reader" class="w-full max-w-[300px] overflow-hidden rounded border-2 border-dashed border-gray-400"></div>
-                <p class="text-[10px] text-gray-400 mt-2 text-center uppercase" id="qr-status">Initializing Scanner...</p>
-            </div>
+    <section id="employeeMode" class="grid lg:grid-cols-[1.05fr_.95fr] gap-6">
+      <div class="card overflow-hidden">
+        <div class="p-6 sm:p-8 border-b border-slate-100">
+          <span class="pill bg-[#e9f1eb] text-[#003811]">EMPLOYEE CHECK-IN</span>
+          <h2 class="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-[#003811]">Record your Flag Ceremony attendance</h2>
+          <p class="mt-2 text-sm leading-6 text-slate-500">Scan the QR code on your employee ID or enter your employee number. Your profile will be shown before the attendance record is saved.</p>
         </div>
-
-        <div class="lg:col-span-7 flex flex-col items-center justify-center text-center">
-            <div class="mb-8">
-                <h1 class="text-3xl font-bold uppercase tracking-widest text-gray-300 mb-2">Department of Agrarian Reform</h1>
-                <div id="clock" class="clock-text">--:--:-- --</div>
-                <div id="date" class="date-text mt-2">Loading Date...</div>
-            </div>
-
-            <div class="w-full max-w-md bg-white/10 p-6 rounded-xl backdrop-blur-md border border-white/20 shadow-2xl">
-                <p class="mb-2 text-xs font-bold text-[#D4AF37] uppercase tracking-wider">Manual ID Entry (Fallback)</p>
-                <div class="flex gap-2">
-                    <input type="text" id="empIdInput" class="scanner-input flex-1 py-3 rounded-lg" placeholder="ID Number..." autocomplete="off">
-                    <button onclick="handleManualInput()" class="bg-[#D4AF37] text-[#003811] px-6 rounded-lg font-bold uppercase hover:bg-yellow-500 transition-colors">ENTER</button>
-                </div>
-            </div>
-
-            <div id="resultCard" class="hidden mt-8 w-full max-w-lg bg-white p-8 rounded-xl shadow-2xl toast-enter border-l-8">
-                <div class="flex justify-between items-start mb-2">
-                    <p id="resTime" class="text-gray-500 text-sm font-bold"></p>
-                    <span id="flagBadge" class="hidden bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-1 rounded border border-blue-300 uppercase tracking-widest">Flag Ceremony Logged</span>
-                </div>
-                <h2 id="resName" class="text-3xl font-black text-[#003811] mb-1 leading-tight"></h2>
-                <p id="resDivision" class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4"></p>
-                <p id="resStatus" class="text-4xl font-black uppercase tracking-widest"></p>
-                <p class="text-xs text-gray-400 font-bold mt-4">Data secured locally. Ready for next scan.</p>
-            </div>
+        <div class="p-6 sm:p-8 space-y-6">
+          <div class="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+            <button id="manualModeBtn" class="rounded-lg px-3 py-2.5 text-sm font-bold bg-white text-[#003811] shadow-sm" onclick="setEntryMode('manual')">Manual employee ID</button>
+            <button id="qrModeBtn" class="rounded-lg px-3 py-2.5 text-sm font-bold text-slate-500" onclick="setEntryMode('qr')">▣ Scan QR code</button>
+          </div>
+          <div id="manualEntry" class="space-y-3">
+            <label for="employeeId" class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]">Employee number</label>
+            <form onsubmit="locateEmployee(event)" class="flex gap-2"><input id="employeeId" class="input h-12 text-base" autocomplete="off" placeholder="Enter employee ID"><button id="locateBtn" class="btn btn-green h-12 px-5" type="submit">⌕ Locate</button></form>
+          </div>
+          <div id="qrEntry" class="hidden space-y-3"><div id="qr-reader"></div><button class="btn btn-outline w-full" onclick="stopScanner()">✕ Stop camera</button><p id="qrStatus" class="text-xs text-slate-500 text-center"></p></div>
+          <div id="employeeNotice" class="hidden"></div>
+          <div id="employeeProfile" class="hidden rounded-2xl border border-[#d7e6da] bg-[#f5faf6] p-5"></div>
         </div>
-    </div>
+      </div>
 
-    <div id="settings-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-        <div class="bg-white text-gray-800 p-8 rounded-xl w-full max-w-md shadow-2xl">
-            <h2 class="text-xl font-black text-[#003811] mb-6 uppercase border-b pb-2">Hardware Setup</h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Face Capture Camera (Photo)</label>
-                    <select id="sel-face-cam" class="w-full p-2 border rounded bg-gray-50 text-sm"></select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">QR Scanner Camera</label>
-                    <select id="sel-qr-cam" class="w-full p-2 border rounded bg-gray-50 text-sm"></select>
-                </div>
-            </div>
-            <div class="mt-8 flex gap-3">
-                <button onclick="saveSettings()" class="flex-1 bg-[#003811] text-white py-3 rounded font-bold hover:bg-green-800 transition">SAVE & RESTART</button>
-                <button onclick="closeSettings()" class="px-6 bg-gray-200 text-gray-700 py-3 rounded font-bold hover:bg-gray-300 transition">CANCEL</button>
-            </div>
-        </div>
-    </div>
+      <div class="space-y-6">
+        <div class="card bg-[#003811] text-white border-0 overflow-hidden"><div class="p-6 sm:p-8"><div class="flex items-center gap-2 text-[#D4AF37] text-xs font-extrabold uppercase tracking-[.18em]">◷ Current Flag Ceremony</div><p id="ceremonyDateLabel" class="mt-5 text-2xl sm:text-3xl font-extrabold"></p><div class="mt-6 grid grid-cols-2 gap-3"><div class="rounded-xl border border-white/15 bg-white/10 p-4"><span class="block text-[10px] uppercase tracking-wider text-white/60 font-bold">Ceremony time</span><span id="ceremonyTimeLabel" class="block mt-1 text-2xl font-extrabold text-[#D4AF37]"></span></div><div class="rounded-xl border border-white/15 bg-white/10 p-4"><span class="block text-[10px] uppercase tracking-wider text-white/60 font-bold">Allowance</span><span id="ceremonyAllowanceLabel" class="block mt-1 text-2xl font-extrabold text-[#D4AF37]"></span></div></div><div class="mt-6 flex items-start gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm leading-6"><span class="text-[#D4AF37]">▸</span><p id="ceremonyAnnouncement"></p></div><div class="mt-5 pt-4 border-t border-white/15 flex justify-between items-center text-xs"><span>Check-in status</span><span id="ceremonyOpenLabel" class="pill"></span></div></div></div>
+        <div class="card"><div class="p-5 flex items-start gap-3 text-sm text-slate-600 leading-6"><span class="text-[#003811]">●</span><p>The system matches your employee number with the official <strong>employees</strong> table before showing your profile and saving your record.</p></div></div>
+        <button onclick="loadCeremony(true)" class="btn btn-outline w-full no-print">↻ Refresh ceremony notice</button>
+      </div>
+    </section>
 
-<script>
-    // PERFORMANCE CONFIG
-    const DEVICE_ID = "TERMINAL_01"; 
-    const SYNC_INTERVAL_MS = 60 * 60 * 1000; // 1 Hour
-    const SCAN_COOLDOWN_MS = 3000; 
+    <section id="hrMode" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><span class="pill bg-[#e9f1eb] text-[#003811]">HR CONSOLE</span><h2 class="mt-3 text-3xl font-extrabold tracking-tight text-[#003811]">Flag Ceremony monitoring</h2><p id="hrSignedIn" class="mt-2 text-sm text-slate-500"></p></div><button class="btn btn-outline no-print" onclick="loadHrRecords()">↻ Refresh records</button></div>
+      <div id="hrNotice" class="hidden"></div>
+      <div class="grid xl:grid-cols-[380px_1fr] gap-6">
+        <div class="card"><div class="p-6 border-b border-slate-100"><h3 class="font-extrabold text-lg text-[#003811]">⚙ Ceremony settings</h3><p class="text-sm text-slate-500 mt-1">Set the time, allowable allowance and announcement for the selected date.</p></div><form onsubmit="saveCeremony(event)" class="p-6 space-y-5"><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrDate">Ceremony date</label><input id="hrDate" type="date" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrTime">Flag Ceremony time</label><input id="hrTime" type="time" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAllowance">Allowable allowance (minutes)</label><input id="hrAllowance" type="number" min="0" max="180" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAnnouncement">Announcement</label><textarea id="hrAnnouncement" rows="4" class="input mt-2 resize-y" placeholder="Write the message employees will see..."></textarea></div><label class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer"><span><span class="block font-bold text-sm">Allow employee check-in</span><span class="block text-xs text-slate-500 mt-1">Close this after the ceremony.</span></span><input id="hrOpen" type="checkbox" class="w-5 h-5 accent-[#003811]"></label><button id="saveBtn" class="btn btn-green w-full h-11" type="submit">✓ Save ceremony settings</button></form></div>
+        <div class="space-y-6"><div class="grid sm:grid-cols-3 gap-3"><div class="rounded-2xl bg-[#e9f1eb] text-[#003811] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Total checked in</p><p id="countTotal" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-[#fbf4d9] text-[#7a5c00] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Present</p><p id="countPresent" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-red-50 text-red-800 px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Late</p><p id="countLate" class="mt-1 text-3xl font-extrabold">0</p></div></div><div class="card overflow-hidden"><div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-end justify-between gap-3"><div><h3 class="font-extrabold text-lg text-[#003811]">Attendance records</h3><p id="recordsLabel" class="text-sm text-slate-500 mt-1"></p></div><input id="recordSearch" oninput="renderRecords()" class="input sm:w-52" placeholder="Search records"></div><div class="table-wrap"><table class="w-full min-w-[680px] text-left text-sm"><thead class="sticky top-0 bg-[#003811] text-white text-xs uppercase tracking-wider"><tr><th class="px-5 py-3">Employee</th><th class="px-5 py-3">Division</th><th class="px-5 py-3">Time in</th><th class="px-5 py-3">Status</th></tr></thead><tbody id="recordsBody" class="divide-y divide-slate-100"></tbody></table></div></div></div></div>
+    </section>
+  </main>
+  <footer class="max-w-7xl mx-auto px-5 sm:px-8 pb-8 text-xs text-slate-400 flex justify-between gap-3"><span>Attendance is identified by employee number and ceremony date.</span><span>Connected to DAR employee records</span></footer>
 
-    let faceVideo = document.getElementById('face-video');
-    let canvas = document.getElementById('canvas');
-    let isOnline = navigator.onLine;
-    let resetTimer = null;
-    let cachedEmployees = {}; 
-    let isProcessing = false;
+  <script>
+    /*
+     * This page follows the existing DAR HR pages:
+     *   - HR authorization comes from sessionStorage.currentUser.
+     *   - The same Supabase project and publishable key are used.
+     *   - Employees are matched by employees.emp_id.
+     *
+     * Run db/flag-ceremony.sql once to create the flag_ceremonies settings table.
+     */
+    const SUPABASE_URL = window.SUPABASE_URL || window.SUPABASE_CONFIG?.url || window.supabaseConfig?.url || 'https://xnwttnpfzcjbszwxsgox.supabase.co';
+    const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || window.SUPABASE_CONFIG?.anonKey || window.SUPABASE_CONFIG?.publishableKey || window.supabaseConfig?.anonKey || 'sb_publishable_zEh0y_OAF7nVwLBuTTB74w_gPX0XomI';
+    const db = window.supabaseClient || window.secureDbClient || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const state = { mode: 'employee', entryMode: 'manual', ceremony: null, employee: null, existing: null, records: [], scanner: null, user: null };
 
-    let html5QrCode = null;
-    let faceStream = null;
-    let prefFaceCam = localStorage.getItem('prefFaceCam');
-    let prefQRCam = localStorage.getItem('prefQRCam');
+    const today = () => { const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000); return local.toISOString().slice(0, 10); };
+    const esc = (value) => String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+    const cleanId = (value) => { const raw = String(value ?? '').trim(); if (!raw) return ''; try { const url = new URL(raw); const fromUrl = url.searchParams.get('emp_id') || url.searchParams.get('employee_id') || url.searchParams.get('id'); if (fromUrl) return fromUrl.trim().replace(/\s+/g,''); } catch (_) {} const labeled = raw.match(/(?:employee\s*id|emp\s*id|emp[_-]?no)\s*[:=#-]\s*([A-Za-z0-9._/-]+)/i); return (labeled?.[1] || raw).trim().replace(/\s+/g,''); };
+    const displayName = (employee) => employee?.full_name || [employee?.first_name, employee?.last_name].filter(Boolean).join(' ') || employee?.emp_id || '';
+    const splitName = (name) => { const parts = String(name).trim().split(/\s+/).filter(Boolean); return { first_name: parts.shift() || name, last_name: parts.join(' ') || '' }; };
+    const normalTime = (value) => { const m = String(value || '').match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/); return m ? `${String(Math.min(23, Number(m[1]))).padStart(2,'0')}:${m[2]}:${m[3] || '00'}` : ''; };
+    const mins = (value) => { const m = normalTime(value).match(/^(\d{2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : 0; };
+    const time12 = (value) => { const m = normalTime(value).match(/^(\d{2}):(\d{2})/); if (!m) return value || '—'; const h = Number(m[1]); return `${h % 12 || 12}:${m[2]} ${h >= 12 ? 'PM' : 'AM'}`; };
+    const dateLabel = (value) => new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+    const fallbackCeremony = (date) => ({ ceremony_date: date, ceremony_time: '08:00', allowance_minutes: 10, announcement: 'Please be present before the Flag Ceremony begins.', is_open: true });
+    const getUser = () => { const raw = sessionStorage.getItem('currentUser'); if (!raw) return null; try { return JSON.parse(raw); } catch (_) { return null; } };
+    const setBox = (id, html, type) => { const el = document.getElementById(id); el.className = `notice notice-${type || 'error'}`; el.innerHTML = html; el.classList.remove('hidden'); };
+    const clearBox = (id) => { const el = document.getElementById(id); el.classList.add('hidden'); el.innerHTML = ''; };
+    const isRejected = (error) => /relation .*does not exist|could not find the table|schema cache/i.test(String(error?.message || error || ''));
 
-    window.onload = async () => {
-        startClock();
-        updateNetworkStatus();
-        updateQueueCounter();
-        
-        // Non-blocking initialization
-        setTimeout(async () => {
-            await syncEmployeeCache(); // Now fetches from local Node.js server
-            await populateCameras();
-            startCameras();
-        }, 100);
-
-        window.addEventListener('online', () => { isOnline = true; updateNetworkStatus(); syncLogs(false); });
-        window.addEventListener('offline', () => { isOnline = false; updateNetworkStatus(); });
-
-        setInterval(() => syncLogs(false), SYNC_INTERVAL_MS);
-        
-        document.getElementById('empIdInput').addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') handleManualInput();
-        });
-        
-        // Keep input focused for pure hardware scanners
-        document.addEventListener('click', (e) => {
-            if(!e.target.closest('#settings-modal') && e.target.tagName !== 'BUTTON') {
-                document.getElementById('empIdInput').focus();
-            }
-        });
-    };
-
-    function get12HourTime(dateObj) {
-        let hours = dateObj.getHours();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 || 12; 
-        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-        const seconds = String(dateObj.getSeconds()).padStart(2, '0');
-        return { hours, minutes, seconds, ampm, formattedString: `${String(hours).padStart(2, '0')}:${minutes} ${ampm}` };
+    async function loadCeremony(showMessage) {
+      const date = state.mode === 'hr' ? document.getElementById('hrDate').value : today();
+      const { data, error } = await db.from('flag_ceremonies').select('id,ceremony_date,ceremony_time,allowance_minutes,announcement,is_open').eq('ceremony_date', date).limit(1).maybeSingle();
+      if (error && !isRejected(error)) { if (showMessage) setBox('globalNotice', esc(error.message), 'error'); state.ceremony = fallbackCeremony(date); }
+      else state.ceremony = data ? { ...data, ceremony_date: String(data.ceremony_date).slice(0,10), ceremony_time: normalTime(data.ceremony_time).slice(0,5), allowance_minutes: Number(data.allowance_minutes ?? 10), announcement: data.announcement || '', is_open: data.is_open !== false } : fallbackCeremony(date);
+      if (error && isRejected(error)) setBox('globalNotice', '<strong>Setup required:</strong> Run the supplied <code>flag-ceremony.sql</code> once to enable HR ceremony settings. Employee records still use <code>flag_attendance</code>.', 'warn');
+      renderCeremony();
     }
 
-    function startClock() {
-        setInterval(() => {
-            const now = new Date();
-            const t = get12HourTime(now);
-            document.getElementById('clock').innerText = `${String(t.hours).padStart(2, '0')}:${t.minutes}:${t.seconds} ${t.ampm}`;
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            document.getElementById('date').innerText = now.toLocaleDateString('en-US', options);
-        }, 1000);
+    function renderCeremony() {
+      const c = state.ceremony || fallbackCeremony(today());
+      document.getElementById('headerDate').textContent = dateLabel(c.ceremony_date);
+      document.getElementById('ceremonyDateLabel').textContent = dateLabel(c.ceremony_date);
+      document.getElementById('ceremonyTimeLabel').textContent = time12(c.ceremony_time);
+      document.getElementById('ceremonyAllowanceLabel').textContent = `${c.allowance_minutes} min`;
+      document.getElementById('ceremonyAnnouncement').textContent = c.announcement || 'No announcement has been posted for this ceremony.';
+      const status = document.getElementById('ceremonyOpenLabel'); status.textContent = c.is_open ? 'OPEN' : 'CLOSED'; status.className = `pill ${c.is_open ? 'pill-open' : 'pill-closed'}`;
+      if (state.mode === 'hr') { document.getElementById('hrTime').value = String(c.ceremony_time || '08:00').slice(0,5); document.getElementById('hrAllowance').value = c.allowance_minutes; document.getElementById('hrAnnouncement').value = c.announcement || ''; document.getElementById('hrOpen').checked = c.is_open; }
     }
 
-    function updateNetworkStatus() {
-        const indicator = document.getElementById('networkStatus');
-        if (isOnline) {
-            indicator.className = "px-4 py-2 rounded-full font-bold text-sm bg-green-600 shadow-lg flex items-center gap-2 transition-colors duration-300";
-            indicator.innerHTML = `<div class="w-3 h-3 rounded-full bg-white animate-pulse"></div> SYSTEM ONLINE`;
-        } else {
-            indicator.className = "px-4 py-2 rounded-full font-bold text-sm bg-red-600 shadow-lg flex items-center gap-2 transition-colors duration-300";
-            indicator.innerHTML = `<div class="w-3 h-3 rounded-full bg-white"></div> OFFLINE MODE`;
-        }
+    function showMode(mode) {
+      if (mode === 'hr') {
+        const user = getUser();
+        if (!user) { setBox('globalNotice', 'No active HR session was found. Sign in through the existing DAR HR login first. This page does not create a second login.', 'error'); return; }
+        const role = String(user.role || '').toUpperCase();
+        if (!role.includes('HRMO') && !role.includes('ADMIN') && !role.includes('HR')) { setBox('globalNotice', 'This active session is not authorized for the HR Flag Ceremony console.', 'error'); return; }
+        state.user = user; state.mode = 'hr';
+        document.getElementById('employeeMode').classList.add('hidden'); document.getElementById('hrMode').classList.remove('hidden');
+        document.getElementById('employeeTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold text-slate-500'; document.getElementById('hrTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold bg-[#003811] text-white shadow-sm';
+        document.getElementById('pageKicker').textContent = 'HR monitoring workspace'; document.getElementById('pageSub').textContent = 'Manage ceremony settings and monitor check-ins.'; document.getElementById('hrSignedIn').textContent = `Signed in as ${user.full_name || user.username || 'HRMO'} · ${user.role || 'HRMO'}`;
+        document.getElementById('hrDate').value = today(); document.getElementById('recordSearch').value = ''; loadCeremony(false).then(loadHrRecords);
+      } else {
+        state.mode = 'employee'; document.getElementById('employeeMode').classList.remove('hidden'); document.getElementById('hrMode').classList.add('hidden'); document.getElementById('employeeTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold bg-white text-[#003811] shadow-sm'; document.getElementById('hrTab').className = 'px-4 py-2 rounded-lg text-xs font-extrabold text-slate-500'; document.getElementById('pageKicker').textContent = 'Welcome to the Flag Ceremony'; document.getElementById('pageSub').textContent = 'Use your QR code or employee number to record attendance.'; loadCeremony(false);
+      }
     }
 
-    async function populateCameras() {
-        try {
-            await navigator.mediaDevices.getUserMedia({video: true}); 
-            const devices = await Html5Qrcode.getCameras();
-            if (devices && devices.length) {
-                if (!prefFaceCam) prefFaceCam = devices[0].id;
-                if (!prefQRCam) prefQRCam = devices.length > 1 ? devices[1].id : devices[0].id;
-                
-                const sFace = document.getElementById('sel-face-cam');
-                const sQR = document.getElementById('sel-qr-cam');
-                sFace.innerHTML = ''; sQR.innerHTML = '';
-                
-                devices.forEach(d => {
-                    sFace.innerHTML += `<option value="${d.id}" ${d.id === prefFaceCam ? 'selected' : ''}>${d.label || d.id}</option>`;
-                    sQR.innerHTML += `<option value="${d.id}" ${d.id === prefQRCam ? 'selected' : ''}>${d.label || d.id}</option>`;
-                });
-            }
-        } catch (e) {
-            document.getElementById('qr-status').innerText = "CAMERA ACCESS DENIED";
-        }
+    function setEntryMode(mode) {
+      state.entryMode = mode; document.getElementById('manualEntry').classList.toggle('hidden', mode !== 'manual'); document.getElementById('qrEntry').classList.toggle('hidden', mode !== 'qr'); document.getElementById('manualModeBtn').className = `rounded-lg px-3 py-2.5 text-sm font-bold ${mode === 'manual' ? 'bg-white text-[#003811] shadow-sm' : 'text-slate-500'}`; document.getElementById('qrModeBtn').className = `rounded-lg px-3 py-2.5 text-sm font-bold ${mode === 'qr' ? 'bg-white text-[#003811] shadow-sm' : 'text-slate-500'}`;
+      if (mode === 'qr') startScanner(); else stopScanner();
     }
 
-    async function startCameras() {
-        if (faceStream) { faceStream.getTracks().forEach(t => t.stop()); }
-        try {
-            faceStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { deviceId: prefFaceCam ? { exact: prefFaceCam } : undefined, width: { ideal: 640 }, height: { ideal: 480 } } 
-            });
-            faceVideo.srcObject = faceStream;
-        } catch (err) {}
+    function startScanner() {
+      const status = document.getElementById('qrStatus');
+      if (!window.Html5Qrcode) { status.textContent = 'QR scanner library is still loading. Use manual employee ID if it does not start.'; return; }
+      if (state.scanner) return;
+      state.scanner = new Html5Qrcode('qr-reader'); status.textContent = 'Point the camera at the employee ID QR code.';
+      state.scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, (decoded) => { stopScanner(); document.getElementById('employeeId').value = cleanId(decoded); locateEmployee(null); }, () => {}).catch((error) => { status.textContent = `Camera unavailable: ${error.message || 'use manual entry.'}`; state.scanner = null; });
+    }
+    async function stopScanner() { if (!state.scanner) return; try { await state.scanner.stop(); await state.scanner.clear(); } catch (_) {} state.scanner = null; }
 
-        if (html5QrCode) {
-            try { await html5QrCode.stop(); } catch(e) {}
-            html5QrCode.clear();
-        }
-        
-        if (prefQRCam) {
-            html5QrCode = new Html5Qrcode("qr-reader");
-            // OPTIMIZATION: Reduced FPS and disabled flip for CPU efficiency
-            const config = { fps: 4, qrbox: { width: 250, height: 250 }, disableFlip: true };
-            
-            html5QrCode.start(
-                prefQRCam, config, 
-                (decodedText) => {
-                    const empId = decodedText.trim();
-                    if(!isProcessing && empId) processAttendance(empId);
-                }, 
-                (error) => {}
-            ).then(() => {
-                document.getElementById('qr-status').innerText = "SCANNER ACTIVE";
-                document.getElementById('qr-status').className = "text-[10px] font-bold text-green-500 mt-2 text-center uppercase";
-            }).catch(err => {
-                document.getElementById('qr-status').innerText = "SCANNER ERROR";
-            });
-        }
+    async function locateEmployee(event) {
+      if (event) event.preventDefault();
+      const id = cleanId(document.getElementById('employeeId').value); if (!id) return setBox('employeeNotice', 'Enter an employee number.', 'error');
+      const button = document.getElementById('locateBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Locating'; clearBox('employeeNotice'); document.getElementById('employeeProfile').classList.add('hidden'); state.employee = null; state.existing = null;
+      const { data, error } = await db.from('employees').select('*').eq('emp_id', id).limit(1).maybeSingle();
+      if (error) setBox('employeeNotice', esc(error.message), 'error');
+      else if (!data) setBox('employeeNotice', `Employee number <strong>${esc(id)}</strong> was not found in the employees table.`, 'error');
+      else { state.employee = data; const existing = await db.from('flag_attendance').select('emp_id,date,time_in,status').eq('emp_id', id).eq('date', state.ceremony.ceremony_date).limit(1).maybeSingle(); state.existing = existing.data || null; if (existing.error) setBox('employeeNotice', esc(existing.error.message), 'error'); renderProfile(); }
+      button.disabled = false; button.innerHTML = '⌕ Locate';
     }
 
-    // OPTIMIZATION: Aggressive downscaling and compression for speed
-    function captureFaceImage() {
-        if (!faceVideo.videoWidth) return null;
-        const context = canvas.getContext('2d', { alpha: false }); 
-        const targetWidth = 320; 
-        const scale = targetWidth / faceVideo.videoWidth;
-        canvas.width = targetWidth;
-        canvas.height = faceVideo.videoHeight * scale;
-        context.drawImage(faceVideo, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL('image/jpeg', 0.4); 
+    function renderProfile() {
+      const employee = state.employee; const profile = document.getElementById('employeeProfile'); if (!employee) { profile.classList.add('hidden'); return; }
+      const name = displayName(employee); const existing = state.existing; profile.innerHTML = `<div class="flex items-start gap-4"><div class="w-14 h-14 rounded-full bg-[#003811] text-[#D4AF37] grid place-items-center text-lg font-bold">${esc(name.split(/\s+/).slice(0,2).map((p) => p[0]).join('').toUpperCase())}</div><div class="min-w-0 flex-1"><p class="text-xl font-extrabold text-[#003811]">${esc(name)}</p><p class="mt-1 font-mono text-sm text-slate-600">${esc(employee.emp_id)}</p><div class="grid sm:grid-cols-2 gap-3 mt-4 text-sm"><div><span class="block text-[10px] uppercase tracking-wider font-bold text-slate-500">Unit</span><strong>${esc(employee.unit || '—')}</strong></div><div><span class="block text-[10px] uppercase tracking-wider font-bold text-slate-500">Division</span><strong>${esc(employee.division || '—')}</strong></div><div><span class="block text-[10px] uppercase tracking-wider font-bold text-slate-500">Station</span><strong>${esc(employee.station || '—')}</strong></div><div><span class="block text-[10px] uppercase tracking-wider font-bold text-slate-500">Position</span><strong>${esc(employee.position || '—')}</strong></div></div></div></div><div class="border-t border-[#d7e6da] mt-5 pt-4">${existing ? `<div class="flex items-center justify-between rounded-xl bg-white px-4 py-3"><div><p class="font-bold text-sm text-[#003811]">Attendance already recorded</p><p class="text-xs text-slate-500 mt-1">${esc(time12(existing.time_in))} · ${esc(existing.status || 'SAVED')}</p></div><span class="pill pill-present">✓ SAVED</span></div>` : `<button id="checkInBtn" class="btn btn-gold w-full h-12" onclick="recordAttendance()">✓ CONFIRM FLAG CEREMONY ATTENDANCE</button>`}<button class="btn btn-outline w-full mt-2 text-xs" onclick="clearEmployee()">Clear and locate another employee</button></div>`;
+      profile.classList.remove('hidden');
+      const check = document.getElementById('checkInBtn'); if (check && !state.ceremony.is_open) { check.disabled = true; check.textContent = 'CHECK-IN CLOSED'; }
     }
 
-    // --- LOCAL DB CACHING ---
-    async function syncEmployeeCache() {
-        try {
-            // Fetch from ultra-fast local Node.js SQLite database
-            const response = await fetch('http://localhost:3000/api/local-employees');
-            
-            if (response.ok) {
-                const data = await response.json();
-                cachedEmployees = {};
-                data.forEach(e => cachedEmployees[e.emp_id] = e);
-                
-                // Keep a browser backup just in case the Node server restarts
-                localStorage.setItem('masterEmployeeCache', JSON.stringify(cachedEmployees));
-                console.log("Loaded employees from local SQLite database.");
-            }
-        } catch (e) { 
-            console.warn("Could not reach local employee database. Falling back to browser cache.", e); 
-            const stored = localStorage.getItem('masterEmployeeCache');
-            if (stored) cachedEmployees = JSON.parse(stored);
-        }
+    async function recordAttendance() {
+      if (!state.employee) return; if (!state.ceremony.is_open) return setBox('employeeNotice', 'The HR officer has closed this Flag Ceremony for check-in.', 'error');
+      const button = document.getElementById('checkInBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Saving';
+      const now = new Date(); const timeIn = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`; const names = splitName(displayName(state.employee)); const allowedUntil = mins(state.ceremony.ceremony_time) + Number(state.ceremony.allowance_minutes || 0); const status = mins(timeIn) <= allowedUntil ? 'PRESENT' : 'LATE';
+      const payload = { emp_id: cleanId(state.employee.emp_id), date: state.ceremony.ceremony_date, time_in: timeIn, last_name: state.employee.last_name || names.last_name, first_name: state.employee.first_name || names.first_name, division: state.employee.division || 'UNASSIGNED', status };
+      const result = await db.from('flag_attendance').upsert(payload, { onConflict: 'emp_id,date', ignoreDuplicates: true }).select().maybeSingle();
+      if (result.error) { setBox('employeeNotice', esc(result.error.message), 'error'); button.disabled = false; button.innerHTML = '✓ CONFIRM FLAG CEREMONY ATTENDANCE'; return; }
+      state.existing = result.data || payload; setBox('employeeNotice', `✓ Welcome, <strong>${esc(displayName(state.employee))}</strong>. Attendance recorded at <strong>${esc(time12(timeIn))}</strong> (${status}).`, 'success'); renderProfile();
     }
+    function clearEmployee() { state.employee = null; state.existing = null; document.getElementById('employeeId').value = ''; document.getElementById('employeeProfile').classList.add('hidden'); clearBox('employeeNotice'); }
 
-    // --- LOCAL FOLDER SAVING LOGIC ---
-    async function saveImageToLocalDrive(empId, base64Image, logTimeISO) {
-        if (!base64Image) return;
-        try {
-            const response = await fetch('http://localhost:3000/save-image', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ empId: empId, base64Image: base64Image, timestamp: logTimeISO })
-            });
-            if (!response.ok) console.warn("Failed to save image locally. Is Node running?");
-        } catch (error) {
-            console.warn("Local server unreachable. Ensure 'node server.js' is running in cmd.", error);
-        }
+    async function saveCeremony(event) {
+      event.preventDefault(); const button = document.getElementById('saveBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Saving'; clearBox('hrNotice'); const date = document.getElementById('hrDate').value; const payload = { ceremony_date: date, ceremony_time: `${document.getElementById('hrTime').value || '08:00'}:00`, allowance_minutes: Math.max(0, Math.min(180, Number(document.getElementById('hrAllowance').value) || 0)), announcement: document.getElementById('hrAnnouncement').value.trim(), is_open: document.getElementById('hrOpen').checked, created_by: state.user?.username || state.user?.full_name || 'HRMO' };
+      const result = await db.from('flag_ceremonies').upsert(payload, { onConflict: 'ceremony_date' }).select().maybeSingle(); if (result.error) setBox('hrNotice', esc(result.error.message), 'error'); else { state.ceremony = { ...payload, ceremony_time: payload.ceremony_time.slice(0,5) }; setBox('hrNotice', `✓ Ceremony settings saved for ${esc(dateLabel(date))}.`, 'success'); renderCeremony(); await loadHrRecords(); } button.disabled = false; button.innerHTML = '✓ Save ceremony settings';
     }
+    async function loadHrRecords() { const date = document.getElementById('hrDate').value || today(); const result = await db.from('flag_attendance').select('emp_id,date,time_in,last_name,first_name,division,status').eq('date', date).order('time_in', { ascending: true }); if (result.error) { setBox('hrNotice', esc(result.error.message), 'error'); state.records = []; } else state.records = result.data || []; renderRecords(); }
+    function renderRecords() { const filter = String(document.getElementById('recordSearch').value || '').toLowerCase().trim(); const rows = state.records.filter((record) => !filter || [record.emp_id, record.first_name, record.last_name, record.division].some((value) => String(value || '').toLowerCase().includes(filter))); const present = state.records.filter((r) => String(r.status).toUpperCase() === 'PRESENT').length; const late = state.records.filter((r) => String(r.status).toUpperCase() === 'LATE').length; document.getElementById('countTotal').textContent = state.records.length; document.getElementById('countPresent').textContent = present; document.getElementById('countLate').textContent = late; document.getElementById('recordsLabel').textContent = `${dateLabel(document.getElementById('hrDate').value)} · ${state.records.length} saved record(s)`; document.getElementById('recordsBody').innerHTML = rows.length ? rows.map((r) => { const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.emp_id; const isLate = String(r.status).toUpperCase() === 'LATE'; return `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><p class="font-bold text-slate-800">${esc(name)}</p><p class="font-mono text-xs text-slate-500">${esc(r.emp_id)}</p></td><td class="px-5 py-4 text-slate-600">${esc(r.division || '—')}</td><td class="px-5 py-4 font-mono text-slate-700">${esc(time12(r.time_in))}</td><td class="px-5 py-4"><span class="pill ${isLate ? 'pill-late' : 'pill-present'}">${isLate ? 'LATE' : 'PRESENT'}</span></td></tr>`; }).join('') : '<tr><td colspan="4" class="px-5 py-16 text-center text-slate-400">No attendance records for this ceremony yet.</td></tr>'; }
 
-    function openSettings() { document.getElementById('settings-modal').classList.remove('hidden'); }
-    function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
-    function saveSettings() {
-        prefFaceCam = document.getElementById('sel-face-cam').value;
-        prefQRCam = document.getElementById('sel-qr-cam').value;
-        localStorage.setItem('prefFaceCam', prefFaceCam);
-        localStorage.setItem('prefQRCam', prefQRCam);
-        closeSettings();
-        startCameras();
-    }
-
-    function getEmployeeData(empId) {
-        if (Object.keys(cachedEmployees).length === 0) {
-            const stored = localStorage.getItem('masterEmployeeCache');
-            if (stored) cachedEmployees = JSON.parse(stored);
-        }
-        return cachedEmployees[empId] || { emp_id: empId, full_name: "Unknown ID", last_name: "", first_name: "", division: "UNKNOWN" };
-    }
-
-    function handleManualInput() {
-        const input = document.getElementById('empIdInput');
-        const empId = input.value.trim();
-        input.value = '';
-        if (empId) processAttendance(empId);
-    }
-
-    function processAttendance(empId) {
-        if (isProcessing) return;
-        isProcessing = true;
-
-        const now = new Date();
-        const todayDate = now.toISOString().split('T')[0];
-        const logTimeISO = now.toISOString();
-        const t12 = get12HourTime(now); 
-        
-        const emp = getEmployeeData(empId);
-        let logType = determineStatusLocal(empId, todayDate);
-        let colorClass = logType.includes("OUT") ? "border-orange-500 text-orange-600" : "border-green-500 text-green-600";
-        const isMonday = now.getDay() === 1;
-        let isFlagLogged = (isMonday && logType === "TIME IN");
-
-        showResult(emp.full_name, emp.division, logType, colorClass, t12.formattedString, isFlagLogged);
-
-        setTimeout(() => {
-            const base64Image = captureFaceImage();
-            
-            // Trigger local folder save
-            saveImageToLocalDrive(empId, base64Image, logTimeISO);
-            
-            queueSyncTask('attendance_logs', {
-                emp_id: empId,
-                log_time: logTimeISO,
-                device_id: DEVICE_ID,
-                capture_image: base64Image // Keeping it in payload just as backup
-            });
-
-            if (isFlagLogged) {
-                queueSyncTask('flag_attendance', {
-                    emp_id: empId,
-                    date: todayDate,
-                    time_in: t12.formattedString,
-                    last_name: emp.last_name || 'N/A',
-                    first_name: emp.first_name || 'N/A',
-                    division: emp.division || 'N/A',
-                    status: 'PRESENT'
-                });
-            }
-        }, 10); 
-
-        setTimeout(() => { isProcessing = false; }, SCAN_COOLDOWN_MS);
-    }
-
-    function determineStatusLocal(empId, todayDate) {
-        let history = JSON.parse(localStorage.getItem('dailyStatusToggle') || '{}');
-        if (!history[todayDate]) history = {}; 
-        if (!history[todayDate]) history[todayDate] = {};
-        
-        let currentStatus = history[todayDate][empId] || "OUT";
-        let nextStatus = currentStatus === "OUT" ? "TIME IN" : "TIME OUT";
-        
-        history[todayDate][empId] = nextStatus === "TIME IN" ? "IN" : "OUT";
-        localStorage.setItem('dailyStatusToggle', JSON.stringify(history));
-        return nextStatus;
-    }
-
-    function queueSyncTask(table, payload) {
-        let queue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
-        queue.push({ table: table, data: payload, id: Date.now() + Math.random() });
-        localStorage.setItem('syncQueue', JSON.stringify(queue));
-        updateQueueCounter();
-        
-        if (isOnline) {
-            clearTimeout(window.autoSyncTimer);
-            window.autoSyncTimer = setTimeout(() => syncLogs(false), 2000);
-        }
-    }
-
-    function updateQueueCounter() {
-        const queue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
-        const badge = document.getElementById('queueBadge');
-        badge.innerText = `${queue.length} PENDING LOGS`;
-        badge.className = queue.length > 0 
-            ? "px-4 py-2 rounded-full font-bold text-xs bg-yellow-400 text-black shadow-lg cursor-pointer hover:bg-yellow-500 transition z-10" 
-            : "px-4 py-2 rounded-full font-bold text-xs bg-gray-600 text-white shadow-lg cursor-pointer z-10";
-    }
-
-    async function syncLogs(manual = false) {
-        if (!isOnline) {
-            if (manual) alert("Cannot sync. Terminal is offline.");
-            return;
-        }
-        
-        let queue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
-        if (queue.length === 0) {
-            if (manual) alert("All logs are already synced.");
-            return;
-        }
-
-        if (manual) document.getElementById('queueBadge').innerText = "SYNCING...";
-
-        let failedQueue = [];
-        
-        for (let task of queue) {
-            try {
-                const { error } = await window.supabaseClient.from(task.table).insert([task.data]);
-                if (error) failedQueue.push(task); 
-            } catch (e) {
-                failedQueue.push(task);
-            }
-        }
-
-        localStorage.setItem('syncQueue', JSON.stringify(failedQueue));
-        updateQueueCounter();
-        
-        if (manual && failedQueue.length === 0) alert("All pending logs synced successfully.");
-        else if (manual && failedQueue.length > 0) alert(`${failedQueue.length} logs failed to sync. Will retry automatically.`);
-    }
-
-    function showResult(name, division, status, colorClass, timeString, isFlagLogged) {
-        const card = document.getElementById('resultCard');
-        const flagBadge = document.getElementById('flagBadge');
-        
-        document.getElementById('resTime').innerText = `Logged at ${timeString}`;
-        document.getElementById('resName').innerText = name;
-        document.getElementById('resDivision').innerText = division || "";
-        document.getElementById('resStatus').innerText = status;
-        document.getElementById('resStatus').className = `text-4xl font-black uppercase tracking-widest ${colorClass}`;
-        
-        if (isFlagLogged) flagBadge.classList.remove('hidden');
-        else flagBadge.classList.add('hidden');
-
-        card.className = `mt-8 w-full max-w-lg bg-white p-8 rounded-xl shadow-2xl toast-enter border-l-8 ${colorClass}`;
-        card.classList.remove('hidden');
-
-        if (resetTimer) clearTimeout(resetTimer);
-        resetTimer = setTimeout(() => {
-            card.classList.add('hidden');
-            document.getElementById('empIdInput').focus();
-        }, 10000);
-    }
-</script>
+    document.getElementById('hrDate').addEventListener('change', () => { loadCeremony(false).then(loadHrRecords); });
+    window.addEventListener('load', () => { document.getElementById('hrDate').value = today(); loadCeremony(false); });
+  </script>
 </body>
 </html>
