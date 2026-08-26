@@ -176,7 +176,14 @@
     const fallbackCeremony = (date) => ({ ceremony_date: date, ceremony_time: '08:00', allowance_minutes: 10, announcement: 'Please be present before the Flag Ceremony begins.', is_open: true });
     
     const getUser = () => { const raw = localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser'); if (!raw) return null; try { return JSON.parse(raw); } catch (_) { return null; } };
-    const isAllowedHr = (user) => { const role = String(user?.role || '').toUpperCase(); const unit = String(user?.unit || '').toUpperCase(); return /\bHRMO\b/.test(role) || /HR\s*MO\s*STAFF/.test(role) || /HR\s*STAFF/.test(role) || /HR\s*OFFICER/.test(role) || /\bHRMO\b/.test(unit); };
+    
+    // THIS IS THE FIX: Accepts literally ANY user with "HR" in their role, unit, or division.
+    const isAllowedHr = (user) => { 
+      const role = String(user?.role || '').toUpperCase(); 
+      const unit = String(user?.unit || '').toUpperCase(); 
+      const div = String(user?.division || '').toUpperCase();
+      return role.includes('HR') || unit.includes('HR') || div.includes('HR'); 
+    };
 
     function requireHrSession() {
       const user = getUser();
@@ -197,7 +204,6 @@
       btn.innerHTML = '<span class="loader"></span> Authenticating';
       msg.classList.add('hidden');
 
-      // Changed .eq('username', user) to .ilike('username', user) to allow case-insensitive login
       const { data, error } = await db.from('users').select('*').ilike('username', user).eq('password', pass).maybeSingle();
 
       if (error) {
@@ -284,7 +290,6 @@
       const { data, error } = await db.from('employees').select('*').eq('emp_id', id).limit(1).maybeSingle();
 
       if (error) {
-          // EXPLICIT SUPABASE SCHEMA CACHE ERROR TRAP
           if (error.message.includes('schema cache')) {
               setBox('employeeNotice', `<strong>Supabase Backend Error:</strong> Supabase is out of sync. To fix this: Go to your Supabase Dashboard ➔ Project Settings (Gear Icon) ➔ API ➔ scroll to 'Schema Cache' and click <strong>Reload Cache</strong>.`, 'error');
           } else {
@@ -353,10 +358,8 @@
       const ceremonyDate = state.ceremony?.ceremony_date || today();
 
       if (!state.allEmployees) {
-        // Fetching * safely prevents missing column errors (like 'status') from crashing the request entirely
         const { data: emps, error: empErr } = await db.from('employees').select('*');
         if (empErr) {
-            // EXPLICIT SUPABASE SCHEMA CACHE ERROR TRAP FOR DASHBOARD
             if (empErr.message.includes('schema cache')) {
                 dash.innerHTML = '<div class="w-full text-center text-sm text-red-500 py-4 bg-red-50 rounded-xl p-4 border border-red-200"><strong>Supabase API Error:</strong> Supabase cache is out of sync. Please go to your Supabase Dashboard ➔ API Settings ➔ click "Reload Cache".</div>';
             } else {
