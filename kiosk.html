@@ -120,6 +120,11 @@
     <section id="hrMode" class="hidden space-y-6">
       <div class="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><span class="pill bg-[#e9f1eb] text-[#003811]">HR CONSOLE</span><h2 class="mt-3 text-3xl font-extrabold tracking-tight text-[#003811]">Flag Ceremony monitoring</h2><p id="hrSignedIn" class="mt-2 text-sm text-slate-500"></p></div><button class="btn btn-outline no-print" onclick="loadHrRecords()">↻ Refresh records</button></div>
       <div id="hrNotice" class="hidden"></div>
+
+      <!-- NEW: DASHBOARD MONITORING -->
+      <div id="divisionDashboard" class="flex flex-wrap gap-8 justify-center py-6 px-4 bg-white rounded-2xl border border-slate-200 shadow-sm no-print items-center min-h-[140px] overflow-x-auto">
+      </div>
+
       <div class="grid xl:grid-cols-[380px_1fr] gap-6">
         <div class="card"><div class="p-6 border-b border-slate-100"><h3 class="font-extrabold text-lg text-[#003811]">⚙ Ceremony settings</h3><p class="text-sm text-slate-500 mt-1">Set the time, allowable allowance and announcement for the selected date.</p></div><form onsubmit="saveCeremony(event)" class="p-6 space-y-5"><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrDate">Ceremony date</label><input id="hrDate" type="date" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrTime">Flag Ceremony time</label><input id="hrTime" type="time" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAllowance">Allowable allowance (minutes)</label><input id="hrAllowance" type="number" min="0" max="180" class="input mt-2"></div><div><label class="block text-xs font-extrabold uppercase tracking-wide text-[#003811]" for="hrAnnouncement">Announcement</label><textarea id="hrAnnouncement" rows="4" class="input mt-2 resize-y" placeholder="Write the message employees will see..."></textarea></div><label class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer"><span><span class="block font-bold text-sm">Allow employee check-in</span><span class="block text-xs text-slate-500 mt-1">Close this after the ceremony.</span></span><input id="hrOpen" type="checkbox" class="w-5 h-5 accent-[#003811]"></label><button id="saveBtn" class="btn btn-green w-full h-11" type="submit">✓ Save ceremony settings</button></form></div>
         <div class="space-y-6"><div class="grid sm:grid-cols-3 gap-3"><div class="rounded-2xl bg-[#e9f1eb] text-[#003811] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Total checked in</p><p id="countTotal" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-[#fbf4d9] text-[#7a5c00] px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Present</p><p id="countPresent" class="mt-1 text-3xl font-extrabold">0</p></div><div class="rounded-2xl bg-red-50 text-red-800 px-5 py-4"><p class="text-[10px] font-extrabold uppercase tracking-[.16em] opacity-70">Late</p><p id="countLate" class="mt-1 text-3xl font-extrabold">0</p></div></div><div class="card overflow-hidden"><div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-end justify-between gap-3"><div><h3 class="font-extrabold text-lg text-[#003811]">Attendance records</h3><p id="recordsLabel" class="text-sm text-slate-500 mt-1"></p></div><input id="recordSearch" oninput="renderRecords()" class="input sm:w-52" placeholder="Search records"></div><div class="table-wrap"><table class="w-full min-w-[680px] text-left text-sm"><thead class="sticky top-0 bg-[#003811] text-white text-xs uppercase tracking-wider"><tr><th class="px-5 py-3">Employee</th><th class="px-5 py-3">Division</th><th class="px-5 py-3">Time in</th><th class="px-5 py-3">Status</th></tr></thead><tbody id="recordsBody" class="divide-y divide-slate-100"></tbody></table></div></div></div></div>
@@ -243,8 +248,118 @@
       event.preventDefault(); const button = document.getElementById('saveBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Saving'; clearBox('hrNotice'); const date = document.getElementById('hrDate').value; const payload = { ceremony_date: date, ceremony_time: `${document.getElementById('hrTime').value || '08:00'}:00`, allowance_minutes: Math.max(0, Math.min(180, Number(document.getElementById('hrAllowance').value) || 0)), announcement: document.getElementById('hrAnnouncement').value.trim(), is_open: document.getElementById('hrOpen').checked, created_by: state.user?.username || state.user?.full_name || 'HRMO' };
       state.ceremony = { ...payload, ceremony_time: payload.ceremony_time.slice(0,5) }; saveStoredCeremony(state.ceremony); setBox('hrNotice', `✓ Ceremony settings saved on this HR workstation for ${esc(dateLabel(date))}.`, 'success'); renderCeremony(); await loadHrRecords(); button.disabled = false; button.innerHTML = '✓ Save ceremony settings';
     }
-    async function loadHrRecords() { const date = document.getElementById('hrDate').value || today(); const result = await db.from('flag_attendance').select('emp_id,date,time_in,last_name,first_name,division,status').eq('date', date).order('time_in', { ascending: true }); if (result.error) { setBox('hrNotice', esc(result.error.message), 'error'); state.records = []; } else state.records = result.data || []; renderRecords(); }
+    async function loadHrRecords() { 
+      const date = document.getElementById('hrDate').value || today(); 
+      const result = await db.from('flag_attendance').select('emp_id,date,time_in,last_name,first_name,division,status').eq('date', date).order('time_in', { ascending: true }); 
+      if (result.error) { 
+        setBox('hrNotice', esc(result.error.message), 'error'); 
+        state.records = []; 
+      } else {
+        state.records = result.data || []; 
+      }
+      renderRecords(); 
+      await renderDivisionDashboard();
+    }
     function renderRecords() { const filter = String(document.getElementById('recordSearch').value || '').toLowerCase().trim(); const rows = state.records.filter((record) => !filter || [record.emp_id, record.first_name, record.last_name, record.division].some((value) => String(value || '').toLowerCase().includes(filter))); const present = state.records.filter((r) => String(r.status).toUpperCase() === 'PRESENT').length; const late = state.records.filter((r) => String(r.status).toUpperCase() === 'LATE').length; document.getElementById('countTotal').textContent = state.records.length; document.getElementById('countPresent').textContent = present; document.getElementById('countLate').textContent = late; document.getElementById('recordsLabel').textContent = `${dateLabel(document.getElementById('hrDate').value)} · ${state.records.length} saved record(s)`; document.getElementById('recordsBody').innerHTML = rows.length ? rows.map((r) => { const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.emp_id; const isLate = String(r.status).toUpperCase() === 'LATE'; return `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><p class="font-bold text-slate-800">${esc(name)}</p><p class="font-mono text-xs text-slate-500">${esc(r.emp_id)}</p></td><td class="px-5 py-4 text-slate-600">${esc(r.division || '—')}</td><td class="px-5 py-4 font-mono text-slate-700">${esc(time12(r.time_in))}</td><td class="px-5 py-4"><span class="pill ${isLate ? 'pill-late' : 'pill-present'}">${isLate ? 'LATE' : 'PRESENT'}</span></td></tr>`; }).join('') : '<tr><td colspan="4" class="px-5 py-16 text-center text-slate-400">No attendance records for this ceremony yet.</td></tr>'; }
+
+    async function renderDivisionDashboard() {
+      const dash = document.getElementById('divisionDashboard');
+      dash.innerHTML = '<div class="w-full text-center text-sm text-slate-500 py-4"><span class="loader inline-block"></span> Loading division statistics...</div>';
+
+      const { data: emps, error } = await db.from('employees').select('emp_id, division, station, status');
+      if (error) {
+        dash.innerHTML = '<div class="w-full text-center text-sm text-red-500 py-4">Failed to load employee statistics.</div>';
+        return;
+      }
+
+      const divTotals = {};
+      (emps || []).forEach(e => {
+        const station = String(e.station || '').toUpperCase();
+        const status = String(e.status || '').toUpperCase();
+
+        if (station.includes('DARMO')) return;
+        if (status === 'INACTIVE') return;
+
+        const div = String(e.division || 'UNASSIGNED').toUpperCase().trim();
+        divTotals[div] = (divTotals[div] || 0) + 1;
+      });
+
+      const divPresent = {};
+      state.records.forEach(r => {
+        const div = String(r.division || 'UNASSIGNED').toUpperCase().trim();
+        if (divTotals[div] !== undefined) {
+          divPresent[div] = (divPresent[div] || 0) + 1;
+        } else {
+          divTotals[div] = 0;
+          divPresent[div] = 1;
+        }
+      });
+
+      const sortedDivs = Object.keys(divTotals).sort((a, b) => {
+        if (a === 'UNASSIGNED') return 1;
+        if (b === 'UNASSIGNED') return -1;
+        return a.localeCompare(b);
+      });
+
+      if (sortedDivs.length === 0) {
+        dash.innerHTML = '<div class="w-full text-center text-sm text-slate-500 py-4">No active provincial employees found.</div>';
+        return;
+      }
+
+      let overallExpected = 0;
+      let overallPresent = 0;
+      Object.keys(divTotals).forEach(div => {
+        overallExpected += divTotals[div];
+        overallPresent += (divPresent[div] || 0);
+      });
+
+      let overallPercentage = overallExpected > 0 ? Math.round((overallPresent / overallExpected) * 100) : 100;
+      if (overallPercentage > 100) overallPercentage = 100;
+
+      let html = `
+        <div class="flex flex-col items-center gap-2 pr-8 border-r border-slate-100">
+            <div class="relative w-[84px] h-[84px]">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                    <path class="text-slate-100" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path class="text-[#003811] transition-all duration-1000 ease-out" stroke-dasharray="${overallPercentage}, 100" stroke-width="4" stroke="currentColor" fill="none" stroke-linecap="round" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-xl font-extrabold text-[#003811] leading-none">${overallPresent}</span>
+                    <span class="text-[10px] text-slate-500 font-bold border-t border-slate-200 w-10 text-center mt-1 pt-0.5">${overallExpected}</span>
+                </div>
+            </div>
+            <span class="text-[11px] font-extrabold text-[#003811] uppercase tracking-wide text-center max-w-[90px] leading-tight">TOTAL STAFF</span>
+        </div>
+      `;
+
+      const colors = ['text-[#166534]', 'text-[#b45309]', 'text-[#1d4ed8]', 'text-[#b91c1c]', 'text-[#6d28d9]', 'text-[#0f766e]', 'text-[#003811]'];
+
+      sortedDivs.forEach((div, index) => {
+        const total = divTotals[div] || 0;
+        const present = divPresent[div] || 0;
+        let percentage = total > 0 ? Math.round((present / total) * 100) : 100;
+        if (percentage > 100) percentage = 100;
+        const colorClass = colors[index % colors.length];
+
+        html += `
+        <div class="flex flex-col items-center gap-2">
+            <div class="relative w-[76px] h-[76px]">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                    <path class="text-slate-100" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path class="${colorClass} transition-all duration-1000 ease-out" stroke-dasharray="${percentage}, 100" stroke-width="3.5" stroke="currentColor" fill="none" stroke-linecap="round" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-lg font-extrabold text-slate-800 leading-none">${present}</span>
+                    <span class="text-[9px] text-slate-400 font-bold border-t border-slate-200 w-8 text-center mt-1 pt-0.5">${total}</span>
+                </div>
+            </div>
+            <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide text-center max-w-[80px] leading-tight break-words">${esc(div)}</span>
+        </div>
+        `;
+      });
+
+      dash.innerHTML = html;
+    }
 
     document.getElementById('hrDate').addEventListener('change', () => { loadCeremony(false).then(loadHrRecords); });
     window.addEventListener('load', () => { if (!requireHrSession()) return; document.getElementById('hrDate').value = today(); loadCeremony(false); });
