@@ -112,7 +112,7 @@
 
       <div class="space-y-6">
         <div class="card bg-[#003811] text-white border-0 overflow-hidden"><div class="p-6 sm:p-8"><div class="flex items-center gap-2 text-[#D4AF37] text-xs font-extrabold uppercase tracking-[.18em]">◷ Current Flag Ceremony</div><p id="ceremonyDateLabel" class="mt-5 text-2xl sm:text-3xl font-extrabold"></p><div class="mt-6 grid grid-cols-2 gap-3"><div class="rounded-xl border border-white/15 bg-white/10 p-4"><span class="block text-[10px] uppercase tracking-wider text-white/60 font-bold">Ceremony time</span><span id="ceremonyTimeLabel" class="block mt-1 text-2xl font-extrabold text-[#D4AF37]"></span></div><div class="rounded-xl border border-white/15 bg-white/10 p-4"><span class="block text-[10px] uppercase tracking-wider text-white/60 font-bold">Allowance</span><span id="ceremonyAllowanceLabel" class="block mt-1 text-2xl font-extrabold text-[#D4AF37]"></span></div></div><div class="mt-6 flex items-start gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm leading-6"><span class="text-[#D4AF37]">▸</span><p id="ceremonyAnnouncement"></p></div><div class="mt-5 pt-4 border-t border-white/15 flex justify-between items-center text-xs"><span>Check-in status</span><span id="ceremonyOpenLabel" class="pill"></span></div></div></div>
-        <div class="card"><div class="p-5 flex items-start gap-3 text-sm text-slate-600 leading-6"><span class="text-[#003811]">●</span><p>The system matches your employee number with the official <strong>employees</strong> table before showing your profile and saving your record.</p></div></div>
+        <div class="card"><div class="p-5 flex items-start gap-3 text-sm text-slate-600 leading-6"><span class="text-[#003811]">●</span><p>The system matches your employee number with the official <strong>employee</strong> table before showing your profile and saving your record.</p></div></div>
         <button onclick="loadCeremony(true)" class="btn btn-outline w-full no-print">↻ Refresh ceremony notice</button>
       </div>
     </section>
@@ -122,7 +122,7 @@
       <div id="hrNotice" class="hidden"></div>
 
       <!-- NEW: DASHBOARD MONITORING -->
-      <div id="divisionDashboard" class="flex flex-wrap gap-8 justify-center py-6 px-4 bg-white rounded-2xl border border-slate-200 shadow-sm no-print items-center min-h-[140px] overflow-x-auto">
+      <div id="divisionDashboard" class="flex flex-wrap gap-8 justify-center py-8 px-6 bg-white rounded-2xl border border-slate-200 shadow-sm no-print items-center min-h-[160px] overflow-x-auto">
       </div>
 
       <div class="grid xl:grid-cols-[380px_1fr] gap-6">
@@ -137,7 +137,7 @@
      * This page follows the existing DAR HR pages:
      *   - HR authorization comes from sessionStorage.currentUser.
      *   - The same Supabase project and publishable key are used.
-     *   - Employees are matched by employees.emp_id.
+     *   - Employees are matched by employee.emp_id.
      *
      * Ceremony settings are stored on this HR workstation. No additional table
      * is required; attendance records continue to use flag_attendance only.
@@ -219,9 +219,10 @@
       if (event) event.preventDefault();
       const id = cleanId(document.getElementById('employeeId').value); if (!id) return setBox('employeeNotice', 'Enter an employee number.', 'error');
       const button = document.getElementById('locateBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Locating'; clearBox('employeeNotice'); document.getElementById('employeeProfile').classList.add('hidden'); state.employee = null; state.existing = null;
-      const { data, error } = await db.from('employees').select('*').eq('emp_id', id).limit(1).maybeSingle();
+      // Fixed schema cache error by referring to the actual table name 'employee'
+      const { data, error } = await db.from('employee').select('*').eq('emp_id', id).limit(1).maybeSingle();
       if (error) setBox('employeeNotice', esc(error.message), 'error');
-      else if (!data) setBox('employeeNotice', `Employee number <strong>${esc(id)}</strong> was not found in the employees table.`, 'error');
+      else if (!data) setBox('employeeNotice', `Employee number <strong>${esc(id)}</strong> was not found in the employee table.`, 'error');
       else { state.employee = data; const existing = await db.from('flag_attendance').select('emp_id,date,time_in,status').eq('emp_id', id).eq('date', state.ceremony.ceremony_date).limit(1).maybeSingle(); state.existing = existing.data || null; if (existing.error) setBox('employeeNotice', esc(existing.error.message), 'error'); renderProfile(); }
       button.disabled = false; button.innerHTML = '⌕ Locate';
     }
@@ -248,6 +249,7 @@
       event.preventDefault(); const button = document.getElementById('saveBtn'); button.disabled = true; button.innerHTML = '<span class="loader"></span> Saving'; clearBox('hrNotice'); const date = document.getElementById('hrDate').value; const payload = { ceremony_date: date, ceremony_time: `${document.getElementById('hrTime').value || '08:00'}:00`, allowance_minutes: Math.max(0, Math.min(180, Number(document.getElementById('hrAllowance').value) || 0)), announcement: document.getElementById('hrAnnouncement').value.trim(), is_open: document.getElementById('hrOpen').checked, created_by: state.user?.username || state.user?.full_name || 'HRMO' };
       state.ceremony = { ...payload, ceremony_time: payload.ceremony_time.slice(0,5) }; saveStoredCeremony(state.ceremony); setBox('hrNotice', `✓ Ceremony settings saved on this HR workstation for ${esc(dateLabel(date))}.`, 'success'); renderCeremony(); await loadHrRecords(); button.disabled = false; button.innerHTML = '✓ Save ceremony settings';
     }
+
     async function loadHrRecords() { 
       const date = document.getElementById('hrDate').value || today(); 
       const result = await db.from('flag_attendance').select('emp_id,date,time_in,last_name,first_name,division,status').eq('date', date).order('time_in', { ascending: true }); 
@@ -260,25 +262,32 @@
       renderRecords(); 
       await renderDivisionDashboard();
     }
+
     function renderRecords() { const filter = String(document.getElementById('recordSearch').value || '').toLowerCase().trim(); const rows = state.records.filter((record) => !filter || [record.emp_id, record.first_name, record.last_name, record.division].some((value) => String(value || '').toLowerCase().includes(filter))); const present = state.records.filter((r) => String(r.status).toUpperCase() === 'PRESENT').length; const late = state.records.filter((r) => String(r.status).toUpperCase() === 'LATE').length; document.getElementById('countTotal').textContent = state.records.length; document.getElementById('countPresent').textContent = present; document.getElementById('countLate').textContent = late; document.getElementById('recordsLabel').textContent = `${dateLabel(document.getElementById('hrDate').value)} · ${state.records.length} saved record(s)`; document.getElementById('recordsBody').innerHTML = rows.length ? rows.map((r) => { const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.emp_id; const isLate = String(r.status).toUpperCase() === 'LATE'; return `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><p class="font-bold text-slate-800">${esc(name)}</p><p class="font-mono text-xs text-slate-500">${esc(r.emp_id)}</p></td><td class="px-5 py-4 text-slate-600">${esc(r.division || '—')}</td><td class="px-5 py-4 font-mono text-slate-700">${esc(time12(r.time_in))}</td><td class="px-5 py-4"><span class="pill ${isLate ? 'pill-late' : 'pill-present'}">${isLate ? 'LATE' : 'PRESENT'}</span></td></tr>`; }).join('') : '<tr><td colspan="4" class="px-5 py-16 text-center text-slate-400">No attendance records for this ceremony yet.</td></tr>'; }
 
     async function renderDivisionDashboard() {
       const dash = document.getElementById('divisionDashboard');
       dash.innerHTML = '<div class="w-full text-center text-sm text-slate-500 py-4"><span class="loader inline-block"></span> Loading division statistics...</div>';
 
-      const { data: emps, error } = await db.from('employees').select('emp_id, division, station, status');
+      // Fix schema cache error by querying the actual table name 'employee'
+      const { data: emps, error } = await db.from('employee').select('*');
       if (error) {
         dash.innerHTML = '<div class="w-full text-center text-sm text-red-500 py-4">Failed to load employee statistics.</div>';
         return;
       }
 
+      const allowedEmps = new Set();
       const divTotals = {};
+
       (emps || []).forEach(e => {
         const station = String(e.station || '').toUpperCase();
         const status = String(e.status || '').toUpperCase();
 
-        if (station.includes('DARMO')) return;
+        // Strictly exclude DARMO personnel and Inactive staff
+        if (station.startsWith('DARMO')) return;
         if (status === 'INACTIVE') return;
+
+        allowedEmps.add(e.emp_id);
 
         const div = String(e.division || 'UNASSIGNED').toUpperCase().trim();
         divTotals[div] = (divTotals[div] || 0) + 1;
@@ -286,13 +295,11 @@
 
       const divPresent = {};
       state.records.forEach(r => {
+        // Only count them in the dashboard if they are an active, non-DARMO employee
+        if (!allowedEmps.has(r.emp_id)) return;
+
         const div = String(r.division || 'UNASSIGNED').toUpperCase().trim();
-        if (divTotals[div] !== undefined) {
-          divPresent[div] = (divPresent[div] || 0) + 1;
-        } else {
-          divTotals[div] = 0;
-          divPresent[div] = 1;
-        }
+        divPresent[div] = (divPresent[div] || 0) + 1;
       });
 
       const sortedDivs = Object.keys(divTotals).sort((a, b) => {
@@ -313,47 +320,55 @@
         overallPresent += (divPresent[div] || 0);
       });
 
-      let overallPercentage = overallExpected > 0 ? Math.round((overallPresent / overallExpected) * 100) : 100;
+      let overallPercentage = overallExpected > 0 ? (overallPresent / overallExpected) * 100 : 100;
       if (overallPercentage > 100) overallPercentage = 100;
+      const overallDashArray = (overallPercentage / 100) * 251.2; 
 
+      // Build out the dashboard matching the requested aesthetics in the image
       let html = `
-        <div class="flex flex-col items-center gap-2 pr-8 border-r border-slate-100">
-            <div class="relative w-[84px] h-[84px]">
-                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                    <path class="text-slate-100" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path class="text-[#003811] transition-all duration-1000 ease-out" stroke-dasharray="${overallPercentage}, 100" stroke-width="4" stroke="currentColor" fill="none" stroke-linecap="round" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+        <div class="flex flex-col items-center gap-4">
+            <div class="relative w-[110px] h-[110px]">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" stroke-width="8" />
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#003811" stroke-width="8" stroke-dasharray="${overallDashArray} 251.2" stroke-linecap="round" class="transition-all duration-1000 ease-out" />
                 </svg>
                 <div class="absolute inset-0 flex flex-col items-center justify-center">
-                    <span class="text-xl font-extrabold text-[#003811] leading-none">${overallPresent}</span>
-                    <span class="text-[10px] text-slate-500 font-bold border-t border-slate-200 w-10 text-center mt-1 pt-0.5">${overallExpected}</span>
+                    <span class="text-2xl font-extrabold text-[#003811] leading-none">${overallPresent}</span>
+                    <span class="text-[10px] text-slate-500 font-bold mt-1">/ ${overallExpected}</span>
                 </div>
             </div>
-            <span class="text-[11px] font-extrabold text-[#003811] uppercase tracking-wide text-center max-w-[90px] leading-tight">TOTAL STAFF</span>
+            <span class="text-[11px] font-extrabold text-[#003811] uppercase tracking-wider text-center">GLOBAL / OVERALL</span>
         </div>
       `;
 
-      const colors = ['text-[#166534]', 'text-[#b45309]', 'text-[#1d4ed8]', 'text-[#b91c1c]', 'text-[#6d28d9]', 'text-[#0f766e]', 'text-[#003811]'];
+      const colors = ['#16a34a', '#eab308', '#f97316', '#3b82f6', '#ef4444', '#a855f7', '#0f766e'];
 
       sortedDivs.forEach((div, index) => {
         const total = divTotals[div] || 0;
         const present = divPresent[div] || 0;
-        let percentage = total > 0 ? Math.round((present / total) * 100) : 100;
+        
+        let percentage = total > 0 ? (present / total) * 100 : 100;
         if (percentage > 100) percentage = 100;
-        const colorClass = colors[index % colors.length];
+        
+        // Ensure even 0% shows a small dot (line-cap) like the image
+        if (percentage === 0) percentage = 0.1;
+        const dashArray = (percentage / 100) * 251.2;
+        
+        const color = colors[index % colors.length];
 
         html += `
-        <div class="flex flex-col items-center gap-2">
-            <div class="relative w-[76px] h-[76px]">
-                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                    <path class="text-slate-100" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path class="${colorClass} transition-all duration-1000 ease-out" stroke-dasharray="${percentage}, 100" stroke-width="3.5" stroke="currentColor" fill="none" stroke-linecap="round" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+        <div class="flex flex-col items-center gap-4">
+            <div class="relative w-[96px] h-[96px]">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#f8fafc" stroke-width="6" />
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="${dashArray} 251.2" stroke-linecap="round" class="transition-all duration-1000 ease-out" />
                 </svg>
                 <div class="absolute inset-0 flex flex-col items-center justify-center">
-                    <span class="text-lg font-extrabold text-slate-800 leading-none">${present}</span>
-                    <span class="text-[9px] text-slate-400 font-bold border-t border-slate-200 w-8 text-center mt-1 pt-0.5">${total}</span>
+                    <span class="text-xl font-extrabold text-[#003811] leading-none">${present}</span>
+                    <span class="text-[9px] text-slate-400 font-bold mt-1">/ ${total}</span>
                 </div>
             </div>
-            <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide text-center max-w-[80px] leading-tight break-words">${esc(div)}</span>
+            <span class="text-[10px] font-extrabold text-[#003811] uppercase tracking-wider text-center max-w-[90px] leading-tight break-words">${esc(div)}</span>
         </div>
         `;
       });
