@@ -167,26 +167,39 @@
           <div class="p-6 sm:p-8 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
                 <h2 class="text-2xl font-extrabold tracking-tight text-[#003811]">Record Attendance</h2>
-                <p class="mt-1 text-sm text-slate-500">Scan QR or enter ID. <strong class="text-emerald-700">Attendance saves automatically.</strong></p>
-            </div>
-            <div class="flex gap-1 rounded-xl bg-slate-200 p-1 shrink-0">
-              <button id="manualModeBtn" class="rounded-lg px-3 py-2 text-sm font-bold bg-white text-[#003811] shadow-sm" onclick="setEntryMode('manual')">Employee ID</button>
-              <button id="qrModeBtn" class="rounded-lg px-3 py-2 text-sm font-bold text-slate-500" onclick="setEntryMode('qr')">▣ QR Scanner</button>
+                <p class="mt-1 text-sm text-slate-500">Scan QR or start typing ID. <strong class="text-emerald-700">Attendance saves automatically.</strong></p>
             </div>
           </div>
           
           <div class="p-6 sm:p-8 flex-1">
-            <div id="manualEntry" class="space-y-3 mb-6">
-              <form onsubmit="locateEmployee(event)" class="flex gap-2">
-                  <input id="employeeId" class="input h-14 text-lg font-bold tracking-wider" autocomplete="off" placeholder="Enter employee ID" autofocus>
-                  <button id="locateBtn" class="btn btn-green h-14 px-8 text-sm" type="submit">⌕ Locate & Save</button>
-              </form>
-            </div>
             
-            <div id="qrEntry" class="hidden mb-6">
-                <div id="qr-reader" class="mx-auto max-w-md border-4 border-slate-100 rounded-2xl overflow-hidden shadow-inner"></div>
-                <button class="btn btn-outline w-full max-w-md mx-auto mt-3 flex" onclick="stopScanner()">✕ Turn off camera</button>
-                <p id="qrStatus" class="text-xs text-slate-500 text-center mt-2"></p>
+            <div id="entryContainer" class="flex flex-col md:flex-row gap-8 mb-6 items-center md:items-start justify-center">
+                
+                <!-- QR ENTRY -->
+                <div id="qrEntry" class="w-full max-w-[320px] flex-shrink-0">
+                    <div id="qr-reader" class="mx-auto w-full border-4 border-slate-100 rounded-2xl overflow-hidden shadow-inner min-h-[250px] bg-slate-900"></div>
+                    <p id="qrStatus" class="text-xs text-slate-500 text-center mt-3"></p>
+                </div>
+
+                <!-- DIVIDER -->
+                <div class="hidden md:flex flex-col items-center justify-center text-slate-300 font-bold self-stretch">
+                    <div class="w-px h-full bg-slate-200 min-h-[60px]"></div>
+                    <span class="my-3 text-xs tracking-widest uppercase">OR</span>
+                    <div class="w-px h-full bg-slate-200 min-h-[60px]"></div>
+                </div>
+
+                <!-- MANUAL ENTRY -->
+                <div id="manualEntry" class="w-full max-w-[320px] flex-shrink-0 flex flex-col justify-center md:pt-4">
+                    <div class="text-center md:text-left mb-5">
+                        <h3 class="font-extrabold text-[#003811] text-lg">Keyboard Entry</h3>
+                        <p class="text-xs text-slate-500 mt-1">Start typing anytime. Form auto-focuses.</p>
+                    </div>
+                    <form onsubmit="locateEmployee(event)" class="flex flex-col gap-3">
+                        <input id="employeeId" class="input h-14 text-xl font-black tracking-widest text-center" autocomplete="off" placeholder="e.g. 12345" autofocus>
+                        <button id="locateBtn" class="btn btn-green h-14 text-sm w-full shadow-sm" type="submit">⌕ Locate & Save</button>
+                    </form>
+                </div>
+
             </div>
 
             <div id="employeeNotice" class="hidden mb-6"></div>
@@ -224,8 +237,8 @@
       typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'sb_publishable_zEh0y_OAF7nVwLBuTTB74w_gPX0XomI'
     );
     
-    // state.isProcessing ensures scanner lock, state.localQueue handles offline/fast saves
-    const state = { mode: 'employee', entryMode: 'manual', ceremony: null, employee: null, existing: null, records: [], allEmployees: null, scanner: null, user: null, isProcessing: false, localQueue: JSON.parse(localStorage.getItem('dar_attendance_queue') || '[]') };
+    // state.isProcessing ensures scanner lock, state.localQueue handles offline/fast saves, mergedRecords handles already-logged tracking
+    const state = { mode: 'employee', ceremony: null, employee: null, existing: null, records: [], allEmployees: null, scanner: null, user: null, isProcessing: false, localQueue: JSON.parse(localStorage.getItem('dar_attendance_queue') || '[]'), mergedRecords: [] };
 
     const today = () => { const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000); return local.toISOString().slice(0, 10); };
     const esc = (value) => String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
@@ -241,7 +254,18 @@
     const getUser = () => { const raw = localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser'); if (!raw) return null; try { return JSON.parse(raw); } catch (_) { return null; } };
     const isAllowedHr = (user) => { const role = String(user?.role || '').toUpperCase(); const unit = String(user?.unit || '').toUpperCase(); const div = String(user?.division || '').toUpperCase(); return role.includes('HR') || unit.includes('HR') || div.includes('HR'); };
 
-    // --- NEW: Download All Employees to Local Cache for SUPER FAST SCANNING ---
+    // --- GLOBAL KEYPRESS DETECTOR FOR ZERO-TOUCH ENTRY ---
+    document.addEventListener('keydown', (e) => {
+        if (state.mode === 'employee' && !state.isProcessing) {
+            const input = document.getElementById('employeeId');
+            // If the user isn't already focused on the input, and presses a regular letter/number key
+            if (document.activeElement !== input && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                input.focus();
+            }
+        }
+    });
+
+    // --- Download All Employees to Local Cache for SUPER FAST SCANNING ---
     async function syncEmployees() {
         const ind = document.getElementById('syncIndicator');
         try {
@@ -260,7 +284,7 @@
         refreshDashboard();
     }
 
-    // --- NEW: Background Sync for Offline Queue ---
+    // --- Background Sync for Offline Queue ---
     let isFlushing = false;
     async function flushQueue() {
         if (isFlushing || state.localQueue.length === 0) return;
@@ -290,7 +314,7 @@
       const { data, error } = await db.from('users').select('*').ilike('username', user).eq('password', pass).maybeSingle();
       if (error) { msg.textContent = esc(error.message); msg.classList.remove('hidden'); } else if (!data) { msg.textContent = 'Invalid username or password.'; msg.classList.remove('hidden'); } else {
         localStorage.setItem('currentUser', JSON.stringify(data)); sessionStorage.setItem('currentUser', JSON.stringify(data));
-        if (requireHrSession()) { document.getElementById('hrDate').value = today(); loadCeremony(false); }
+        if (requireHrSession()) { document.getElementById('hrDate').value = today(); showMode('employee'); }
       }
       btn.disabled = false; btn.innerHTML = 'LOG IN';
     }
@@ -332,38 +356,47 @@
         empTab.className = 'px-3 py-1.5 rounded text-xs font-bold text-white/70 hover:text-white transition-colors'; 
         hrTab.className = 'px-3 py-1.5 rounded text-xs font-bold bg-white text-[#003811]';
         document.getElementById('hrSignedIn').textContent = `Signed in as ${user.full_name || user.username || 'HRMO'} · ${user.role || 'HRMO'}`;
-        document.getElementById('hrDate').value = today(); document.getElementById('recordSearch').value = ''; loadCeremony(false).then(loadHrRecords);
+        document.getElementById('hrDate').value = today(); document.getElementById('recordSearch').value = ''; 
+        stopScanner();
+        loadCeremony(false).then(loadHrRecords);
       } else {
         state.mode = 'employee'; 
         document.getElementById('employeeMode').classList.remove('hidden'); document.getElementById('employeeMode').classList.add('flex'); document.getElementById('hrMode').classList.add('hidden'); document.getElementById('hrMode').classList.remove('flex');
         empTab.className = 'px-3 py-1.5 rounded text-xs font-bold bg-white text-[#003811]'; 
         hrTab.className = 'px-3 py-1.5 rounded text-xs font-bold text-white/70 hover:text-white transition-colors'; 
         loadCeremony(false);
+        startScanner();
+        document.getElementById('employeeId').focus();
       }
     }
 
-    function setEntryMode(mode) {
-      state.entryMode = mode; document.getElementById('manualEntry').classList.toggle('hidden', mode !== 'manual'); document.getElementById('qrEntry').classList.toggle('hidden', mode !== 'qr'); document.getElementById('manualModeBtn').className = `rounded-lg px-3 py-2.5 text-sm font-bold ${mode === 'manual' ? 'bg-white text-[#003811] shadow-sm' : 'text-slate-500'}`; document.getElementById('qrModeBtn').className = `rounded-lg px-3 py-2.5 text-sm font-bold ${mode === 'qr' ? 'bg-white text-[#003811] shadow-sm' : 'text-slate-500'}`;
-      if (mode === 'qr') startScanner(); else stopScanner();
-    }
-
+    // --- REVISED: Optimized Scanner for Speed and Accuracy ---
     function startScanner() {
       const status = document.getElementById('qrStatus');
-      if (!window.Html5Qrcode) { status.textContent = 'QR scanner library is still loading. Use manual employee ID if it does not start.'; return; }
+      if (!window.Html5Qrcode) { 
+          status.textContent = 'QR scanner loading...'; 
+          setTimeout(startScanner, 500); // Retry if library not yet loaded via CDN
+          return; 
+      }
       if (state.scanner) return;
-      state.scanner = new Html5Qrcode('qr-reader'); status.textContent = 'Point the camera at the employee ID QR code.';
+      state.scanner = new Html5Qrcode('qr-reader'); status.textContent = 'Point camera at ID.';
       
-      // DO NOT STOP ON SCAN. Use isProcessing to lock.
-      state.scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, (decoded) => { 
-          if(state.isProcessing) return; // Prevent multiple scans while saving
-          document.getElementById('employeeId').value = cleanId(decoded); 
-          locateEmployee(null); 
-      }, () => {}).catch((error) => { status.textContent = `Camera unavailable: ${error.message || 'use manual entry.'}`; state.scanner = null; });
+      // DO NOT STOP ON SCAN. Use isProcessing to lock. Bumped FPS to 30 and enlarged qrbox for better read rate.
+      state.scanner.start(
+          { facingMode: 'environment' }, 
+          { fps: 30, qrbox: { width: 250, height: 250 } }, 
+          (decoded) => { 
+              if(state.isProcessing) return; // Prevent multiple scans while saving
+              document.getElementById('employeeId').value = cleanId(decoded); 
+              locateEmployee(null); 
+          }, 
+          () => {}
+      ).catch((error) => { status.textContent = `Camera unavailable. Please use keyboard entry.`; state.scanner = null; });
     }
     
     async function stopScanner() { if (!state.scanner) return; try { await state.scanner.stop(); await state.scanner.clear(); } catch (_) {} state.scanner = null; }
 
-    // --- REVISED: Extremely Fast Offline/Online Lookup ---
+    // --- Extremely Fast Offline/Online Lookup ---
     async function locateEmployee(event) {
       if (event) event.preventDefault();
       if (state.isProcessing && event) return; // double submit prevention
@@ -372,6 +405,7 @@
       const id = cleanId(document.getElementById('employeeId').value); 
       if (!id) { setBox('employeeNotice', 'Enter an employee number.', 'error'); state.isProcessing = false; return; }
       
+      document.getElementById('entryContainer').classList.add('hidden');
       document.getElementById('processingOverlay').classList.remove('hidden');
       document.getElementById('processingOverlay').classList.add('flex');
       clearBox('employeeNotice'); document.getElementById('employeeProfile').classList.add('hidden'); 
@@ -384,7 +418,7 @@
       if (!emp) {
           const { data, error } = await db.from('employees').select('*').eq('emp_id', id).limit(1).maybeSingle();
           if (data) emp = data;
-          if (error && error.message.includes('schema cache')) { setBox('employeeNotice', `<strong>Supabase Backend Error:</strong> Please reload schema cache via Supabase API dashboard.`, 'error'); document.getElementById('processingOverlay').classList.add('hidden'); document.getElementById('processingOverlay').classList.remove('flex'); setTimeout(clearEmployee, 3000); return; }
+          if (error && error.message.includes('schema cache')) { setBox('employeeNotice', `<strong>Supabase Backend Error:</strong> Please reload schema cache via Supabase API dashboard.`, 'error'); document.getElementById('processingOverlay').classList.add('hidden'); document.getElementById('processingOverlay').classList.remove('flex'); document.getElementById('entryContainer').classList.remove('hidden'); setTimeout(clearEmployee, 3000); return; }
       }
 
       if (!emp) {
@@ -399,7 +433,7 @@
       }
     }
 
-    // --- REVISED: Immediate Background Save and UI Render ---
+    // --- Immediate Background Save and UI Render ---
     async function recordAttendanceFast() {
       if (!state.employee) return; 
       if (!state.ceremony.is_open) {
@@ -407,6 +441,21 @@
           document.getElementById('processingOverlay').classList.add('hidden'); document.getElementById('processingOverlay').classList.remove('flex');
           renderProfile();
           setTimeout(clearEmployee, 2500); // Auto-resume
+          return;
+      }
+
+      // --- CHECK IF ALREADY LOGGED IN TODAY ---
+      const cleanEmpId = cleanId(state.employee.emp_id);
+      const alreadyLogged = (state.mergedRecords || []).find(r => cleanId(r.emp_id) === cleanEmpId);
+
+      if (alreadyLogged) {
+          setBox('employeeNotice', `Employee <strong>${esc(displayName(state.employee))}</strong> is <strong>ALREADY LOGGED-IN</strong> for today's ceremony.`, 'warn');
+          document.getElementById('processingOverlay').classList.add('hidden'); 
+          document.getElementById('processingOverlay').classList.remove('flex');
+          
+          state.existing = alreadyLogged; // Shows their ORIGINAL time in the profile card
+          renderProfile();
+          setTimeout(clearEmployee, 2500);
           return;
       }
       
@@ -482,6 +531,7 @@
         const input = document.getElementById('employeeId');
         input.value = ''; 
         document.getElementById('employeeProfile').classList.add('hidden'); 
+        document.getElementById('entryContainer').classList.remove('hidden');
         clearBox('employeeNotice');
         input.focus();
         state.isProcessing = false; // UNLOCK FOR NEXT QR SCAN
@@ -511,8 +561,8 @@
         return;
       }
 
-      // 1. Fetch live from DB
-      const { data: att } = await db.from('flag_attendance').select('emp_id, division, status').eq('date', ceremonyDate);
+      // 1. Fetch live from DB (Added time_in to select to track original scan time)
+      const { data: att } = await db.from('flag_attendance').select('emp_id, division, status, time_in').eq('date', ceremonyDate);
       
       const allowedEmps = new Set();
       const divTotals = {};
@@ -533,6 +583,9 @@
       
       // 2. Merge Live Database records + Fast Local Queue Records
       const mergedRecords = [...(att || []), ...state.localQueue.filter(q => q.date === ceremonyDate)];
+      
+      // Save merged records to state for checking "Already Logged In"
+      state.mergedRecords = mergedRecords; 
 
       mergedRecords.forEach(r => {
         if (!allowedEmps.has(r.emp_id) || processedThisSession.has(r.emp_id)) return;
@@ -564,7 +617,7 @@
       dash.innerHTML = html;
     }
 
-    // --- NEW: HR Generate QR Codes ---
+    // --- HR Generate QR Codes ---
     function generateAllQRCodes() {
         if(!state.allEmployees || state.allEmployees.length === 0) {
             alert("No employees loaded. Please wait for the sync to finish or refresh.");
@@ -608,7 +661,7 @@
     window.addEventListener('load', () => { 
         if (requireHrSession()) {
             document.getElementById('hrDate').value = today(); 
-            loadCeremony(false); 
+            showMode('employee'); 
         }
         syncEmployees(); // Start local caching exactly on load
     });
