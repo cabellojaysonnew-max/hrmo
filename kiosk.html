@@ -379,12 +379,29 @@
           return; 
       }
       if (state.scanner) return;
-      state.scanner = new Html5Qrcode('qr-reader'); status.textContent = 'Point camera at ID.';
       
-      // DO NOT STOP ON SCAN. Use isProcessing to lock. Bumped FPS to 30 and enlarged qrbox for better read rate.
+      // Explicitly limit to QR_CODE only to stop the engine from searching for 1D barcodes. This massively speeds up detection.
+      state.scanner = new Html5Qrcode('qr-reader', { formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] }); 
+      status.textContent = 'Point camera at ID.';
+      
+      // DO NOT STOP ON SCAN. Use isProcessing to lock.
+      // FPS lowered to 15 to prevent CPU throttling on mobile devices.
+      // qrbox made responsive to adapt to different camera screen sizes.
       state.scanner.start(
-          { facingMode: 'environment' }, 
-          { fps: 30, qrbox: { width: 250, height: 250 } }, 
+          { 
+              facingMode: 'environment',
+              advanced: [{ focusMode: "continuous" }] 
+          }, 
+          { 
+              fps: 15, 
+              qrbox: function(viewfinderWidth, viewfinderHeight) {
+                  let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+                  let qrboxSize = Math.floor(minEdgeSize * 0.75); // 75% of the screen
+                  return { width: qrboxSize, height: qrboxSize };
+              },
+              aspectRatio: 1.0,
+              disableFlip: false
+          }, 
           (decoded) => { 
               if(state.isProcessing) return; // Prevent multiple scans while saving
               document.getElementById('employeeId').value = cleanId(decoded); 
