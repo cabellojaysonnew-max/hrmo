@@ -273,6 +273,11 @@
                 <p class="text-sm text-gray-500 mb-8 italic pb-4 border-b">Set Expected Time-In / Time-Out for DTR Late/Undertime Computation</p>
                 <div class="bg-[#FFF9C4] p-4 rounded mb-8 border border-yellow-200">
                     <p id="sched_current_setup" class="text-sm font-bold text-[#003811]">Status: Select an employee to view current active setup.</p>
+                    <div id="sched_details" class="hidden mt-2 text-xs text-[#003811] grid grid-cols-1 md:grid-cols-3 gap-2 border-t border-yellow-300 pt-2">
+                        <p><strong>Effective Date:</strong> <span id="sched_detail_dates"></span></p>
+                        <p><strong>Updated By:</strong> <span id="sched_detail_by"></span></p>
+                        <p><strong>Updated On:</strong> <span id="sched_detail_on"></span></p>
+                    </div>
                 </div>
                 <div class="space-y-6">
                     <div>
@@ -433,6 +438,7 @@
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('s_start_date').value = today;
         document.getElementById('s_end_date').value = today;
+        checkActiveSetup();
     };
 
     async function fetchEmployees() {
@@ -562,12 +568,37 @@
     async function checkActiveSetup() { 
         const target = document.getElementById('s_target').value;
         const statusLbl = document.getElementById('sched_current_setup');
+        const detailsDiv = document.getElementById('sched_details');
         
         if (target === 'ALL') {
             statusLbl.innerText = 'Status: Global override selected. This configuration will apply to all employees.';
-            return;
+        } else {
+            statusLbl.innerText = `Status: Configuring override for Employee ID: ${target}.`;
         }
-        statusLbl.innerText = `Status: Configuring override for Employee ID: ${target}.`;
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('schedule_overrides')
+                .select('*')
+                .eq('emp_id', target)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                const record = data[0];
+                document.getElementById('sched_detail_dates').innerText = `${record.start_date} to ${record.end_date}`;
+                document.getElementById('sched_detail_by').innerText = record.updated_by || 'Unknown User';
+                document.getElementById('sched_detail_on').innerText = new Date(record.created_at).toLocaleString();
+                detailsDiv.classList.remove('hidden');
+            } else {
+                detailsDiv.classList.add('hidden');
+            }
+        } catch (e) {
+            console.error("Error fetching current setup:", e);
+            detailsDiv.classList.add('hidden');
+        }
     }
     
     async function applySchedule() { 
@@ -600,7 +631,8 @@
                 schedule_type: schedType,
                 start_time: startTime || null,
                 end_time: endTime || null,
-                working_days: workDays.join(',')
+                working_days: workDays.join(','),
+                updated_by: currentUser.full_name || currentUser.fullName || 'System'
             };
 
             const { error } = await supabaseClient.from('schedule_overrides').insert([payload]);
@@ -609,6 +641,8 @@
 
             document.getElementById('sched_status_lbl').innerText = 'Schedule Configuration Successfully Applied!';
             setTimeout(() => { document.getElementById('sched_status_lbl').innerText = ''; }, 3000);
+            
+            checkActiveSetup();
             
         } catch (e) {
             alert(`Error updating schedule: ${e.message}`);
