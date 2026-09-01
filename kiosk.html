@@ -380,18 +380,16 @@
       }
       if (state.scanner) return;
       
-      // Explicitly limit to QR_CODE only to stop the engine from searching for 1D barcodes. This massively speeds up detection.
-      state.scanner = new Html5Qrcode('qr-reader', { formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] }); 
+      // Removed formatsToSupport completely. 
+      // Safest initialization method across all browser versions.
+      state.scanner = new Html5Qrcode('qr-reader'); 
       status.textContent = 'Point camera at ID.';
       
       // DO NOT STOP ON SCAN. Use isProcessing to lock.
       // FPS lowered to 15 to prevent CPU throttling on mobile devices.
       // qrbox made responsive to adapt to different camera screen sizes.
       state.scanner.start(
-          { 
-              facingMode: 'environment',
-              advanced: [{ focusMode: "continuous" }] 
-          }, 
+          { facingMode: 'environment' }, // strictly just facingMode, removed advanced constraints
           { 
               fps: 15, 
               qrbox: function(viewfinderWidth, viewfinderHeight) {
@@ -399,7 +397,6 @@
                   let qrboxSize = Math.floor(minEdgeSize * 0.75); // 75% of the screen
                   return { width: qrboxSize, height: qrboxSize };
               },
-              aspectRatio: 1.0,
               disableFlip: false
           }, 
           (decoded) => { 
@@ -408,7 +405,10 @@
               locateEmployee(null); 
           }, 
           () => {}
-      ).catch((error) => { status.textContent = `Camera unavailable. Please use keyboard entry.`; state.scanner = null; });
+      ).catch((error) => { 
+          status.textContent = `Camera unavailable. Please use keyboard entry.`; 
+          state.scanner = null; 
+      });
     }
     
     async function stopScanner() { if (!state.scanner) return; try { await state.scanner.stop(); await state.scanner.clear(); } catch (_) {} state.scanner = null; }
