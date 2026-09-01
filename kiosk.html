@@ -370,41 +370,49 @@
       }
     }
 
-    // --- REVISED: Standard Scanner Initialization to Ensure Camera Works ---
+    // --- REVISED: Optimized Scanner for Speed and Robust Initialization ---
     function startScanner() {
       const status = document.getElementById('qrStatus');
       if (!window.Html5Qrcode) { 
           status.textContent = 'QR scanner loading...'; 
-          setTimeout(startScanner, 500); // Retry if library not yet loaded via CDN
+          setTimeout(startScanner, 500); 
           return; 
       }
       if (state.scanner) return;
       
-      // Standard initialization to ensure full device compatibility (Removed strict format/resolution filters that crash cameras)
       state.scanner = new Html5Qrcode('qr-reader'); 
       status.textContent = 'Point camera at ID.';
       
-      // FPS lowered to 15 to prevent CPU throttling on mobile devices.
-      state.scanner.start(
-          { facingMode: 'environment' }, 
-          { 
-              fps: 15, 
-              qrbox: function(viewfinderWidth, viewfinderHeight) {
-                  let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-                  let qrboxSize = Math.floor(minEdgeSize * 0.75); // 75% of the screen
-                  return { width: qrboxSize, height: qrboxSize };
-              },
-              disableFlip: false
-          }, 
-          (decoded) => { 
-              if(state.isProcessing) return; // Prevent multiple scans while saving
-              document.getElementById('employeeId').value = cleanId(decoded); 
-              locateEmployee(null); 
-          }, 
-          () => {}
-      ).catch((error) => { 
-          status.textContent = `Camera unavailable. Please use keyboard entry.`; 
-          state.scanner = null; 
+      const config = { 
+          fps: 20, // Increased FPS for faster scanning response
+          qrbox: function(viewfinderWidth, viewfinderHeight) {
+              let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+              let qrboxSize = Math.floor(minEdgeSize * 0.75); // 75% of screen
+              return { width: qrboxSize, height: qrboxSize };
+          },
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true } // Massive speed boost using native hardware scanning where available
+      };
+      
+      // Restrict to QR Code only if available, to speed up parsing by ignoring standard barcodes
+      if (window.Html5QrcodeSupportedFormats) {
+          config.formatsToSupport = [ window.Html5QrcodeSupportedFormats.QR_CODE ];
+      }
+
+      const onScanSuccess = (decoded) => { 
+          if(state.isProcessing) return; // Prevent multiple scans while saving
+          document.getElementById('employeeId').value = cleanId(decoded); 
+          locateEmployee(null); 
+      };
+
+      // 1st Attempt: Use Environment (Back) Camera
+      state.scanner.start({ facingMode: 'environment' }, config, onScanSuccess, () => {})
+      .catch((error) => { 
+          // 2nd Attempt: If Environment fails (e.g. PC without rear camera), Fallback to User (Front) Camera
+          state.scanner.start({ facingMode: 'user' }, config, onScanSuccess, () => {})
+          .catch(() => {
+              status.textContent = `Camera unavailable. Please use keyboard entry.`; 
+              state.scanner = null; 
+          });
       });
     }
     
