@@ -370,7 +370,7 @@
       }
     }
 
-    // --- REVISED: Optimized Scanner for Speed and Accuracy ---
+    // --- REVISED: Standard Scanner Initialization to Ensure Camera Works ---
     function startScanner() {
       const status = document.getElementById('qrStatus');
       if (!window.Html5Qrcode) { 
@@ -380,14 +380,13 @@
       }
       if (state.scanner) return;
       
-      // Included formatsToSupport to strictly only process standard QR codes, saving computation time
-      state.scanner = new Html5Qrcode('qr-reader', { formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] }); 
+      // Standard initialization to ensure full device compatibility (Removed strict format/resolution filters that crash cameras)
+      state.scanner = new Html5Qrcode('qr-reader'); 
       status.textContent = 'Point camera at ID.';
       
       // FPS lowered to 15 to prevent CPU throttling on mobile devices.
-      // Forced an ideal low resolution (640x480) so the camera doesn't attempt to process 1080p frames, drastically speeding up JS execution.
       state.scanner.start(
-          { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }, 
+          { facingMode: 'environment' }, 
           { 
               fps: 15, 
               qrbox: function(viewfinderWidth, viewfinderHeight) {
