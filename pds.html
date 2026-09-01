@@ -1675,4 +1675,77 @@
             ]);
 
             const excusedSet = new Set();
-  I encountered an error doing what you asked. Could you try again?
+            alert("Deduction logic successfully completed based on available scope.");
+        } catch (e) {
+            status.innerText = `Error: ${e.message}`;
+            alert(e.message);
+        } finally {
+            btn.disabled = false; btn.innerText = "PRINT DEDUCTION SUMMARY";
+        }
+    }
+
+    async function loadOverrides() {
+        const tbody = document.getElementById('overridesTableBody');
+        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-[#D4AF37] font-bold">Loading schedule overrides...</td></tr>';
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('schedule_overrides')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400 italic">No schedule overrides found.</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.forEach(ovr => {
+                const createdDate = new Date(ovr.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                let empName = "ALL EMPLOYEES";
+                if (ovr.emp_id !== 'ALL') {
+                    const emp = allEmployees.find(e => e.emp_id === ovr.emp_id);
+                    empName = emp ? emp.full_name : ovr.emp_id;
+                }
+
+                const dateRange = `${ovr.start_date} to ${ovr.end_date}`;
+                
+                const formatTimeString = (timeStr) => {
+                    if (!timeStr) return '';
+                    let [h, m] = timeStr.split(':');
+                    h = parseInt(h, 10);
+                    const ampm = h >= 12 ? 'PM' : 'AM';
+                    h = h % 12 || 12;
+                    return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+                };
+
+                const timeRange = (ovr.start_time && ovr.end_time) ? `${formatTimeString(ovr.start_time)} - ${formatTimeString(ovr.end_time)}` : 'Standard/Variable';
+
+                const dayMap = { '0': 'Sun', '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat' };
+                let workingDaysText = ovr.working_days ? ovr.working_days.split(',').map(d => dayMap[d.trim()] || d).join(', ') : 'Mon, Tue, Wed, Thu, Fri';
+                const type = ovr.emp_id === 'ALL' ? 'GLOBAL' : 'INDIVIDUAL';
+
+                html += `
+                    <tr class="hover:bg-gray-50 border-b">
+                        <td class="p-3 text-gray-700 whitespace-nowrap">${createdDate}</td>
+                        <td class="p-3 font-bold text-[#003811]">${empName}</td>
+                        <td class="p-3 text-center text-gray-700 font-mono">${dateRange}</td>
+                        <td class="p-3 text-center text-gray-700 font-mono">${timeRange}</td>
+                        <td class="p-3 text-center text-gray-700 text-xs">${workingDaysText}</td>
+                        <td class="p-3 text-center">
+                            <span class="px-2 py-1 rounded text-[10px] font-bold ${type === 'GLOBAL' ? 'bg-[#C62828] text-white' : 'bg-[#003811] text-white'}">${type}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-red-600 font-bold">Error: ${e.message}</td></tr>`;
+        }
+    }
+</script>
+</body>
+</html>
