@@ -272,11 +272,23 @@
                 <h3 class="text-2xl font-bold text-[#003811] mb-2">Work Schedule Configuration</h3>
                 <p class="text-sm text-gray-500 mb-8 italic pb-4 border-b">Set Expected Time-In / Time-Out for DTR Late/Undertime Computation</p>
                 <div class="bg-[#FFF9C4] p-4 rounded mb-8 border border-yellow-200">
-                    <p id="sched_current_setup" class="text-sm font-bold text-[#003811]">Status: Select an employee to view current active setup.</p>
-                    <div id="sched_details" class="hidden mt-2 text-xs text-[#003811] grid grid-cols-1 md:grid-cols-3 gap-2 border-t border-yellow-300 pt-2">
-                        <p><strong>Effective Date:</strong> <span id="sched_detail_dates"></span></p>
-                        <p><strong>Updated By:</strong> <span id="sched_detail_by"></span></p>
-                        <p><strong>Updated On:</strong> <span id="sched_detail_on"></span></p>
+                    <p id="sched_current_setup" class="text-sm font-bold text-[#003811]">Status: Select an employee to view schedule history.</p>
+                    <div id="sched_history_container" class="hidden mt-4 border-t border-yellow-300 pt-3">
+                        <h4 class="text-xs font-bold text-[#003811] mb-2 uppercase">Configuration History</h4>
+                        <div class="max-h-40 overflow-y-auto border border-yellow-300 rounded bg-white scroll-list">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-yellow-100 sticky top-0 shadow-sm">
+                                    <tr>
+                                        <th class="p-2 border-b border-yellow-200 text-[#003811]">Setup</th>
+                                        <th class="p-2 border-b border-yellow-200 text-[#003811]">Effective Dates</th>
+                                        <th class="p-2 border-b border-yellow-200 text-[#003811]">Updated By</th>
+                                        <th class="p-2 border-b border-yellow-200 text-[#003811]">Updated On</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sched_history_body" class="divide-y divide-yellow-100 text-gray-700">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 <div class="space-y-6">
@@ -568,7 +580,8 @@
     async function checkActiveSetup() { 
         const target = document.getElementById('s_target').value;
         const statusLbl = document.getElementById('sched_current_setup');
-        const detailsDiv = document.getElementById('sched_details');
+        const historyContainer = document.getElementById('sched_history_container');
+        const historyBody = document.getElementById('sched_history_body');
         
         if (target === 'ALL') {
             statusLbl.innerText = 'Status: Global override selected. This configuration will apply to all employees.';
@@ -581,23 +594,36 @@
                 .from('schedule_overrides')
                 .select('*')
                 .eq('emp_id', target)
-                .order('created_at', { ascending: false })
-                .limit(1);
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
 
             if (data && data.length > 0) {
-                const record = data[0];
-                document.getElementById('sched_detail_dates').innerText = `${record.start_date} to ${record.end_date}`;
-                document.getElementById('sched_detail_by').innerText = record.updated_by || 'Unknown User';
-                document.getElementById('sched_detail_on').innerText = new Date(record.created_at).toLocaleString();
-                detailsDiv.classList.remove('hidden');
+                historyBody.innerHTML = '';
+                data.forEach(record => {
+                    const tr = document.createElement('tr');
+                    
+                    let setupDesc = record.schedule_type;
+                    if (record.start_time && record.end_time) {
+                        setupDesc += ` (${record.start_time} - ${record.end_time})`;
+                    }
+                    
+                    tr.innerHTML = `
+                        <td class="p-2">${setupDesc}</td>
+                        <td class="p-2">${record.start_date} to ${record.end_date}</td>
+                        <td class="p-2">${record.updated_by || 'Unknown User'}</td>
+                        <td class="p-2">${new Date(record.created_at).toLocaleString()}</td>
+                    `;
+                    historyBody.appendChild(tr);
+                });
+                historyContainer.classList.remove('hidden');
             } else {
-                detailsDiv.classList.add('hidden');
+                historyBody.innerHTML = '<tr><td colspan="4" class="p-2 text-center text-gray-500 italic">No previous configurations found.</td></tr>';
+                historyContainer.classList.remove('hidden');
             }
         } catch (e) {
             console.error("Error fetching current setup:", e);
-            detailsDiv.classList.add('hidden');
+            historyContainer.classList.add('hidden');
         }
     }
     
