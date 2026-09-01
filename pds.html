@@ -649,64 +649,73 @@
         return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
     }
 
-    async function loadOverrides() {
-        const tbody = document.getElementById('schedOverridesTableBody');
-        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Loading overrides...</td></tr>';
+async function loadOverrides() {
+    const tbody = document.getElementById('schedOverridesTableBody');
+    tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Loading overrides...</td></tr>';
+    
+    try {
+        const { data, error } = await supabaseClient.from('schedule_overrides')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+        if (error) throw error;
         
-        try {
-            const { data, error } = await supabaseClient.from('schedule_overrides')
-                .select('*')
-                .order('created_at', { ascending: false });
-                
-            if (error) throw error;
-            
-            if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No schedule overrides found.</td></tr>';
-                return;
-            }
-            
-            let html = '';
-            const dayMap = { '0': 'Sun', '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat' };
-            
-            data.forEach(ovr => {
-                const createdDate = new Date(ovr.created_at).toLocaleString('en-US', { 
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-yellow-600 font-bold italic">No records found. (If data exists in Supabase, check your RLS Policies)</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        const dayMap = { '0': 'Sun', '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat' };
+        
+        data.forEach(ovr => {
+            // Bulletproof date parsing fallback
+            let createdDate = 'Unknown Date';
+            try {
+                const safeDate = ovr.created_at ? String(ovr.created_at).replace(' ', 'T') : new Date();
+                createdDate = new Date(safeDate).toLocaleString('en-US', { 
                     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
                 });
-                
-                let targetName = 'ALL EMPLOYEES';
-                if (ovr.emp_id !== 'ALL') {
-                    const emp = allEmployees.find(e => e.emp_id === ovr.emp_id);
-                    targetName = emp ? `${emp.emp_id} - ${emp.full_name}` : ovr.emp_id;
-                }
-                
-                const dateRange = `${ovr.start_date} to ${ovr.end_date}`;
-                
-                let schedString = ovr.schedule_type || 'Standard';
-                if (ovr.start_time && ovr.end_time) {
-                    schedString += ` (${formatTime12(ovr.start_time)} - ${formatTime12(ovr.end_time)})`;
-                }
-                
-                const daysArr = ovr.working_days ? String(ovr.working_days).split(',') : [];
-                const readableDays = daysArr.map(d => dayMap[d.trim()] || d).join(', ');
-                
-                html += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="p-2 whitespace-nowrap">${createdDate}</td>
-                        <td class="p-2 font-bold text-[#003811]">${targetName}</td>
-                        <td class="p-2 whitespace-nowrap">${dateRange}</td>
-                        <td class="p-2 whitespace-nowrap">${schedString}</td>
-                        <td class="p-2">${readableDays}</td>
-                    </tr>
-                `;
-            });
+            } catch (dateErr) {
+                console.warn("Date parsing skipped for:", ovr.created_at);
+            }
             
-            tbody.innerHTML = html;
-        } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 italic">Failed to load overrides.</td></tr>`;
-            console.error(e);
-        }
+            let targetName = 'ALL EMPLOYEES';
+            if (ovr.emp_id && ovr.emp_id !== 'ALL') {
+                const emp = allEmployees.find(e => e.emp_id === ovr.emp_id);
+                targetName = emp ? `${emp.emp_id} - ${emp.full_name}` : ovr.emp_id;
+            }
+            
+            const dateRange = `${ovr.start_date || '?'} to ${ovr.end_date || '?'}`;
+            
+            let schedString = ovr.schedule_type || 'Standard';
+            if (ovr.start_time && ovr.end_time) {
+                schedString += ` (${formatTime12(ovr.start_time)} - ${formatTime12(ovr.end_time)})`;
+            }
+            
+            // Safely handle if working_days column is entirely missing or null
+            const daysArr = ovr.working_days ? String(ovr.working_days).split(',') : [];
+            const readableDays = daysArr.length > 0 ? daysArr.map(d => dayMap[d.trim()] || d).join(', ') : 'Not Set';
+            
+            html += `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-2 whitespace-nowrap">${createdDate}</td>
+                    <td class="p-2 font-bold text-[#003811]">${targetName}</td>
+                    <td class="p-2 whitespace-nowrap">${dateRange}</td>
+                    <td class="p-2 whitespace-nowrap">${schedString}</td>
+                    <td class="p-2">${readableDays}</td>
+                </tr>
+            `;
+        });
+        
+        tbody.innerHTML = html;
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-600 font-bold uppercase">DB ERROR: ${e.message}</td></tr>`;
+        console.error("Load Overrides Error:", e);
     }
-
+}
+    
+    
     // --- GENERATE LIST LOGIC ---
     let currentListData = []; 
     let isGroupedList = false;
