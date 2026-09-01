@@ -669,7 +669,7 @@
             const dayMap = { '0': 'Sun', '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat' };
             
             data.forEach(ovr => {
-                const createdDate = new Date(ovr.created_at).toLocaleDateString('en-US', { 
+                const createdDate = new Date(ovr.created_at).toLocaleString('en-US', { 
                     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
                 });
                 
@@ -686,7 +686,7 @@
                     schedString += ` (${formatTime12(ovr.start_time)} - ${formatTime12(ovr.end_time)})`;
                 }
                 
-                const daysArr = ovr.working_days ? ovr.working_days.split(',') : [];
+                const daysArr = ovr.working_days ? String(ovr.working_days).split(',') : [];
                 const readableDays = daysArr.map(d => dayMap[d.trim()] || d).join(', ');
                 
                 html += `
