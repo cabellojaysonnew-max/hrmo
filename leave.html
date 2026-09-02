@@ -783,7 +783,7 @@
                 if (activeOverride && activeOverride.working_days) {
                     const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
                     if (wDays.length === 4) {
-                        if (['VL', 'SL', 'CTO'].includes(cat)) {
+                        if (cat !== 'WL' && cat !== 'SPL') {
                             multiplier = 1.25;
                         }
                     }
@@ -881,7 +881,7 @@
                 if (activeOverride && activeOverride.working_days) {
                     const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
                     if (wDays.length === 4) {
-                        if (['VL', 'SL', 'CTO'].includes(cat)) multiplier = 1.25;
+                        if (cat !== 'WL' && cat !== 'SPL') multiplier = 1.25;
                     }
                 }
             }
@@ -943,7 +943,7 @@
                 if (activeOverride && activeOverride.working_days) {
                     const wDays = activeOverride.working_days.split(',').map(d => d.trim()).filter(Boolean);
                     if (wDays.length === 4) {
-                        if (['VL', 'SL', 'CTO'].includes(cat)) multiplier = 1.25;
+                        if (cat !== 'WL' && cat !== 'SPL') multiplier = 1.25;
                     }
                 }
             }
