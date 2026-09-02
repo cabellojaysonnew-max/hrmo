@@ -1,1 +1,3001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance & Form 48 - DAR HRMO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        :root {
+            --color-primary: #003811;
+            --color-secondary: #D4AF37;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #F3F4F6; color: #1F2937; }
+        .card { background: #FFFFFF; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; }
+        .form-input { width: 100%; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.875rem; transition: border-color 0.2s; }
+        .form-input:focus { outline: none; border-color: var(--color-primary); ring: 1px solid var(--color-primary); }
+        .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.25rem; text-transform: uppercase; }
+        
+        .scroll-list::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
+        .scroll-list::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .scroll-list::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
+        .tab-btn { transition: all 0.2s; }
+        .tab-active { background-color: #FFFFFF; border-top: 4px solid var(--color-secondary); color: var(--color-primary); font-weight: bold; }
+        .tab-inactive { background-color: #F3F4F6; color: #6B7280; font-weight: 600; border-top: 4px solid transparent; }
+        .tab-inactive:hover { background-color: #E5E7EB; }
+        .modal-bg { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); }
+
+        .status-onto { color: #1976D2; font-weight: bold; }
+        .status-onpso { color: #C62828; font-weight: bold; }
+        .status-onleave { color: #8E24AA; font-weight: bold; }
+        .status-absent { color: #D32F2F; font-weight: bold; font-style: italic; }
+        .status-incomplete { color: #E64A19; font-weight: bold; }
+        
+        .editable-cell { cursor: pointer; transition: background-color 0.2s; }
+        .editable-cell:hover { background-color: #FEF3C7; }
+
+        /* DTR Log Extractor tab */
+        .extractor-alert { margin-bottom: 1rem; padding: .8rem 1rem; border-left: 4px solid #1769a0; border-radius: .375rem; background: #eff6ff; color: #1e3a5f; }
+        .extractor-alert-error { border-left-color: #b91c1c; background: #fff1f2; color: #881337; }
+        .extractor-alert-success { border-left-color: #006400; background: #f0fdf4; color: #166534; }
+        .extractor-table-wrap { width: 100%; overflow: auto; border: 1px solid #dbe3ea; border-radius: .5rem; background: #fff; max-height: 680px; }
+        .extractor-table { width: 100%; min-width: 1280px; border-collapse: collapse; }
+        .extractor-table th, .extractor-table td { padding: .65rem .8rem; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; font-size: .82rem; }
+        .extractor-table th { position: sticky; top: 0; z-index: 10; background: #003811; color: #fff; font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+        .extractor-division-row { background: #003811 !important; }
+        .extractor-division-row td { color: #D4AF37; font-size: .78rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+        .extractor-name-row { background: #eef4f0 !important; }
+        .extractor-name-row td { color: #003811; font-size: .95rem; font-weight: 800; }
+        .extractor-issue-row td { background: #fff1f2 !important; }
+        .extractor-issue-row td:first-child { border-left: 4px solid #b91c1c; }
+        .extractor-weekend-row td { background: #f8fafc !important; color: #64748b; }
+        .extractor-holiday-row td { background: #faf5ff !important; }
+        .extractor-status { display: inline-flex; align-items: center; padding: .2rem .55rem; border-radius: 999px; font-size: .66rem; font-weight: 800; white-space: nowrap; margin: 0 .25rem .2rem 0; }
+        .extractor-status-green { background: #dcfce7; color: #166534; }
+        .extractor-status-red { background: #fee2e2; color: #991b1b; }
+        .extractor-status-amber { background: #fef3c7; color: #92400e; }
+        .extractor-status-gray { background: #e2e8f0; color: #475569; }
+        .extractor-status-blue { background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd; }
+        .extractor-status-purple { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+        .extractor-time-input { width: 105px; padding: .35rem .45rem; border: 1px solid #cbd5e1; border-radius: .25rem; background: #fff; color: #1e293b; font-family: monospace; font-size: .8rem; }
+        .extractor-time-input:focus { outline: none; border-color: #1769a0; box-shadow: 0 0 0 2px rgba(23,105,160,.1); }
+        .extractor-time-input.extractor-manual-entry { background: #fff7ed; border: 2px solid #fcd34d; }
+        .extractor-time-input[readonly], .extractor-time-input:disabled { background: #f1f5f9; color: #64748b; cursor: not-allowed; opacity: .8; }
+        .extractor-time-select { min-width: 145px; width: 100%; }
+        .extractor-employee-locator { width: min(520px, 100%); margin-left: 12px; padding: .5rem .65rem; border: 1px solid #d97706; border-radius: .3rem; background: #fffbeb; color: #78350f; font-size: .76rem; font-weight: 700; }
+        .extractor-unidentified { color: #991b1b; }
+        .extractor-monthly-tables { display: grid; gap: .8rem; }
+        .extractor-division-heading { margin-top: .5rem; padding: .65rem .9rem; border-radius: .4rem; background: #003811; color: #D4AF37; font-size: .78rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+        .extractor-month-card { overflow: hidden; border: 1px solid #cbd5e1; border-radius: .5rem; background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+        .extractor-month-card > summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding: .85rem 1rem; cursor: pointer; background: #eef4f0; color: #003811; font-size: .85rem; font-weight: 800; list-style: none; }
+        .extractor-month-card > summary::-webkit-details-marker { display: none; }
+        .extractor-month-card > summary::after { content: 'OPEN MONTHLY TABLE'; color: #1769a0; font-size: .66rem; letter-spacing: .04em; }
+        .extractor-month-card[open] > summary::after { content: 'CLOSE MONTHLY TABLE'; }
+        .extractor-month-card .extractor-table-wrap { max-height: 560px; border: 0; border-top: 1px solid #dbe3ea; border-radius: 0; }
+        .extractor-slot-editor { display: grid; gap: .3rem; min-width: 150px; }
+        .extractor-punch-picker { width: 100%; padding: .3rem .35rem; border: 1px solid #d97706; border-radius: .25rem; background: #fffbeb; color: #78350f; font-size: .68rem; font-weight: 700; }
+        .extractor-slot-editor .extractor-time-input { width: 100%; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-[#1F2937]">
+
+    <nav class="bg-[#003811] md:w-64 flex flex-col text-white flex-shrink-0 shadow-xl z-20">
+        <div class="p-6 hidden md:block border-b border-[#006400]">
+            <h2 class="text-xl font-bold text-[#D4AF37]">DAR HR</h2>
+            <p id="userRoleBadge" class="text-[10px] text-gray-300 uppercase tracking-widest mt-1 font-bold"></p>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <a href="dashboard.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">DASHBOARD</a>
+            <a href="pds.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">PDS MANAGER</a>
+            <a href="attendance.html" class="block w-full text-left px-6 py-4 text-sm font-bold bg-[#006400] border-l-4 border-[#D4AF37]">ATTENDANCE</a>
+            <a href="leave.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">LEAVE PROCESSING</a>
+            <a href="cto_gp.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">GATE PASS & CTO</a>
+            <a href="reports.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">REPORTS</a>
+            <a href="users.html" class="block w-full text-left px-6 py-4 text-sm font-bold border-l-4 border-transparent hover:bg-[#006400]">USERS</a>
+        </div>
+        <div class="p-4 bg-black/20 hidden md:block">
+            <p id="activeUser" class="text-xs text-gray-300 truncate mb-2 font-bold"></p>
+            <button onclick="logout()" class="w-full bg-red-800 py-2 text-xs font-bold rounded shadow hover:bg-red-700 transition-colors">LOGOUT</button>
+        </div>
+    </nav>
+
+    <main class="flex-1 flex flex-col overflow-hidden bg-gray-100 relative">
+        <div class="px-8 pt-8 pb-4 flex justify-between items-end">
+            <div>
+                <h2 class="text-3xl font-bold text-[#003811]">Monthly Attendance & Form 48</h2>
+                <p class="text-sm text-gray-500 font-bold mt-1 uppercase tracking-wide">Log Management & Civil Service Generation</p>
+            </div>
+            <button onclick="openLockModal()" class="bg-red-700 text-white px-4 py-2 rounded text-xs font-bold shadow hover:bg-red-800 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                LOCK MONTH
+            </button>
+        </div>
+
+        <div class="flex px-8 border-b border-gray-300">
+            <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn tab-active px-6 py-3 rounded-t-lg">Monthly Log View</button>
+            <button onclick="switchTab('extractor')" id="tab-extractor" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">DTR Log Extractor</button>
+            <button onclick="switchTab('f48')" id="tab-f48" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Form 48 Generator</button>
+            <button onclick="switchTab('deduction')" id="tab-deduction" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Deduction</button>
+            <button onclick="switchTab('flag')" id="tab-flag" class="tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2">Flag Convocation</button>
+        </div>
+
+        <div id="module-logs" class="flex-1 flex flex-col p-8 overflow-hidden">
+            <div class="card bg-white flex flex-col h-full overflow-hidden">
+                <div class="p-4 border-b bg-gray-50 flex flex-wrap gap-4 items-end">
+                    <div>
+                        <label class="form-label">Station</label>
+                        <select id="viewStation" class="form-input py-1.5 w-32 h-[36px]">
+                            <option value="DARPO-CS1">DARPO-CS1</option>
+                            <option value="DARMOS">DARMOs</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Type Filter</label>
+                        <div class="flex gap-3 bg-white border border-gray-300 rounded px-3 py-1.5 h-[36px] items-center">
+                            <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
+                                <input type="radio" name="viewType" value="REGULAR" class="accent-[#003811]"> REGULAR
+                            </label>
+                            <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
+                                <input type="radio" name="viewType" value="COS" class="accent-[#003811]"> COS
+                            </label>
+                            <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
+                                <input type="radio" name="viewType" value="SPLIT" class="accent-[#003811]"> SPLIT
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label">Month</label>
+                        <select id="viewMonth" class="form-input py-1.5 w-32 h-[36px]">
+                            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+                            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+                            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+                            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Year</label>
+                        <select id="viewYear" class="form-input py-1.5 w-24 h-[36px]"></select>
+                    </div>
+                    <button onclick="generateMonthlyView()" id="btnGenerateView" class="bg-[#003811] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-[#006400] h-[36px]">GENERATE VIEW</button>
+                    
+                    <div class="flex-1"></div>
+                    <div class="flex items-center mr-4 border-r border-gray-300 pr-4">
+                        <label class="form-label mb-0 mr-2 text-[10px]">Daily Summary:</label>
+                        <input type="date" id="printDailyDate" class="form-input py-1.5 w-32 h-[36px] mr-2 text-xs">
+                        <button onclick="printDailySummary()" id="btnDailySummary" class="bg-[#1976D2] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-blue-800 shadow-sm h-[36px]">PRINT</button>
+                    </div>
+                    <button onclick="printMissingLogs()" class="bg-[#C62828] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-red-800 shadow-sm mr-2 h-[36px]">PRINT MISSING LOGS</button>
+                    <button onclick="openManualEntryModal()" class="bg-[#D4AF37] text-[#003811] px-4 py-1.5 rounded text-sm font-bold hover:bg-yellow-500 shadow-sm h-[36px]">+ MANUAL ENTRY</button>
+                </div>
+                
+                <div class="flex-1 overflow-auto scroll-list">
+                    <table class="w-full text-xs text-left whitespace-nowrap" id="tblLogs">
+                        <thead class="bg-[#003811] text-white sticky top-0 z-10">
+                            <tr>
+                                <th class="p-3 font-bold border-b">EMP ID</th>
+                                <th class="p-3 font-bold border-b">NAME</th>
+                                <th class="p-3 font-bold border-b text-center">DATE</th>
+                                <th class="p-3 font-bold border-b text-center">AM IN</th>
+                                <th class="p-3 font-bold border-b text-center">AM OUT</th>
+                                <th class="p-3 font-bold border-b text-center">PM IN</th>
+                                <th class="p-3 font-bold border-b text-center">PM OUT</th>
+                                <th class="p-3 font-bold border-b text-center">UNDERTIME</th>
+                                <th class="p-3 font-bold border-b text-center">STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody" class="divide-y">
+                            <tr><td colspan="9" class="p-8 text-center text-gray-400 italic">Select Month & Year, then click Generate View...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="module-extractor" class="hidden flex-1 p-8 overflow-y-auto">
+            <div class="card p-6 border-t-4 border-[#D4AF37]">
+                <div class="mb-6 border-b pb-4">
+                    <h3 class="text-2xl font-bold text-[#003811]">DTR Log Extractor</h3>
+                    <p class="text-sm text-gray-500 mt-1">Extract the selected month from a DAT file and generate the DARPO-CS1 DTR View with TO itineraries, PSOs, and holidays.</p>
+                </div>
+
+                <div id="extractorAlertBox" class="extractor-alert" style="display:none;"></div>
+
+                <div class="grid grid-cols-1 md:grid-cols-[190px_1fr_auto] gap-4 items-end mb-6 p-4 bg-gray-50 border rounded-lg">
+                    <div>
+                        <label for="extractorTargetMonth" class="form-label">Target Month</label>
+                        <input type="month" id="extractorTargetMonth" class="form-input h-[42px]">
+                    </div>
+                    <div>
+                        <label for="extractorFileInput" class="form-label">Biometric File (.dat)</label>
+                        <input type="file" id="extractorFileInput" class="form-input h-[42px] bg-white" accept=".dat,.txt">
+                    </div>
+                    <button id="extractorParseBtn" type="button" class="bg-[#003811] text-white px-5 h-[42px] rounded font-bold text-sm hover:bg-[#006400]">EXTRACT &amp; CHECK</button>
+                </div>
+
+                <div id="extractorUploadAction" class="hidden flex-wrap justify-between items-center gap-4 my-5 pt-5 border-t border-dashed">
+                    <div>
+                        <h4 id="extractorLogCount" class="font-bold text-[#003811]">0 records processed</h4>
+                        <p id="extractorCurrentMonthLabel" class="text-xs text-gray-500">Arranged by Division and Employee Name</p>
+                    </div>
+                    <button id="extractorUploadBtn" type="button" class="bg-[#006400] text-white px-5 py-2.5 rounded font-bold text-sm hover:bg-green-800">POST EXTRACTED LOGS</button>
+                </div>
+
+                <datalist id="extractorEmployeeDirectoryOptions"></datalist>
+                <div id="extractorTableWrapper" class="extractor-monthly-tables" style="display:none;">
+                    <div id="extractorPreviewBody"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="module-f48" class="hidden flex-1 p-8 overflow-y-auto">
+            <div class="card p-8 max-w-4xl mx-auto border-t-4 border-[#003811]">
+                <h3 class="text-2xl font-bold text-[#003811] mb-2">Civil Service Form 48 Generation</h3>
+                <p class="text-sm text-gray-500 mb-6 italic pb-4 border-b">Generate official DTR forms capturing Travel Orders, PSOs, Leaves, and Schedule Overrides.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">1. Select Period</h4>
+                            <div class="flex gap-4">
+                                <div class="w-1/2">
+                                    <label class="form-label">Month</label>
+                                    <select id="f48Month" class="form-input"></select>
+                                </div>
+                                <div class="w-1/2">
+                                    <label class="form-label">Year</label>
+                                    <select id="f48Year" class="form-input"></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">2. Select Target Scope</h4>
+                            
+                            <div class="flex gap-4 mb-4">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="f48Mode" value="individual" checked onchange="toggleF48Mode()" class="accent-[#003811]">
+                                    <span class="text-sm font-bold text-gray-700">Individual Employee</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="f48Mode" value="batch" onchange="toggleF48Mode()" class="accent-[#003811]">
+                                    <span class="text-sm font-bold text-gray-700">Batch Generate</span>
+                                </label>
+                            </div>
+                            
+                            <div class="h-[85px] bg-gray-50 p-3 rounded border relative overflow-hidden">
+                                
+                                <div id="divIndividual" class="absolute inset-0 p-3 w-full transition-opacity duration-200">
+                                    <label class="form-label text-[10px]">Search Employee</label>
+                                    <input type="text" id="f48Employee" list="f48EmployeeList" class="form-input py-1.5" placeholder="Type name or ID...">
+                                    <datalist id="f48EmployeeList"></datalist>
+                                </div>
+
+                                <div id="divBatch" class="absolute inset-0 p-3 w-full opacity-0 pointer-events-none transition-opacity duration-200">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="form-label text-[10px] mb-0">Division / Office</label>
+                                        <div class="flex gap-3">
+                                            <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-gray-700">
+                                                <input type="radio" name="f48Type" value="ALL" checked class="accent-[#003811]"> ALL
+                                            </label>
+                                            <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-gray-700">
+                                                <input type="radio" name="f48Type" value="REGULAR" class="accent-[#003811]"> REGULAR
+                                            </label>
+                                            <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-gray-700">
+                                                <input type="radio" name="f48Type" value="COS" class="accent-[#003811]"> COS
+                                            </label>
+                                            <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-gray-700">
+                                                <input type="radio" name="f48Type" value="SPLIT" class="accent-[#003811]"> SPLIT
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <select id="f48Division" class="form-input py-1.5 text-xs">
+                                        <option value="ALL">ALL</option>
+                                        <option value="OFFICE OF THE PARPO">OFFICE OF THE PARPO</option>
+                                        <option value="MARPOs">MARPOs</option>
+                                        <option value="PARAD">PARAD</option>
+                                        <option value="LTSP">LTSP</option>
+                                        <option value="AJDP">AJDP</option>
+                                        <option value="PBDD">PBDD</option>
+                                        <option value="STOD">STOD</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col justify-center items-center bg-gray-50 rounded-lg border border-dashed border-gray-300 p-6">
+                        <svg class="w-16 h-16 text-[#003811] mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <button onclick="generateForm48Trigger()" id="btnGenerateF48" class="w-full bg-[#003811] text-white py-4 rounded-lg font-bold text-lg shadow-lg hover:bg-[#006400] transition-colors">
+                            GENERATE FORM 48
+                        </button>
+                        <p id="f48Status" class="mt-4 text-sm font-bold text-[#D4AF37] text-center"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="module-deduction" class="hidden flex-1 p-8 overflow-y-auto">
+            <div class="card p-8 max-w-4xl mx-auto border-t-4 border-[#C62828]">
+                <h3 class="text-2xl font-bold text-[#003811] mb-2">Monthly Deduction Summary</h3>
+                <p class="text-sm text-gray-500 mb-6 italic pb-4 border-b">Generate printable summary of Tardiness, Undertime, and Gate Pass per division.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-bold text-[#D4AF37] border-b pb-2 mb-3">Select Period</h4>
+                            <div class="flex gap-4">
+                                <div class="w-1/2">
+                                    <label class="form-label">Month</label>
+                                    <select id="deductMonth" class="form-input"></select>
+                                </div>
+                                <div class="w-1/2">
+                                    <label class="form-label">Year</label>
+                                    <select id="deductYear" class="form-input"></select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col justify-center items-center bg-gray-50 rounded-lg border border-dashed border-gray-300 p-6">
+                        <svg class="w-16 h-16 text-[#C62828] mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <button onclick="printDeductionSummary()" id="btnGenerateDeduction" class="w-full bg-[#C62828] text-white py-4 rounded-lg font-bold text-lg shadow-lg hover:bg-red-800 transition-colors">
+                            PRINT DEDUCTION SUMMARY
+                        </button>
+                        <p id="deductStatus" class="mt-4 text-sm font-bold text-red-700 text-center"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="module-flag" class="hidden flex-1 p-8 overflow-y-auto">
+            <div class="card p-6 border-t-4 border-[#003811]">
+                <div class="mb-6 border-b pb-4 flex justify-between items-end">
+                    <div>
+                        <h3 class="text-2xl font-bold text-[#003811]">Flag Convocation Summary</h3>
+                        <p class="text-sm text-gray-500 mt-1">Generate summary of flag ceremony attendance across all stations per division.</p>
+                    </div>
+                    <div class="flex gap-4 items-end">
+                        <div>
+                            <label class="form-label">Select Date</label>
+                            <input type="date" id="flagDate" class="form-input h-[36px]">
+                        </div>
+                        <button onclick="generateFlagView()" class="bg-[#003811] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-[#006400] h-[36px]">GENERATE</button>
+                        <button onclick="printFlagPDF()" id="btnFlagPrint" class="bg-[#1976D2] text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-blue-800 shadow-sm h-[36px]">PRINT PDF</button>
+                    </div>
+                </div>
+                <div class="overflow-auto scroll-list" style="max-height: 600px;">
+                    <table class="w-full text-xs text-left" id="tblFlag">
+                        <thead class="bg-[#003811] text-white sticky top-0 z-10">
+                            <tr>
+                                <th class="p-3 font-bold border-b">NAME</th>
+                                <th class="p-3 font-bold border-b text-center">ATTENDANCE LOG</th>
+                                <th class="p-3 font-bold border-b text-center">FLAG CEREMONY LOG</th>
+                                <th class="p-3 font-bold border-b text-center">TRAVEL ORDER</th>
+                                <th class="p-3 font-bold border-b text-center">LEAVE</th>
+                                <th class="p-3 font-bold border-b text-center">PSO</th>
+                                <th class="p-3 font-bold border-b">REMARKS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="flagTableBody" class="divide-y">
+                            <tr><td colspan="7" class="p-8 text-center text-gray-400 italic">Select a date and click Generate...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="modalManual" class="fixed inset-0 modal-bg hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-2xl w-[500px]">
+            <div class="px-6 py-4 bg-[#003811] text-white rounded-t-lg flex justify-between items-center">
+                <h3 class="font-bold text-lg">Resolve Absences / Manual Entry</h3>
+                <button onclick="closeModal('modalManual')" class="text-white hover:text-gray-300 font-bold text-xl">&times;</button>
+            </div>
+            <div class="p-6">
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4 text-xs text-yellow-800">
+                    Logs entered manually will be securely tagged with your HR credentials (<strong><span id="lblHrName"></span></strong>) and the current date.
+                </div>
+
+                <div class="mb-4 flex gap-4 items-center">
+                    <label class="form-label mb-0">Station:</label>
+                    <select id="mStation" class="form-input w-32 py-1" onchange="populateManualSearch()">
+                        <option value="DARPO-CS1">DARPO-CS1</option>
+                        <option value="DARMOS">DARMOs</option>
+                    </select>
+                    
+                    <label class="form-label mb-0 ml-2">Type Filter:</label>
+                    <div id="manualTypeContainer" class="flex gap-3">
+                        <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
+                            <input type="radio" name="mType" value="REGULAR" class="accent-[#003811]" onchange="populateManualSearch()"> REGULAR
+                        </label>
+                        <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
+                            <input type="radio" name="mType" value="COS" class="accent-[#003811]" onchange="populateManualSearch()"> COS
+                        </label>
+                        <label class="flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-700">
+                            <input type="radio" name="mType" value="SPLIT" class="accent-[#003811]" onchange="populateManualSearch()"> SPLIT
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label">Search Employee</label>
+                    <input type="text" id="mEmployeeSearch" list="mEmployeeList" class="form-input" placeholder="Type name or ID to search..." onchange="checkMissingLogs()">
+                    <datalist id="mEmployeeList"></datalist>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Log Date</label>
+                    <input type="date" id="mDate" class="form-input" onchange="checkMissingLogs()">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div><label class="form-label">AM IN</label><input type="text" id="mAmIn" placeholder="e.g. 08:00" class="form-input"></div>
+                    <div><label class="form-label">AM OUT</label><input type="text" id="mAmOut" placeholder="e.g. 12:00" class="form-input"></div>
+                    <div><label class="form-label">PM IN</label><input type="text" id="mPmIn" placeholder="e.g. 13:00" class="form-input"></div>
+                    <div><label class="form-label">PM OUT</label><input type="text" id="mPmOut" placeholder="e.g. 17:00" class="form-input"></div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
+                <button onclick="closeModal('modalManual')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded font-bold text-sm hover:bg-gray-400">CANCEL</button>
+                <button onclick="submitManualLogs()" id="btnSubmitManual" class="px-4 py-2 bg-[#D4AF37] text-[#003811] rounded font-bold text-sm shadow hover:bg-yellow-500">INSERT LOGS</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalLock" class="fixed inset-0 modal-bg hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-2xl w-[400px]">
+            <div class="px-6 py-4 bg-red-700 text-white rounded-t-lg flex justify-between items-center">
+                <h3 class="font-bold text-lg">Lock Attendance Month</h3>
+                <button onclick="closeModal('modalLock')" class="text-white hover:text-gray-300 font-bold text-xl">&times;</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-gray-600">Locking a month records your signature and finalizes the ledger. <strong>This requires Super Admin confirmation.</strong></p>
+                <div class="flex gap-4">
+                    <div class="w-1/2">
+                        <label class="form-label">Month</label>
+                        <select id="lockMonth" class="form-input"></select>
+                    </div>
+                    <div class="w-1/2">
+                        <label class="form-label">Year</label>
+                        <select id="lockYear" class="form-input"></select>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 border rounded mt-2">
+                    <label class="form-label text-red-700">HR Super Password</label>
+                    <input type="password" id="lockPass" class="form-input" placeholder="Enter HR Password...">
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
+                <button onclick="closeModal('modalLock')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded font-bold text-sm hover:bg-gray-400">CANCEL</button>
+                <button onclick="submitLock()" id="btnSubmitLock" class="px-4 py-2 bg-red-700 text-white rounded font-bold text-sm shadow hover:bg-red-800">AUTHORIZE & LOCK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalExtractorAuth" class="fixed inset-0 modal-bg hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-2xl w-[400px]">
+            <div class="px-6 py-4 bg-[#003811] text-white rounded-t-lg flex justify-between items-center">
+                <h3 class="font-bold text-lg">Authorize DTR Posting</h3>
+                <button onclick="closeModal('modalExtractorAuth')" class="text-white hover:text-gray-300 font-bold text-xl">&times;</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-gray-600">Please enter your HR password to authorize posting these extracted logs to the database.</p>
+                <div class="bg-gray-50 p-4 border rounded mt-2">
+                    <label class="form-label text-[#003811]">HR Password</label>
+                    <input type="password" id="extractorAuthPass" class="form-input" placeholder="Enter Password...">
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
+                <button onclick="closeModal('modalExtractorAuth')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded font-bold text-sm hover:bg-gray-400">CANCEL</button>
+                <button id="btnSubmitExtractorAuth" class="px-4 py-2 bg-[#D4AF37] text-[#003811] rounded font-bold text-sm shadow hover:bg-yellow-500">AUTHORIZE & POST</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const userData = sessionStorage.getItem('currentUser');
+    if (!userData) window.location.href = 'index.html';
+    const currentUser = JSON.parse(userData);
+    
+    if (!currentUser.role.toUpperCase().includes('HRMO')) {
+        alert("Unauthorized Access. HR personnel only.");
+        window.location.href = 'dashboard.html';
+    }
+
+    document.getElementById('activeUser').innerText = currentUser.full_name;
+    document.getElementById('userRoleBadge').innerText = currentUser.role;
+    document.getElementById('lblHrName').innerText = currentUser.username;
+
+    function logout() {
+        sessionStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    }
+
+    function switchTab(tab) {
+        document.getElementById('module-logs').classList.add('hidden');
+        document.getElementById('module-extractor').classList.add('hidden');
+        document.getElementById('module-f48').classList.add('hidden');
+        document.getElementById('module-deduction').classList.add('hidden');
+        document.getElementById('module-flag').classList.add('hidden');
+        
+        document.getElementById('tab-logs').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg';
+        document.getElementById('tab-extractor').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
+        document.getElementById('tab-f48').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
+        document.getElementById('tab-deduction').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
+        document.getElementById('tab-flag').className = 'tab-btn tab-inactive px-6 py-3 rounded-t-lg ml-2';
+
+        if (tab === 'logs') {
+            document.getElementById('module-logs').classList.remove('hidden');
+            document.getElementById('module-logs').classList.add('flex');
+            document.getElementById('tab-logs').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg';
+        } else if (tab === 'extractor') {
+            document.getElementById('module-extractor').classList.remove('hidden');
+            document.getElementById('tab-extractor').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
+        } else if (tab === 'f48') {
+            document.getElementById('module-f48').classList.remove('hidden');
+            document.getElementById('module-f48').classList.add('flex');
+            document.getElementById('tab-f48').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
+        } else if (tab === 'deduction') {
+            document.getElementById('module-deduction').classList.remove('hidden');
+            document.getElementById('module-deduction').classList.add('flex');
+            document.getElementById('tab-deduction').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
+        } else if (tab === 'flag') {
+            document.getElementById('module-flag').classList.remove('hidden');
+            document.getElementById('module-flag').classList.add('flex');
+            document.getElementById('tab-flag').className = 'tab-btn tab-active px-6 py-3 rounded-t-lg ml-2';
+        }
+    }
+
+    let allEmployees = [];
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    let currentViewData = []; 
+
+    window.onload = async () => {
+        const today = new Date();
+        document.getElementById('mDate').value = today.toISOString().split('T')[0];
+        document.getElementById('printDailyDate').value = today.toISOString().split('T')[0];
+        document.getElementById('flagDate').value = today.toISOString().split('T')[0];
+        document.getElementById('extractorTargetMonth').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+        const currYear = today.getFullYear();
+        const yHtml = `<option value="${currYear}">${currYear}</option><option value="${currYear-1}">${currYear-1}</option>`;
+        
+        document.getElementById('viewYear').innerHTML = yHtml;
+        document.getElementById('f48Year').innerHTML = yHtml;
+        document.getElementById('lockYear').innerHTML = yHtml;
+        document.getElementById('deductYear').innerHTML = yHtml;
+
+        const mHtml = `
+            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        `;
+        document.getElementById('f48Month').innerHTML = mHtml;
+        document.getElementById('lockMonth').innerHTML = mHtml;
+        document.getElementById('deductMonth').innerHTML = mHtml;
+
+        document.getElementById('viewMonth').value = today.getMonth() + 1;
+        document.getElementById('f48Month').value = today.getMonth() + 1;
+        document.getElementById('lockMonth').value = today.getMonth() + 1;
+        document.getElementById('deductMonth').value = today.getMonth() + 1;
+
+        await fetchEmployees();
+        
+        if (currentUser.role.toUpperCase() === 'HRMO-SPLIT') {
+            document.querySelector('input[name="mType"][value="SPLIT"]').checked = true;
+            document.querySelector('input[name="mType"][value="REGULAR"]').disabled = true;
+            document.querySelector('input[name="mType"][value="COS"]').disabled = true;
+            
+            document.querySelector('input[name="viewType"][value="SPLIT"]').checked = true;
+            document.querySelector('input[name="viewType"][value="REGULAR"]').disabled = true;
+            document.querySelector('input[name="viewType"][value="COS"]').disabled = true;
+        } else {
+            document.querySelector('input[name="mType"][value="REGULAR"]').checked = true;
+            document.querySelector('input[name="viewType"][value="REGULAR"]').checked = true;
+        }
+        populateManualSearch();
+    };
+
+    const fetchSafe = async (query) => {
+        try {
+            return await query;
+        } catch(e) {
+            console.error('Fetch error:', e);
+            return { data: [] };
+        }
+    };
+
+    async function fetchEmployees() {
+        try {
+            const { data } = await supabaseClient.from('employees').select('*').order('full_name');
+            allEmployees = data || [];
+            
+            let f48Html = '';
+            allEmployees.forEach(e => {
+                f48Html += `<option value="${e.emp_id} - ${e.full_name}"></option>`;
+            });
+            document.getElementById('f48EmployeeList').innerHTML = f48Html;
+            populateManualSearch();
+            
+        } catch (e) {
+            console.error("Fetch employees failed.", e);
+        }
+    }
+    
+    function populateManualSearch() {
+        const typeFilter = document.querySelector('input[name="mType"]:checked');
+        if (!typeFilter) return;
+        const selectedType = typeFilter.value;
+        const selectedStation = document.getElementById('mStation').value;
+        
+        let searchHtml = '';
+        allEmployees.forEach(e => {
+            const eStation = String(e.station || '').toUpperCase();
+            const eType = String(e.type || '').toUpperCase();
+            
+            let stationMatch = false;
+            if (selectedStation === 'DARPO-CS1' && eStation === 'DARPO-CS1') stationMatch = true;
+            if (selectedStation === 'DARMOS' && eStation.includes('DARMO')) stationMatch = true;
+
+            if (stationMatch && eType === selectedType) {
+                searchHtml += `<option value="${e.emp_id} - ${e.full_name}"></option>`;
+            }
+        });
+        document.getElementById('mEmployeeList').innerHTML = searchHtml;
+        document.getElementById('mEmployeeSearch').value = '';
+    }
+
+    function formatTime12(dateObj) {
+        if (!dateObj) return "";
+        return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).replace(' AM', '').replace(' PM','');
+    }
+
+    async function generateMonthlyView() {
+        const btn = document.getElementById('btnGenerateView');
+        const tbody = document.getElementById('logsTableBody');
+        
+        const m = parseInt(document.getElementById('viewMonth').value);
+        const y = parseInt(document.getElementById('viewYear').value);
+        
+        btn.disabled = true; btn.innerText = "LOADING...";
+        tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-[#D4AF37] font-bold">Aggregating Monthly Data...</td></tr>';
+        currentViewData = [];
+
+        try {
+            const startDtStr = `${y}-${String(m).padStart(2,'0')}-01`;
+            const endDt = new Date(y, m, 0);
+            const endDtStr = `${y}-${String(m).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
+
+            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, holRes] = await Promise.all([
+                fetchSafe(supabaseClient.from('attendance_logs').select('id, emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')), 
+                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
+                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
+                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
+                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days, start_time, end_time').lte('start_date', endDtStr).gte('end_date', startDtStr).order('created_at', { ascending: false })),
+                fetchSafe(supabaseClient.from('holidays').select('date, description').gte('date', startDtStr).lte('date', endDtStr))
+            ]);
+
+            const logMap = {};
+            (logsRes.data || []).forEach(l => {
+                const dateStr = l.log_time.split('T')[0];
+                const key = `${l.emp_id}_${dateStr}`;
+                if(!logMap[key]) logMap[key] = [];
+                logMap[key].push({ time: new Date(l.log_time), id: l.id });
+            });
+
+            const toSet = new Set();
+            (itinRes.data || []).forEach(i => {
+                const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
+                empsOnTO.forEach(t => {
+                    toSet.add(`${t.emp_id}_${i.travel_date}`);
+                });
+            });
+
+            const psoList = psoRes.data || [];
+            const leaveSet = new Set((leaveRes.data || []).map(l => `${l.emp_id}_${l.date}`));
+            const ovrList = ovrRes.data || [];
+            
+            const holMap = {};
+            (holRes.data || []).forEach(h => { holMap[h.date] = h.description; });
+
+            let html = '';
+            
+            const selectedViewType = document.querySelector('input[name="viewType"]:checked').value;
+            const selectedStation = document.getElementById('viewStation').value;
+            
+            for(let d = 1; d <= endDt.getDate(); d++) {
+                const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const dObj = new Date(y, m - 1, d);
+                const dayOfWeek = dObj.getDay().toString();
+
+                allEmployees.forEach(e => {
+                    const eStation = String(e.station || '').toUpperCase();
+                    const eType = String(e.type || '').toUpperCase();
+
+                    let stationMatch = false;
+                    if (selectedStation === 'DARPO-CS1' && eStation === 'DARPO-CS1') stationMatch = true;
+                    if (selectedStation === 'DARMOS' && eStation.includes('DARMO')) stationMatch = true;
+
+                    if (!stationMatch) return;
+                    if (eType !== selectedViewType) return;
+
+                    let expectedDays = ['1', '2', '3', '4', '5'];
+                    const override = ovrList.find(o => (o.emp_id === e.emp_id || o.emp_id === 'ALL') && dateStr >= o.start_date && dateStr <= o.end_date);
+                    if (override && override.working_days) {
+                        expectedDays = override.working_days.split(',');
+                    }
+
+                    if (!expectedDays.includes(dayOfWeek)) return;
+
+                    let status = "PRESENT";
+                    let cssClass = "";
+                    let amIn = "-", amOut = "-", pmIn = "-", pmOut = "-", ud = "0:00";
+                    let amInId = null, amOutId = null, pmInId = null, pmOutId = null;
+
+                    const key = `${e.emp_id}_${dateStr}`;
+                    const isTO = toSet.has(key);
+                    const isLeave = leaveSet.has(key);
+                    const isPSO = psoList.some(p => p.emp_id === e.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
+                    const isHoliday = !!holMap[dateStr];
+                    
+                    let overrideLogs = false;
+
+                    if (isLeave) { status = "ON LEAVE"; cssClass = "status-onleave"; overrideLogs = true; }
+                    else if (isPSO) { status = "ON PSO"; cssClass = "status-onpso"; overrideLogs = true; }
+                    else if (isTO) { status = "ON TO"; cssClass = "status-onto"; overrideLogs = true; }
+                    
+                    const dayLogs = (logMap[key] || []).sort((a,b) => a.time - b.time);
+                    
+                    if (isHoliday && dayLogs.length === 0 && !overrideLogs) {
+                        status = "HOLIDAY"; cssClass = "status-onpso"; overrideLogs = true;
+                    }
+
+                    if (!overrideLogs) {
+                        if (dayLogs.length === 0) { 
+                            status = "ABSENT"; cssClass = "status-absent"; 
+                        } else {
+                            if (dayLogs.length > 0) { amIn = formatTime12(dayLogs[0].time); amInId = dayLogs[0].id; }
+                            if (dayLogs.length > 1) { amOut = formatTime12(dayLogs[1].time); amOutId = dayLogs[1].id; }
+                            if (dayLogs.length > 2) { pmIn = formatTime12(dayLogs[2].time); pmInId = dayLogs[2].id; }
+                            if (dayLogs.length > 3) { pmOut = formatTime12(dayLogs[3].time); pmOutId = dayLogs[3].id; }
+
+                            let reqIn = e.flexi_range_start || '08:00:00';
+                            let reqOut = e.flexi_range_end || '17:00:00';
+                            if (override) {
+                                if (override.start_time) reqIn = override.start_time;
+                                if (override.end_time) reqOut = override.end_time;
+                            }
+
+                            const firstLog = dayLogs[0].time;
+                            const lastLog = dayLogs[dayLogs.length - 1].time;
+                            const reqStart = new Date(`${dateStr}T${reqIn}`);
+                            const reqEnd = new Date(`${dateStr}T${reqOut}`);
+
+                            let utMins = 0;
+                            if (firstLog > reqStart) utMins += Math.floor((firstLog - reqStart) / 60000);
+                            if (dayLogs.length > 1 && lastLog < reqEnd) utMins += Math.floor((reqEnd - lastLog) / 60000);
+
+                            if (utMins > 0) {
+                                let h = Math.floor(utMins / 60);
+                                let m = utMins % 60;
+                                ud = `${h}:${m.toString().padStart(2, '0')}`;
+                            }
+
+                            if (amIn === "-" || pmOut === "-") {
+                                status = "INCOMPLETE"; cssClass = "status-incomplete";
+                            }
+                        }
+                    }
+
+                    currentViewData.push({ 
+                        emp_id: e.emp_id, 
+                        full_name: e.full_name, 
+                        division: e.division, 
+                        type: e.type,
+                        date: dateStr, 
+                        amIn, amOut, pmIn, pmOut, status 
+                    });
+
+                    html += `
+                        <tr class="hover:bg-gray-50 border-b">
+                            <td class="p-2 text-[#003811] font-mono">${e.emp_id}</td>
+                            <td class="p-2 font-bold text-gray-800 truncate max-w-[150px]" title="${e.full_name}">${e.full_name}</td>
+                            <td class="p-2 text-center text-gray-600">${dateStr}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${amInId}')">${amIn}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${amOutId}')">${amOut}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${pmInId}')">${pmIn}</td>
+                            <td class="p-2 text-center font-mono editable-cell" ondblclick="inlineEdit(this, '${e.emp_id}', '${dateStr}', '${pmOutId}')">${pmOut}</td>
+                            <td class="p-2 text-center font-mono text-red-600">${ud}</td>
+                            <td class="p-2 text-center ${cssClass}">${status}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            tbody.innerHTML = html || '<tr><td colspan="9" class="p-8 text-center text-gray-400 italic">No attendance expected for this period.</td></tr>';
+
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-red-600 font-bold">Error: ${e.message}</td></tr>`;
+        } finally {
+            btn.disabled = false; btn.innerText = "GENERATE VIEW";
+        }
+    }
+
+    function inlineEdit(td, emp_id, dateStr, logId) {
+        if (td.querySelector('input')) return; 
+        const oldVal = td.innerText;
+        td.innerHTML = `<input type="text" value="${oldVal === '-' ? '' : oldVal}" class="w-20 text-center font-mono border border-gray-400 px-1 py-0.5" placeholder="HH:MM" onblur="cancelEdit(this, '${oldVal}')" onkeydown="saveEdit(event, this, '${emp_id}', '${dateStr}', '${oldVal}', '${logId}')">`;
+        const input = td.querySelector('input');
+        input.focus();
+        input.select();
+    }
+
+    function cancelEdit(input, oldVal) {
+        input.parentElement.innerText = oldVal;
+    }
+
+    async function saveEdit(event, input, emp_id, dateStr, oldVal, logId) {
+        if (event.key !== 'Enter') return;
+        const val = input.value.trim();
+        const td = input.parentElement;
+
+        if (!val) { td.innerText = oldVal; return; }
+
+        let parsedTime;
+        try {
+            let h = 0, m = 0;
+            const match = val.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+            
+            if (match) {
+                h = parseInt(match[1]);
+                m = match[2];
+                if (match[3]) {
+                    if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+                    if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+                } else {
+                    if (h < 12 && td.cellIndex >= 5) h += 12; 
+                }
+            } else if (val.includes(':')) {
+                const parts = val.split(':');
+                h = parseInt(parts[0]);
+                m = parts[1];
+            } else {
+                throw new Error();
+            }
+            
+            parsedTime = `${String(h).padStart(2, '0')}:${m}:00`;
+        } catch {
+            alert("Invalid time format. Please use HH:MM (e.g. 08:00 or 14:00)");
+            td.innerText = oldVal;
+            return;
+        }
+
+        td.innerText = "Saving...";
+        
+        try {
+            const timestamp = `${dateStr}T${parsedTime}`;
+            const payload = {
+                emp_id: emp_id,
+                log_time: timestamp,
+                device_id: 'HR_MANUAL_EDIT',
+                manual_log_name: currentUser.username,
+                manual_log_date: new Date().toISOString()
+            };
+
+            if (logId && logId !== 'null') {
+                const { error } = await supabaseClient.from('attendance_logs').update(payload).eq('id', logId);
+                if (error) throw error;
+            } else {
+                const { error } = await supabaseClient.from('attendance_logs').insert(payload);
+                if (error) throw error;
+            }
+
+            generateMonthlyView(); 
+        } catch (e) {
+            alert(`Save failed: ${e.message}`);
+            td.innerText = oldVal;
+        }
+    }
+
+    async function checkMissingLogs() {
+        const dStr = document.getElementById('mDate').value;
+        const empSearchVal = document.getElementById('mEmployeeSearch').value;
+        const empIdToUse = empSearchVal.includes(' - ') ? empSearchVal.split(' - ')[0] : empSearchVal;
+
+        document.getElementById('mAmIn').value = '';
+        document.getElementById('mAmOut').value = '';
+        document.getElementById('mPmIn').value = '';
+        document.getElementById('mPmOut').value = '';
+
+        if(!dStr || !empIdToUse) return;
+
+        const { data } = await supabaseClient.from('attendance_logs')
+            .select('log_time')
+            .eq('emp_id', empIdToUse)
+            .gte('log_time', dStr + "T00:00:00")
+            .lte('log_time', dStr + "T23:59:59")
+            .order('log_time', { ascending: true });
+
+        if(data && data.length > 0) {
+            if (data.length > 0) document.getElementById('mAmIn').value = formatTime12(new Date(data[0].log_time));
+            if (data.length > 1) document.getElementById('mAmOut').value = formatTime12(new Date(data[1].log_time));
+            if (data.length > 2) document.getElementById('mPmIn').value = formatTime12(new Date(data[2].log_time));
+            if (data.length > 3) document.getElementById('mPmOut').value = formatTime12(new Date(data[3].log_time));
+        }
+    }
+
+    async function printDailySummary() {
+        const dStr = document.getElementById('printDailyDate').value;
+        if (!dStr) return alert("Please select a date for the Daily Summary.");
+
+        const btn = document.getElementById('btnDailySummary');
+        const origText = btn.innerText;
+        btn.disabled = true; btn.innerText = "PRINTING...";
+
+        try {
+            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, holRes] = await Promise.all([
+                fetchSafe(supabaseClient.from('attendance_logs').select('id, emp_id, log_time').gte('log_time', dStr + "T00:00:00").lte('log_time', dStr + "T23:59:59")),
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')),
+                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').eq('travel_date', dStr)),
+                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', dStr).gte('end_date', dStr)),
+                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').eq('date', dStr)),
+                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, working_days, start_time, end_time').lte('start_date', dStr).gte('end_date', dStr).order('created_at', { ascending: false })),
+                fetchSafe(supabaseClient.from('holidays').select('date, description').eq('date', dStr))
+            ]);
+
+            const logMap = {};
+            (logsRes.data || []).forEach(l => {
+                if(!logMap[l.emp_id]) logMap[l.emp_id] = [];
+                logMap[l.emp_id].push({ time: new Date(l.log_time), id: l.id });
+            });
+
+            const toSet = new Set();
+            (itinRes.data || []).forEach(i => {
+                const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
+                empsOnTO.forEach(t => toSet.add(t.emp_id));
+            });
+
+            const psoList = psoRes.data || [];
+            const leaveSet = new Set((leaveRes.data || []).map(l => l.emp_id));
+            const ovrList = ovrRes.data || [];
+            const isHoliday = (holRes.data || []).length > 0;
+
+            const dailyData = [];
+            const dObj = new Date(dStr);
+            const dayOfWeek = dObj.getDay().toString();
+
+            allEmployees.forEach(e => {
+                let expectedDays = ['1', '2', '3', '4', '5'];
+                const override = ovrList.find(o => (o.emp_id === e.emp_id || o.emp_id === 'ALL'));
+                if (override && override.working_days) {
+                    expectedDays = override.working_days.split(',');
+                }
+
+                if (!expectedDays.includes(dayOfWeek)) return;
+
+                let status = "PRESENT";
+                let amIn = "-", amOut = "-", pmIn = "-", pmOut = "-", ud = "0:00";
+                let overrideLogs = false;
+
+                const isTO = toSet.has(e.emp_id);
+                const isLeave = leaveSet.has(e.emp_id);
+                const isPSO = psoList.some(p => p.emp_id === e.emp_id);
+
+                if (isLeave) { status = "ON LEAVE"; overrideLogs = true; }
+                else if (isPSO) { status = "ON PSO"; overrideLogs = true; }
+                else if (isTO) { status = "ON TO"; overrideLogs = true; }
+
+                const dayLogs = (logMap[e.emp_id] || []).sort((a,b) => a.time - b.time);
+
+                if (isHoliday && dayLogs.length === 0 && !overrideLogs) {
+                    status = "HOLIDAY"; overrideLogs = true;
+                }
+
+                if (!overrideLogs) {
+                    if (dayLogs.length === 0) {
+                        status = "ABSENT";
+                    } else {
+                        if (dayLogs.length > 0) amIn = formatTime12(dayLogs[0].time);
+                        if (dayLogs.length > 1) amOut = formatTime12(dayLogs[1].time);
+                        if (dayLogs.length > 2) pmIn = formatTime12(dayLogs[2].time);
+                        if (dayLogs.length > 3) pmOut = formatTime12(dayLogs[3].time);
+
+                        let reqIn = e.flexi_range_start || '08:00:00';
+                        let reqOut = e.flexi_range_end || '17:00:00';
+                        if (override) {
+                            if (override.start_time) reqIn = override.start_time;
+                            if (override.end_time) reqOut = override.end_time;
+                        }
+
+                        const firstLog = dayLogs[0].time;
+                        const lastLog = dayLogs[dayLogs.length - 1].time;
+                        const reqStart = new Date(`${dStr}T${reqIn}`);
+                        const reqEnd = new Date(`${dStr}T${reqOut}`);
+
+                        let utMins = 0;
+                        if (firstLog > reqStart) utMins += Math.floor((firstLog - reqStart) / 60000);
+                        if (dayLogs.length > 1 && lastLog < reqEnd) utMins += Math.floor((reqEnd - lastLog) / 60000);
+
+                        if (utMins > 0) {
+                            let h = Math.floor(utMins / 60);
+                            let m = utMins % 60;
+                            ud = `${h}:${m.toString().padStart(2, '0')}`;
+                        }
+
+                        if (amIn === "-" || pmOut === "-") {
+                            status = "INCOMPLETE";
+                        }
+                    }
+                }
+
+                dailyData.push({
+                    emp_id: e.emp_id,
+                    full_name: e.full_name,
+                    division: e.division,
+                    type: e.type,
+                    amIn, amOut, pmIn, pmOut, ud, status
+                });
+            });
+
+            if (dailyData.length === 0) return alert("No expected attendance for this date.");
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+
+            const byDiv = {};
+            dailyData.forEach(r => {
+                let div = String(r.division || 'UNASSIGNED').toUpperCase();
+                let type = String(r.type || '').toUpperCase();
+                if (div.includes('SPLIT') || type === 'SPLIT') div = 'SPLIT';
+                else if (!div) div = 'UNASSIGNED';
+
+                if(!byDiv[div]) byDiv[div] = [];
+                byDiv[div].push(r);
+            });
+
+            let isFirst = true;
+            for (const div in byDiv) {
+                if (!isFirst) doc.addPage();
+                isFirst = false;
+
+                doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+                doc.text(`DAILY ATTENDANCE SUMMARY - ${div}`, 148.5, 15, { align: "center" });
+                doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+                const formattedDate = new Date(dStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                doc.text(`Date: ${formattedDate}`, 148.5, 22, { align: "center" });
+
+                let yPos = 35;
+                doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+                doc.rect(10, yPos, 20, 6); doc.text("ID", 20, yPos + 4, { align: "center" });
+                doc.rect(30, yPos, 70, 6); doc.text("NAME", 65, yPos + 4, { align: "center" });
+                doc.rect(100, yPos, 25, 6); doc.text("AM IN", 112.5, yPos + 4, { align: "center" });
+                doc.rect(125, yPos, 25, 6); doc.text("AM OUT", 137.5, yPos + 4, { align: "center" });
+                doc.rect(150, yPos, 25, 6); doc.text("PM IN", 162.5, yPos + 4, { align: "center" });
+                doc.rect(175, yPos, 25, 6); doc.text("PM OUT", 187.5, yPos + 4, { align: "center" });
+                doc.rect(200, yPos, 25, 6); doc.text("UNDERTIME", 212.5, yPos + 4, { align: "center" });
+                doc.rect(225, yPos, 30, 6); doc.text("STATUS", 240, yPos + 4, { align: "center" });
+
+                yPos += 6;
+                doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+
+                byDiv[div].forEach(r => {
+                    doc.rect(10, yPos, 20, 6); doc.text(r.emp_id, 20, yPos + 4, { align: "center" });
+                    doc.rect(30, yPos, 70, 6); doc.text(r.full_name.substring(0,40), 32, yPos + 4);
+                    doc.rect(100, yPos, 25, 6); doc.text(r.amIn, 112.5, yPos + 4, { align: "center" });
+                    doc.rect(125, yPos, 25, 6); doc.text(r.amOut, 137.5, yPos + 4, { align: "center" });
+                    doc.rect(150, yPos, 25, 6); doc.text(r.pmIn, 162.5, yPos + 4, { align: "center" });
+                    doc.rect(175, yPos, 25, 6); doc.text(r.pmOut, 187.5, yPos + 4, { align: "center" });
+                    doc.rect(200, yPos, 25, 6); doc.text(r.ud, 212.5, yPos + 4, { align: "center" });
+                    doc.rect(225, yPos, 30, 6); doc.text(r.status, 240, yPos + 4, { align: "center" });
+
+                    yPos += 6;
+                    if (yPos > 185) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                });
+
+                yPos += 15;
+                doc.text("Certified Correct:", 15, yPos);
+                yPos += 15;
+                doc.text("_______________________", 15, yPos);
+                doc.text("HR Officer Signature", 15, yPos + 5);
+            }
+
+            doc.save(`Daily_Summary_${dStr}.pdf`);
+
+        } catch (error) {
+            console.error(error);
+            alert("Error generating summary: " + error.message);
+        } finally {
+            btn.disabled = false; btn.innerText = origText;
+        }
+    }
+
+    function printMissingLogs() {
+        const missing = currentViewData.filter(d => d.status === 'ABSENT' || d.status === 'INCOMPLETE');
+        if (missing.length === 0) return alert("No missing logs to print for this period.");
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const m = document.getElementById('viewMonth').options[document.getElementById('viewMonth').selectedIndex].text;
+        const y = document.getElementById('viewYear').value;
+
+        const byDiv = {};
+        missing.forEach(r => {
+            let div = String(r.division || 'UNASSIGNED').toUpperCase();
+            let type = String(r.type || '').toUpperCase();
+            
+            if (div.includes('SPLIT') || type === 'SPLIT') div = 'SPLIT';
+            else if (!div) div = 'UNASSIGNED';
+            
+            if(!byDiv[div]) byDiv[div] = [];
+            byDiv[div].push(r);
+        });
+
+        let isFirst = true;
+        for (const div in byDiv) {
+            if (!isFirst) doc.addPage();
+            isFirst = false;
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+            doc.text(`MISSING / INCOMPLETE LOGS REPORT - ${div}`, 105, 15, { align: "center" });
+            doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+            doc.text(`Period: ${m} ${y}`, 105, 22, { align: "center" });
+
+            let yPos = 35;
+            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+            doc.rect(10, yPos, 20, 6); doc.text("ID", 20, yPos + 4, { align: "center" });
+            doc.rect(30, yPos, 50, 6); doc.text("NAME", 55, yPos + 4, { align: "center" });
+            doc.rect(80, yPos, 25, 6); doc.text("DATE", 92.5, yPos + 4, { align: "center" });
+            doc.rect(105, yPos, 20, 6); doc.text("AM IN", 115, yPos + 4, { align: "center" });
+            doc.rect(125, yPos, 20, 6); doc.text("AM OUT", 135, yPos + 4, { align: "center" });
+            doc.rect(145, yPos, 20, 6); doc.text("PM IN", 155, yPos + 4, { align: "center" });
+            doc.rect(165, yPos, 20, 6); doc.text("PM OUT", 175, yPos + 4, { align: "center" });
+            doc.rect(185, yPos, 15, 6); doc.text("STAT", 192.5, yPos + 4, { align: "center" });
+
+            yPos += 6;
+            doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+            
+            byDiv[div].forEach(r => {
+                doc.rect(10, yPos, 20, 6); doc.text(r.emp_id, 20, yPos + 4, { align: "center" });
+                doc.rect(30, yPos, 50, 6); doc.text(r.full_name.substring(0,25), 32, yPos + 4);
+                doc.rect(80, yPos, 25, 6); doc.text(r.date, 92.5, yPos + 4, { align: "center" });
+                doc.rect(105, yPos, 20, 6); doc.text(r.amIn, 115, yPos + 4, { align: "center" });
+                doc.rect(125, yPos, 20, 6); doc.text(r.amOut, 135, yPos + 4, { align: "center" });
+                doc.rect(145, yPos, 20, 6); doc.text(r.pmIn, 155, yPos + 4, { align: "center" });
+                doc.rect(165, yPos, 20, 6); doc.text(r.pmOut, 175, yPos + 4, { align: "center" });
+                doc.rect(185, yPos, 15, 6); doc.text(r.status === 'ABSENT' ? 'ABS' : 'INC', 192.5, yPos + 4, { align: "center" });
+                
+                yPos += 6;
+                if (yPos > 270) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+            });
+
+            yPos += 15;
+            doc.text("Certified Correct:", 15, yPos);
+            yPos += 15;
+            doc.text("_______________________", 15, yPos);
+            doc.text("HR Officer Signature", 15, yPos + 5);
+        }
+
+        doc.save(`Missing_Logs_${m}_${y}.pdf`);
+    }
+
+    function openManualEntryModal() { document.getElementById('modalManual').classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    async function submitManualLogs() {
+        const dStr = document.getElementById('mDate').value;
+        const empSearchVal = document.getElementById('mEmployeeSearch').value;
+        
+        const empIdToUse = empSearchVal.includes(' - ') ? empSearchVal.split(' - ')[0] : empSearchVal;
+
+        if(!dStr || !empIdToUse) return alert("Date and Employee are required.");
+
+        const amIn = document.getElementById('mAmIn').value.trim();
+        const amOut = document.getElementById('mAmOut').value.trim();
+        const pmIn = document.getElementById('mPmIn').value.trim();
+        const pmOut = document.getElementById('mPmOut').value.trim();
+
+        const logsToInsert = [];
+        const currentIso = new Date().toISOString();
+
+        const createPayload = (timeStr, isPMBox) => {
+            if (!timeStr) return null;
+            let val = timeStr;
+            let h = 0, m = 0;
+            
+            try {
+                const match = val.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+                if (match) {
+                    h = parseInt(match[1]);
+                    m = match[2];
+                    if (match[3]) {
+                        if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+                        if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+                    } else {
+                        if (h < 12 && isPMBox) h += 12; 
+                    }
+                } else if (val.includes(':')) {
+                    const parts = val.split(':');
+                    h = parseInt(parts[0]);
+                    m = parts[1];
+                } else {
+                    return null;
+                }
+                
+                return {
+                    emp_id: empIdToUse,
+                    log_time: `${dStr}T${String(h).padStart(2, '0')}:${m}:00`,
+                    device_id: 'HR_MANUAL',
+                    manual_log_name: currentUser.username,
+                    manual_log_date: currentIso
+                };
+            } catch {
+                return null;
+            }
+        };
+
+        const p1 = createPayload(amIn, false);
+        if(p1) logsToInsert.push(p1);
+        
+        const p2 = createPayload(amOut, false);
+        if(p2) logsToInsert.push(p2);
+        
+        const p3 = createPayload(pmIn, true);
+        if(p3) logsToInsert.push(p3);
+        
+        const p4 = createPayload(pmOut, true);
+        if(p4) logsToInsert.push(p4);
+
+        if (logsToInsert.length === 0) return alert("Please provide at least one new time entry.");
+
+        const btn = document.getElementById('btnSubmitManual');
+        btn.innerText = "INSERTING..."; btn.disabled = true;
+
+        try {
+            await supabaseClient.from('attendance_logs')
+                .delete()
+                .eq('emp_id', empIdToUse)
+                .gte('log_time', dStr + "T00:00:00")
+                .lte('log_time', dStr + "T23:59:59");
+
+            const { error } = await supabaseClient.from('attendance_logs').insert(logsToInsert);
+            if (error) throw error;
+
+            alert(`Successfully inserted ${logsToInsert.length} log(s) for the employee. Existing data for this date was overridden.`);
+            closeModal('modalManual');
+            
+            document.getElementById('mEmployeeSearch').value = '';
+            document.getElementById('mAmIn').value = '';
+            document.getElementById('mAmOut').value = '';
+            document.getElementById('mPmIn').value = '';
+            document.getElementById('mPmOut').value = '';
+            
+            const viewM = document.getElementById('viewMonth').value;
+            const insertM = parseInt(dStr.split('-')[1]).toString();
+            if (viewM === insertM) generateMonthlyView();
+
+        } catch (e) {
+            alert(`Insert failed: ${e.message}`);
+        } finally {
+            btn.innerText = "INSERT LOGS"; btn.disabled = false;
+        }
+    }
+
+    function openLockModal() { 
+        const roleParts = currentUser.role.toUpperCase().split(',').map(r => r.trim());
+        const hasHrmo = roleParts.some(r => r.includes('HRMO') && r !== 'HRMO STAFF');
+        
+        if (!hasHrmo && !roleParts.includes('ADMIN')) {
+            return alert("Access Denied: Only the head HRMO account is authorized to lock the monthly ledger. HR Staff accounts are not permitted.");
+        }
+        document.getElementById('modalLock').classList.remove('hidden'); 
+    }
+    
+    async function submitLock() {
+        const pass = document.getElementById('lockPass').value;
+        if (!pass) return alert("HR Password required to authorize.");
+        
+        try {
+            const { data: u, error } = await supabaseClient.from('users').select('password').eq('username', currentUser.username).single();
+            if (error || !u) throw new Error("Authentication failed.");
+            
+            if (u.password !== pass) throw new Error("Invalid Password.");
+
+            alert("Month successfully locked. Further modifications are restricted.");
+            closeModal('modalLock');
+            document.getElementById('lockPass').value = '';
+
+        } catch(e) {
+            alert(e.message);
+        }
+    }
+
+    function toggleF48Mode() {
+        const mode = document.querySelector('input[name="f48Mode"]:checked').value;
+        
+        if (mode === 'individual') {
+            document.getElementById('divBatch').classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => document.getElementById('divIndividual').classList.remove('opacity-0', 'pointer-events-none'), 150);
+        } else {
+            document.getElementById('divIndividual').classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => document.getElementById('divBatch').classList.remove('opacity-0', 'pointer-events-none'), 150);
+        }
+    }
+
+    window.generateForm48Trigger = async function() {
+        const mode = document.querySelector('input[name="f48Mode"]:checked').value;
+        const month = parseInt(document.getElementById('f48Month').value) - 1;
+        const year = parseInt(document.getElementById('f48Year').value);
+        
+        const btn = document.getElementById('btnGenerateF48');
+        const status = document.getElementById('f48Status');
+        
+        btn.disabled = true; btn.innerText = "GENERATING PDF...";
+        status.innerText = "Processing data. Please wait...";
+
+        try {
+            let targetEmps = [];
+            if (mode === 'individual') {
+                const eSearchVal = document.getElementById('f48Employee').value;
+                const eVal = eSearchVal.includes(' - ') ? eSearchVal.split(' - ')[0].trim() : eSearchVal.trim();
+                const found = allEmployees.find(e => e.emp_id === eVal);
+                if (found) {
+                    const isDarpo = String(found.station || '').toUpperCase() === 'DARPO-CS1';
+                    const isDarmo = String(found.station || '').toUpperCase().includes('DARMO');
+                    const eType = String(found.type || '').toUpperCase();
+                    
+                    if ((isDarpo || isDarmo) && (eType === 'SPLIT' || eType === 'REGULAR' || eType === 'COS')) {
+                        targetEmps = [found];
+                    } else {
+                         throw new Error("Only DARPO-CS1 or DARMOs Regular, COS, and Split employees can be generated.");
+                    }
+                } else {
+                    throw new Error("Please select a valid employee from the search list.");
+                }
+            } else {
+                const div = document.getElementById('f48Division').value;
+                const empTypeFilter = document.querySelector('input[name="f48Type"]:checked').value;
+
+                targetEmps = allEmployees.filter(e => {
+                    const isDarpo = String(e.station || '').toUpperCase() === 'DARPO-CS1';
+                    const isDarmo = String(e.station || '').toUpperCase().includes('DARMO');
+                    if (!isDarpo && !isDarmo) return false;
+
+                    let eDiv = String(e.division || '').toUpperCase().trim();
+                    let eType = String(e.type || '').toUpperCase().trim();
+                    
+                    if (String(e.position || '').toUpperCase() === 'MARPO') eDiv = 'MARPOS'; 
+                    if (eDiv === 'PARPO') eDiv = 'OFFICE OF THE PARPO';
+                    if (eDiv === 'PARPO I') eDiv = 'OFFICE OF THE PARPO'; 
+
+                    if (empTypeFilter !== 'ALL' && eType !== empTypeFilter) return false;
+                    if (eType !== 'SPLIT' && eType !== 'REGULAR' && eType !== 'COS') return false;
+
+                    if (div === 'ALL') return true;
+                    return eDiv === div;
+                });
+            }
+
+            if (targetEmps.length === 0) throw new Error("No employees found for the selected criteria.");
+
+            // Strict Grouping logic for batch sorting to distinctly separate by DARMO & Regular/Split
+            targetEmps.sort((a, b) => {
+                const divA = (a.division || 'UNASSIGNED').toUpperCase().trim();
+                const divB = (b.division || 'UNASSIGNED').toUpperCase().trim();
+                if (divA !== divB) return divA.localeCompare(divB);
+                
+                const typeA = (a.type || 'REGULAR').toUpperCase().trim();
+                const typeB = (b.type || 'REGULAR').toUpperCase().trim();
+                if (typeA !== typeB) return typeA.localeCompare(typeB);
+                
+                const nameA = (a.full_name || '').toUpperCase().trim();
+                const nameB = (b.full_name || '').toUpperCase().trim();
+                return nameA.localeCompare(nameB);
+            });
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const mName = monthNames[month];
+
+            const startDtStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
+            const endDt = new Date(year, month + 1, 0);
+            const endDtStr = `${year}-${String(month+1).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
+
+            const empIds = targetEmps.map(e => e.emp_id);
+            
+            status.innerText = "Fetching signatories...";
+            const { data: chiefUsers } = await fetchSafe(supabaseClient.from('users').select('full_name, division, role').eq('role', 'CHIEF'));
+            const chiefMap = {};
+            (chiefUsers || []).forEach(u => {
+                if(u.division) {
+                    const divBase = u.division.split(',')[0].trim().toUpperCase();
+                    chiefMap[divBase] = u.full_name.toUpperCase();
+                }
+            });
+
+            status.innerText = "Fetching attendance logs...";
+            const { data: allLogs } = await fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').in('emp_id', empIds).gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59"));
+            
+            status.innerText = "Fetching schedule overrides...";
+            const empIdsWithAll = [...empIds, 'ALL'];
+            const { data: allOverrides } = await fetchSafe(supabaseClient.from('schedule_overrides').select('*').in('emp_id', empIdsWithAll).lte('start_date', endDtStr).gte('end_date', startDtStr).order('created_at', { ascending: false }));
+
+            status.innerText = "Fetching TO, PSO, Leaves and Holidays...";
+            const [toRes, itinRes, psoRes, leaveRes, holRes] = await Promise.all([
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')), 
+                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date, destination').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
+                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date, pso_no').in('emp_id', empIds).lte('start_date', endDtStr).gte('end_date', startDtStr)),
+                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type').eq('transaction_t', 'APPROVED').in('emp_id', empIds).gte('date', startDtStr).lte('date', endDtStr)),
+                fetchSafe(supabaseClient.from('holidays').select('date, description').gte('date', startDtStr).lte('date', endDtStr))
+            ]);
+
+            const toDateMap = {};
+            (itinRes.data || []).forEach(i => {
+                const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
+                empsOnTO.forEach(t => {
+                    toDateMap[`${t.emp_id}_${i.travel_date}`] = `TO - ${i.to_no}`;
+                });
+            });
+
+            const psoList = psoRes.data || [];
+            const leaveMap = {};
+            (leaveRes.data || []).forEach(l => { leaveMap[`${l.emp_id}_${l.date}`] = l.type; });
+
+            const holMap = {};
+            (holRes.data || []).forEach(h => { holMap[h.date] = h.description; });
+
+            for (let i = 0; i < targetEmps.length; i++) {
+                const emp = targetEmps[i];
+                status.innerText = `Processing ${i+1}/${targetEmps.length}: ${emp.full_name}...`;
+
+                if (i > 0) doc.addPage();
+
+                const myLogs = (allLogs || []).filter(l => l.emp_id === emp.emp_id);
+                const logsByDate = {};
+                myLogs.forEach(l => {
+                    const dateObj = new Date(l.log_time.split('+')[0].trim().replace(' ', 'T'));
+                    const isoStr = dateObj.getFullYear() + "-" + String(dateObj.getMonth() + 1).padStart(2, '0') + "-" + String(dateObj.getDate()).padStart(2, '0');
+                    if(!logsByDate[isoStr]) logsByDate[isoStr] = [];
+                    logsByDate[isoStr].push(dateObj);
+                });
+
+                const schedOverrides = (allOverrides || []).filter(o => o.emp_id === emp.emp_id || o.emp_id === 'ALL');
+
+                let chiefName = "_________________________";
+                let chiefPos = "DIVISION CHIEF";
+                let empDiv = (emp.division || "").toUpperCase().trim();
+                
+                if (String(emp.position || '').toUpperCase() === 'MARPO') empDiv = "LTSP";
+
+                if (empDiv === "OFFICE OF THE PARPO" || empDiv === "PARPO" || empDiv === "PARPO I") {
+                    chiefName = "RICARDO C. GARCIA";
+                    chiefPos = "PARPO II";
+                } else {
+                    const baseDiv = empDiv.split(',')[0].trim();
+                    if (chiefMap[baseDiv]) chiefName = chiefMap[baseDiv];
+                    chiefPos = "DIVISION CHIEF";
+                }
+
+                const eType = (emp.type || 'REGULAR').toUpperCase();
+                let typeColor = [0, 56, 17]; // Primary Green (REGULAR)
+                if (eType === 'SPLIT') typeColor = [212, 175, 55]; // Gold (SPLIT)
+                else if (eType === 'COS') typeColor = [198, 40, 40]; // Red (COS)
+
+                const drawForm = (startX, startY) => {
+                    doc.setTextColor(typeColor[0], typeColor[1], typeColor[2]);
+                    doc.setFont("helvetica", "italic"); doc.setFontSize(6);
+                    doc.text("CIVIL SERVICE FORM 48", startX, startY + 3);
+                    doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+                    doc.text("DAILY TIME RECORD", startX + 42.5, startY + 7, { align: "center" });
+
+                    doc.setFontSize(6);
+                    doc.text(`${empDiv} - ${eType}`, startX + 42.5, startY + 10, { align: "center" });
+
+                    doc.setFontSize(8);
+                    doc.text(emp.full_name, startX + 42.5, startY + 15, { align: "center" });
+                    doc.setTextColor(0, 0, 0); // Reset for the rest
+
+                    doc.line(startX, startY + 16, startX + 85, startY + 16);
+                    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+                    doc.text("Name", startX + 42.5, startY + 19, { align: "center" });
+
+                    doc.text("For the month of", startX, startY + 23);
+                    doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+                    doc.text(`${mName} ${year}`, startX + 25, startY + 23);
+                    doc.line(startX + 22, startY + 24, startX + 55, startY + 24);
+
+                    let ty = startY + 30;
+                    let cw_day = 8, cw_time = 14, cw_u = 11;
+                    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+
+                    doc.rect(startX, ty, cw_day, 8); doc.text("Days", startX + 4, ty + 5, { align: "center" });
+                    doc.rect(startX + cw_day, ty, cw_time * 2, 4); doc.text("A.M.", startX + cw_day + cw_time, ty + 3, { align: "center" });
+                    doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time * 2, 4); doc.text("P.M.", startX + cw_day + (cw_time * 3), ty + 3, { align: "center" });
+                    doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u * 2, 4); doc.text("UNDERTIME", startX + cw_day + (cw_time * 4) + cw_u, ty + 3, { align: "center" });
+
+                    ty += 4;
+                    doc.rect(startX + cw_day, ty, cw_time, 4); doc.text("Arrival", startX + cw_day + 7, ty + 3, { align: "center" });
+                    doc.rect(startX + cw_day + cw_time, ty, cw_time, 4); doc.text("Departure", startX + cw_day + cw_time + 7, ty + 3, { align: "center" });
+                    doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, 4); doc.text("Arrival", startX + cw_day + (cw_time * 2) + 7, ty + 3, { align: "center" });
+                    doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, 4); doc.text("Departure", startX + cw_day + (cw_time * 3) + 7, ty + 3, { align: "center" });
+                    doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, 4); doc.text("Hours", startX + cw_day + (cw_time * 4) + 5.5, ty + 3, { align: "center" });
+                    doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, 4); doc.text("Min.", startX + cw_day + (cw_time * 4) + cw_u + 5.5, ty + 3, { align: "center" });
+
+                    ty += 4;
+                    let row_h = 4.2;
+
+                    for (let d = 1; d <= 31; d++) {
+                        doc.rect(startX, ty, cw_day, row_h);
+                        doc.text(String(d), startX + 4, ty + 3, { align: "center" });
+
+                        let isOverrideLog = false;
+                        let special = "";
+
+                        if (d <= endDt.getDate()) {
+                            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                            const dayLogs = (logsByDate[dateStr] || []).sort((a,b) => a-b);
+                            
+                            const dateObj = new Date(year, month, d);
+                            const dayOfWeek = dateObj.getDay().toString();
+                            
+                            let expectedDays = ['1', '2', '3', '4', '5'];
+                            let activeOverride = schedOverrides.find(s => dateStr >= s.start_date && dateStr <= s.end_date);
+                            if (activeOverride && activeOverride.working_days) {
+                                expectedDays = activeOverride.working_days.split(',');
+                            }
+                            
+                            let isWeekend = !expectedDays.includes(dayOfWeek);
+                            
+                            if (isWeekend) {
+                                if (dayOfWeek === '0') special = "SUNDAY";
+                                else if (dayOfWeek === '6') special = "SATURDAY";
+                                else if (dayOfWeek === '5') special = "(FRIDAY - COMPRESSED WORKWEEK)";
+                                else special = "DAY OFF";
+                            }
+                            
+                            const key = `${emp.emp_id}_${dateStr}`;
+
+                            if (leaveMap[key]) {
+                                special = leaveMap[key].toUpperCase();
+                                isOverrideLog = true;
+                            } else {
+                                const pso = psoList.find(p => p.emp_id === emp.emp_id && dateStr >= p.start_date && dateStr <= p.end_date);
+                                if(pso) {
+                                    special = `PSO ${pso.pso_no || ''}`.toUpperCase();
+                                    isOverrideLog = true;
+                                } else if (toDateMap[key]) {
+                                    special = toDateMap[key].toUpperCase();
+                                    isOverrideLog = true;
+                                } else if (holMap[dateStr]) {
+                                    special = holMap[dateStr].toUpperCase();
+                                    isOverrideLog = (dayLogs.length === 0);
+                                }
+                            }
+
+                            if (isOverrideLog || (special && dayLogs.length === 0)) {
+                                doc.setFont("helvetica", "bold"); doc.setFontSize(5);
+                                doc.rect(startX + cw_day, ty, cw_time * 4, row_h);
+                                doc.text(special.substring(0, 45), startX + cw_day + (cw_time * 2), ty + 3, { align: "center" });
+                                doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+                            } else {
+                                let amIn="", amOut="", pmIn="", pmOut="";
+                                if (dayLogs.length > 0) amIn = formatTime12(dayLogs[0]);
+                                if (dayLogs.length > 1) amOut = formatTime12(dayLogs[1]);
+                                if (dayLogs.length > 2) pmIn = formatTime12(dayLogs[2]);
+                                if (dayLogs.length > 3) pmOut = formatTime12(dayLogs[3]);
+
+                                let utH = "", utM = "";
+                                if (dayLogs.length > 0) {
+                                    let reqIn = emp.flexi_range_start || '08:00:00';
+                                    let reqOut = emp.flexi_range_end || '17:00:00';
+                                    let activeOvr = schedOverrides.find(o => dateStr >= o.start_date && dateStr <= o.end_date);
+                                    if (activeOvr) {
+                                        if (activeOvr.start_time) reqIn = activeOvr.start_time;
+                                        if (activeOvr.end_time) reqOut = activeOvr.end_time;
+                                    }
+
+                                    const firstLog = dayLogs[0];
+                                    const lastLog = dayLogs[dayLogs.length - 1];
+                                    const reqStart = new Date(`${dateStr}T${reqIn}`);
+                                    const reqEnd = new Date(`${dateStr}T${reqOut}`);
+
+                                    let utMins = 0;
+                                    if (firstLog > reqStart) utMins += Math.floor((firstLog - reqStart) / 60000);
+                                    if (dayLogs.length > 1 && lastLog < reqEnd) utMins += Math.floor((reqEnd - lastLog) / 60000);
+
+                                    if (utMins > 0) {
+                                        let h = Math.floor(utMins / 60);
+                                        let m = utMins % 60;
+                                        if (h > 0) utH = h.toString();
+                                        utM = m.toString();
+                                    }
+                                }
+
+                                doc.rect(startX + cw_day, ty, cw_time, row_h); doc.text(amIn, startX + cw_day + 7, ty + 3, { align: "center" });
+                                doc.rect(startX + cw_day + cw_time, ty, cw_time, row_h); doc.text(amOut, startX + cw_day + cw_time + 7, ty + 3, { align: "center" });
+                                doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, row_h); doc.text(pmIn, startX + cw_day + (cw_time * 2) + 7, ty + 3, { align: "center" });
+                                doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, row_h); doc.text(pmOut, startX + cw_day + (cw_time * 3) + 7, ty + 3, { align: "center" });
+                                
+                                doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h); 
+                                if (utH) doc.text(utH, startX + cw_day + (cw_time * 4) + 5.5, ty + 3, { align: "center" });
+                                doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h); 
+                                if (utM) doc.text(utM, startX + cw_day + (cw_time * 4) + cw_u + 5.5, ty + 3, { align: "center" });
+                            }
+
+                        } else {
+                            doc.rect(startX + cw_day, ty, cw_time, row_h);
+                            doc.rect(startX + cw_day + cw_time, ty, cw_time, row_h);
+                            doc.rect(startX + cw_day + (cw_time * 2), ty, cw_time, row_h);
+                            doc.rect(startX + cw_day + (cw_time * 3), ty, cw_time, row_h);
+                            doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h);
+                            doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h);
+                        }
+                        
+                        if (d <= endDt.getDate() && (isOverrideLog || (special && (logsByDate[`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`] || []).length === 0))) {
+                            doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, row_h);
+                            doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, row_h);
+                        }
+
+                        ty += row_h;
+                    }
+                    
+                    doc.text("Total", startX + cw_day + (cw_time * 4) - 2, ty + 3, { align: "right" });
+                    doc.rect(startX + cw_day + (cw_time * 4), ty, cw_u, 5); 
+                    doc.rect(startX + cw_day + (cw_time * 4) + cw_u, ty, cw_u, 5);
+
+                    ty += 8;
+                    doc.setFont("helvetica", "italic");
+                    const cert = "I certify on my honor that the above is true and correct report of the hours of work performed, record of which was made daily at the time of arrival and departure from office.";
+                    doc.text(cert, startX, ty, { maxWidth: 85, align: "justify" });
+
+                    ty += 12;
+                    doc.line(startX + 10, ty, startX + 75, ty);
+                    doc.setFont("helvetica", "normal");
+                    doc.text("(Employee's Signature)", startX + 42.5, ty + 3, { align: "center" });
+
+                    ty += 8;
+                    doc.text("Verified as to prescribed office hours:", startX, ty);
+                    
+                    ty += 8;
+                    doc.setFont("helvetica", "bold");
+                    doc.text(chiefName, startX + 42.5, ty, { align: "center" });
+                    doc.line(startX + 10, ty + 1, startX + 75, ty + 1);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(chiefPos, startX + 42.5, ty + 4, { align: "center" });
+                };
+
+                drawForm(10, 10);
+                drawForm(110, 10);
+            }
+            
+            const fName = mode === 'individual' ? `Form48_${targetEmps[0].full_name}_${mName}${year}.pdf` : `Form48_BATCH_${mName}${year}.pdf`;
+            doc.save(fName);
+            status.innerText = "PDF Generated Successfully!";
+
+        } catch (e) {
+            status.innerText = `Error: ${e.message}`;
+            alert(e.message);
+        } finally {
+            btn.disabled = false; btn.innerText = "GENERATE FORM 48";
+        }
+    };
+
+    // ==========================================
+    // DEDUCTION SUMMARY LOGIC
+    // ==========================================
+    function formatMinutesToHours(totalMinutes) {
+        if (!totalMinutes || totalMinutes <= 0) return "0m";
+        const h = Math.floor(totalMinutes / 60); 
+        const m = totalMinutes % 60;
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    async function printDeductionSummary() {
+        const btn = document.getElementById('btnGenerateDeduction');
+        const status = document.getElementById('deductStatus');
+        btn.disabled = true; btn.innerText = "GENERATING...";
+        status.innerText = "Fetching data...";
+
+        try {
+            const m = parseInt(document.getElementById('deductMonth').value) - 1;
+            const y = parseInt(document.getElementById('deductYear').value);
+            const mName = monthNames[m];
+
+            const startDtStr = `${y}-${String(m+1).padStart(2,'0')}-01`;
+            const endDt = new Date(y, m + 1, 0);
+            const endDtStr = `${y}-${String(m+1).padStart(2,'0')}-${String(endDt.getDate()).padStart(2,'0')}`;
+
+            const [logsRes, toRes, itinRes, psoRes, leaveRes, ovrRes, gpRes, holRes] = await Promise.all([
+                fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', startDtStr + "T00:00:00").lte('log_time', endDtStr + "T23:59:59")),
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')), 
+                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date').gte('travel_date', startDtStr).lte('travel_date', endDtStr)),
+                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', endDtStr).gte('end_date', startDtStr)),
+                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date').eq('transaction_t', 'APPROVED').gte('date', startDtStr).lte('date', endDtStr)),
+                fetchSafe(supabaseClient.from('schedule_overrides').select('emp_id, start_date, end_date, start_time, end_time, working_days').lte('start_date', endDtStr).gte('end_date', startDtStr).order('created_at', { ascending: false })),
+                fetchSafe(supabaseClient.from('gate_pass_logs').select('emp_id, date, minutes, status').gte('date', startDtStr).lte('date', endDtStr).eq('status', 'APPROVED')),
+                fetchSafe(supabaseClient.from('holidays').select('date').gte('date', startDtStr).lte('date', endDtStr))
+            ]);
+
+            const excusedSet = new Set();
+            (itinRes.data || []).forEach(i => {
+                const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
+                empsOnTO.forEach(t => {
+                    excusedSet.add(`${t.emp_id}_${i.travel_date}`);
+                });
+            });
+            (leaveRes.data || []).forEach(l => excusedSet.add(`${l.emp_id}_${l.date}`));
+            
+            const psoList = psoRes.data || [];
+            psoList.forEach(p => {
+                let currD = new Date(p.start_date);
+                let eD = new Date(p.end_date);
+                while(currD <= eD) {
+                    excusedSet.add(`${p.emp_id}_${currD.toISOString().split('T')[0]}`);
+                    currD.setDate(currD.getDate() + 1);
+                }
+            });
+
+            const holidays = new Set((holRes.data || []).map(h => h.date));
+
+            const logsByEmp = {};
+            (logsRes.data || []).forEach(l => {
+                if (!logsByEmp[l.emp_id]) logsByEmp[l.emp_id] = {};
+                const d = l.log_time.split('T')[0];
+                if (!logsByEmp[l.emp_id][d]) logsByEmp[l.emp_id][d] = [];
+                logsByEmp[l.emp_id][d].push(new Date(l.log_time));
+            });
+
+            const gpByEmp = {};
+            (gpRes.data || []).forEach(g => {
+                if (!gpByEmp[g.emp_id]) gpByEmp[g.emp_id] = 0;
+                if (g.minutes) gpByEmp[g.emp_id] += parseInt(g.minutes);
+            });
+
+            const deductions = [];
+
+            allEmployees.forEach(emp => {
+                let tardiness = 0;
+                let undertime = 0;
+                let gatepass = gpByEmp[emp.emp_id] || 0;
+
+                const myLogs = logsByEmp[emp.emp_id] || {};
+                const schedOverrides = (ovrRes.data || []).filter(o => o.emp_id === emp.emp_id || o.emp_id === 'ALL');
+
+                for (let d = 1; d <= endDt.getDate(); d++) {
+                    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    
+                    if (excusedSet.has(`${emp.emp_id}_${dateStr}`) || holidays.has(dateStr)) continue;
+
+                    const dayOfWeek = new Date(y, m, d).getDay().toString();
+                    let expectedDays = ['1', '2', '3', '4', '5'];
+                    let startReqStr = emp.flexi_range_start || '08:00:00';
+                    let cutoffStr = emp.flexi_range_end || '08:00:00';
+                    let overrideEndStr = null;
+
+                    const override = schedOverrides.find(o => dateStr >= o.start_date && dateStr <= o.end_date);
+                    if (override) {
+                        if (override.working_days) expectedDays = override.working_days.split(',');
+                        startReqStr = override.start_time || startReqStr;
+                        cutoffStr = override.start_time || cutoffStr;
+                        overrideEndStr = override.end_time;
+                    }
+
+                    if (!expectedDays.includes(dayOfWeek)) continue;
+
+                    const dayLogs = (myLogs[dateStr] || []).sort((a,b) => a-b);
+                    if (dayLogs.length === 0) continue; 
+
+                    const firstLog = dayLogs[0];
+                    const lastLog = dayLogs[dayLogs.length - 1];
+
+                    const cutoffDate = new Date(dateStr + 'T' + cutoffStr);
+                    const startDate = new Date(dateStr + 'T' + startReqStr);
+
+                    if (firstLog > cutoffDate) {
+                        tardiness += Math.floor((firstLog - cutoffDate) / 60000);
+                    }
+
+                    let requiredEnd;
+                    if (overrideEndStr) {
+                        requiredEnd = new Date(dateStr + 'T' + overrideEndStr);
+                    } else {
+                        let countedStart = firstLog <= startDate ? startDate : (firstLog <= cutoffDate ? firstLog : cutoffDate);
+                        requiredEnd = new Date(countedStart.getTime() + (9 * 60 * 60 * 1000));
+                    }
+
+                    if (lastLog < requiredEnd && firstLog !== lastLog) {
+                        undertime += Math.floor((requiredEnd - lastLog) / 60000);
+                    }
+                }
+
+                const total = tardiness + undertime + gatepass;
+                if (total > 0 || gatepass > 0 || tardiness > 0 || undertime > 0) {
+                    deductions.push({
+                        emp_id: emp.emp_id,
+                        name: emp.full_name,
+                        division: String(emp.division || 'UNASSIGNED').toUpperCase().trim(),
+                        tardiness,
+                        undertime,
+                        gatepass,
+                        total
+                    });
+                }
+            });
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+
+            const byDiv = {};
+            deductions.forEach(d => {
+                let dName = d.division;
+                if(dName.includes('MARPO')) dName = 'MARPOS';
+                if(dName.includes('SPLIT')) dName = 'SPLIT';
+                if(!byDiv[dName]) byDiv[dName] = [];
+                byDiv[dName].push(d);
+            });
+
+            let isFirst = true;
+            for (const div in byDiv) {
+                if (!isFirst) doc.addPage();
+                isFirst = false;
+
+                doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+                doc.text("SUMMARY OF DEDUCTIONS", 105, 20, { align: "center" });
+                doc.setFontSize(11);
+                doc.text(`Division/Office: ${div}`, 105, 28, { align: "center" });
+                doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+                doc.text(`Period: ${mName} ${y}`, 105, 34, { align: "center" });
+
+                let yPos = 45;
+                doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+                doc.rect(10, yPos, 20, 6); doc.text("EMP NO", 20, yPos + 4, { align: "center" });
+                doc.rect(30, yPos, 60, 6); doc.text("NAME", 60, yPos + 4, { align: "center" });
+                doc.rect(90, yPos, 25, 6); doc.text("TARDINESS", 102.5, yPos + 4, { align: "center" });
+                doc.rect(115, yPos, 25, 6); doc.text("UNDERTIME", 127.5, yPos + 4, { align: "center" });
+                doc.rect(140, yPos, 25, 6); doc.text("GATE PASS", 152.5, yPos + 4, { align: "center" });
+                doc.rect(165, yPos, 35, 6); doc.text("TOTAL DEDUCTION", 180, yPos + 4, { align: "center" });
+
+                yPos += 6;
+                doc.setFont("helvetica", "normal");
+                
+                byDiv[div].sort((a,b) => a.name.localeCompare(b.name)).forEach(r => {
+                    doc.rect(10, yPos, 20, 6); doc.text(r.emp_id, 20, yPos + 4, { align: "center" });
+                    doc.rect(30, yPos, 60, 6); doc.text(r.name.substring(0,35), 32, yPos + 4);
+                    doc.rect(90, yPos, 25, 6); doc.text(formatMinutesToHours(r.tardiness), 102.5, yPos + 4, { align: "center" });
+                    doc.rect(115, yPos, 25, 6); doc.text(formatMinutesToHours(r.undertime), 127.5, yPos + 4, { align: "center" });
+                    doc.rect(140, yPos, 25, 6); doc.text(formatMinutesToHours(r.gatepass), 152.5, yPos + 4, { align: "center" });
+                    doc.rect(165, yPos, 35, 6); doc.setFont("helvetica", "bold"); doc.text(formatMinutesToHours(r.total), 180, yPos + 4, { align: "center" });
+                    doc.setFont("helvetica", "normal");
+                    
+                    yPos += 6;
+                    if (yPos > 270) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                });
+            }
+
+            if (Object.keys(byDiv).length === 0) {
+                doc.text("No deductions found for any employee this month.", 105, 50, { align: "center" });
+            }
+
+            doc.save(`Deduction_Summary_${mName}_${y}.pdf`);
+            status.innerText = "Generated successfully.";
+        } catch(e) {
+            status.innerText = `Error: ${e.message}`;
+            alert("Error generating summary: " + e.message);
+        } finally {
+            btn.disabled = false; btn.innerText = "PRINT DEDUCTION SUMMARY";
+        }
+    }
+
+    // ==========================================
+    // FLAG CONVOCATION LOGIC
+    // ==========================================
+    let flagDataCache = {}; 
+
+    async function generateFlagView() {
+        const dStr = document.getElementById('flagDate').value;
+        if (!dStr) return alert("Please select a date.");
+
+        const tbody = document.getElementById('flagTableBody');
+        tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-[#D4AF37] font-bold">Fetching Data...</td></tr>';
+        flagDataCache = {};
+
+        try {
+            const [empRes, attRes, flagRes, toRes, itinRes, psoRes, leaveRes] = await Promise.all([
+                fetchSafe(supabaseClient.from('employees').select('emp_id, full_name, division, flexi_range_start')),
+                fetchSafe(supabaseClient.from('attendance_logs').select('emp_id, log_time').gte('log_time', dStr + "T00:00:00").lte('log_time', dStr + "T23:59:59").order('log_time', {ascending: true})),
+                fetchSafe(supabaseClient.from('flag_attendance').select('emp_id, time_in, status').eq('date', dStr)),
+                fetchSafe(supabaseClient.from('travel_orders').select('to_no, emp_id').neq('status', 'CANCELLED')),
+                fetchSafe(supabaseClient.from('itinerary').select('to_no, travel_date, destination, purpose').eq('travel_date', dStr)),
+                fetchSafe(supabaseClient.from('pso_records').select('emp_id, start_date, end_date').lte('start_date', dStr).gte('end_date', dStr)),
+                fetchSafe(supabaseClient.from('leave_ledger').select('emp_id, date, type, transaction_t').in('transaction_t', ['APPROVED', 'PENDING']).eq('date', dStr))
+            ]);
+            const attMap = {};
+            (attRes.data || []).forEach(l => {
+                if (!attMap[l.emp_id]) attMap[l.emp_id] = [];
+                attMap[l.emp_id].push(new Date(l.log_time));
+            });
+
+            const flagMap = {};
+            (flagRes.data || []).forEach(f => {
+                flagMap[f.emp_id] = f;
+            });
+
+            const toMap = {};
+            (itinRes.data || []).forEach(i => {
+                const empsOnTO = (toRes.data || []).filter(t => t.to_no === i.to_no);
+                empsOnTO.forEach(t => {
+                    toMap[t.emp_id] = { destination: i.destination, purpose: i.purpose };
+                });
+            });
+
+            const psoSet = new Set((psoRes.data || []).map(p => p.emp_id));
+            const leaveMap = {};
+            (leaveRes.data || []).forEach(l => leaveMap[l.emp_id] = { type: l.type, status: l.transaction_t });
+
+            const emps = empRes.data || [];
+            const byDiv = {};
+
+            emps.forEach(e => {
+                const div = (e.division || 'UNASSIGNED').toUpperCase();
+                if (!byDiv[div]) byDiv[div] = [];
+
+                
+                let remarks = "";
+                let attLogDisplay = "-";
+                let flagLogDisplay = "-";
+                let toDisplay = toMap[e.emp_id] ? "YES" : "-";
+                let leaveData = leaveMap[e.emp_id];
+                let leaveDisplay = leaveData ? leaveData.type : "-";
+                let psoDisplay = psoSet.has(e.emp_id) ? "YES" : "-";
+                
+                const aLogs = attMap[e.emp_id] || [];
+                const fLog = flagMap[e.emp_id];
+
+                if (aLogs.length > 0) {
+                    attLogDisplay = formatTime12(aLogs[0]);
+                }
+
+                let isFlagAbsent = false;
+
+                if (fLog) {
+                    if (fLog.time_in && fLog.time_in.toUpperCase() !== 'ABSENT') {
+                        flagLogDisplay = formatTime12(new Date(`${dStr}T${fLog.time_in}`));
+                    } else if (fLog.time_in && fLog.time_in.toUpperCase() === 'ABSENT') {
+                        flagLogDisplay = 'ABSENT';
+                        isFlagAbsent = true;
+                    } else if (!fLog.time_in && fLog.status) {
+                        flagLogDisplay = fLog.status;
+                        if (fLog.status.toUpperCase() === 'ABSENT') isFlagAbsent = true;
+                    } else {
+                        flagLogDisplay = "YES";
+                    }
+                }
+
+                let isLate = false;
+                const cutoff = new Date(`${dStr}T08:00:00`); 
+
+                if (aLogs.length > 0 && aLogs[0] > cutoff) isLate = true;
+                if (fLog && fLog.time_in && fLog.time_in.toUpperCase() !== 'ABSENT' && new Date(`${dStr}T${fLog.time_in}`) > cutoff) isLate = true;
+                if (fLog && fLog.status && fLog.status.toUpperCase() === 'LATE') isLate = true;
+
+                if (toDisplay === "YES") {
+                    const tInfo = toMap[e.emp_id];
+                    const dest = tInfo.destination ? tInfo.destination : "N/A";
+                    const purp = tInfo.purpose ? tInfo.purpose : "N/A";
+                    remarks = `ON TRAVEL - ${dest} (${purp})`;
+                } else if (psoDisplay === "YES") {
+                    remarks = "WITH PSO/RSO/SO";
+                } else if (leaveData) {
+                    remarks = leaveData.status === 'PENDING' ? `PENDING LEAVE APPLICATION (${leaveDisplay})` : `ON LEAVE (${leaveDisplay})`;
+                } else {
+                    const attendedFlag = fLog && !isFlagAbsent;
+                    if (attendedFlag && aLogs.length > 0 && !isLate) {
+                        remarks = "Present and Attended Flag Ceremony";
+                    } else if (attendedFlag && aLogs.length > 0 && isLate) {
+                        remarks = "Late and Attended Flag Ceremony";
+                    } else if (!attendedFlag && aLogs.length > 0 && !isLate) {
+                        remarks = "Present but did not attend Flag Ceremony";
+                    } else if (!attendedFlag && aLogs.length > 0 && isLate) {
+                        remarks = "Late and did not attend Flag Ceremony";
+                    } else if (attendedFlag && aLogs.length === 0) {
+                        remarks = "NO ATTENDANCE LOG, ATTENDED FLAG CEREMONY";
+                    } else {
+                        remarks = "ABSENT";
+                    }
+                }
+
+                byDiv[div].push({
+                    name: e.full_name,
+                    attLog: attLogDisplay,
+                    flagLog: flagLogDisplay,
+                    to: toDisplay,
+                    leave: leaveDisplay,
+                    pso: psoDisplay,
+                    remarks: remarks
+                });
+            });
+
+            let html = '';
+            const sortedDivs = Object.keys(byDiv).sort();
+            sortedDivs.forEach(div => {
+                html += `<tr class="bg-[#003811] text-[#D4AF37]"><td colspan="7" class="p-2 font-bold uppercase tracking-widest">${div}</td></tr>`;
+                byDiv[div].sort((a,b) => a.name.localeCompare(b.name)).forEach(r => {
+                    let rmClass = "";
+                    if(r.remarks.includes("Late")) rmClass = "text-orange-600 font-bold";
+                    if(r.remarks === "ABSENT") rmClass = "text-red-600 font-bold italic";
+                    if(r.remarks === "Present and Attended Flag Ceremony") rmClass = "text-green-700 font-bold";
+                    if(r.remarks.includes("did not attend")) rmClass = "text-red-500 font-bold";
+                    if(r.remarks.includes("PENDING LEAVE")) rmClass = "text-yellow-600 font-bold italic";
+
+                    html += `<tr class="hover:bg-gray-50 border-b">
+                        <td class="p-2 font-medium">${r.name}</td>
+                        <td class="p-2 text-center font-mono">${r.attLog}</td>
+                        <td class="p-2 text-center font-mono">${r.flagLog}</td>
+                        <td class="p-2 text-center">${r.to}</td>
+                        <td class="p-2 text-center">${r.leave}</td>
+                        <td class="p-2 text-center">${r.pso}</td>
+                        <td class="p-2 ${rmClass}">${r.remarks}</td>
+                    </tr>`;
+                });
+            });
+
+            tbody.innerHTML = html;
+            flagDataCache = byDiv;
+
+        } catch (error) {
+            tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-red-600">Error: ${error.message}</td></tr>`;
+        }
+    }
+
+    async function printFlagPDF() {
+        if (!flagDataCache || Object.keys(flagDataCache).length === 0) {
+            return alert("Please generate the view first before printing.");
+        }
+        const dStr = document.getElementById('flagDate').value;
+        const formattedDate = new Date(dStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4'); 
+
+        let isFirst = true;
+        for (const div in flagDataCache) {
+            if (!isFirst) doc.addPage();
+            isFirst = false;
+
+            // Updated DAR Formatted Header
+            doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("Republic of the Philippines", 148.5, 15, { align: "center" });
+            doc.setFontSize(12);
+            doc.text("DEPARTMENT OF AGRARIAN REFORM", 148.5, 21, { align: "center" });
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text("Provincial Office of Camarines Sur 1", 148.5, 26, { align: "center" });
+            doc.text("Panganiban Drive, Naga City", 148.5, 30, { align: "center" });
+
+            doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+            doc.text("FLAG CEREMONY ATTENDANCE SUMMARY", 148.5, 40, { align: "center" });
+            doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+            doc.text(`Division/Office: ${div}      Date: ${formattedDate}`, 148.5, 46, { align: "center" });
+
+            let yPos = 55;
+            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+            doc.rect(10, yPos, 70, 6); doc.text("NAME", 45, yPos + 4, { align: "center" });
+            doc.rect(80, yPos, 25, 6); doc.text("ATT LOG", 92.5, yPos + 4, { align: "center" });
+            doc.rect(105, yPos, 25, 6); doc.text("FLAG LOG", 117.5, yPos + 4, { align: "center" });
+            doc.rect(130, yPos, 20, 6); doc.text("T.O.", 140, yPos + 4, { align: "center" });
+            doc.rect(150, yPos, 20, 6); doc.text("LEAVE", 160, yPos + 4, { align: "center" });
+            doc.rect(170, yPos, 20, 6); doc.text("PSO", 180, yPos + 4, { align: "center" });
+            doc.rect(190, yPos, 90, 6); doc.text("REMARKS", 235, yPos + 4, { align: "center" });
+
+            yPos += 6;
+            doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+
+            flagDataCache[div].forEach(r => {
+                doc.rect(10, yPos, 70, 6); doc.text(r.name.substring(0, 45), 12, yPos + 4);
+                doc.rect(80, yPos, 25, 6); doc.text(r.attLog, 92.5, yPos + 4, { align: "center" });
+                doc.rect(105, yPos, 25, 6); doc.text(r.flagLog, 117.5, yPos + 4, { align: "center" });
+                doc.rect(130, yPos, 20, 6); doc.text(r.to, 140, yPos + 4, { align: "center" });
+                doc.rect(150, yPos, 20, 6); doc.text(r.leave, 160, yPos + 4, { align: "center" });
+                doc.rect(170, yPos, 20, 6); doc.text(r.pso, 180, yPos + 4, { align: "center" });
+                doc.rect(190, yPos, 90, 6); doc.text(r.remarks.substring(0, 55), 192, yPos + 4);
+
+                yPos += 6;
+                if (yPos > 180) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+            });
+
+            yPos += 15;
+            doc.text("Certified Correct:", 15, yPos);
+            yPos += 15;
+            doc.text("_______________________", 15, yPos);
+            doc.text("HR Officer Signature", 15, yPos + 5);
+        }
+
+        doc.save(`Flag_Summary_${dStr}.pdf`);
+    }
+
+    // DTR LOG EXTRACTOR TAB
+    // ================================================================
+    (() => {
+        // Reuse the attendance page's existing currentUser session. This tab
+        // does not create or request a second login.
+        const requireActiveAttendanceSession = () => {
+            const activeSession = sessionStorage.getItem('currentUser');
+            if (!activeSession) {
+                window.location.href = 'index.html';
+                throw new Error('Your attendance session is no longer active.');
+            }
+
+            let activeUser;
+            try {
+                activeUser = JSON.parse(activeSession);
+            } catch (error) {
+                window.location.href = 'index.html';
+                throw new Error('Your attendance session is invalid.');
+            }
+
+            if (!String(activeUser.role || '').toUpperCase().includes('HRMO')) {
+                throw new Error('Unauthorized Access. HR personnel only.');
+            }
+            return activeUser;
+        };
+
+        const PAGE_SIZE = 1000;
+        const QUERY_BATCH_SIZE = 150;
+        const QUERY_TIMEOUT_MS = 30000;
+        const state = {
+            hierarchy: {},
+            schedules: {},
+            datLogs: [],
+            employeeDirectory: {},
+            directorySearch: {},
+            resolutions: {},
+            unresolvedIds: new Set(),
+            context: null
+        };
+
+        const escapeHtml = (value) => String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+
+        const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
+
+        const runWithTimeout = (request, label) => {
+            let timer;
+            return Promise.race([
+                Promise.resolve(request),
+                new Promise((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(`${label} timed out. Please check the connection and try again.`)), QUERY_TIMEOUT_MS);
+                })
+            ]).finally(() => clearTimeout(timer));
+        };
+
+        const fetchAllRows = async (table, columns, applyFilters, label = table) => {
+            const rows = [];
+            for (let from = 0; ; from += PAGE_SIZE) {
+                let query = supabaseClient.from(table).select(columns);
+                if (applyFilters) query = applyFilters(query);
+                query = query.range(from, from + PAGE_SIZE - 1);
+
+                const { data, error } = await runWithTimeout(query, label);
+                if (error) throw new Error(`${label}: ${error.message}`);
+                const page = data || [];
+                rows.push(...page);
+                if (page.length < PAGE_SIZE) break;
+                await yieldToBrowser();
+            }
+            return rows;
+        };
+
+        const fetchRowsByValues = async (table, columns, column, values, label) => {
+            const uniqueValues = [...new Set(values.map(value => String(value).trim()).filter(Boolean))];
+            if (!uniqueValues.length) return [];
+
+            const rows = [];
+            for (let i = 0; i < uniqueValues.length; i += QUERY_BATCH_SIZE * 4) {
+                const requests = [];
+                const end = Math.min(i + QUERY_BATCH_SIZE * 4, uniqueValues.length);
+                for (let start = i; start < end; start += QUERY_BATCH_SIZE) {
+                    const batch = uniqueValues.slice(start, start + QUERY_BATCH_SIZE);
+                    requests.push(fetchAllRows(
+                        table,
+                        columns,
+                        query => query.in(column, batch).order('id', { ascending: true }),
+                        `${label} batch ${Math.floor(start / QUERY_BATCH_SIZE) + 1}`
+                    ));
+                }
+                const results = await Promise.all(requests);
+                results.forEach(result => rows.push(...result));
+            }
+            return rows;
+        };
+
+        const normalizeDatTime = (value) => {
+            const match = String(value || '').match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/);
+            return match ? `${match[1]}:${match[2]}:${match[3] || '00'}` : '';
+        };
+
+        const isValidIsoDate = (value) => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+            const [year, month, day] = value.split('-').map(Number);
+            const parsed = new Date(Date.UTC(year, month - 1, day));
+            return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+        };
+
+        const parseDatFile = async (file, targetMonth) => {
+            const logs = [];
+            const seenLogs = new Set();
+            let invalidLines = 0;
+            let otherMonthLines = 0;
+            let duplicateLines = 0;
+            let processedSinceYield = 0;
+
+            const parseLine = (line) => {
+                const cleanLine = line.trim();
+                if (!cleanLine) return;
+                const parts = cleanLine.split(/\s+/);
+                if (parts.length < 5) { invalidLines++; return; }
+
+                const emp_id = String(parts[0]).replace(/^\uFEFF/, '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
+                const date = String(parts[1]).replace(/\//g, '-');
+                const time = normalizeDatTime(parts[2]);
+                if (!date.startsWith(targetMonth)) { otherMonthLines++; return; }
+                if (!emp_id || !isValidIsoDate(date) || !time) { invalidLines++; return; }
+
+                // Remove exact duplicate punches from noisy biometric exports.
+                const cleanKey = `${emp_id}|${date}|${time}`;
+                if (seenLogs.has(cleanKey)) { duplicateLines++; return; }
+                seenLogs.add(cleanKey);
+
+                logs.push({
+                    emp_id,
+                    raw_emp_id: emp_id,
+                    date,
+                    time,
+                    device_id: String(parts[3]).trim(),
+                    status: String(parts[4]).trim(),
+                    sourceIndex: logs.length
+                });
+            };
+
+            if (file.stream && typeof TextDecoderStream !== 'undefined') {
+                const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader();
+                let remainder = '';
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const lines = (remainder + value).split(/\r?\n/);
+                    remainder = lines.pop() || '';
+                    lines.forEach(parseLine);
+                    processedSinceYield += lines.length;
+                    if (processedSinceYield >= 5000) {
+                        processedSinceYield = 0;
+                        await yieldToBrowser();
+                    }
+                }
+                if (remainder.trim()) parseLine(remainder);
+            } else {
+                const content = await runWithTimeout(file.text(), 'DAT file reading');
+                const lines = content.split(/\r?\n/);
+                for (let i = 0; i < lines.length; i++) {
+                    parseLine(lines[i]);
+                    if (i > 0 && i % 5000 === 0) await yieldToBrowser();
+                }
+            }
+            logs.sort((a, b) => a.emp_id.localeCompare(b.emp_id) || a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+            logs.forEach((log, sourceIndex) => { log.sourceIndex = sourceIndex; });
+            return { logs, invalidLines, otherMonthLines, duplicateLines };
+        };
+
+        const getDatesInRange = (startDate, endDate) => {
+            const start = new Date(`${startDate}T00:00:00Z`);
+            const end = new Date(`${endDate}T00:00:00Z`);
+            const dates = [];
+            while (start <= end) {
+                dates.push(start.toISOString().slice(0, 10));
+                start.setUTCDate(start.getUTCDate() + 1);
+            }
+            return dates;
+        };
+
+        const isSpecialWorkingDay = (holiday) => {
+            const classification = `${holiday?.type || ''} ${holiday?.description || ''}`
+                .trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+            return classification.includes('SPECIAL WORKING') && !classification.includes('NON WORKING');
+        };
+
+        const showExtractorAlert = (message, type = 'error') => {
+            const box = document.getElementById('extractorAlertBox');
+            box.style.display = 'block';
+            box.className = type === 'success'
+                ? 'extractor-alert extractor-alert-success'
+                : 'extractor-alert extractor-alert-error';
+            box.innerHTML = `<strong>${type === 'success' ? 'Success:' : 'Notice:'}</strong> ${escapeHtml(message)}`;
+        };
+
+        const ensureDay = (division, empId, fullName, date, employeeMeta = {}) => {
+            if (!state.hierarchy[division]) state.hierarchy[division] = {};
+            if (!state.hierarchy[division][empId]) {
+                state.hierarchy[division][empId] = { full_name: fullName, ...employeeMeta, dates: {} };
+            }
+            if (!state.hierarchy[division][empId].dates[date]) {
+                state.hierarchy[division][empId].dates[date] = { logs: [], to: null, pso: null, holidays: [] };
+            }
+        };
+
+        const scheduleForDate = (empId, date) => {
+            const schedules = [...(state.schedules.ALL || []), ...(state.schedules[empId] || [])];
+            const target = new Date(`${date}T00:00:00Z`);
+            return schedules.find(schedule => {
+                const start = schedule.start_date ? new Date(`${String(schedule.start_date).slice(0,10)}T00:00:00Z`) : new Date('2000-01-01T00:00:00Z');
+                const end = schedule.end_date ? new Date(`${String(schedule.end_date).slice(0,10)}T00:00:00Z`) : new Date('2100-01-01T00:00:00Z');
+                return target >= start && target <= end;
+            });
+        };
+
+        const rebuildExtractorHierarchy = () => {
+            state.hierarchy = {};
+            state.unresolvedIds = new Set();
+            if (!state.context) return;
+
+            const participants = {};
+            state.datLogs.forEach(log => {
+                const rawEmpId = String(log.raw_emp_id || log.emp_id || '').trim();
+                const resolvedEmpId = state.employeeDirectory[rawEmpId]
+                    ? rawEmpId
+                    : state.resolutions[rawEmpId];
+                const employee = resolvedEmpId ? state.employeeDirectory[resolvedEmpId] : null;
+                const internalEmpId = employee ? resolvedEmpId : `UNIDENTIFIED::${rawEmpId}`;
+                const division = employee ? employee.division : 'UNIDENTIFIED EMPLOYEE NUMBERS';
+                const fullName = employee ? employee.full_name : 'UNIDENTIFIED EMPLOYEE';
+                const employeeMeta = employee
+                    ? { effective_emp_id: resolvedEmpId, isUnidentified: false }
+                    : { effective_emp_id: '', isUnidentified: true, raw_emp_id: rawEmpId };
+
+                if (!employee) state.unresolvedIds.add(rawEmpId);
+                participants[internalEmpId] = { division, fullName, employeeMeta };
+                ensureDay(division, internalEmpId, fullName, log.date, employeeMeta);
+                state.hierarchy[division][internalEmpId].dates[log.date].logs.push(log);
+            });
+
+            Object.entries(participants).forEach(([internalEmpId, participant]) => {
+                const effectiveEmpId = participant.employeeMeta.effective_emp_id;
+                for (let day = 1; day <= state.context.daysInMonth; day++) {
+                    const date = `${state.context.targetMonth}-${String(day).padStart(2, '0')}`;
+                    ensureDay(participant.division, internalEmpId, participant.fullName, date, participant.employeeMeta);
+                    const dayData = state.hierarchy[participant.division][internalEmpId].dates[date];
+                    if (effectiveEmpId) {
+                        dayData.to = state.context.toLookup[`${effectiveEmpId}_${date}`] || null;
+                        dayData.pso = (state.context.psoLookup[`${effectiveEmpId}_${date}`] || []).join('; ') || null;
+                    }
+                    dayData.holidays = state.context.holidayLookup[date] || [];
+                }
+            });
+        };
+
+        const inferPunchSlots = (logs, expectedStatuses) => {
+            const sorted = [...logs].sort((a, b) => a.time.localeCompare(b.time));
+            const slots = [null, null, null, null];
+            const usedLogs = new Set();
+
+            const assign = (slotIndex, log) => {
+                if (slots[slotIndex] || !log || usedLogs.has(log)) return;
+                slots[slotIndex] = {
+                    time: log.time,
+                    device_id: log.device_id,
+                    status: expectedStatuses[slotIndex],
+                    sourceIndex: log.sourceIndex
+                };
+                usedLogs.add(log);
+            };
+
+            const beforeLunch = sorted.filter(log => log.time.slice(0, 5) < '12:00');
+            const lunchRange = sorted.filter(log => {
+                const hhmm = log.time.slice(0, 5);
+                return hhmm >= '12:00' && hhmm <= '13:00';
+            });
+            const afterLunch = sorted.filter(log => log.time.slice(0, 5) > '13:00');
+
+            assign(0, beforeLunch[0]);
+
+            if (lunchRange.length >= 2) {
+                assign(1, lunchRange[0]);
+                assign(2, lunchRange[lunchRange.length - 1]);
+            } else if (lunchRange.length === 1) {
+                assign(lunchRange[0].time.slice(0, 5) < '12:30' ? 1 : 2, lunchRange[0]);
+            }
+
+            if (!slots[1] && beforeLunch.length > 1 && lunchRange.length === 0) {
+                assign(1, beforeLunch[beforeLunch.length - 1]);
+            }
+
+            if (afterLunch.length >= 2) {
+                assign(2, afterLunch[0]);
+                assign(3, afterLunch[afterLunch.length - 1]);
+            } else if (afterLunch.length === 1) {
+                const slotIndex = afterLunch[0].time.slice(0, 5) >= '15:00' ? 3 : 2;
+                assign(slotIndex, afterLunch[0]);
+            }
+
+            return slots.map((slot, slotIndex) => slot || {
+                time: '',
+                device_id: 'Manual',
+                status: expectedStatuses[slotIndex]
+            });
+        };
+
+        const buildRemarks = (slots, toInfo, psoInfo, holidayInfo, isWeekend, isCompressedFriday, isNoWorkFriday, rawPunchCount = 0) => {
+            const marks = [];
+            const filled = slots.filter(slot => slot?.time).length;
+            const selectedTimes = slots.map(slot => slot?.time).filter(Boolean);
+            const hasDuplicateSelection = new Set(selectedTimes).size !== selectedTimes.length;
+            const travelOrders = Array.isArray(toInfo) ? toInfo : (toInfo ? [toInfo] : []);
+            const holidays = Array.isArray(holidayInfo) ? holidayInfo : (holidayInfo ? [holidayInfo] : []);
+            const nonWorkingHolidays = holidays.filter(holiday => !isSpecialWorkingDay(holiday));
+            const isExcused = isWeekend || isCompressedFriday || isNoWorkFriday || travelOrders.length > 0 || Boolean(psoInfo) || nonWorkingHolidays.length > 0;
+
+            if (isWeekend) marks.push('<span class="extractor-status extractor-status-gray">WEEKEND</span>');
+            else if (isNoWorkFriday) marks.push('<span class="extractor-status extractor-status-gray">FRIDAY - NO WORK</span>');
+            else if (isCompressedFriday) marks.push('<span class="extractor-status extractor-status-gray">FRIDAY (Compressed)</span>');
+
+            if (rawPunchCount > 4) {
+                marks.push(`<span class="extractor-status extractor-status-amber">${rawPunchCount} PUNCHES - SELECT THE CORRECT FOUR</span>`);
+            } else if (rawPunchCount > 0 && rawPunchCount < 4) {
+                marks.push(`<span class="extractor-status extractor-status-amber">${rawPunchCount} PUNCHES - ASSIGN LOGS AND ENTER MISSING TIME</span>`);
+            }
+            if (hasDuplicateSelection) {
+                marks.push('<span class="extractor-status extractor-status-red">DUPLICATE TIME SELECTED</span>');
+            }
+
+            const withinLunchRange = (time) => {
+                const hhmm = String(time || '').slice(0, 5);
+                return hhmm >= '12:00' && hhmm <= '13:00';
+            };
+            if (slots[1]?.time && !withinLunchRange(slots[1].time)) {
+                marks.push('<span class="extractor-status extractor-status-amber">CHECK LUNCH OUT (12:00–1:00)</span>');
+            }
+            if (slots[2]?.time && !withinLunchRange(slots[2].time)) {
+                marks.push('<span class="extractor-status extractor-status-amber">CHECK AFTERNOON IN (12:00–1:00)</span>');
+            }
+
+            holidays.forEach(holiday => {
+                const working = isSpecialWorkingDay(holiday);
+                const details = [holiday.type, holiday.coverage].filter(Boolean).map(escapeHtml).join(' | ');
+                marks.push(`<span class="extractor-status ${working ? 'extractor-status-amber' : 'extractor-status-purple'}">${working ? 'SPECIAL WORKING DAY' : 'HOLIDAY'}: ${escapeHtml(holiday.description)}${details ? ` (${details})` : ''}</span>`);
+            });
+
+            if (filled === 4 && !hasDuplicateSelection) marks.push('<span class="extractor-status extractor-status-green">COMPLETE</span>');
+            else if (filled === 0 && !isExcused) marks.push('<span class="extractor-status extractor-status-red">ABSENT / NO PUNCHES</span>');
+            else if (filled > 0 && filled < 4 && !isExcused) marks.push(`<span class="extractor-status extractor-status-red">MISSING (${4 - filled})</span>`);
+            else if (filled > 0 && filled < 4) marks.push(`<span class="extractor-status extractor-status-gray">PARTIAL PUNCHES (${filled}/4)</span>`);
+
+            travelOrders.forEach(to => {
+                const status = String(to.status || '').trim();
+                const normalized = status.toUpperCase();
+                const green = ['APPROVED', 'COMPLETED', 'POSTED', 'RELEASED'].includes(normalized);
+                const purpose = to.purpose ? ` | ${escapeHtml(to.purpose)}` : '';
+                marks.push(`<span class="extractor-status ${green ? 'extractor-status-green' : 'extractor-status-amber'}">TO ${escapeHtml(to.to_no)} ${escapeHtml(status)} - ${escapeHtml(to.destination)}${purpose}</span>`);
+            });
+
+            if (psoInfo) marks.push(`<span class="extractor-status extractor-status-blue">PSO: ${escapeHtml(psoInfo)}</span>`);
+            return marks.join(' ');
+        };
+
+        const renderExtractorTable = async () => {
+            const tbody = document.getElementById('extractorPreviewBody');
+            tbody.innerHTML = '';
+
+            const expectedStatuses = ['0', '2', '3', '1']; // IN, OUT, IN, OUT
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const employeeList = [];
+            let processedDays = 0;
+
+            state.directorySearch = {};
+            const directoryOptions = Object.entries(state.employeeDirectory)
+                .sort((a, b) => String(a[1].full_name || '').localeCompare(String(b[1].full_name || '')))
+                .map(([empId, employee]) => {
+                    const label = `${employee.full_name} — ${empId} — ${employee.division}`;
+                    state.directorySearch[label.trim().toLowerCase()] = empId;
+                    state.directorySearch[String(empId).trim().toLowerCase()] = empId;
+                    return `<option value="${escapeHtml(label)}"></option>`;
+                }).join('');
+            document.getElementById('extractorEmployeeDirectoryOptions').innerHTML = directoryOptions;
+
+            Object.entries(state.hierarchy).forEach(([division, employees]) => {
+                Object.entries(employees).forEach(([empId, employee]) => {
+                    employeeList.push({ division, empId, employee });
+                });
+            });
+            employeeList.sort((a, b) =>
+                String(a.division).localeCompare(String(b.division)) ||
+                String(a.employee.full_name || '').localeCompare(String(b.employee.full_name || ''))
+            );
+
+            let html = '';
+            let lastDivision = null;
+            for (let employeeIndex = 0; employeeIndex < employeeList.length; employeeIndex++) {
+                const { division, empId, employee } = employeeList[employeeIndex];
+                const effectiveEmpId = employee.effective_emp_id || '';
+                if (division !== lastDivision) {
+                    html += `<div class="extractor-division-heading">DIVISION: ${escapeHtml(division)}</div>`;
+                    lastDivision = division;
+                }
+
+                const displayName = employee.isUnidentified ? 'UNIDENTIFIED EMPLOYEE' : employee.full_name;
+                const displayEmpId = employee.isUnidentified ? employee.raw_emp_id : (effectiveEmpId || empId);
+                const shouldOpen = employeeIndex === 0 || employee.isUnidentified ? 'open' : '';
+                html += `<details class="extractor-month-card" ${shouldOpen}>
+                    <summary>
+                        <span>${escapeHtml(displayName)} <span class="text-xs font-normal text-gray-500">(${escapeHtml(displayEmpId)})</span></span>
+                        <span class="text-xs font-normal">${escapeHtml(state.context.targetMonth)} MONTHLY DTR</span>
+                    </summary>
+                    <div class="extractor-table-wrap">
+                        <table class="extractor-table">
+                            <thead><tr>
+                                <th style="width:110px;">Date</th><th style="width:100px;">Day</th>
+                                <th>AM In</th><th>AM Out</th><th>PM In</th><th>PM Out</th>
+                                <th style="width:390px;">Remarks</th>
+                            </tr></thead><tbody>`;
+
+                if (employee.isUnidentified) {
+                    html += `<tr class="extractor-name-row">
+                        <td colspan="7">
+                            <span class="text-[11px] tracking-widest">NAME:</span>
+                            <span class="extractor-unidentified">UNIDENTIFIED EMPLOYEE</span>
+                            <span class="text-xs font-normal text-red-700 ml-2">(BIOMETRIC ID: ${escapeHtml(employee.raw_emp_id)})</span>
+                            <input type="search" list="extractorEmployeeDirectoryOptions"
+                                class="extractor-employee-locator" data-raw-emp="${escapeHtml(employee.raw_emp_id)}"
+                                placeholder="TYPE EMPLOYEE NAME OR EMPLOYEE NUMBER…" autocomplete="off">
+                        </td>
+                    </tr>`;
+                } else {
+                    html += `<tr class="extractor-name-row"><td colspan="7"><span class="text-[11px] tracking-widest">NAME:</span> ${escapeHtml(employee.full_name)} <span class="text-xs font-normal text-gray-500 ml-2">(EMP ID: ${escapeHtml(effectiveEmpId || empId)})</span></td></tr>`;
+                }
+
+                for (const date of Object.keys(employee.dates).sort()) {
+                    const dayData = employee.dates[date];
+                    const dateObject = new Date(`${date}T00:00:00Z`);
+                    const dayOfWeek = dateObject.getUTCDay();
+                    const dayName = dayNames[dayOfWeek];
+                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                    const activeSchedule = effectiveEmpId ? scheduleForDate(effectiveEmpId, date) : null;
+                    const workingDays = String(activeSchedule?.working_days || 'Monday,Tuesday,Wednesday,Thursday,Friday').toLowerCase();
+                    const hasFriday = workingDays.includes('fri');
+                    const compressed = String(activeSchedule?.schedule_type || '').toUpperCase().includes('COMPRESSED') || workingDays.includes('4-day') || workingDays.includes('4 day');
+                    const isCompressedFriday = dayOfWeek === 5 && !hasFriday && compressed;
+                    const isNoWorkFriday = dayOfWeek === 5 && !hasFriday && !compressed;
+
+                    const cleanLogs = [...dayData.logs]
+                        .filter(log => normalizeDatTime(log.time))
+                        .sort((a, b) => a.time.localeCompare(b.time))
+                        .filter((log, index, logs) => index === 0 || log.time !== logs[index - 1].time);
+                    const hasRedundantPunches = cleanLogs.length > 4;
+                    const slots = inferPunchSlots(cleanLogs, expectedStatuses);
+                    const requiresHrReview = cleanLogs.length !== 4 || slots.some(slot => !slot.time);
+
+                    const filled = slots.filter(slot => slot.time).length;
+                    const hasTo = Array.isArray(dayData.to) ? dayData.to.length > 0 : Boolean(dayData.to);
+                    const hasPso = Boolean(dayData.pso);
+                    const hasNonWorkingHoliday = (dayData.holidays || []).some(holiday => !isSpecialWorkingDay(holiday));
+                    const canManualInput = requiresHrReview && !employee.isUnidentified && !hasTo && !hasPso && !hasNonWorkingHoliday && !isWeekend && !isCompressedFriday && !isNoWorkFriday;
+                    const dataEmpId = effectiveEmpId || employee.raw_emp_id || empId;
+
+                    const renderedSlots = slots.map((slot, slotIndex) => {
+                        const hasDatSource = Number.isInteger(slot.sourceIndex);
+                        const lunchLimits = canManualInput && (slotIndex === 1 || slotIndex === 2)
+                            ? 'min="12:00" max="13:00" title="HR manual lunch entry: 12:00–1:00 PM"'
+                            : '';
+
+                        if (requiresHrReview) {
+                            const options = cleanLogs.map(log =>
+                                `<option value="${escapeHtml(log.time)}" data-device="${escapeHtml(log.device_id)}" data-source-index="${log.sourceIndex}" ${log.sourceIndex === slot.sourceIndex ? 'selected' : ''}>${escapeHtml(log.time)} — Device ${escapeHtml(log.device_id)}</option>`
+                            ).join('');
+                            const manualState = canManualInput ? '' : 'readonly';
+                            const pickerState = employee.isUnidentified ? 'disabled' : '';
+                            return `<div class="extractor-slot-editor">
+                                <select class="extractor-punch-picker" ${pickerState} title="Assign a biometric punch to this DTR slot">
+                                    <option value="">MANUAL / LEAVE BLANK</option>${options}
+                                </select>
+                                <input type="time" step="1" class="extractor-time-input ${!hasDatSource && canManualInput ? 'extractor-manual-entry' : ''}"
+                                    data-division="${escapeHtml(division)}" data-internal-emp="${escapeHtml(empId)}"
+                                    data-emp="${escapeHtml(dataEmpId)}" data-date="${date}"
+                                    data-device="${escapeHtml(slot.device_id)}" data-status="${expectedStatuses[slotIndex]}"
+                                    data-source-index="${slot.sourceIndex ?? ''}" data-original="${escapeHtml(slot.time)}"
+                                    value="${escapeHtml(slot.time)}" ${lunchLimits} ${manualState}>
+                            </div>`;
+                        }
+
+                        return `<input type="time" step="1" class="extractor-time-input"
+                            data-division="${escapeHtml(division)}" data-internal-emp="${escapeHtml(empId)}"
+                            data-emp="${escapeHtml(dataEmpId)}" data-date="${date}"
+                            data-device="${escapeHtml(slot.device_id)}" data-status="${expectedStatuses[slotIndex]}"
+                            data-source-index="${slot.sourceIndex ?? ''}" data-original="${escapeHtml(slot.time)}"
+                            value="${escapeHtml(slot.time)}" readonly>`;
+                    });
+
+                    let rowClass = '';
+                    if (hasRedundantPunches) rowClass = 'extractor-issue-row';
+                    else if (hasNonWorkingHoliday) rowClass = 'extractor-holiday-row';
+                    else if (isWeekend || isCompressedFriday || isNoWorkFriday) rowClass = 'extractor-weekend-row';
+                    else if (filled < 4 && !hasTo && !hasPso) rowClass = 'extractor-issue-row';
+
+                    const remarks = buildRemarks(slots, dayData.to, dayData.pso, dayData.holidays, isWeekend, isCompressedFriday, isNoWorkFriday, cleanLogs.length);
+                    html += `<tr class="${rowClass}" data-is-weekend="${isWeekend}" data-is-compressed="${isCompressedFriday}" data-is-no-work="${isNoWorkFriday}" data-is-non-working-holiday="${hasNonWorkingHoliday}" data-raw-count="${cleanLogs.length}">
+                        <td><strong>${date}</strong></td><td>${dayName}</td>
+                        <td>${renderedSlots[0]}</td><td>${renderedSlots[1]}</td><td>${renderedSlots[2]}</td><td>${renderedSlots[3]}</td>
+                        <td class="extractor-remarks-cell">${remarks}</td></tr>`;
+                    processedDays++;
+                }
+
+                html += `</tbody></table></div></details>`;
+
+                if ((employeeIndex + 1) % 20 === 0) {
+                    tbody.insertAdjacentHTML('beforeend', html);
+                    html = '';
+                    await yieldToBrowser();
+                }
+            }
+            if (html) tbody.insertAdjacentHTML('beforeend', html);
+
+            tbody.onchange = async (event) => {
+                let input = event.target;
+
+                if (input.matches('.extractor-employee-locator')) {
+                    const rawEmpId = input.dataset.rawEmp;
+                    const searchValue = String(input.value || '').trim();
+                    const selectedEmpId = state.directorySearch[searchValue.toLowerCase()];
+                    if (!selectedEmpId || !state.employeeDirectory[selectedEmpId]) {
+                        showExtractorAlert('Select an employee from the search results using the employee name or employee number.');
+                        input.focus();
+                        return;
+                    }
+                    state.resolutions[rawEmpId] = selectedEmpId;
+                    rebuildExtractorHierarchy();
+                    await renderExtractorTable();
+                    showExtractorAlert(`Biometric ID ${rawEmpId} was matched to ${state.employeeDirectory[selectedEmpId].full_name} (${selectedEmpId}).`, 'success');
+                    return;
+                }
+
+                if (input.matches('.extractor-punch-picker')) {
+                    const timeInput = input.closest('.extractor-slot-editor')?.querySelector('.extractor-time-input');
+                    if (!timeInput) return;
+                    const selectedOption = input.options[input.selectedIndex];
+                    timeInput.value = input.value;
+                    timeInput.dataset.sourceIndex = selectedOption?.dataset.sourceIndex || '';
+                    timeInput.dataset.device = selectedOption?.dataset.device || 'Manual';
+                    input = timeInput;
+                }
+
+                if (!input.matches('.extractor-time-input')) return;
+                const sourcePicker = input.closest('.extractor-slot-editor')?.querySelector('.extractor-punch-picker');
+                if (sourcePicker && sourcePicker.value !== input.value) {
+                    sourcePicker.value = '';
+                    input.dataset.sourceIndex = '';
+                    input.dataset.device = 'Manual';
+                }
+                const row = input.closest('tr');
+                const dayData = state.hierarchy[input.dataset.division]?.[input.dataset.internalEmp]?.dates?.[input.dataset.date];
+                if (!dayData) return;
+
+                input.classList.toggle('extractor-manual-entry', input.value !== input.dataset.original);
+                const rowSlots = Array.from(row.querySelectorAll('.extractor-time-input')).map(field => ({ time: field.value }));
+                const isWeekend = row.dataset.isWeekend === 'true';
+                const isCompressed = row.dataset.isCompressed === 'true';
+                const isNoWork = row.dataset.isNoWork === 'true';
+                const isNonWorkingHoliday = row.dataset.isNonWorkingHoliday === 'true';
+                const rawCount = Number(row.dataset.rawCount || 0);
+
+                row.querySelector('.extractor-remarks-cell').innerHTML = buildRemarks(rowSlots, dayData.to, dayData.pso, dayData.holidays, isWeekend, isCompressed, isNoWork, rawCount);
+
+                const filled = rowSlots.filter(slot => slot.time).length;
+                const hasTo = Array.isArray(dayData.to) ? dayData.to.length > 0 : Boolean(dayData.to);
+                const chosenTimes = rowSlots.map(slot => slot.time).filter(Boolean);
+                const hasDuplicateSelection = new Set(chosenTimes).size !== chosenTimes.length;
+                if (rawCount > 4 || hasDuplicateSelection) row.className = 'extractor-issue-row';
+                else if (isNonWorkingHoliday) row.className = 'extractor-holiday-row';
+                else if (isWeekend || isCompressed || isNoWork) row.className = 'extractor-weekend-row';
+                else if (filled < 4 && !hasTo && !dayData.pso) row.className = 'extractor-issue-row';
+                else row.className = '';
+            };
+
+            document.getElementById('extractorLogCount').textContent = `${processedDays} DTR day record(s) mapped.`;
+            document.getElementById('extractorTableWrapper').style.display = 'block';
+            const action = document.getElementById('extractorUploadAction');
+            action.classList.remove('hidden');
+            action.style.display = 'flex';
+
+            if (state.unresolvedIds.size) {
+                showExtractorAlert(`${state.unresolvedIds.size} unidentified biometric employee number(s) are shown below. Locate each employee before posting.`);
+            } else {
+                document.getElementById('extractorAlertBox').style.display = 'none';
+            }
+        };
+
+        document.getElementById('extractorParseBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('extractorFileInput');
+            const button = document.getElementById('extractorParseBtn');
+            const targetMonth = document.getElementById('extractorTargetMonth').value;
+
+            if (!fileInput.files.length) return showExtractorAlert('Please select a .dat file first.');
+            if (!/^\d{4}-\d{2}$/.test(targetMonth)) return showExtractorAlert('Please select a valid target month.');
+
+            button.disabled = true;
+            button.textContent = 'VERIFYING SESSION...';
+            state.hierarchy = {};
+            state.schedules = {};
+            state.datLogs = [];
+            state.employeeDirectory = {};
+            state.directorySearch = {};
+            state.resolutions = {};
+            state.unresolvedIds = new Set();
+            state.context = null;
+            document.getElementById('extractorTableWrapper').style.display = 'none';
+            document.getElementById('extractorUploadAction').style.display = 'none';
+
+            try {
+                await requireActiveAttendanceSession();
+                const [year, month] = targetMonth.split('-').map(Number);
+                const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+                const monthStart = `${targetMonth}-01`;
+                const monthEnd = `${targetMonth}-${String(daysInMonth).padStart(2, '0')}`;
+
+                button.textContent = 'READING DAT FILE...';
+                const parsed = await parseDatFile(fileInput.files[0], targetMonth);
+                const datEmpIds = [...new Set(parsed.logs.map(log => log.emp_id))];
+                if (!datEmpIds.length) throw new Error(`No valid biometric logs were found for ${targetMonth}.`);
+
+                button.textContent = 'CHECKING TO, ITINERARY, PSO & HOLIDAYS...';
+                const [matchedEmployees, darpoEmployees, travelOrders, itineraries, psos, holidays, schedules] = await Promise.all([
+                    fetchRowsByValues('employees', 'emp_id,full_name,division,station', 'emp_id', datEmpIds, 'Employees'),
+                    fetchAllRows('employees', 'emp_id,full_name,division,station', query => query.eq('station', 'DARPO-CS1').order('id', { ascending: true }), 'DARPO-CS1 employee directory'),
+                    fetchAllRows('travel_orders', 'to_no,emp_id,status', query => query.order('id', { ascending: true }), 'Travel Orders'),
+                    fetchAllRows('itinerary', 'to_no,travel_date,destination,purpose', query => query.like('travel_date', `${targetMonth}%`).order('id', { ascending: true }), 'Travel Order itineraries'),
+                    fetchAllRows('pso_records', 'pso_no,emp_id,start_date,end_date,subject,status', query => query.lte('start_date', monthEnd).gte('end_date', monthStart).order('id', { ascending: true }), 'PSO records'),
+                    fetchAllRows('holidays', 'date,description,type,coverage', query => query.like('date', `${targetMonth}%`).order('id', { ascending: true }), 'Holidays'),
+                    fetchAllRows('schedule_overrides', 'emp_id,start_date,end_date,schedule_type,working_days', query => query.order('id', { ascending: true }), 'Schedule overrides')
+                ]);
+
+                const matchedEmployeeMap = {};
+                matchedEmployees.forEach(employee => {
+                    const empId = String(employee.emp_id || '').trim();
+                    if (empId) matchedEmployeeMap[empId] = employee;
+                });
+
+                [...darpoEmployees, ...matchedEmployees].forEach(employee => {
+                    const empId = String(employee.emp_id || '').trim();
+                    if (empId && String(employee.station || '').trim().toUpperCase() === 'DARPO-CS1') {
+                        state.employeeDirectory[empId] = {
+                            full_name: employee.full_name || empId,
+                            division: employee.division || 'UNASSIGNED',
+                            station: 'DARPO-CS1'
+                        };
+                    }
+                });
+
+                const unknownEmpIds = new Set(datEmpIds.filter(empId => !matchedEmployeeMap[empId]));
+                const eligibleEmpIds = new Set(datEmpIds.filter(empId => state.employeeDirectory[empId]));
+                const wrongStationIds = new Set(datEmpIds.filter(empId => matchedEmployeeMap[empId] && !state.employeeDirectory[empId]));
+
+                state.datLogs = parsed.logs
+                    .filter(log => eligibleEmpIds.has(log.emp_id) || unknownEmpIds.has(log.emp_id))
+                    .map((log, sourceIndex) => ({ ...log, sourceIndex }));
+
+                if (!state.datLogs.length) {
+                    throw new Error(`No DARPO-CS1 or unidentified employee logs were found for ${targetMonth}.`);
+                }
+
+                const employeeMap = state.employeeDirectory;
+
+                schedules.forEach(schedule => {
+                    const empId = String(schedule.emp_id || '').trim();
+                    if (empId !== 'ALL' && !employeeMap[empId]) return;
+                    if (!state.schedules[empId]) state.schedules[empId] = [];
+                    state.schedules[empId].push(schedule);
+                });
+
+                const psoLookup = {};
+                psos.forEach(pso => {
+                    const status = String(pso.status || '').trim().toUpperCase();
+                    if (!pso.start_date || !pso.end_date || ['CANCELLED', 'CANCELED', 'REJECTED'].includes(status)) return;
+                    const start = String(pso.start_date).slice(0, 10) < monthStart ? monthStart : String(pso.start_date).slice(0, 10);
+                    const end = String(pso.end_date).slice(0, 10) > monthEnd ? monthEnd : String(pso.end_date).slice(0, 10);
+                    String(pso.emp_id || '').split(',').map(value => value.trim()).filter(value => employeeMap[value]).forEach(empId => {
+                        getDatesInRange(start, end).forEach(date => {
+                            const key = `${empId}_${date}`;
+                            if (!psoLookup[key]) psoLookup[key] = [];
+                            const label = [pso.pso_no, pso.subject].filter(Boolean).join(' - ') || 'Official PSO';
+                            if (!psoLookup[key].includes(label)) psoLookup[key].push(label);
+                        });
+                    });
+                });
+
+                const holidayLookup = {};
+                holidays.forEach(holiday => {
+                    const date = String(holiday.date || '').slice(0, 10);
+                    if (!date.startsWith(targetMonth)) return;
+                    if (!holidayLookup[date]) holidayLookup[date] = [];
+                    const item = { description: holiday.description || 'Holiday', type: holiday.type || '', coverage: holiday.coverage || '' };
+                    const signature = JSON.stringify(item);
+                    if (!holidayLookup[date].some(existing => JSON.stringify(existing) === signature)) holidayLookup[date].push(item);
+                });
+
+                const excludedStatuses = new Set(['CANCELLED', 'CANCELED', 'UNAPPROVED', 'NOT APPROVED', 'DISAPPROVED', 'REJECTED']);
+                const travelOrderReference = {};
+                travelOrders.forEach(travelOrder => {
+                    const status = String(travelOrder.status || '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+                    const toNo = String(travelOrder.to_no || '').trim();
+                    if (!toNo || excludedStatuses.has(status)) return;
+                    const employeeIds = String(travelOrder.emp_id || '').split(',').map(value => value.trim()).filter(value => employeeMap[value]);
+                    if (!employeeIds.length) return;
+                    if (!travelOrderReference[toNo]) travelOrderReference[toNo] = [];
+                    travelOrderReference[toNo].push({ to_no: toNo, status: travelOrder.status || '', employeeIds });
+                });
+
+                const toLookup = {};
+                itineraries.forEach(itinerary => {
+                    const toNo = String(itinerary.to_no || '').trim();
+                    const travelDate = String(itinerary.travel_date || '').slice(0, 10);
+                    if (!travelDate.startsWith(targetMonth)) return;
+                    (travelOrderReference[toNo] || []).forEach(parent => {
+                        parent.employeeIds.forEach(empId => {
+                            const key = `${empId}_${travelDate}`;
+                            if (!toLookup[key]) toLookup[key] = [];
+                            const mapped = {
+                                to_no: parent.to_no,
+                                status: parent.status,
+                                destination: itinerary.destination || 'No destination indicated',
+                                purpose: itinerary.purpose || ''
+                            };
+                            const signature = JSON.stringify(mapped);
+                            if (!toLookup[key].some(existing => JSON.stringify(existing) === signature)) toLookup[key].push(mapped);
+                        });
+                    });
+                });
+
+                state.context = { targetMonth, daysInMonth, toLookup, psoLookup, holidayLookup };
+                rebuildExtractorHierarchy();
+
+                const knownCount = eligibleEmpIds.size;
+                const unknownCount = unknownEmpIds.size;
+                const skippedCount = wrongStationIds.size;
+                document.getElementById('extractorCurrentMonthLabel').textContent = `${knownCount} DARPO-CS1 employee(s), ${unknownCount} unidentified biometric ID(s) for ${targetMonth}${skippedCount ? `; ${skippedCount} non-DARPO employee ID(s) excluded` : ''}.`;
+                await renderExtractorTable();
+                const ignored = parsed.invalidLines + parsed.otherMonthLines + parsed.duplicateLines;
+                if (ignored && !state.unresolvedIds.size) {
+                    showExtractorAlert(`DTR View generated. ${parsed.invalidLines} invalid, ${parsed.otherMonthLines} out-of-month, and ${parsed.duplicateLines} duplicate line(s) were safely removed.`, 'success');
+                }
+            } catch (error) {
+                console.error('Extractor error:', error);
+                showExtractorAlert(error.message || 'The extractor could not complete the request.');
+            } finally {
+                button.disabled = false;
+                button.textContent = 'EXTRACT & CHECK';
+            }
+        });
+
+        document.getElementById('extractorUploadBtn').addEventListener('click', () => {
+            document.getElementById('extractorAuthPass').value = '';
+            document.getElementById('modalExtractorAuth').classList.remove('hidden');
+        });
+
+        document.getElementById('btnSubmitExtractorAuth').addEventListener('click', async () => {
+            const pass = document.getElementById('extractorAuthPass').value;
+            if (!pass) return alert("HR Password required to post data.");
+
+            const authBtn = document.getElementById('btnSubmitExtractorAuth');
+            authBtn.disabled = true;
+            authBtn.textContent = 'VERIFYING...';
+
+            try {
+                const { data: u, error } = await supabaseClient.from('users').select('password').eq('username', currentUser.username).single();
+                if (error || !u) throw new Error("Authentication failed.");
+                if (u.password !== pass) throw new Error("Invalid Password.");
+
+                closeModal('modalExtractorAuth');
+
+                const button = document.getElementById('extractorUploadBtn');
+                button.disabled = true;
+                button.textContent = 'POSTING...';
+                
+                const verifiedProfile = await requireActiveAttendanceSession();
+                const nowIso = new Date().toISOString();
+                if (state.unresolvedIds.size) {
+                    throw new Error(`Please locate all ${state.unresolvedIds.size} unidentified biometric employee number(s) before posting.`);
+                }
+
+                const payload = [];
+                const selectedPunches = new Set();
+                document.querySelectorAll('#extractorPreviewBody .extractor-time-input').forEach(input => {
+                    let time = input.value;
+                    if (!time) return;
+                    if (time && time.length === 5) time += ':00';
+                    const selectedOption = input.tagName === 'SELECT' ? input.options[input.selectedIndex] : null;
+                    const sourceIndex = selectedOption?.dataset.sourceIndex ?? input.dataset.sourceIndex;
+                    const hasSource = sourceIndex !== '' && Number.isInteger(Number(sourceIndex));
+                    const cleanEmpId = String(input.dataset.emp || '').trim();
+                    const cleanDate = String(input.dataset.date || '').trim();
+                    const cleanTime = normalizeDatTime(time);
+                    if (!cleanEmpId || !isValidIsoDate(cleanDate) || !cleanTime) return;
+
+                    const selectionKey = `${cleanEmpId}|${cleanDate}|${cleanTime}`;
+                    if (selectedPunches.has(selectionKey)) {
+                        throw new Error(`Duplicate time ${cleanTime} was selected for employee ${cleanEmpId} on ${cleanDate}.`);
+                    }
+                    selectedPunches.add(selectionKey);
+
+                    payload.push({
+                        emp_id: cleanEmpId,
+                        log_time: `${cleanDate} ${cleanTime}`,
+                        device_id: hasSource ? (selectedOption?.dataset.device || input.dataset.device || 'Biometric') : 'Manual',
+                        status: String(input.dataset.status || '').trim(),
+                        manual_log_name: hasSource ? null : currentUser.username,
+                        manual_log_date: hasSource ? null : nowIso
+                    });
+                });
+
+                const finalPayload = payload.sort((a, b) =>
+                    a.emp_id.localeCompare(b.emp_id) || a.log_time.localeCompare(b.log_time)
+                );
+                if (!finalPayload.length) throw new Error('No actual time punches were found to post.');
+
+                const batchSize = 1000;
+                for (let index = 0; index < finalPayload.length; index += batchSize) {
+                    const batch = finalPayload.slice(index, index + batchSize);
+                    button.textContent = `POSTING ${Math.min(index + batch.length, finalPayload.length)} OF ${finalPayload.length}...`;
+                    const { error: insErr } = await runWithTimeout(
+                        supabaseClient.from('attendance_logs').insert(batch),
+                        `Attendance upload batch ${Math.floor(index / batchSize) + 1}`
+                    );
+                    if (insErr) throw insErr;
+                    await yieldToBrowser();
+                }
+
+                showExtractorAlert(`${finalPayload.length} attendance log(s) were posted by ${verifiedProfile.full_name || verifiedProfile.username}.`, 'success');
+                state.hierarchy = {};
+                state.schedules = {};
+                state.datLogs = [];
+                state.employeeDirectory = {};
+                state.directorySearch = {};
+                state.resolutions = {};
+                state.unresolvedIds = new Set();
+                state.context = null;
+                document.getElementById('extractorFileInput').value = '';
+                document.getElementById('extractorTableWrapper').style.display = 'none';
+                document.getElementById('extractorUploadAction').style.display = 'none';
+            } catch (error) {
+                console.error('Extractor upload error:', error);
+                showExtractorAlert(error.message || 'The attendance logs could not be posted.');
+            } finally {
+                authBtn.disabled = false;
+                authBtn.textContent = 'AUTHORIZE & POST';
+                const button = document.getElementById('extractorUploadBtn');
+                button.disabled = false;
+                button.textContent = 'POST EXTRACTED LOGS';
+            }
+        });
+    })();
+</script>
+</body>
+</html>
