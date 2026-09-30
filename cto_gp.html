@@ -181,7 +181,10 @@
 
                 <div class="card">
                     <div class="p-4 border-b border-gray-200 bg-gray-50 flex gap-4 justify-between items-center">
-                        <h3 class="font-bold text-[#003811]">Process Encoded CTO</h3>
+                        <div>
+                            <h3 class="font-bold text-[#003811]">Process CTO Credits</h3>
+                            <p class="text-[11px] text-gray-500 mt-1">Employee-submitted CTO credit requests are not yet credited. Require the hard-copy supporting documents before processing.</p>
+                        </div>
                         <button onclick="loadCtoProcessing()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded shadow">Refresh</button>
                     </div>
                     <div class="overflow-x-auto">
@@ -756,6 +759,51 @@
         }
     }
 
+    // CTO SCHEDULE HELPERS
+    // schedule_override is the current schedule source. schedule_overrides is kept
+    // only as a compatibility fallback. Employee-specific rows take priority over ALL.
+    async function getCtoScheduleOverride(empId, dateStr) {
+        const columns = 'emp_id, start_date, end_date, start_time, end_time, schedule_type';
+        const runQuery = async (tableName) => await supabaseClient.from(tableName)
+            .select(columns)
+            .in('emp_id', [empId, 'ALL'])
+            .lte('start_date', dateStr)
+            .gte('end_date', dateStr)
+            .order('start_date', { ascending: false });
+
+        let result = await runQuery('schedule_override');
+        if (result.error) result = await runQuery('schedule_overrides');
+        if (result.error) {
+            console.warn('Unable to read schedule override. Using standard schedule fallback:', result.error.message);
+            return null;
+        }
+
+        const rows = result.data || [];
+        return rows.find(s => String(s.emp_id) === String(empId))
+            || rows.find(s => String(s.emp_id || '').toUpperCase() === 'ALL')
+            || null;
+    }
+
+    function isCompressedCtoSchedule(override) {
+        if (!override || String(override.schedule_type || '').toUpperCase() !== 'FIXED') return false;
+        return String(override.start_time || '').substring(0,5) === '07:00'
+            && String(override.end_time || '').substring(0,5) === '18:00';
+    }
+
+    function getCtoScheduledHours(override) {
+        if (!override || String(override.schedule_type || '').toUpperCase() !== 'FIXED' || !override.start_time || !override.end_time) return 8;
+        const toMins = (t) => {
+            const p = String(t).split(':');
+            return (parseInt(p[0],10) || 0) * 60 + (parseInt(p[1],10) || 0);
+        };
+        const start = toMins(override.start_time);
+        const end = toMins(override.end_time);
+        if (end <= start) return 8;
+        const lunchOverlap = Math.max(0, Math.min(end, 13*60) - Math.max(start, 12*60));
+        const mins = (end - start) - lunchOverlap;
+        return mins > 0 ? mins / 60 : 8;
+    }
+
     async function loadCtoProcessing() {
         const list = document.getElementById('cto-process-list');
         list.innerHTML = `<tr><td colspan="6" class="table-td text-center text-gray-500">Loading...</td></tr>`;
@@ -779,24 +827,42 @@
                 const multValue = parseFloat(r.multiplier) || 1.0;
                 const isWeekend = multValue > 1.0;
                 
+                const isEmployeeRequest = r.remarks === 'FOR HR PROCESSING';
+                const isForProcessing = r.remarks === 'ENCODED' || isEmployeeRequest;
+
                 let sCls = 'bg-gray-100 text-gray-800';
+                if(isEmployeeRequest) sCls = 'bg-amber-100 text-amber-800';
                 if(r.remarks === 'PROCESSED') sCls = 'bg-blue-100 text-blue-800';
                 if(r.remarks === 'POSTED') sCls = 'bg-green-100 text-green-800';
                 
                 let creditableCell = '';
                 let actionCell = '';
                 
-                if(r.remarks === 'ENCODED') {
+                if(isForProcessing) {
                     creditableCell = `
                         <div class="flex items-center gap-2 justify-center">
                             <input type="number" step="0.1" id="baseHr_${r.id}" class="border rounded px-2 py-1 w-20 text-center text-sm bg-white" value="${parseFloat(r.base_hours) || 0}" oninput="calcCtoCredited('${r.id}', ${multValue})">
                             <button onclick="fetchLogsForCTOProcess('${r.id}', '${r.emp_id}', '${r.date}', ${isWeekend})" class="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 rounded shadow">Check DTR</button>
                         </div>
                     `;
-                    actionCell = `
-                        <button onclick="processCTO('${r.id}')" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mb-1">Process</button>
-                        <button onclick="deleteCTO('${r.id}')" class="text-red-600 text-xs hover:underline block mx-auto mt-1">Delete</button>
-                    `;
+
+                    if(isEmployeeRequest) {
+                        actionCell = `
+                            <div class="mb-2 p-2 bg-amber-50 border border-amber-200 rounded text-left">
+                                <label class="flex items-start gap-2 text-[10px] font-bold text-amber-900 cursor-pointer leading-tight">
+                                    <input type="checkbox" id="hardcopy_${r.id}" class="mt-0.5 w-4 h-4 accent-[#003811]">
+                                    <span>HARD COPY supporting documents received by HR</span>
+                                </label>
+                            </div>
+                            <button onclick="processCTO('${r.id}', true)" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mb-1">Process</button>
+                            <button onclick="deleteCTO('${r.id}')" class="text-red-600 text-xs hover:underline block mx-auto mt-1">Delete</button>
+                        `;
+                    } else {
+                        actionCell = `
+                            <button onclick="processCTO('${r.id}', false)" class="bg-[#003811] text-white text-xs px-3 py-1 rounded hover:bg-[#002200] shadow mb-1">Process</button>
+                            <button onclick="deleteCTO('${r.id}')" class="text-red-600 text-xs hover:underline block mx-auto mt-1">Delete</button>
+                        `;
+                    }
                 } else {
                     creditableCell = `<div class="text-center font-bold">${parseFloat(r.base_hours) || 0}</div>`;
                     if(r.remarks === 'PROCESSED') {
@@ -821,7 +887,7 @@
                         </td>
                         <td class="table-td">${creditableCell}</td>
                         <td class="table-td text-center font-bold text-[#003811]" id="credHr_${r.id}">${parseFloat(r.calculated_hours) || 0}</td>
-                        <td class="table-td text-center flex justify-center"><span class="badge ${sCls}">${r.remarks || 'ENCODED'}</span></td>
+                        <td class="table-td text-center flex justify-center"><span class="badge ${sCls}">${isEmployeeRequest ? 'FOR HR PROCESSING' : (r.remarks || 'ENCODED')}</span></td>
                         <td class="table-td text-center">${actionCell}</td>
                     </tr>
                 `;
@@ -865,43 +931,40 @@
             
             const firstLog = new Date(logs[0].log_time.substring(0, 19));
             const lastLog = new Date(logs[logs.length-1].log_time.substring(0, 19));
+            const schedule = await getCtoScheduleOverride(emp_id, dateStr);
+            const day = new Date(dateStr + 'T00:00:00').getDay();
+            const isCwwFriday = isCompressedCtoSchedule(schedule) && day === 5;
+            const isRestDay = !!isWeekend || day === 0 || day === 6 || isCwwFriday;
+            const effectiveMultiplier = isRestDay ? 1.5 : 1.0;
             let creditableHours = 0;
-            
-            const { data: sched } = await supabaseClient.from('schedule_overrides')
-                .select('*')
-                .eq('emp_id', emp_id)
-                .lte('start_date', dateStr)
-                .gte('end_date', dateStr)
-                .order('created_at', { ascending: false })
-                .limit(1);
-                
-            let endTimeStr = "17:00"; 
-            let isHalfDay = false;
-            
-            if(sched && sched.length > 0 && sched[0].end_time) {
-                endTimeStr = sched[0].end_time.substring(0,5);
-                if(endTimeStr === "12:00") isHalfDay = true;
-            } else {
-                const empInfo = empDataMap[emp_id];
-                if(empInfo && empInfo.flexi_range_end) endTimeStr = empInfo.flexi_range_end.substring(0,5);
-            }
 
-            if(isWeekend && !isHalfDay) {
-                creditableHours = (lastLog - firstLog) / (1000 * 60 * 60);
-                if(creditableHours > 5) creditableHours -= 1; // Basic 1 hr lunch deduction logic if prolonged
+            if (isRestDay) {
+                // Rest day / CWW Friday: actual worked hours are creditable.
+                // Deduct only the actual overlap with the 12:00-13:00 lunch period.
+                let workedMs = Math.max(0, lastLog - firstLog);
+                const lunchStart = new Date(`${dateStr}T12:00:00`);
+                const lunchEnd = new Date(`${dateStr}T13:00:00`);
+                const overlapMs = Math.max(0, Math.min(lastLog, lunchEnd) - Math.max(firstLog, lunchStart));
+                workedMs -= overlapMs;
+                creditableHours = Math.max(0, workedMs / (1000 * 60 * 60));
             } else {
-                // If schedule ends early (e.g., half day at 12:00), account for 1hr lunch break from 12-1
-                let schedEnd = new Date(`${dateStr}T${endTimeStr}:00`);
-                if (isHalfDay) {
-                    schedEnd = new Date(`${dateStr}T13:00:00`); 
+                // Working day: credit begins after the applicable schedule end time.
+                let endTimeStr = schedule?.end_time ? String(schedule.end_time).substring(0,5) : '';
+                if (!endTimeStr) {
+                    const empInfo = empDataMap[emp_id];
+                    if(empInfo && empInfo.flexi_range_end) endTimeStr = String(empInfo.flexi_range_end).substring(0,5);
                 }
-                
-                if(lastLog > schedEnd) {
-                    creditableHours = (lastLog - schedEnd) / (1000 * 60 * 60);
-                }
+                if (!endTimeStr) endTimeStr = '17:00';
+
+                const schedEnd = new Date(`${dateStr}T${endTimeStr}:00`);
+                if(lastLog > schedEnd) creditableHours = (lastLog - schedEnd) / (1000 * 60 * 60);
             }
             
             const numEl = document.getElementById(`baseHr_${recordId}`);
+            if (!numEl) return;
+            numEl.dataset.ctoMultiplier = String(effectiveMultiplier);
+            numEl.dataset.scheduleHours = String(getCtoScheduledHours(schedule));
+
             if(creditableHours > 0 && creditableHours < 2) {
                 alert(`Calculated excess time is ${creditableHours.toFixed(2)} hours. (Must be 2 hours or more to be creditable). Outputting raw value for HR review. You may also enter the hours manually.`);
                 numEl.value = creditableHours.toFixed(2);
@@ -911,35 +974,50 @@
                 numEl.value = creditableHours.toFixed(2);
             }
             
-            // Trigger the auto-calculation
-            calcCtoCredited(recordId, isWeekend ? 1.5 : 1.0);
+            // CTO is always credited in HOURS. CWW Friday is automatically a rest day.
+            calcCtoCredited(recordId, effectiveMultiplier);
             
         } catch(e) {
             alert("Error fetching logs: " + e.message);
         }
     }
 
-    window.processCTO = async function(id) {
+    window.processCTO = async function(id, requireHardCopy = false) {
+        if (requireHardCopy) {
+            const hardCopyEl = document.getElementById(`hardcopy_${id}`);
+            if (!hardCopyEl || !hardCopyEl.checked) {
+                alert('HARD COPY REQUIRED. Confirm that the employee has submitted the supporting documents to HR before processing this CTO credit request.');
+                return;
+            }
+        }
+
         const baseHrEl = document.getElementById(`baseHr_${id}`);
         const credHrEl = document.getElementById(`credHr_${id}`);
         let baseHr = parseFloat(baseHrEl.value) || 0;
         let credHr = parseFloat(credHrEl.innerText) || 0;
+        const resolvedMultiplier = parseFloat(baseHrEl.dataset.ctoMultiplier || '') || null;
 
         if (baseHr > 0 && baseHr < 2) {
             alert("Creditable hours must be 2 or more to be processed for CTO.");
             return;
         }
 
-        if(!confirm(`Process this CTO with ${credHr.toFixed(2)} credited hours?`)) return;
+        const confirmMessage = requireHardCopy
+            ? `Hard copy received. Process this CTO request with ${credHr.toFixed(2)} credited hours? The hours will then be included in the employee's CTO balance.`
+            : `Process this CTO with ${credHr.toFixed(2)} credited hours?`;
+        if(!confirm(confirmMessage)) return;
 
         try {
-            await supabaseClient.from('cto_records').update({
+            const updatePayload = {
                 base_hours: String(baseHr),
                 calculated_hours: String(credHr),
                 remarks: 'PROCESSED'
-            }).eq('id', id);
+            };
+            if (resolvedMultiplier) updatePayload.multiplier = String(resolvedMultiplier);
+
+            await supabaseClient.from('cto_records').update(updatePayload).eq('id', id);
             
-            alert('CTO Processed successfully. It will now be ready for posting in the Leave Processing page.');
+            alert("CTO processed successfully. The credited hours are now included in the employee\'s CTO balance.");
             loadCtoProcessing();
         } catch(e) {
             alert("Error: " + e.message);
