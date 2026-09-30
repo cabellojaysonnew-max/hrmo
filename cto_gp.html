@@ -1025,12 +1025,15 @@
 
         try {
             const updatePayload = {
+                // Every CTO credit processed by HR must be an EARNED record so the
+                // employee portal can immediately include it in the available balance.
+                transaction_type: 'EARNED',
                 base_hours: String(baseHr),
                 calculated_hours: String(credHr),
                 // IMPORTANT: PROCESSED is the final CTO earning status.
                 // The employee portal automatically computes:
-                // opening cto_balance + EARNED/PROCESSED calculated_hours - USED hours.
-                // Do NOT change this earned record to POSTED.
+                // opening cto_balance + credited EARNED calculated_hours - USED hours.
+                // Do NOT require a second posting step.
                 remarks: 'PROCESSED'
             };
             if (resolvedMultiplier) updatePayload.multiplier = String(resolvedMultiplier);
